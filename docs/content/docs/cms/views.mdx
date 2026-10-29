@@ -152,7 +152,7 @@ export const Orders = defineView({
 });
 ```
 
-A column holding a choice shows the label of its option, so a `role` of `admin` reads Admin. Until the view names `filters` or `sorts`, `list` receives the search alone, and the admin sorts and pages the records it returns.
+A column is headed by its field's `label`, or its name written out. A choice shows the label of its option, so a `role` of `admin` reads Admin, and a date shows as one, so `z.iso.datetime()` reads 28 Oct 2026, 09:42. Until the view names `filters` or `sorts`, `list` receives the search alone, and the admin sorts and pages the records it returns.
 
 The page arranges its fields with the same [layout](/docs/cms/fields#layout) as a collection: tabs, rows, collapsible sections and the sidebar.
 

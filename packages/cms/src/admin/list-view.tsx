@@ -29,7 +29,7 @@ const EITHER = new Intl.ListFormat('en', {
  * What the search box says it looks in, like "Search by name or email".
  */
 export const viewSearchPlaceholder = (view: ViewSummary): string =>
-    view.search.length === 0 ? 'Search' : `Search by ${EITHER.format(view.search.map((field) => columnLabel(field).toLowerCase()))}`;
+    view.search.length === 0 ? 'Search' : `Search by ${EITHER.format(view.search.map((field) => columnLabel(view, field).toLowerCase()))}`;
 
 /**
  * A view's records, as its `list` returns them for what the editor searched,

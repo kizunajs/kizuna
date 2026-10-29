@@ -225,4 +225,27 @@ describe('views in the admin', () => {
         ]);
         expect(viewColumnsOf(appUsers).every((column) => column.sortable === undefined)).toBe(true);
     });
+
+    it("heads a column with its field's label, and shows a date column as one", () => {
+        const labelled: ViewSummary = {
+            ...appUsers,
+            columns: ['email', 'role'],
+            search: ['name', 'email'],
+            labels: {
+                email: 'Email address',
+                signedUpAt: 'Signed up',
+            },
+            formats: {
+                signedUpAt: 'date-time',
+            },
+            sorts: ['signedUpAt'],
+        };
+        expect(viewColumnsOf(labelled).map((column) => [column.key, column.label, column.format])).toEqual([
+            ['name', 'Name', undefined],
+            ['email', 'Email address', undefined],
+            ['role', 'Role', undefined],
+            ['signedUpAt', 'Signed up', 'date-time'],
+        ]);
+        expect(searchPlaceholder(labelled)).toBe('Search name, email address');
+    });
 });

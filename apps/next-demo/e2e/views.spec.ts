@@ -26,6 +26,40 @@ test.describe('a view that filters and sorts on the server', () => {
         await signInToAdmin(page);
     });
 
+    test("heads App users' columns with their labels and shows when each signed up as a date", async ({ page }) => {
+        await page.goto('/admin#/views/appUsers');
+        await expect(
+            page.getByRole('link', {
+                name: 'Edda Editor',
+            })
+        ).toBeVisible();
+        await expect(
+            page.getByRole('columnheader', {
+                name: 'Signed up',
+            })
+        ).toBeVisible();
+        await expect(
+            page
+                .getByRole('cell', {
+                    name: /^\d{1,2} [A-Z][a-z]{2} \d{4}, \d{2}:\d{2}$/,
+                })
+                .first()
+        ).toBeVisible();
+        await expect(
+            page.getByRole('cell', {
+                name: /\d{4}-\d{2}-\d{2}T/,
+            })
+        ).toHaveCount(0);
+        await expect(
+            page
+                .getByRole('cell', {
+                    name: 'Admin',
+                    exact: true,
+                })
+                .first()
+        ).toBeVisible();
+    });
+
     test('filters App users by role and sorts them by name or sign-up date', async ({ page }) => {
         await page.goto('/admin#/views/appUsers');
         await expect(
@@ -85,7 +119,7 @@ test.describe('a view that filters and sorts on the server', () => {
             .click();
         await page
             .getByRole('menuitemradio', {
-                name: 'Signed up at',
+                name: 'Signed up',
             })
             .click();
         await expect.poll(() => titles(page)).toEqual(['Kizuna Dev', 'Ada Admin']);

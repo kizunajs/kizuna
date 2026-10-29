@@ -2,9 +2,8 @@ import { useMemo, useState, type CSSProperties, type DragEvent, type ReactNode }
 import { Checkbox } from '@base-ui/react/checkbox';
 import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, ChevronsUpDown, Minus } from 'lucide-react';
 import { ICON } from '../view/context.js';
-import { dateTimeOf, nextSort, type ListColumn, type ListRow, type Sort } from './list-columns.js';
+import { columnText, dateTimeOf, nextSort, type ListColumn, type ListRow, type Sort } from './list-columns.js';
 import { treeLinesOf, type TreePlace } from './list-tree.js';
-import { cellText } from './views.js';
 
 /**
  * The rows ticked for the selection's actions, by ref.
@@ -190,7 +189,7 @@ function Cell({ row, column, options, lead }: { row: ListRow; column: ListColumn
                 options.nameOf(row.updatedBy)
             )
         ) : (
-            cellText(row.values?.[column.key])
+            columnText(row.values?.[column.key], column.format)
         );
     return <td data-kind={column.kind}>{content}</td>;
 }

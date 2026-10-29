@@ -3,6 +3,8 @@ import {
     DOCUMENT_COLUMNS,
     NEWEST_FIRST,
     collectionColumnsOf,
+    columnText,
+    dateOf,
     dateTimeOf,
     fieldValuesOf,
     nextSort,
@@ -128,6 +130,18 @@ describe('the columns of a list', () => {
     it('says when a row changed with the day, the year and the time', () => {
         expect(dateTimeOf(new Date(2026, 9, 28, 9, 42).toISOString())).toBe('28 Oct 2026, 09:42');
         expect(dateTimeOf(null)).toBe('');
+    });
+
+    it('shows a date as its day and a date and time as the list shows Updated', () => {
+        const signedUpAt = new Date(2026, 9, 28, 9, 42).toISOString();
+        expect(dateOf('2026-10-28')).toBe('28 Oct 2026');
+        expect(columnText('2026-10-28', 'date')).toBe('28 Oct 2026');
+        expect(columnText(signedUpAt, 'date-time')).toBe('28 Oct 2026, 09:42');
+        expect(columnText(['2026-10-28', '2026-11-02'], 'date')).toBe('28 Oct 2026, 2 Nov 2026');
+        expect(columnText('soon', 'date')).toBe('soon');
+        expect(columnText(null, 'date-time')).toBe('');
+        expect(columnText(signedUpAt, undefined)).toBe(signedUpAt);
+        expect(columnText(true, undefined)).toBe('Yes');
     });
 
     it('offers the fields of a collection as columns, sorting by its indexes alone', () => {

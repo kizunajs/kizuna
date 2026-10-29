@@ -61,6 +61,14 @@ export const ViewSummarySchema = Kizuna.model({
         options: z
             .record(z.string(), z.record(z.string(), z.string()))
             .describe('For each column holding a choice, the label editors see for each value, like Admin for admin.'),
+        labels: z
+            .record(z.string(), z.string())
+            .describe(
+                'For each column and field the search looks in whose field declares a `label`, that label, like Signed up for signedUpAt.'
+            ),
+        formats: z
+            .record(z.string(), z.enum(['date', 'date-time']))
+            .describe('For each column holding a date or a date and time, its JSON Schema `format`, so the list shows it as one.'),
         search: z.array(z.string()).describe('The fields the search box looks in.'),
         filters: z.array(ViewFilterSchema).describe('The fields the list filters by.'),
         sorts: z.array(z.string()).describe('The fields the list sorts by.'),
@@ -376,6 +384,34 @@ const columnOptionsOf = (view: View): Record<string, Record<string, string>> =>
         })
     );
 
+/**
+ * The label of each column, and of each field the search looks in, whose
+ * field declares one.
+ */
+const columnLabelsOf = (view: View): Record<string, string> =>
+    Object.fromEntries(
+        [...new Set([...listedOf(view), ...(view.search ?? [])])].flatMap((column) => {
+            const label = fieldOf(view, column)?.label;
+            return label === undefined ? [] : [[column, label]];
+        })
+    );
+
+/**
+ * The `format` of each column holding a date or a date and time, read from
+ * the JSON Schema of the value, or of each entry of a list.
+ */
+const columnFormatsOf = (
+    view: View,
+    jsonSchemaOf: (schema: z.core.$ZodType) => Record<string, unknown>
+): Record<string, 'date' | 'date-time'> =>
+    Object.fromEntries(
+        listedOf(view).flatMap((column) => {
+            const field = fieldOf(view, column);
+            const format = field === undefined ? undefined : jsonSchemaOf(entrySchemaOf(field.schema)).format;
+            return format === 'date' || format === 'date-time' ? [[column, format]] : [];
+        })
+    );
+
 const EITHER = new Intl.ListFormat('en', {
     type: 'disjunction',
 });
@@ -581,6 +617,8 @@ export const listViewsRoute = (input: ViewRouteInput) =>
                             title: titleFieldOf(view),
                             columns: [...(view.columns ?? [titleFieldOf(view)])],
                             options: columnOptionsOf(view),
+                            labels: columnLabelsOf(view),
+                            formats: columnFormatsOf(view, (schema) => cms.fieldJsonSchema(schema)),
                             search: [...(view.search ?? [])],
                             filters: filtersOf(view, (schema) => cms.referenceBrandOf(schema)),
                             sorts: [...(view.sorts ?? [])],

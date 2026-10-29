@@ -1,7 +1,7 @@
 import { humanize, type DescribedField, type DescribedLayout } from '../view/schema.js';
 import { toolSegment, type AdminCall, type AvailableAction } from './actions.js';
 import type { ListFilter } from './config.js';
-import type { ListColumn, Sort } from './list-columns.js';
+import type { ColumnFormat, ListColumn, Sort } from './list-columns.js';
 
 /**
  * A view as the editing routes list it.
@@ -18,6 +18,15 @@ export interface ViewSummary {
      * For each column holding a choice, the label of each value.
      */
     options?: Record<string, Record<string, string>>;
+    /**
+     * For each column and searched field whose field declares a `label`,
+     * that label.
+     */
+    labels?: Record<string, string>;
+    /**
+     * For each column holding a date, or a date and time, its format.
+     */
+    formats?: Record<string, ColumnFormat>;
     search: string[];
     /**
      * The fields its `list` filters by, with the values a condition may name.
@@ -143,9 +152,23 @@ export const hiddenSortsOf = (view: ViewSummary): string[] => {
 };
 
 /**
- * A column's heading.
+ * A column's heading: its field's `label`, or its name written out.
  */
-export const columnLabel = (column: string): string => (column === 'id' ? 'ID' : humanize(column));
+export const columnLabel = (view: ViewSummary, column: string): string =>
+    view.labels?.[column] ?? (column === 'id' ? 'ID' : humanize(column));
+
+/**
+ * The format of a column holding a date, or a date and time, as the column
+ * carries it.
+ */
+const formatOf = (view: ViewSummary, column: string): Pick<ListColumn, 'format'> => {
+    const format = view.formats?.[column];
+    return format === undefined
+        ? {}
+        : {
+              format,
+          };
+};
 
 /**
  * The columns of a view's list: the title and `columns`, then each field of
@@ -159,8 +182,9 @@ export const viewColumnsOf = (view: ViewSummary): ListColumn[] => {
         ...columnsOf(view).map(
             (column, index): ListColumn => ({
                 key: column,
-                label: columnLabel(column),
+                label: columnLabel(view, column),
                 kind: index === 0 ? 'title' : 'text',
+                ...formatOf(view, column),
                 shown: true,
                 fixed: index === 0,
                 ...(serves
@@ -173,8 +197,9 @@ export const viewColumnsOf = (view: ViewSummary): ListColumn[] => {
         ...hiddenSortsOf(view).map(
             (column): ListColumn => ({
                 key: column,
-                label: columnLabel(column),
+                label: columnLabel(view, column),
                 kind: 'text',
+                ...formatOf(view, column),
                 shown: false,
                 sortable: true,
             })
@@ -186,7 +211,7 @@ export const viewColumnsOf = (view: ViewSummary): ListColumn[] => {
  * What the search box says it looks in.
  */
 export const searchPlaceholder = (view: ViewSummary): string =>
-    view.search.length === 0 ? 'Search' : `Search ${view.search.map((field) => columnLabel(field).toLowerCase()).join(', ')}`;
+    view.search.length === 0 ? 'Search' : `Search ${view.search.map((field) => columnLabel(view, field).toLowerCase()).join(', ')}`;
 
 /**
  * A record's values with each choice read as the label of its option, so a

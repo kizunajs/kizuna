@@ -8,6 +8,12 @@ import { cellText } from './views.js';
  */
 export type ColumnKind = 'title' | 'status' | 'date' | 'person' | 'text';
 
+/**
+ * The JSON Schema `format` of a text column holding a date, or a date and
+ * time.
+ */
+export type ColumnFormat = 'date' | 'date-time';
+
 export interface ListColumn {
     key: string;
     label: string;
@@ -25,6 +31,10 @@ export interface ListColumn {
      * alone, and never by who saved an item.
      */
     sortable?: boolean;
+    /**
+     * Shown as a date, or a date and time, rather than as the string it is.
+     */
+    format?: ColumnFormat;
 }
 
 /**
@@ -305,6 +315,35 @@ export const dateTimeOf = (iso: string | null | undefined): string => {
     if (iso === null || iso === undefined) return '';
     const date = new Date(iso);
     return Number.isNaN(date.getTime()) ? '' : DATE_TIME.format(date);
+};
+
+const DATE = new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+});
+
+/**
+ * A day, as a list cell says it: "28 Oct 2026". A date holds no time of day,
+ * so it reads the same in every time zone.
+ */
+export const dateOf = (iso: string | null | undefined): string => {
+    if (iso === null || iso === undefined) return '';
+    const date = new Date(iso);
+    return Number.isNaN(date.getTime()) ? '' : DATE.format(date);
+};
+
+/**
+ * A value as one cell of a text column shows it, a date or a date and time
+ * as one where the column says so.
+ */
+export const columnText = (value: unknown, format: ColumnFormat | undefined): string => {
+    if (format === undefined) return cellText(value);
+    if (Array.isArray(value)) return value.map((entry) => columnText(entry, format)).join(', ');
+    if (typeof value !== 'string') return cellText(value);
+    const shown = format === 'date' ? dateOf(value) : dateTimeOf(value);
+    return shown === '' ? value : shown;
 };
 
 /**

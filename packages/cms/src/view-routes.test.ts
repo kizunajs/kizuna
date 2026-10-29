@@ -143,12 +143,19 @@ const ProductReviews = defineView({
             name: 'status',
             schema: z.enum(['pending', 'approved', 'rejected']),
         },
+        {
+            name: 'postedAt',
+            label: 'Posted',
+            schema: z.iso.datetime().optional(),
+        },
     ],
+    columns: ['text', 'postedAt'],
     list: () => [
         {
             id: 'review_1',
             text: 'Lovely',
             status: 'pending',
+            postedAt: '2026-10-28T09:42:00.000Z',
         },
     ],
     get: ({ id }) =>
@@ -157,6 +164,7 @@ const ProductReviews = defineView({
                   id,
                   text: 'Lovely',
                   status: 'pending',
+                  postedAt: '2026-10-28T09:42:00.000Z',
               }
             : undefined,
     actions: {
@@ -335,6 +343,8 @@ describe('listing views', () => {
                         pro: 'Pro',
                     },
                 },
+                labels: {},
+                formats: {},
                 search: ['name', 'email'],
                 filters: [],
                 sorts: [],
@@ -347,8 +357,14 @@ describe('listing views', () => {
                 label: 'Product reviews',
                 group: null,
                 title: 'text',
-                columns: ['text'],
+                columns: ['text', 'postedAt'],
                 options: {},
+                labels: {
+                    postedAt: 'Posted',
+                },
+                formats: {
+                    postedAt: 'date-time',
+                },
                 search: [],
                 filters: [],
                 sorts: [],
@@ -409,6 +425,16 @@ describe('listing views', () => {
                 free: 'Free',
                 pro: 'Pro',
             },
+        });
+    });
+
+    it('names the label of each column whose field declares one, and the format of each holding a date', async () => {
+        const [, members] = (await as('admin', request(app).get('/editing/views'))).body.views;
+        expect(members.labels).toEqual({
+            plan: 'Plan',
+        });
+        expect(members.formats).toEqual({
+            joinedOn: 'date',
         });
     });
 });
