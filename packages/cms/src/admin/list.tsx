@@ -17,6 +17,9 @@ import {
     countOf,
     pageOf,
     pagesAround,
+    collectionColumnsOf,
+    fieldValuesOf,
+    orderOf,
     readChosenColumns,
     saveChosenColumns,
     shownColumnsOf,
@@ -24,7 +27,7 @@ import {
     type ListColumn,
     type Sort,
 } from './list-columns.js';
-import { NO_FILTERS, activeConditions, filterItems, isFiltering, itemQueriesOf, queryKeyOf, type Filters } from './list-filters.js';
+import { NO_FILTERS, activeConditions, filterEntriesOf, isFiltering, type Filters } from './list-filters.js';
 import { EmptyTable, FlatRows, TreeRows, type TableOptions, type TreeRow } from './list-rows.js';
 import { ColumnsPanel, ListToolbar, SortMenu, type ListPanel } from './list-toolbar.js';
 import { parentAfterDrop, parentChange, type TreePlace } from './list-tree.js';
@@ -54,6 +57,44 @@ interface OwnSearch {
     onQuery: (query: string) => void;
     placeholder: string;
 }
+
+/**
+ * A list whose server searches, filters, sorts and pages the rows, so it
+ * shows them as they arrive and asks again for another page or order.
+ */
+export interface ServerList {
+    sort: Sort | undefined;
+    onSort: (sort: Sort | undefined) => void;
+    page: number;
+    onPage: (page: number) => void;
+    perPage: number;
+    onPerPage: (perPage: number) => void;
+    /**
+     * How many rows the search and filters keep, on every page together.
+     */
+    matching: number;
+    /**
+     * Every row the search and filters keep, for Select all.
+     */
+    selectAll: () => Promise<Array<{ ref: string; title: string }>>;
+}
+
+/**
+ * Where one page the server sent sits among every row it keeps.
+ */
+const serverPageOf = <Row,>(
+    rows: readonly Row[],
+    server: ServerList
+): { rows: Row[]; page: number; pageCount: number; first: number; last: number } => {
+    const start = server.page * server.perPage;
+    return {
+        rows: [...rows],
+        page: server.page,
+        pageCount: Math.max(1, Math.ceil(server.matching / server.perPage)),
+        first: rows.length === 0 ? 0 : start + 1,
+        last: start + rows.length,
+    };
+};
 
 /**
  * Every page holds at least this many rows, so a list no longer than this has
@@ -191,6 +232,8 @@ export function ListScreen({
     bulk,
     filters,
     search,
+    server,
+    drafts: draftCount,
     tree,
     above,
     facts = [],
@@ -243,6 +286,15 @@ export function ListScreen({
      * paths itself.
      */
     search?: OwnSearch | undefined;
+    /**
+     * The server that searches, sorts and pages the rows, when the list holds
+     * only the page it shows.
+     */
+    server?: ServerList | undefined;
+    /**
+     * How many rows are drafts, when they arrive a page at a time.
+     */
+    drafts?: number | undefined;
     tree?:
         | {
               onMove: (dragged: TreePlace, target: TreePlace | null) => void;
@@ -264,12 +316,20 @@ export function ListScreen({
         columns: `${panelId}-columns`,
     };
     const [ownQuery, setOwnQuery] = useState('');
-    const [page, setPage] = useState(0);
-    const [perPage, setPerPage] = useState(PAGE_SIZE);
-    const [sort, setSort] = useState<Sort | undefined>(defaultSort);
+    const [ownPage, setOwnPage] = useState(0);
+    const [ownPerPage, setOwnPerPage] = useState(PAGE_SIZE);
+    const [ownSort, setOwnSort] = useState<Sort | undefined>(defaultSort);
     const [panel, setPanel] = useState<ListPanel | undefined>();
     const [chosen, setChosen] = useState<string[] | undefined>(() => readChosenColumns(list));
     const [selected, setSelected] = useState<Set<string>>(() => new Set());
+    // The titles of rows ticked by Select all, which may sit on other pages.
+    const [titles, setTitles] = useState<ReadonlyMap<string, string>>(() => new Map());
+    const page = server?.page ?? ownPage;
+    const setPage = server?.onPage ?? setOwnPage;
+    const perPage = server?.perPage ?? ownPerPage;
+    const setPerPage = server?.onPerPage ?? setOwnPerPage;
+    const sort = server === undefined ? ownSort : server.sort;
+    const setSort = server?.onSort ?? setOwnSort;
 
     const query = search?.query ?? ownQuery;
     const filterValue = filters?.value ?? NO_FILTERS;
@@ -280,18 +340,21 @@ export function ListScreen({
         if (search !== undefined || term === '') return rows ?? [];
         return (rows ?? []).filter((row) => row.title.toLowerCase().includes(term) || (row.detail ?? '').toLowerCase().includes(term));
     }, [rows, query, search]);
-    const sorted = useMemo(() => sortRows(searched, sort, columns, nameOf), [searched, sort, columns, nameOf]);
+    const sorted = useMemo(
+        () => (server === undefined ? sortRows(searched, sort, columns, nameOf) : [...searched]),
+        [searched, sort, columns, nameOf, server]
+    );
     const nested = tree !== undefined && query.trim() === '' && !filtering && sort === undefined ? tree : undefined;
-    const shownPage = pageOf(sorted, page, perPage);
+    const shownPage = server === undefined ? pageOf(sorted, page, perPage) : serverPageOf(sorted, server);
+    const matching = server?.matching ?? sorted.length;
     const shownColumns = shownColumnsOf(columns, chosen);
 
     const runOnSelected = async (action: BulkAction) => {
-        const targets = (rows ?? [])
-            .filter((row) => selected.has(row.ref))
-            .map((row) => ({
-                ref: row.ref,
-                title: row.tree?.label ?? row.title,
-            }));
+        const shown = new Map((rows ?? []).map((row) => [row.ref, row.tree?.label ?? row.title]));
+        const targets = [...selected].map((ref) => ({
+            ref,
+            title: shown.get(ref) ?? titles.get(ref) ?? ref,
+        }));
         const results = (await bulk?.run(action, targets)) ?? [];
         // The rows it did not run on stay ticked, to try again.
         setSelected(new Set(results.filter((result) => result.problem !== undefined).map((result) => result.ref)));
@@ -320,10 +383,19 @@ export function ListScreen({
         onSort: setSort,
         nameOf,
     };
-    const ticked = (rows ?? []).filter((row) => selected.has(row.ref)).length;
+    const ticked = selected.size;
     const nothingYet = rows !== undefined && rows.length === 0 && query.trim() === '' && !filtering;
     // Rows arrive filtered, so drafts are counted only while they are all there.
-    const drafts = filtering ? 0 : (rows ?? []).filter((row) => row.status === 'draft').length;
+    const drafts = draftCount ?? (filtering ? 0 : (rows ?? []).filter((row) => row.status === 'draft').length);
+    const selectAll = async (): Promise<void> => {
+        if (server === undefined) {
+            setSelected(new Set(sorted.map((row) => row.ref)));
+            return;
+        }
+        const every = await server.selectAll();
+        setTitles(new Map(every.map((row) => [row.ref, row.title])));
+        setSelected(new Set(every.map((row) => row.ref)));
+    };
 
     const createButton =
         create === undefined ? undefined : (
@@ -359,10 +431,10 @@ export function ListScreen({
                     bulk !== undefined && ticked > 0 ? (
                         <SelectionActions
                             count={ticked}
-                            total={sorted.length}
+                            total={matching}
                             actions={bulk.actions}
                             bulk={bulkRun}
-                            onSelectAll={() => setSelected(new Set(sorted.map((row) => row.ref)))}
+                            onSelectAll={() => void selectAll()}
                             onClear={() => setSelected(new Set())}
                         />
                     ) : (
@@ -469,7 +541,7 @@ export function ListScreen({
                                     pageCount={shownPage.pageCount}
                                     first={shownPage.first}
                                     last={shownPage.last}
-                                    total={sorted.length}
+                                    total={matching}
                                     perPage={perPage}
                                     onPage={setPage}
                                     onPerPage={(next) => {
@@ -586,7 +658,14 @@ interface ItemEntry {
     updatedBy: string;
     parent?: string | null;
     treeLabel?: string;
+    values?: Record<string, unknown>;
+    labels?: Record<string, string>;
 }
+
+/**
+ * How long the search waits after the last key before it asks the server.
+ */
+const SEARCH_DELAY = 250;
 
 /**
  * Adds an item to a collection as a draft, and answers with its ref.
@@ -609,9 +688,8 @@ export const createItem = async (connection: Connection, name: string): Promise<
 
 /**
  * One collection's items, newest change first, or nested under their
- * parents for a collection with a `tree`. The filters ask the list route
- * once for each field they name, and ticked rows get the selection's
- * actions.
+ * parents for a collection with a `tree`. The list route searches, filters,
+ * sorts and pages them, and ticked rows get the selection's actions.
  */
 export function CollectionList({
     connection,
@@ -630,75 +708,122 @@ export function CollectionList({
     routes: Readonly<Record<string, AdminRoute>>;
     onOpen: (ref: string) => void;
 }) {
-    const [answers, setAnswers] = useState<ReadonlyMap<string, ItemEntry[]> | undefined>();
+    const tree = options?.tree;
+    const [items, setItems] = useState<{ items: ItemEntry[]; total: number } | undefined>();
+    const [counts, setCounts] = useState<{ total: number; drafts: number } | undefined>();
     const [problem, setProblem] = useState<string | undefined>();
     const [creating, setCreating] = useState(false);
     const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+    const [query, setQuery] = useState('');
+    const [sort, setSort] = useState<Sort | undefined>(tree === undefined ? NEWEST_FIRST : undefined);
+    const [page, setPage] = useState(0);
+    const [perPage, setPerPage] = useState(PAGE_SIZE);
     const [moveProblem, setMoveProblem] = useState<string | undefined>();
     const [loads, setLoads] = useState(0);
     const nameOf = useNames(connection);
     const name = collection.name;
-    const tree = options?.tree;
-    // Changing how two conditions join asks nothing new, so the queries follow their key.
-    const queriesKey = JSON.stringify(itemQueriesOf(filters));
-    const queries = useMemo(() => JSON.parse(queriesKey) as Array<Record<string, string | boolean>>, [queriesKey]);
+    const columns = useMemo(() => collectionColumnsOf(options), [options]);
+    // The filter follows its key, so a new list of the same conditions asks nothing new.
+    const filterKey = JSON.stringify(filterEntriesOf(filters));
+    const filter = useMemo(() => JSON.parse(filterKey) as string[], [filterKey]);
+    // A tree shows every item at once, nested, until the editor searches, filters or sorts.
+    const nested = tree !== undefined && query.trim() === '' && filter.length === 0 && sort === undefined;
+
+    const listQuery = useMemo(
+        () => ({
+            ...(query.trim() === ''
+                ? {}
+                : {
+                      q: query.trim(),
+                  }),
+            ...(filter.length === 0
+                ? {}
+                : {
+                      filter,
+                  }),
+            ...orderOf(sort),
+        }),
+        [query, filter, sort]
+    );
+    const fields = useMemo(() => (options?.columns ?? []).map((column) => column.field), [options]);
 
     useEffect(() => {
         let current = true;
-        setProblem(undefined);
-        void Promise.all(
-            queries.map((query) =>
-                connection.call<{ items: ItemEntry[] }>('editing_collections_list_items', {
-                    params: {
-                        name,
-                    },
-                    query,
-                })
-            )
-        ).then((listed) => {
+        const ask = async (): Promise<void> => {
+            const answer = await connection.call<{ items: ItemEntry[]; total: number }>('editing_collections_list_items', {
+                params: {
+                    name,
+                },
+                query: {
+                    ...listQuery,
+                    ...(fields.length === 0
+                        ? {}
+                        : {
+                              fields,
+                          }),
+                    ...(nested
+                        ? {}
+                        : {
+                              limit: perPage,
+                              offset: page * perPage,
+                          }),
+                },
+            });
             if (!current) return;
-            const failed = listed.find((answer) => answer.status !== 200);
-            if (failed !== undefined) {
-                setProblem(problemOf(failed, 'The items did not load'));
+            if (answer.status !== 200) {
+                setProblem(problemOf(answer, 'The items did not load'));
                 return;
             }
-            setAnswers(new Map(queries.map((query, index) => [queryKeyOf(query), listed[index]!.body.items])));
+            // A page past the end, after items were deleted, moves back to the last one.
+            if (answer.body.items.length === 0 && page > 0 && answer.body.total > 0) {
+                setPage(Math.ceil(answer.body.total / perPage) - 1);
+                return;
+            }
+            setProblem(undefined);
+            setItems(answer.body);
+        };
+        const timer = window.setTimeout(() => void ask(), 'q' in listQuery ? SEARCH_DELAY : 0);
+        return () => {
+            current = false;
+            window.clearTimeout(timer);
+        };
+    }, [connection, name, listQuery, fields, nested, page, perPage, loads]);
+
+    useEffect(() => {
+        let current = true;
+        const count = (filter: string[]) =>
+            connection.call<{ total: number }>('editing_collections_list_items', {
+                params: {
+                    name,
+                },
+                query: {
+                    ...(filter.length === 0
+                        ? {}
+                        : {
+                              filter,
+                          }),
+                    limit: 1,
+                },
+            });
+        void Promise.all([count([]), count(['status:is:draft'])]).then(([every, drafted]) => {
+            if (!current || every.status !== 200 || drafted.status !== 200) return;
+            setCounts({
+                total: every.body.total,
+                drafts: drafted.body.total,
+            });
         });
         return () => {
             current = false;
         };
-    }, [connection, name, queries, loads]);
+    }, [connection, name, loads]);
 
     const rows = useMemo<TreeRow[] | undefined>(() => {
-        const every = answers?.get(queryKeyOf({}));
-        if (answers === undefined || every === undefined) return undefined;
-        const held = new Map([...answers].map(([key, items]) => [key, new Set(items.map((item) => item.ref))]));
-        const kept = filterItems(every, filters, (query) => held.get(queryKeyOf(query)));
-        const ordered =
-            tree === undefined
-                ? kept
-                : kept.sort((left, right) => (left.treeLabel ?? left.label).localeCompare(right.treeLabel ?? right.label));
-        return ordered.map((item) => ({
-            ref: item.ref,
-            href: hrefOf({
-                kind: 'document',
-                ref: item.ref,
-            }),
-            title: item.treeLabel ?? item.label,
-            detail: item.path ?? undefined,
-            status: item.status,
-            updatedAt: item.updatedAt,
-            updatedBy: item.updatedBy,
-            tree:
-                tree === undefined
-                    ? undefined
-                    : {
-                          id: item.id,
-                          parent: item.parent ?? null,
-                          label: item.label,
-                      },
-        }));
-    }, [answers, filters, tree]);
+        if (items === undefined) return undefined;
+        const ordered = nested
+            ? [...items.items].sort((left, right) => (left.treeLabel ?? left.label).localeCompare(right.treeLabel ?? right.label))
+            : items.items;
+        return ordered.map((item) => rowOf(item, tree));
+    }, [items, nested, tree]);
 
     const create = async (): Promise<void> => {
         setCreating(true);
@@ -731,6 +856,21 @@ export function CollectionList({
         setLoads((count) => count + 1);
     };
 
+    const selectAll = async (): Promise<Array<{ ref: string; title: string }>> => {
+        const answer = await connection.call<{ items: ItemEntry[] }>('editing_collections_list_items', {
+            params: {
+                name,
+            },
+            query: listQuery,
+        });
+        return answer.status === 200
+            ? answer.body.items.map((item) => ({
+                  ref: item.ref,
+                  title: item.label,
+              }))
+            : [];
+    };
+
     const actions = offeredActions(routes);
     const noun = collection.label.toLowerCase();
 
@@ -740,12 +880,31 @@ export function CollectionList({
             title={collection.label}
             noun={noun}
             rows={rows}
-            total={answers?.get(queryKeyOf({}))?.length}
+            total={counts?.total ?? items?.total}
+            drafts={counts?.drafts ?? 0}
             problem={problem}
-            columns={DOCUMENT_COLUMNS}
+            columns={columns}
             defaultSort={tree === undefined ? NEWEST_FIRST : undefined}
             defaultSortLabel="Tree order"
             nameOf={nameOf}
+            server={{
+                sort,
+                onSort: (next) => {
+                    setSort(next);
+                    setPage(0);
+                },
+                page,
+                onPage: setPage,
+                perPage,
+                onPerPage: setPerPage,
+                matching: items?.total ?? 0,
+                selectAll,
+            }}
+            search={{
+                query,
+                onQuery: setQuery,
+                placeholder: 'Search by title or path',
+            }}
             create={
                 routes['editing_collections_create_item'] === undefined
                     ? undefined
@@ -794,3 +953,29 @@ export function CollectionList({
         />
     );
 }
+
+/**
+ * One item as a row of its collection's list, its field columns showing the
+ * labels the server gives.
+ */
+const rowOf = (item: ItemEntry, tree: string | undefined): TreeRow => ({
+    ref: item.ref,
+    href: hrefOf({
+        kind: 'document',
+        ref: item.ref,
+    }),
+    title: item.treeLabel ?? item.label,
+    detail: item.path ?? undefined,
+    status: item.status,
+    updatedAt: item.updatedAt,
+    updatedBy: item.updatedBy,
+    values: fieldValuesOf(item.values, item.labels),
+    tree:
+        tree === undefined
+            ? undefined
+            : {
+                  id: item.id,
+                  parent: item.parent ?? null,
+                  label: item.label,
+              },
+});

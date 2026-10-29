@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
     DOCUMENT_COLUMNS,
     NEWEST_FIRST,
+    collectionColumnsOf,
     dateTimeOf,
+    fieldValuesOf,
     nextSort,
+    orderOf,
     pageOf,
     pagesAround,
     shownColumnsOf,
@@ -125,5 +128,76 @@ describe('the columns of a list', () => {
     it('says when a row changed with the day, the year and the time', () => {
         expect(dateTimeOf(new Date(2026, 9, 28, 9, 42).toISOString())).toBe('28 Oct 2026, 09:42');
         expect(dateTimeOf(null)).toBe('');
+    });
+
+    it('offers the fields of a collection as columns, sorting by its indexes alone', () => {
+        const columns = collectionColumnsOf({
+            filters: [],
+            columns: [
+                {
+                    field: 'author',
+                    label: 'Written by',
+                    sortable: false,
+                    shown: true,
+                },
+                {
+                    field: 'publishedOn',
+                    label: null,
+                    sortable: true,
+                    shown: false,
+                },
+            ],
+        });
+        expect(columns.slice(DOCUMENT_COLUMNS.length)).toEqual([
+            {
+                key: 'field:author',
+                label: 'Written by',
+                kind: 'text',
+                shown: true,
+                sortable: false,
+            },
+            {
+                key: 'field:publishedOn',
+                label: 'Published on',
+                kind: 'text',
+                shown: false,
+                sortable: true,
+            },
+        ]);
+        expect(columns.find((column) => column.key === 'updatedBy')?.sortable).toBe(false);
+    });
+
+    it('asks the server for the sort a column names', () => {
+        expect(orderOf(NEWEST_FIRST)).toEqual({
+            orderBy: 'updatedAt',
+            direction: 'desc',
+        });
+        expect(
+            orderOf({
+                column: 'field:publishedOn',
+                direction: 'ascending',
+            })
+        ).toEqual({
+            orderBy: 'publishedOn',
+            direction: 'asc',
+        });
+        expect(orderOf(undefined)).toEqual({});
+    });
+
+    it('shows a field by the label the server gives it', () => {
+        expect(
+            fieldValuesOf(
+                {
+                    topic: 'care',
+                    order: 2,
+                },
+                {
+                    topic: 'Plant care',
+                }
+            )
+        ).toEqual({
+            'field:topic': 'Plant care',
+            'field:order': 2,
+        });
     });
 });

@@ -129,7 +129,7 @@ function Head({ rows, options }: { rows: readonly ListRow[]; options: TableOptio
                             className="k-table__heading"
                             data-kind={column.kind}
                             aria-sort={sorted ?? undefined}>
-                            {onSort === undefined || rows.length === 0 ? (
+                            {onSort === undefined || rows.length === 0 || column.sortable === false ? (
                                 column.label
                             ) : (
                                 <button

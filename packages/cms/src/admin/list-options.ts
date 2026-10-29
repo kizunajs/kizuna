@@ -3,7 +3,7 @@ import { readDef, readMetaBrand, unwrapOptionalWrappers } from 'kizunajs/generat
 import { brandOf } from '../cms.js';
 import type { Collection } from '../definitions.js';
 import { dataFields } from '../field.js';
-import type { ListFilter, ListOptions } from './config.js';
+import type { ListColumnOption, ListFilter, ListOptions } from './config.js';
 
 /**
  * An enum's values, read through `.optional()` and a list.
@@ -15,9 +15,9 @@ const enumValuesOf = (schema: z.core.$ZodType): string[] | undefined => {
 };
 
 /**
- * How each collection lists in the admin: the field its `tree` names, and the
- * fields of its `indexes` an editor can pick a value of. An index holding
- * text or a number sorts the list, and the search box finds its text.
+ * How each collection lists in the admin: the field its `tree` names, the
+ * fields of its `indexes` an editor can pick a value of, and the columns it
+ * offers, every index and each field `columns` names.
  */
 export const listOptionsOf = (collections: readonly Collection[]): Record<string, ListOptions> => {
     const trees = new Set(
@@ -54,6 +54,21 @@ export const listOptionsOf = (collections: readonly Collection[]): Record<string
                     },
                 ];
             });
+            const indexes: readonly string[] = definition.indexes ?? [];
+            const named: readonly string[] = definition.columns ?? [];
+            const columns = [...new Set([...named, ...indexes])].flatMap((name): ListColumnOption[] => {
+                const field = fields.find((candidate) => candidate.name === name);
+                return field === undefined
+                    ? []
+                    : [
+                          {
+                              field: name,
+                              label: field.label ?? null,
+                              sortable: indexes.includes(name),
+                              shown: named.includes(name),
+                          },
+                      ];
+            });
             return [
                 definition.name,
                 {
@@ -63,6 +78,7 @@ export const listOptionsOf = (collections: readonly Collection[]): Record<string
                               tree: definition.tree,
                           }),
                     filters,
+                    columns,
                 },
             ];
         })

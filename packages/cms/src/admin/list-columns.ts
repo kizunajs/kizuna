@@ -1,3 +1,5 @@
+import { humanize } from '../view/schema.js';
+import type { ListOptions } from './config.js';
 import { cellText } from './views.js';
 
 /**
@@ -18,6 +20,11 @@ export interface ListColumn {
      * The title holds the link, so it is always shown.
      */
     fixed?: boolean;
+    /**
+     * Whether the rows sort by it. A collection's list sorts by its indexes
+     * alone, and never by who saved an item.
+     */
+    sortable?: boolean;
 }
 
 /**
@@ -74,6 +81,53 @@ export const DOCUMENT_COLUMNS: readonly ListColumn[] = [
     },
 ];
 
+/**
+ * What a field's column key starts with, so a field named `title` or
+ * `status` keeps its own column.
+ */
+const FIELD_COLUMN = 'field:';
+
+/**
+ * The columns of a collection's list: the title, status and dates, then each
+ * field it offers, every field of `indexes` and those `columns` names. Who
+ * saved an item last does not sort, since the server cannot.
+ */
+export const collectionColumnsOf = (options: ListOptions | undefined): ListColumn[] => [
+    ...DOCUMENT_COLUMNS.map((column) =>
+        column.kind === 'person'
+            ? {
+                  ...column,
+                  sortable: false,
+              }
+            : column
+    ),
+    ...(options?.columns ?? []).map(
+        (column): ListColumn => ({
+            key: `${FIELD_COLUMN}${column.field}`,
+            label: column.label ?? humanize(column.field),
+            kind: 'text',
+            shown: column.shown,
+            sortable: column.sortable,
+        })
+    ),
+];
+
+/**
+ * The field a column shows, for a column of a collection's field.
+ */
+export const fieldOfColumn = (key: string): string | undefined =>
+    key.startsWith(FIELD_COLUMN) ? key.slice(FIELD_COLUMN.length) : undefined;
+
+/**
+ * The cells of a collection's field columns: the label of a choice or an id
+ * where the server gives one, else the value.
+ */
+export const fieldValuesOf = (
+    values: Readonly<Record<string, unknown>> | undefined,
+    labels: Readonly<Record<string, string>> | undefined
+): Record<string, unknown> =>
+    Object.fromEntries(Object.entries(values ?? {}).map(([field, value]) => [`${FIELD_COLUMN}${field}`, labels?.[field] ?? value]));
+
 export type SortDirection = 'ascending' | 'descending';
 
 export interface Sort {
@@ -87,6 +141,28 @@ export interface Sort {
 export const NEWEST_FIRST: Sort = {
     column: 'updated',
     direction: 'descending',
+};
+
+/**
+ * The `orderBy` and `direction` the list route sorts by for a sort, or
+ * nothing to keep the order it lists in.
+ */
+export const orderOf = (sort: Sort | undefined): { orderBy?: string; direction?: 'asc' | 'desc' } => {
+    if (sort === undefined) return {};
+    const orderBy =
+        sort.column === 'title'
+            ? 'title'
+            : sort.column === 'status'
+              ? 'status'
+              : sort.column === 'updated'
+                ? 'updatedAt'
+                : fieldOfColumn(sort.column);
+    return orderBy === undefined
+        ? {}
+        : {
+              orderBy,
+              direction: sort.direction === 'ascending' ? 'asc' : 'desc',
+          };
 };
 
 const STATUS_ORDER = ['published', 'changed', 'draft', 'empty'];

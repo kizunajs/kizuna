@@ -52,8 +52,13 @@ const Articles = defineCollection({
             name: 'order',
             schema: z.int(),
         },
+        {
+            name: 'excerpt',
+            schema: z.string().optional(),
+        },
     ],
     indexes: ['topic', 'tags', 'author', 'order', 'title'],
+    columns: ['excerpt', 'topic'],
 });
 
 describe('how the admin lists each collection', () => {
@@ -61,10 +66,11 @@ describe('how the admin lists each collection', () => {
         expect(listOptionsOf([Tags]).tags).toEqual({
             tree: 'parent',
             filters: [],
+            columns: [],
         });
     });
 
-    it('filters by the enums and ids of its indexes, and sorts by the rest', () => {
+    it('filters by the enums and ids of its indexes, and offers its columns, then every index', () => {
         expect(listOptionsOf([Tags, Articles]).articles).toEqual({
             filters: [
                 {
@@ -92,6 +98,44 @@ describe('how the admin lists each collection', () => {
                     label: 'Written by',
                     brand: 'EmployeeId',
                     nested: false,
+                },
+            ],
+            columns: [
+                {
+                    field: 'excerpt',
+                    label: null,
+                    sortable: false,
+                    shown: true,
+                },
+                {
+                    field: 'topic',
+                    label: null,
+                    sortable: true,
+                    shown: true,
+                },
+                {
+                    field: 'tags',
+                    label: null,
+                    sortable: true,
+                    shown: false,
+                },
+                {
+                    field: 'author',
+                    label: 'Written by',
+                    sortable: true,
+                    shown: false,
+                },
+                {
+                    field: 'order',
+                    label: null,
+                    sortable: true,
+                    shown: false,
+                },
+                {
+                    field: 'title',
+                    label: null,
+                    sortable: true,
+                    shown: false,
                 },
             ],
         });

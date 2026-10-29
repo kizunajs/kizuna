@@ -316,6 +316,7 @@ export const Articles = defineCollection({
         },
     ],
     indexes: ['topic', 'publishedOn'],
+    columns: ['topic', 'author'],
     actions: {
         announce: {
             label: 'Announce to the team',

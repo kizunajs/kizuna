@@ -76,10 +76,25 @@ export interface ListFilter {
     nested?: boolean;
 }
 
+/**
+ * A field the list can show as a column: one of `indexes`, which sorts, or
+ * one `columns` names, which shows until the editor hides it.
+ */
+export interface ListColumnOption {
+    field: string;
+    /**
+     * The field's `label`, or `null` to show its name.
+     */
+    label: string | null;
+    sortable: boolean;
+    shown: boolean;
+}
+
 export interface ListOptions {
     /**
      * The field naming each item's parent, for a collection with a `tree`.
      */
     tree?: string;
     filters: ListFilter[];
+    columns: ListColumnOption[];
 }

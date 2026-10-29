@@ -184,14 +184,16 @@ export function SortMenu({
                                         </Menu.RadioItemIndicator>
                                     </Menu.RadioItem>
                                 )}
-                                {columns.map((column) => (
+                                {columns
+                                    .filter((column) => column.sortable !== false)
+                                    .map((column) => (
                                     <Menu.RadioItem key={column.key} value={column.key} className="k-menu__item" closeOnClick>
                                         {column.label}
                                         <Menu.RadioItemIndicator className="k-menu__check">
                                             <Check {...ICON} />
                                         </Menu.RadioItemIndicator>
                                     </Menu.RadioItem>
-                                ))}
+                                    ))}
                             </Menu.RadioGroup>
                         </Menu.Group>
                         {sort === undefined ? null : (

@@ -1,30 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-    NO_FILTERS,
-    STATUS_FIELD,
-    filterItems,
-    groupsOf,
-    isFiltering,
-    itemQueriesOf,
-    queryKeyOf,
-    withCondition,
-    type Condition,
-} from './list-filters.js';
-
-const articles = [
-    {
-        ref: 'item:articles:wateringMonstera',
-        status: 'published',
-    },
-    {
-        ref: 'item:articles:repotting',
-        status: 'draft',
-    },
-    {
-        ref: 'item:articles:northWindow',
-        status: 'changed',
-    },
-];
+import { NO_FILTERS, STATUS_FIELD, filterEntriesOf, groupsOf, isFiltering, withCondition, type Condition } from './list-filters.js';
 
 const topicIs = (value: string, join: Condition['join'] = 'and'): Condition => ({
     join,
@@ -42,16 +17,16 @@ const statusIs = (value: string, join: Condition['join'] = 'and'): Condition => 
 
 describe('the filters above a list', () => {
     it('asks for every item when nothing is filtered', () => {
-        expect(itemQueriesOf(NO_FILTERS)).toEqual([{}]);
+        expect(filterEntriesOf(NO_FILTERS)).toEqual([]);
         expect(isFiltering(NO_FILTERS)).toBe(false);
     });
 
-    it('asks once for each field, besides every item, and never for the status', () => {
+    it('writes each condition for the list route, with or between the groups', () => {
         expect(
-            itemQueriesOf([
+            filterEntriesOf([
                 topicIs('care'),
                 statusIs('draft'),
-                topicIs('care', 'or'),
+                topicIs('season', 'or'),
                 {
                     join: 'and',
                     field: 'category',
@@ -59,18 +34,7 @@ describe('the filters above a list', () => {
                     value: 'lighting',
                 },
             ])
-        ).toEqual([
-            {},
-            {
-                field: 'topic',
-                value: 'care',
-            },
-            {
-                field: 'category',
-                value: 'lighting',
-                descendants: true,
-            },
-        ]);
+        ).toEqual(['topic:is:care', 'status:is:draft', 'or', 'topic:is:season', 'category:outside:lighting']);
     });
 
     it('leaves out a row with no value picked', () => {
@@ -83,34 +47,11 @@ describe('the filters above a list', () => {
             },
         ];
         expect(isFiltering(filters)).toBe(false);
-        expect(itemQueriesOf(filters)).toEqual([{}]);
+        expect(filterEntriesOf(filters)).toEqual([]);
     });
 
     it('groups the rows joined by and, and starts a group at each or', () => {
         expect(groupsOf([statusIs('draft'), topicIs('care'), statusIs('published', 'or')]).map((group) => group.length)).toEqual([2, 1]);
-    });
-
-    it('keeps the items every condition of some group holds', () => {
-        const held = new Map([
-            [queryKeyOf(itemQueriesOf([topicIs('care')])[1]!), new Set(['item:articles:repotting', 'item:articles:northWindow'])],
-        ]);
-        const refs = (filters: readonly Condition[]) =>
-            filterItems(articles, filters, (query) => held.get(queryKeyOf(query))).map((item) => item.ref);
-        expect(refs([topicIs('care'), statusIs('draft')])).toEqual(['item:articles:repotting']);
-        expect(refs([statusIs('published'), topicIs('care', 'or')])).toEqual([
-            'item:articles:wateringMonstera',
-            'item:articles:repotting',
-            'item:articles:northWindow',
-        ]);
-        expect(
-            refs([
-                {
-                    ...topicIs('care'),
-                    operator: 'isNot',
-                },
-            ])
-        ).toEqual(['item:articles:wateringMonstera']);
-        expect(refs(NO_FILTERS)).toHaveLength(3);
     });
 
     it('changes one row, or removes it', () => {
