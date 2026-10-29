@@ -14,6 +14,10 @@ export interface RelationshipOption {
      * A thumbnail URL.
      */
     image?: string;
+    /**
+     * A short line beside the label, like a price.
+     */
+    detail?: string;
 }
 
 /**

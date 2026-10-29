@@ -149,6 +149,7 @@ const ProductOptions = defineRelationship({
             {
                 id: 'prod_1',
                 label: 'Tulip bulbs',
+                detail: '149 kr',
             },
             {
                 id: 'prod_2',
@@ -1124,12 +1125,13 @@ describe('draft mode', () => {
 });
 
 describe('relationships', () => {
-    it("lists a relationship's options for the picker, and names held ids", async () => {
+    it("lists a relationship's options for the picker with their detail, and names held ids", async () => {
         const searched = await asEditor(request(app).get('/editing/items/ProductId').query({ q: 'tulip' }));
         expect(searched.body.items).toEqual([
             {
                 id: 'prod_1',
                 label: 'Tulip bulbs',
+                detail: '149 kr',
             },
         ]);
         const named = await asEditor(request(app).get('/editing/items/ProductId?ids=prod_2&ids=prod_9'));

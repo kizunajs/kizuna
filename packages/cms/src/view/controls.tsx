@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Collapsible } from '@base-ui/react/collapsible';
 import { Combobox } from '@base-ui/react/combobox';
 import { Dialog } from '@base-ui/react/dialog';
@@ -21,7 +21,7 @@ import {
     Upload,
     X,
 } from 'lucide-react';
-import { itemNounOf, movedIndex, remapOpen, rowLabelsOf } from './array-rows.js';
+import { itemNounOf, movedIndex, remapOpen, rowLabelsOf, singularOf } from './array-rows.js';
 import { ICON, useEditorContext } from './context.js';
 import { Hint } from './hint.js';
 import { cropOf, edgesOf, type CropEdges } from './crop.js';
@@ -39,6 +39,7 @@ import {
     type DescribedBlock,
     type JsonSchema,
 } from './schema.js';
+import { ReferenceSheet, useItemSearch, type SearchResult } from './reference-sheet.js';
 import { RichTextControl } from './rich-text.js';
 import { isSeo, SeoControl } from './seo.js';
 import { counterShown, stringInputOf } from './string-input.js';
@@ -279,37 +280,18 @@ function BooleanControl({ value, onChange, disabled, id }: ControlProps) {
     );
 }
 
-interface SearchResult {
-    id: string;
-    label: string;
-    image?: string;
-}
-
 /**
  * An id from a collection or a relationship, picked from what its search
  * answers.
  */
 function ReferenceControl({ value, onChange, brand, disabled, id }: ControlProps) {
-    const { connection, resolveUrl } = useEditorContext();
+    const { resolveUrl } = useEditorContext();
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
     const [chosen, setChosen] = useState<SearchResult | undefined>();
     const current = typeof value === 'string' ? value : '';
-
-    const search = useCallback(
-        async (input: { q?: string; ids?: string[] }) => {
-            if (brand === undefined) return [];
-            const answer = await connection.call<{ items: SearchResult[] }>('editing_search_items', {
-                params: {
-                    brand,
-                },
-                query: input,
-            });
-            return answer.status === 200 ? answer.body.items : [];
-        },
-        [connection, brand]
-    );
+    const search = useItemSearch(brand);
 
     useEffect(() => {
         if (current === '') {
@@ -372,6 +354,7 @@ function ReferenceControl({ value, onChange, brand, disabled, id }: ControlProps
                                 <Combobox.Item key={result.id} value={result} className="k-menu__item">
                                     {result.image !== undefined ? <img className="k-thumb" src={resolveUrl(result.image)} alt="" /> : null}
                                     <span className="k-ellipsis">{result.label}</span>
+                                    {result.detail === undefined ? null : <span className="k-picker__detail">{result.detail}</span>}
                                     <Combobox.ItemIndicator className="k-menu__check">
                                         <Check {...ICON} />
                                     </Combobox.ItemIndicator>
@@ -1106,6 +1089,136 @@ function ArrayControl(props: ControlProps) {
 }
 
 /**
+ * What one id of a list and the list as a whole are called, in lower case,
+ * from its label: "product" and "products" for Products.
+ */
+const referenceNounOf = (label: string | undefined): { one: string; many: string } => {
+    const many = (label ?? 'items').toLowerCase();
+    const one = singularOf(many);
+    return {
+        one: one === many ? 'item' : one,
+        many,
+    };
+};
+
+/**
+ * A list of ids from a collection or a relationship: a row for each, with
+ * its thumbnail and detail, in the order the editor drags them into, and a
+ * button that opens the sheet to choose them.
+ */
+function ReferenceListControl(props: ControlProps & { brand: string }) {
+    const { schema, value, onChange, disabled, brand } = props;
+    const { resolveUrl } = useEditorContext();
+    const ids = Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+    const search = useItemSearch(brand);
+    const [named, setNamed] = useState<ReadonlyMap<string, SearchResult>>(new Map());
+    const [picking, setPicking] = useState(false);
+    const noun = referenceNounOf(props.label);
+    const unnamed = ids.filter((id) => !named.has(id)).join('\n');
+
+    useEffect(() => {
+        if (unnamed === '') return;
+        let current = true;
+        void search({
+            ids: unnamed.split('\n'),
+        }).then((found) => {
+            if (!current) return;
+            setNamed((previous) => new Map([...previous, ...found.map((result): [string, SearchResult] => [result.id, result])]));
+        });
+        return () => {
+            current = false;
+        };
+    }, [unnamed, search]);
+
+    const moveTo = (from: number, to: number): void => onChange(moveItem(ids, from, to));
+    const { drag, rows, startDrag } = useDrag(disabled, moveTo);
+    const keyMove = (index: number, event: React.KeyboardEvent<HTMLButtonElement>): void => {
+        const to = event.key === 'ArrowUp' ? index - 1 : event.key === 'ArrowDown' ? index + 1 : undefined;
+        if (to === undefined || to < 0 || to >= ids.length) return;
+        event.preventDefault();
+        moveTo(index, to);
+        window.requestAnimationFrame(() => rows.current[to]?.querySelector<HTMLButtonElement>('.k-array__grip')?.focus());
+    };
+
+    return (
+        <div className="k-array k-references" data-dragging={drag !== undefined}>
+            {ids.map((id, index) => {
+                const result = named.get(id);
+                const label = result?.label ?? id;
+                return (
+                    <div
+                        key={id}
+                        ref={(row) => {
+                            rows.current[index] = row;
+                        }}
+                        className="k-array__item k-references__item"
+                        data-dragged={drag?.from === index}
+                        style={{
+                            transform: `translateY(${shiftFor(index, drag)}px)`,
+                        }}>
+                        {disabled ? null : (
+                            <button
+                                type="button"
+                                className="k-array__grip"
+                                aria-label={`Move ${label}. Drag, or use the arrow keys.`}
+                                onPointerDown={(event) => startDrag(index, event)}
+                                onKeyDown={(event) => keyMove(index, event)}>
+                                <GripVertical {...ICON} />
+                            </button>
+                        )}
+                        {result?.image === undefined ? (
+                            <span className="k-references__thumb" aria-hidden="true" />
+                        ) : (
+                            <img className="k-references__thumb" src={resolveUrl(result.image)} alt="" />
+                        )}
+                        <span className="k-references__label k-ellipsis">{label}</span>
+                        {result?.detail === undefined ? null : <span className="k-references__detail">{result.detail}</span>}
+                        {disabled ? null : (
+                            <button
+                                type="button"
+                                className="k-icon-button"
+                                disabled={ids.length <= (schema.minItems ?? 0)}
+                                onClick={() => onChange(ids.filter((_, at) => at !== index))}
+                                aria-label={`Remove ${label}`}>
+                                <X {...ICON} />
+                            </button>
+                        )}
+                    </div>
+                );
+            })}
+            {disabled && props.help === undefined ? null : (
+                <div className="k-array__foot">
+                    {props.help === undefined ? <span /> : <p className="k-help">{props.help}</p>}
+                    {disabled ? null : (
+                        <button
+                            type="button"
+                            className="k-button k-button--secondary k-button--small k-array__add"
+                            aria-haspopup="dialog"
+                            onClick={() => setPicking(true)}>
+                            <Plus {...ICON} />
+                            Choose {noun.many}
+                        </button>
+                    )}
+                </div>
+            )}
+            <ReferenceSheet
+                open={picking}
+                onOpenChange={setPicking}
+                brand={brand}
+                chosen={ids}
+                named={named}
+                max={schema.maxItems}
+                noun={noun}
+                onApply={(picked, known) => {
+                    setNamed(known);
+                    onChange(picked);
+                }}
+            />
+        </div>
+    );
+}
+
+/**
  * The mark a required field's label carries.
  */
 export function Required() {
@@ -1320,6 +1433,11 @@ export function Control(props: ControlProps) {
     const brand = props.brand ?? resolved.brand;
     if (isImage(props.schema, props.root)) return <ImageControl {...props} schema={resolved} />;
     if (brand !== undefined && typeOf(resolved) !== 'array') return <ReferenceControl {...props} schema={resolved} brand={brand} />;
+    const listed = typeOf(resolved) === 'array' ? resolveRef(resolved.items ?? {}, props.root) : undefined;
+    const listedBrand = brand ?? listed?.brand;
+    if (listed !== undefined && listedBrand !== undefined && typeOf(listed) === 'string') {
+        return <ReferenceListControl {...props} schema={resolved} brand={listedBrand} />;
+    }
     switch (typeOf(resolved)) {
         case 'string':
             return <StringControl {...props} schema={resolved} />;

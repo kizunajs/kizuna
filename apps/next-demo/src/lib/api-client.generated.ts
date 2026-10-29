@@ -867,6 +867,7 @@ export namespace API {
                     id: ProductId;
                     label: string;
                     image?: string;
+                    detail?: string;
                 }>;
             }; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
@@ -1530,7 +1531,7 @@ export interface Client {
             fetchOptions?: RequestInit;
         }, API.ProductsListProducts.Result>;
         /**
-         * List products by name and thumbnail, for the CMS editor's picker
+         * List products by name, thumbnail and price, for the CMS editor's picker
          *
          * @example
          * const result = await client.products.listProductOptions();

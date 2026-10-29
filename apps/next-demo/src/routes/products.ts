@@ -17,6 +17,15 @@ const ProductSchema = Kizuna.model({
 
 type Product = z.output<typeof ProductSchema>;
 
+const kroner = new Intl.NumberFormat('nb-NO', {
+    maximumFractionDigits: 0,
+});
+
+/**
+ * A price as the shop writes it, like "1 290 kr".
+ */
+const priceOf = (price: number): string => `${kroner.format(price)} kr`;
+
 const catalogue = new Map<string, Product>(
     shopCatalogue.map((entry) => [
         entry.id,
@@ -59,7 +68,7 @@ export const products = k.routes.products({
             method: 'GET',
             path: '/product-options',
             auth: false,
-            summary: "List products by name and thumbnail, for the CMS editor's picker",
+            summary: "List products by name, thumbnail and price, for the CMS editor's picker",
             query: z.object({
                 q: z.string().optional(),
                 ids: z.array(ProductId).optional(),
@@ -71,6 +80,7 @@ export const products = k.routes.products({
                             id: ProductId,
                             label: z.string(),
                             image: z.string().optional(),
+                            detail: z.string().optional(),
                         })
                     ),
                 }),
@@ -89,6 +99,7 @@ export const products = k.routes.products({
                         id: product.id,
                         label: product.name,
                         image: product.imageUrl,
+                        detail: priceOf(product.price),
                     })),
             },
         })),

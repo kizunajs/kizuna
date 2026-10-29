@@ -26,7 +26,7 @@ Every article by one author is a `where` on the field. Deleting an employee that
 
 ## From your own API
 
-A record in your own tables. `defineRelationship` gives the editor the list to pick from, through a route that returns id, label and image:
+A record in your own tables. `defineRelationship` gives the editor the list to pick from, through a route that returns an id, a label, an image and a detail like the price:
 
 ```ts title="src/cms/relationships.ts"
 export const Products = defineRelationship({
@@ -45,7 +45,7 @@ export const Products = defineRelationship({
 });
 ```
 
-It runs as the editor, so your route decides what they see. To let editors change the products themselves, add a [view](/docs/cms/views). The page holds `z.array(Products.id)` and fetches the products itself:
+It runs as the editor, so your route decides what they see. The picker shows each option's image and `detail` beside its label. To let editors change the products themselves, add a [view](/docs/cms/views). The page holds `z.array(Products.id)` and fetches the products itself:
 
 ```tsx
 const featured = inStoredOrder(content.featured, result.body.products, (product) => product.id);

@@ -7,7 +7,7 @@ description: 'Records that live outside the CMS, held by id, with the list an ed
 defineRelationship(definition: { name: string; id: Brand; options: (input) => Promise<Option[]>; imageOrigins?: string[] }): Relationship
 ```
 
-`options` receives `{ query, ids, headers }` and returns `{ id, label, image? }[]`. It runs as the editor. `Relationship.id` is the field schema a page uses.
+`options` receives `{ query, ids, headers }` and returns `{ id, label, image?, detail? }[]`. `detail` is a short line the picker shows beside the label, like a price. It runs as the editor. `Relationship.id` is the field schema a page uses.
 
 ```ts
 export const Products = defineRelationship({
