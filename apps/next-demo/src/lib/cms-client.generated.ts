@@ -827,6 +827,14 @@ export namespace API {
              */
             options: Record<string, Record<string, string>>;
             /**
+             * For each column and field the search looks in whose field declares a `label`, that label, like Signed up for signedUpAt.
+             */
+            labels: Record<string, string>;
+            /**
+             * For each column holding a date or a date and time, its JSON Schema `format`, so the list shows it as one.
+             */
+            formats: Record<string, "date" | "date-time">;
+            /**
              * The fields the search box looks in.
              */
             search: Array<string>;

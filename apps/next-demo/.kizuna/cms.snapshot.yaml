@@ -9523,6 +9523,14 @@ routes:
                     optional: false
                     schema:
                       kind: record
+                  labels:
+                    optional: false
+                    schema:
+                      kind: record
+                  formats:
+                    optional: false
+                    schema:
+                      kind: record
                   search:
                     optional: false
                     schema:
