@@ -1441,7 +1441,7 @@ export namespace API {
             | { status: 200; body: {
                 items: Array<{
                     /**
-                     * Under 8 words. Wrap a word in *asterisks* to set it in italics.
+                     * Under 8 words.
                      */
                     title: string;
                     /**
@@ -1520,7 +1520,7 @@ export namespace API {
         export type Result =
             | { status: 200; body: {
                 /**
-                 * Under 8 words. Wrap a word in *asterisks* to set it in italics.
+                 * Under 8 words.
                  */
                 title: string;
                 /**

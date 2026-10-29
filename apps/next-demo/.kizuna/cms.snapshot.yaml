@@ -13579,7 +13579,7 @@ tools:
 content:
   collection:articles:
     kind: collection
-    migration: 0
+    migration: 1
     schema:
       kind: object
       fields:
