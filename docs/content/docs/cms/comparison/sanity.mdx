@@ -5,23 +5,23 @@ description: Kizuna CMS and Sanity side by side, the same page written in both, 
 
 Sanity keeps content in its own cloud, the content lake, queried with GROQ, and the editor is a Studio you configure and host.
 
-|                                  | Kizuna CMS                                                                    | Sanity              |
-| -------------------------------- | ----------------------------------------------------------------------------- | ------------------- |
-| Where content lives              | Your Postgres                                                                 |                     |
-| Content is declared              | Beside the route, as what that page needs                                     |                     |
-| Schema                           | Zod                                                                           |                     |
-| Reading                          |                                                                               |                     |
-| Related records                  |                                                                               |                     |
-| Ids                              | One branded type in the CMS, your API and the Swift, Kotlin and fetch clients |                     |
-| Editor                           | Your chat, and clicking the page                                              |                     |
-| AI                               | The model edits as the signed-in editor, and publishing asks first            |                     |
-| Data outside the CMS             | A relationship holds the id, a view edits it                                  |                     |
-| Several sites                    | Content every site reads, and each site's own, in one CMS                     |                     |
-| Where is this used, across sites | Kept as it saves                                                              | Not across datasets |
-| Localization                     | Per document, shared fields, one language at a time                           |                     |
-| Rich text                        | Portable Text                                                                 | Portable Text       |
-| Hosting                          | Your Next.js app                                                              |                     |
-| Price                            | MIT, your hosting                                                             |                     |
+|                                  | Kizuna CMS                                                                            | Sanity              |
+| -------------------------------- | ------------------------------------------------------------------------------------- | ------------------- |
+| Where content lives              | Your Postgres                                                                         |                     |
+| Content is declared              | Beside the route, as what that page needs                                             |                     |
+| Schema                           | Zod                                                                                   |                     |
+| Reading                          |                                                                                       |                     |
+| Related records                  |                                                                                       |                     |
+| Ids                              | One branded type in the CMS, your API and the Swift, Kotlin and fetch clients         |                     |
+| Editor                           | Your chat, and clicking the page                                                      |                     |
+| AI                               | The model edits as the signed-in editor, and publishing asks first                    |                     |
+| Data outside the CMS             | A view lists and edits it through your own functions, and a relationship holds its id |                     |
+| Several sites                    | Content every site reads, and each site's own, in one CMS                             |                     |
+| Where is this used, across sites | Kept as it saves                                                                      | Not across datasets |
+| Localization                     | Per document, shared fields, one language at a time                                   |                     |
+| Rich text                        | Portable Text                                                                         | Portable Text       |
+| Hosting                          | Your Next.js app                                                                      |                     |
+| Price                            | MIT, your hosting                                                                     |                     |
 
 ## The same page, both ways
 
@@ -75,6 +75,10 @@ const article = await client.fetch(
 
 Both store Portable Text and both have a typed read. In Kizuna the page is declared beside its route and the content is in your database. In Sanity the page writes a query against a hosted store.
 
+## Data the CMS doesn't store
+
+In Kizuna, a [view](/docs/cms/views) shows editors your app's users, orders or reviews where they already live. It declares the fields and hands `list`, `get` and `actions` to your own functions, so the CMS stores nothing. Editors get the list a collection has, with filters, sorting and paging run by your query, and access on each field and action, checked on the server. The model gets the same view as tools.
+
 ## Pick Sanity when
 
 - You want a hosted content store and a real query language.
@@ -87,4 +91,5 @@ Both store Portable Text and both have a typed read. In Kizuna the page is decla
 - Content belongs in the same database and the same types as the app.
 - Editors are happy in their chat and on the page.
 - Several sites share content and "where is this used" has to work across them.
+- Editors manage your app's users and orders beside the content, through your own functions.
 - You would rather not pay per seat.

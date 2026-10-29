@@ -30,7 +30,7 @@ const columns: Column[] = [
             'Change the layout or the design, since they only get the fields you declare',
             'Write HTML or scripts, since rich text never holds HTML and SVG uploads are refused',
             'Touch a field their role doesn’t allow',
-            'Edit your products or orders, which stay in your own API',
+            'Change your app’s own data, except through the views you write',
             'Overwrite a colleague’s newer change',
         ],
     },

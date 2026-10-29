@@ -1,6 +1,7 @@
 import {
     ArrowLeftRight,
     Blocks,
+    Database,
     FileText,
     Globe,
     ImageIcon,
@@ -56,6 +57,12 @@ export const cmsFeatures: Feature[] = [
         title: 'Relationships',
         href: '/docs/cms/relationships',
         description: 'Pick products from your own API or Stripe. The page holds their ids.',
+    },
+    {
+        icons: [Database],
+        title: 'Views',
+        href: '/docs/cms/views',
+        description: 'Your app’s users and orders in the editor, read and saved by your own functions.',
     },
     {
         icons: [UserCheck],
