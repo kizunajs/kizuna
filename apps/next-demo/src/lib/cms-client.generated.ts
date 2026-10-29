@@ -37,6 +37,18 @@ export namespace API {
             available: boolean;
         };
 
+        export type AddReviewComment = {
+            /**
+             * The review's id, from the document's `review`.
+             */
+            review: string;
+            /**
+             * The field to comment on, as a change to it is keyed, like hero.heading.
+             */
+            path: string;
+            text: string;
+        };
+
         export type Block = {
             /**
              * What an item of the list stores under its block key.
@@ -303,6 +315,14 @@ export namespace API {
              * Its label after the labels of the items above it, like "Lighting / Workshop". Only in a collection with a tree.
              */
             treeLabel?: string;
+            /**
+             * The fields `fields` names, as stored. Only when the list is asked for fields.
+             */
+            values?: Record<string, unknown>;
+            /**
+             * What an editor reads for the fields of `values` holding a choice or an id, like "Plant care" for care.
+             */
+            labels?: Record<string, string>;
         };
 
         export type Field = {
@@ -530,7 +550,18 @@ export namespace API {
             /**
              * Everyone who edits, to name as an owner or a reviewer.
              */
-            people: Array<CMS.Person>;
+            people: Array<{
+                id: string;
+                name: string;
+                /**
+                 * A picture of them, as a URL.
+                 */
+                image?: string;
+                /**
+                 * Their roles, as the app gives them.
+                 */
+                roles?: Array<string>;
+            }>;
         };
 
         export type Person = {
@@ -564,6 +595,29 @@ export namespace API {
             paths: Array<string>;
         };
 
+        export type ReviewComment = {
+            id: string;
+            /**
+             * The field it is about, as a change to it is keyed.
+             */
+            path: string;
+            text: string;
+            by: CMS.Person;
+            createdAt: string;
+            /**
+             * Who resolved it, or null while it is open.
+             */
+            resolvedBy: CMS.Person | null;
+            resolvedAt: string | null;
+        };
+
+        export type ReviewIds = {
+            /**
+             * The reviews, by their id.
+             */
+            ids: Array<string>;
+        };
+
         export type Reviews = {
             reviews: Array<CMS.ReviewState>;
         };
@@ -571,9 +625,9 @@ export namespace API {
         export type ReviewState = {
             id: string;
             /**
-             * Waiting for an answer, approved, sent back with changes to make, or approved before the draft changed again.
+             * Waiting for an answer, approved, sent back with changes to make, approved before the draft changed again, taken back by the person who asked, or published before anyone approved it. `decidedBy` names who did the last.
              */
-            status: "open" | "approved" | "changes" | "outdated";
+            status: "open" | "approved" | "changes" | "outdated" | "withdrawn" | "published-past-review";
             /**
              * The draft version it was asked about, or the one the reviewer answered.
              */
@@ -585,6 +639,10 @@ export namespace API {
             decidedBy: CMS.Person | null;
             decisionNote: string | null;
             decidedAt: string | null;
+            /**
+             * Comments on single fields, on this review and the earlier ones since the document was last published, oldest first.
+             */
+            comments: Array<CMS.ReviewComment>;
         };
 
         export type ReviewsWidget = {
@@ -595,9 +653,9 @@ export namespace API {
             reviews: Array<{
                 id: string;
                 /**
-                 * Waiting for an answer, approved, sent back with changes to make, or approved before the draft changed again.
+                 * Waiting for an answer, approved, sent back with changes to make, approved before the draft changed again, taken back by the person who asked, or published before anyone approved it. `decidedBy` names who did the last.
                  */
-                status: "open" | "approved" | "changes" | "outdated";
+                status: "open" | "approved" | "changes" | "outdated" | "withdrawn" | "published-past-review";
                 /**
                  * The draft version it was asked about, or the one the reviewer answered.
                  */
@@ -609,6 +667,10 @@ export namespace API {
                 decidedBy: CMS.Person | null;
                 decisionNote: string | null;
                 decidedAt: string | null;
+                /**
+                 * Comments on single fields, on this review and the earlier ones since the document was last published, oldest first.
+                 */
+                comments: Array<CMS.ReviewComment>;
                 ref: string;
                 label: string;
                 path: string | null;
@@ -714,6 +776,14 @@ export namespace API {
              * Whether this is the version readers see.
              */
             published: boolean;
+            /**
+             * Who approved this version, or who published it before anyone approved it.
+             */
+            review: {
+                status: "approved" | "published-past-review";
+                by: CMS.Person;
+                at: string;
+            } | null;
         };
 
         export type VersionContent = {
@@ -748,6 +818,10 @@ export namespace API {
              * The fields the list shows.
              */
             columns: Array<string>;
+            /**
+             * For each column holding a choice, the label editors see for each value, like Admin for admin.
+             */
+            options: Record<string, Record<string, string>>;
             /**
              * The fields the search box looks in.
              */
@@ -791,9 +865,9 @@ export namespace API {
             reviews: Array<{
                 id: string;
                 /**
-                 * Waiting for an answer, approved, sent back with changes to make, or approved before the draft changed again.
+                 * Waiting for an answer, approved, sent back with changes to make, approved before the draft changed again, taken back by the person who asked, or published before anyone approved it. `decidedBy` names who did the last.
                  */
-                status: "open" | "approved" | "changes" | "outdated";
+                status: "open" | "approved" | "changes" | "outdated" | "withdrawn" | "published-past-review";
                 /**
                  * The draft version it was asked about, or the one the reviewer answered.
                  */
@@ -805,6 +879,10 @@ export namespace API {
                 decidedBy: CMS.Person | null;
                 decisionNote: string | null;
                 decidedAt: string | null;
+                /**
+                 * Comments on single fields, on this review and the earlier ones since the document was last published, oldest first.
+                 */
+                comments: Array<CMS.ReviewComment>;
                 ref: string;
                 label: string;
                 path: string | null;
@@ -1997,22 +2075,42 @@ export namespace API {
 
         export type Query = {
             /**
-             * Keep only the items whose field, by name, holds `value`, or holds it in a list.
+             * Keep the items whose title or address holds this text, in any case.
              */
-            field?: string;
+            q?: string;
             /**
-             * What `field` holds, like an id.
+             * Conditions, each `field:operator:value`, like `topic:is:care`. `field` is `status` (empty, draft, changed or published) or a field of the collection's indexes. `operator` is `is` or `isNot`, which also find the value in a list of ids, or for ids of a collection with a tree `within` or `outside`, which take in every item under the value. The conditions all hold together, and an `or` entry between them starts another set that may hold instead.
              */
-            value?: string;
+            filter?: Array<string>;
             /**
-             * Also keep the items holding an item under `value`, when `field` holds ids of a collection with a tree.
+             * `title`, `status`, `updatedAt` or a field of the collection's indexes. `title` when left out.
              */
-            descendants?: boolean;
+            orderBy?: string;
+            /**
+             * Ascending when left out, newest first for `updatedAt`.
+             */
+            direction?: "asc" | "desc";
+            /**
+             * How many items a page holds. Without it, every item that matches.
+             */
+            limit?: number;
+            /**
+             * How many matching items to skip, for the pages after the first.
+             */
+            offset?: number;
+            /**
+             * Fields of the collection's indexes and columns each item carries under `values`, with `labels` for a choice or an id. A name or several joined by commas, like `topic,author`.
+             */
+            fields?: Array<string>;
         };
 
         export type Result =
             | { status: 200; body: {
                 items: Array<CMS.EditorItem>;
+                /**
+                 * How many items match, on every page together.
+                 */
+                total: number;
             }; headers: Record<string, string> }
             | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
@@ -2544,6 +2642,7 @@ export namespace API {
                     id: string;
                     label: string;
                     image?: string;
+                    detail?: string;
                     /**
                      * The id of the item it sits under, null at the top. Only in a collection with a tree.
                      */
@@ -2645,6 +2744,64 @@ export namespace API {
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
             | { status: 409; body: ProblemDetails; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingReviewsWithdraw {
+        export type Body = CMS.ReviewIds;
+
+        export type Result =
+            | { status: 200; body: CMS.Reviews; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingReviewsReopen {
+        export type Body = CMS.ReviewIds;
+
+        export type Result =
+            | { status: 200; body: CMS.Reviews; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingReviewsComment {
+        export type Body = CMS.AddReviewComment;
+
+        export type Result =
+            | { status: 201; body: CMS.ReviewState; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingReviewsResolveComment {
+        export type Params = {
+            id: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.ReviewState; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> };
     }
 
     export namespace Invalidate {
@@ -3302,6 +3459,8 @@ export interface Client {
             /**
              * List every item of a collection, drafts included, with its status and address
              *
+             * Pages with `limit` and `offset`, and counts every item that matches as `total`. employees filters and sorts by department, order, name. articles filters and sorts by slug, topic, publishedOn, and also shows author.
+             *
              * @example
              * const result = await client.editing.collections.listItems({
              *     params: {
@@ -3892,7 +4051,7 @@ export interface Client {
             /**
              * Ask people to review the drafts of one or more documents before they go live
              *
-             * Each reviewer sees the request in the editor and when they ask what is waiting for them. Name reviewers by their id from the people list, and suggest the owner first.
+             * Each reviewer sees the request in the editor and when they ask what is waiting for them. Name reviewers by their id from the people list, and suggest the owner first. Comments on single fields from an earlier review of the same draft stay.
              *
              * @example
              * const result = await client.editing.reviews.request({
@@ -3914,7 +4073,7 @@ export interface Client {
             /**
              * Approve reviews, or send them back with changes to make
              *
-             * An approval is the person's own judgement of what goes live, so they confirm first: in a host that cannot ask, such as Claude, they answer in the editor instead.
+             * An approval is the person's own judgement of what goes live, so they confirm first: in a host that cannot ask, such as Claude, they answer in the editor instead. An approval can be undone until the draft is published, with the reopen route.
              *
              * @example
              * const result = await client.editing.reviews.decide({
@@ -3931,6 +4090,80 @@ export interface Client {
                 headers?: Record<string, string>;
                 fetchOptions?: RequestInit;
             }, API.EditingReviewsDecide.Result>;
+            /**
+             * Withdraw reviews you asked for that still wait for an answer
+             *
+             * Nobody is asked any more, and the document reads as if no review was asked for. Only the person who asked may withdraw a review, and only while it waits.
+             *
+             * @example
+             * const result = await client.editing.reviews.withdraw({
+             *     body: {
+             *         ids: [
+             *             'string',
+             *         ],
+             *     },
+             * });
+             */
+            withdraw: ClientMethod<'POST', false, {
+                body: API.EditingReviewsWithdraw.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReviewsWithdraw.Result>;
+            /**
+             * Undo your approval of reviews whose drafts are not published yet
+             *
+             * Each review waits for an answer again, and a document that requires a review stops publishing until someone approves it. Only the person who approved may undo it, and only before the draft goes live.
+             *
+             * @example
+             * const result = await client.editing.reviews.reopen({
+             *     body: {
+             *         ids: [
+             *             'string',
+             *         ],
+             *     },
+             * });
+             */
+            reopen: ClientMethod<'POST', false, {
+                body: API.EditingReviewsReopen.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReviewsReopen.Result>;
+            /**
+             * Comment on one field of a review's draft
+             *
+             * The person who asked sees the comment under that field in the editor, and the reviewer under the change. Anyone taking part in the review may comment: who asked, who was asked, who answered, and a role under `reviews.roles`. Name the field as the changes list keys it. Answers with the review and every comment on the draft.
+             *
+             * @example
+             * const result = await client.editing.reviews.comment({
+             *     body: {
+             *         review: 'string',
+             *         path: 'string',
+             *         text: 'string',
+             *     },
+             * });
+             */
+            comment: ClientMethod<'POST', false, {
+                body: API.EditingReviewsComment.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReviewsComment.Result>;
+            /**
+             * Resolve a comment on a review once it is dealt with
+             *
+             * The comment folds away under its field. Anyone taking part in the review may resolve it.
+             *
+             * @example
+             * const result = await client.editing.reviews.resolveComment({
+             *     params: {
+             *         id: '1',
+             *     },
+             * });
+             */
+            resolveComment: ClientMethod<'POST', false, {
+                params: API.EditingReviewsResolveComment.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReviewsResolveComment.Result>;
         };
     };
     /**
@@ -4784,6 +5017,54 @@ const routes: GeneratedRoutes = {
                     404: {},
                     409: {},
                     400: {},
+                },
+            },
+            withdraw: {
+                method: 'POST',
+                path: '/editing/reviews/withdraw',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    400: {},
+                },
+            },
+            reopen: {
+                method: 'POST',
+                path: '/editing/reviews/reopen',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    400: {},
+                },
+            },
+            comment: {
+                method: 'POST',
+                path: '/editing/reviews/comments',
+                responses: {
+                    201: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    422: {},
+                    400: {},
+                },
+            },
+            resolveComment: {
+                method: 'POST',
+                path: '/editing/reviews/comments/:id/resolve',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
                 },
             },
         },

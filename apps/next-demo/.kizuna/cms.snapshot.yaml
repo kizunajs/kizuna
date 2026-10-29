@@ -2189,6 +2189,8 @@ routes:
                       - changes
                       - open
                       - outdated
+                      - published-past-review
+                      - withdrawn
                 version:
                   optional: false
                   schema:
@@ -2266,6 +2268,69 @@ routes:
                   schema:
                     kind: string
                     nullable: true
+                comments:
+                  optional: false
+                  schema:
+                    kind: array
+                    element:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        path:
+                          optional: false
+                          schema:
+                            kind: string
+                        text:
+                          optional: false
+                          schema:
+                            kind: string
+                        by:
+                          optional: false
+                          schema:
+                            kind: object
+                            fields:
+                              id:
+                                optional: false
+                                schema:
+                                  kind: string
+                              name:
+                                optional: false
+                                schema:
+                                  kind: string
+                              image:
+                                optional: true
+                                schema:
+                                  kind: string
+                        createdAt:
+                          optional: false
+                          schema:
+                            kind: string
+                        resolvedBy:
+                          optional: false
+                          schema:
+                            kind: object
+                            nullable: true
+                            fields:
+                              id:
+                                optional: false
+                                schema:
+                                  kind: string
+                              name:
+                                optional: false
+                                schema:
+                                  kind: string
+                              image:
+                                optional: true
+                                schema:
+                                  kind: string
+                        resolvedAt:
+                          optional: false
+                          schema:
+                            kind: string
+                            nullable: true
           requireReview:
             optional: false
             schema:
@@ -3011,6 +3076,40 @@ routes:
                     optional: false
                     schema:
                       kind: boolean
+                  review:
+                    optional: false
+                    schema:
+                      kind: object
+                      nullable: true
+                      fields:
+                        status:
+                          optional: false
+                          schema:
+                            kind: enum
+                            values:
+                              - approved
+                              - published-past-review
+                        by:
+                          optional: false
+                          schema:
+                            kind: object
+                            fields:
+                              id:
+                                optional: false
+                                schema:
+                                  kind: string
+                              name:
+                                optional: false
+                                schema:
+                                  kind: string
+                              image:
+                                optional: true
+                                schema:
+                                  kind: string
+                        at:
+                          optional: false
+                          schema:
+                            kind: string
       "401":
         kind: object
         fields:
@@ -3230,6 +3329,8 @@ routes:
                       - changes
                       - open
                       - outdated
+                      - published-past-review
+                      - withdrawn
                 version:
                   optional: false
                   schema:
@@ -3307,6 +3408,69 @@ routes:
                   schema:
                     kind: string
                     nullable: true
+                comments:
+                  optional: false
+                  schema:
+                    kind: array
+                    element:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        path:
+                          optional: false
+                          schema:
+                            kind: string
+                        text:
+                          optional: false
+                          schema:
+                            kind: string
+                        by:
+                          optional: false
+                          schema:
+                            kind: object
+                            fields:
+                              id:
+                                optional: false
+                                schema:
+                                  kind: string
+                              name:
+                                optional: false
+                                schema:
+                                  kind: string
+                              image:
+                                optional: true
+                                schema:
+                                  kind: string
+                        createdAt:
+                          optional: false
+                          schema:
+                            kind: string
+                        resolvedBy:
+                          optional: false
+                          schema:
+                            kind: object
+                            nullable: true
+                            fields:
+                              id:
+                                optional: false
+                                schema:
+                                  kind: string
+                              name:
+                                optional: false
+                                schema:
+                                  kind: string
+                              image:
+                                optional: true
+                                schema:
+                                  kind: string
+                        resolvedAt:
+                          optional: false
+                          schema:
+                            kind: string
+                            nullable: true
           requireReview:
             optional: false
             schema:
@@ -4794,6 +4958,40 @@ routes:
                     optional: false
                     schema:
                       kind: boolean
+                  review:
+                    optional: false
+                    schema:
+                      kind: object
+                      nullable: true
+                      fields:
+                        status:
+                          optional: false
+                          schema:
+                            kind: enum
+                            values:
+                              - approved
+                              - published-past-review
+                        by:
+                          optional: false
+                          schema:
+                            kind: object
+                            fields:
+                              id:
+                                optional: false
+                                schema:
+                                  kind: string
+                              name:
+                                optional: false
+                                schema:
+                                  kind: string
+                              image:
+                                optional: true
+                                schema:
+                                  kind: string
+                        at:
+                          optional: false
+                          schema:
+                            kind: string
       "401":
         kind: object
         fields:
@@ -5013,6 +5211,8 @@ routes:
                       - changes
                       - open
                       - outdated
+                      - published-past-review
+                      - withdrawn
                 version:
                   optional: false
                   schema:
@@ -5090,6 +5290,69 @@ routes:
                   schema:
                     kind: string
                     nullable: true
+                comments:
+                  optional: false
+                  schema:
+                    kind: array
+                    element:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        path:
+                          optional: false
+                          schema:
+                            kind: string
+                        text:
+                          optional: false
+                          schema:
+                            kind: string
+                        by:
+                          optional: false
+                          schema:
+                            kind: object
+                            fields:
+                              id:
+                                optional: false
+                                schema:
+                                  kind: string
+                              name:
+                                optional: false
+                                schema:
+                                  kind: string
+                              image:
+                                optional: true
+                                schema:
+                                  kind: string
+                        createdAt:
+                          optional: false
+                          schema:
+                            kind: string
+                        resolvedBy:
+                          optional: false
+                          schema:
+                            kind: object
+                            nullable: true
+                            fields:
+                              id:
+                                optional: false
+                                schema:
+                                  kind: string
+                              name:
+                                optional: false
+                                schema:
+                                  kind: string
+                              image:
+                                optional: true
+                                schema:
+                                  kind: string
+                        resolvedAt:
+                          optional: false
+                          schema:
+                            kind: string
+                            nullable: true
           requireReview:
             optional: false
             schema:
@@ -6016,18 +6279,41 @@ routes:
     query:
       kind: object
       fields:
-        field:
+        q:
           optional: true
           schema:
             kind: string
-        value:
+        filter:
+          optional: true
+          schema:
+            kind: array
+            element:
+              kind: string
+        orderBy:
           optional: true
           schema:
             kind: string
-        descendants:
+        direction:
           optional: true
           schema:
-            kind: boolean
+            kind: enum
+            values:
+              - asc
+              - desc
+        limit:
+          optional: true
+          schema:
+            kind: number
+        offset:
+          optional: true
+          schema:
+            kind: number
+        fields:
+          optional: true
+          schema:
+            kind: array
+            element:
+              kind: string
     responses:
       "200":
         kind: object
@@ -6086,6 +6372,18 @@ routes:
                     optional: true
                     schema:
                       kind: string
+                  values:
+                    optional: true
+                    schema:
+                      kind: record
+                  labels:
+                    optional: true
+                    schema:
+                      kind: record
+          total:
+            optional: false
+            schema:
+              kind: number
       "400":
         kind: object
         fields:
@@ -6979,6 +7277,40 @@ routes:
                     optional: false
                     schema:
                       kind: boolean
+                  review:
+                    optional: false
+                    schema:
+                      kind: object
+                      nullable: true
+                      fields:
+                        status:
+                          optional: false
+                          schema:
+                            kind: enum
+                            values:
+                              - approved
+                              - published-past-review
+                        by:
+                          optional: false
+                          schema:
+                            kind: object
+                            fields:
+                              id:
+                                optional: false
+                                schema:
+                                  kind: string
+                              name:
+                                optional: false
+                                schema:
+                                  kind: string
+                              image:
+                                optional: true
+                                schema:
+                                  kind: string
+                        at:
+                          optional: false
+                          schema:
+                            kind: string
       "401":
         kind: object
         fields:
@@ -7198,6 +7530,8 @@ routes:
                       - changes
                       - open
                       - outdated
+                      - published-past-review
+                      - withdrawn
                 version:
                   optional: false
                   schema:
@@ -7275,6 +7609,69 @@ routes:
                   schema:
                     kind: string
                     nullable: true
+                comments:
+                  optional: false
+                  schema:
+                    kind: array
+                    element:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        path:
+                          optional: false
+                          schema:
+                            kind: string
+                        text:
+                          optional: false
+                          schema:
+                            kind: string
+                        by:
+                          optional: false
+                          schema:
+                            kind: object
+                            fields:
+                              id:
+                                optional: false
+                                schema:
+                                  kind: string
+                              name:
+                                optional: false
+                                schema:
+                                  kind: string
+                              image:
+                                optional: true
+                                schema:
+                                  kind: string
+                        createdAt:
+                          optional: false
+                          schema:
+                            kind: string
+                        resolvedBy:
+                          optional: false
+                          schema:
+                            kind: object
+                            nullable: true
+                            fields:
+                              id:
+                                optional: false
+                                schema:
+                                  kind: string
+                              name:
+                                optional: false
+                                schema:
+                                  kind: string
+                              image:
+                                optional: true
+                                schema:
+                                  kind: string
+                        resolvedAt:
+                          optional: false
+                          schema:
+                            kind: string
+                            nullable: true
           requireReview:
             optional: false
             schema:
@@ -9122,6 +9519,10 @@ routes:
                       kind: array
                       element:
                         kind: string
+                  options:
+                    optional: false
+                    schema:
+                      kind: record
                   search:
                     optional: false
                     schema:
@@ -10273,6 +10674,8 @@ routes:
                                     - changes
                                     - open
                                     - outdated
+                                    - published-past-review
+                                    - withdrawn
                               version:
                                 optional: false
                                 schema:
@@ -10350,6 +10753,69 @@ routes:
                                 schema:
                                   kind: string
                                   nullable: true
+                              comments:
+                                optional: false
+                                schema:
+                                  kind: array
+                                  element:
+                                    kind: object
+                                    fields:
+                                      id:
+                                        optional: false
+                                        schema:
+                                          kind: string
+                                      path:
+                                        optional: false
+                                        schema:
+                                          kind: string
+                                      text:
+                                        optional: false
+                                        schema:
+                                          kind: string
+                                      by:
+                                        optional: false
+                                        schema:
+                                          kind: object
+                                          fields:
+                                            id:
+                                              optional: false
+                                              schema:
+                                                kind: string
+                                            name:
+                                              optional: false
+                                              schema:
+                                                kind: string
+                                            image:
+                                              optional: true
+                                              schema:
+                                                kind: string
+                                      createdAt:
+                                        optional: false
+                                        schema:
+                                          kind: string
+                                      resolvedBy:
+                                        optional: false
+                                        schema:
+                                          kind: object
+                                          nullable: true
+                                          fields:
+                                            id:
+                                              optional: false
+                                              schema:
+                                                kind: string
+                                            name:
+                                              optional: false
+                                              schema:
+                                                kind: string
+                                            image:
+                                              optional: true
+                                              schema:
+                                                kind: string
+                                      resolvedAt:
+                                        optional: false
+                                        schema:
+                                          kind: string
+                                          nullable: true
                               ref:
                                 optional: false
                                 schema:
@@ -10571,6 +11037,10 @@ routes:
                     optional: true
                     schema:
                       kind: string
+                  detail:
+                    optional: true
+                    schema:
+                      kind: string
                   parent:
                     optional: true
                     schema:
@@ -10784,6 +11254,12 @@ routes:
                     optional: true
                     schema:
                       kind: string
+                  roles:
+                    optional: true
+                    schema:
+                      kind: array
+                      element:
+                        kind: string
       "401":
         kind: object
         fields:
@@ -10864,6 +11340,8 @@ routes:
                         - changes
                         - open
                         - outdated
+                        - published-past-review
+                        - withdrawn
                   version:
                     optional: false
                     schema:
@@ -10941,6 +11419,69 @@ routes:
                     schema:
                       kind: string
                       nullable: true
+                  comments:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: object
+                        fields:
+                          id:
+                            optional: false
+                            schema:
+                              kind: string
+                          path:
+                            optional: false
+                            schema:
+                              kind: string
+                          text:
+                            optional: false
+                            schema:
+                              kind: string
+                          by:
+                            optional: false
+                            schema:
+                              kind: object
+                              fields:
+                                id:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                name:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                image:
+                                  optional: true
+                                  schema:
+                                    kind: string
+                          createdAt:
+                            optional: false
+                            schema:
+                              kind: string
+                          resolvedBy:
+                            optional: false
+                            schema:
+                              kind: object
+                              nullable: true
+                              fields:
+                                id:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                name:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                image:
+                                  optional: true
+                                  schema:
+                                    kind: string
+                          resolvedAt:
+                            optional: false
+                            schema:
+                              kind: string
+                              nullable: true
                   ref:
                     optional: false
                     schema:
@@ -11047,6 +11588,8 @@ routes:
                         - changes
                         - open
                         - outdated
+                        - published-past-review
+                        - withdrawn
                   version:
                     optional: false
                     schema:
@@ -11124,6 +11667,69 @@ routes:
                     schema:
                       kind: string
                       nullable: true
+                  comments:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: object
+                        fields:
+                          id:
+                            optional: false
+                            schema:
+                              kind: string
+                          path:
+                            optional: false
+                            schema:
+                              kind: string
+                          text:
+                            optional: false
+                            schema:
+                              kind: string
+                          by:
+                            optional: false
+                            schema:
+                              kind: object
+                              fields:
+                                id:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                name:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                image:
+                                  optional: true
+                                  schema:
+                                    kind: string
+                          createdAt:
+                            optional: false
+                            schema:
+                              kind: string
+                          resolvedBy:
+                            optional: false
+                            schema:
+                              kind: object
+                              nullable: true
+                              fields:
+                                id:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                name:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                image:
+                                  optional: true
+                                  schema:
+                                    kind: string
+                          resolvedAt:
+                            optional: false
+                            schema:
+                              kind: string
+                              nullable: true
       "400":
         kind: object
         fields:
@@ -11292,6 +11898,8 @@ routes:
                         - changes
                         - open
                         - outdated
+                        - published-past-review
+                        - withdrawn
                   version:
                     optional: false
                     schema:
@@ -11365,6 +11973,1048 @@ routes:
                       kind: string
                       nullable: true
                   decidedAt:
+                    optional: false
+                    schema:
+                      kind: string
+                      nullable: true
+                  comments:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: object
+                        fields:
+                          id:
+                            optional: false
+                            schema:
+                              kind: string
+                          path:
+                            optional: false
+                            schema:
+                              kind: string
+                          text:
+                            optional: false
+                            schema:
+                              kind: string
+                          by:
+                            optional: false
+                            schema:
+                              kind: object
+                              fields:
+                                id:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                name:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                image:
+                                  optional: true
+                                  schema:
+                                    kind: string
+                          createdAt:
+                            optional: false
+                            schema:
+                              kind: string
+                          resolvedBy:
+                            optional: false
+                            schema:
+                              kind: object
+                              nullable: true
+                              fields:
+                                id:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                name:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                image:
+                                  optional: true
+                                  schema:
+                                    kind: string
+                          resolvedAt:
+                            optional: false
+                            schema:
+                              kind: string
+                              nullable: true
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: union
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "409":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.reviews.withdraw:
+    method: POST
+    path: /editing/reviews/withdraw
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+      - 409
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        ids:
+          optional: false
+          schema:
+            kind: array
+            element:
+              kind: string
+    responses:
+      "200":
+        kind: object
+        fields:
+          reviews:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                  status:
+                    optional: false
+                    schema:
+                      kind: enum
+                      values:
+                        - approved
+                        - changes
+                        - open
+                        - outdated
+                        - published-past-review
+                        - withdrawn
+                  version:
+                    optional: false
+                    schema:
+                      kind: number
+                  reviewers:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: object
+                        fields:
+                          id:
+                            optional: false
+                            schema:
+                              kind: string
+                          name:
+                            optional: false
+                            schema:
+                              kind: string
+                          image:
+                            optional: true
+                            schema:
+                              kind: string
+                  requestedBy:
+                    optional: false
+                    schema:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        name:
+                          optional: false
+                          schema:
+                            kind: string
+                        image:
+                          optional: true
+                          schema:
+                            kind: string
+                  note:
+                    optional: false
+                    schema:
+                      kind: string
+                      nullable: true
+                  createdAt:
+                    optional: false
+                    schema:
+                      kind: string
+                  decidedBy:
+                    optional: false
+                    schema:
+                      kind: object
+                      nullable: true
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        name:
+                          optional: false
+                          schema:
+                            kind: string
+                        image:
+                          optional: true
+                          schema:
+                            kind: string
+                  decisionNote:
+                    optional: false
+                    schema:
+                      kind: string
+                      nullable: true
+                  decidedAt:
+                    optional: false
+                    schema:
+                      kind: string
+                      nullable: true
+                  comments:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: object
+                        fields:
+                          id:
+                            optional: false
+                            schema:
+                              kind: string
+                          path:
+                            optional: false
+                            schema:
+                              kind: string
+                          text:
+                            optional: false
+                            schema:
+                              kind: string
+                          by:
+                            optional: false
+                            schema:
+                              kind: object
+                              fields:
+                                id:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                name:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                image:
+                                  optional: true
+                                  schema:
+                                    kind: string
+                          createdAt:
+                            optional: false
+                            schema:
+                              kind: string
+                          resolvedBy:
+                            optional: false
+                            schema:
+                              kind: object
+                              nullable: true
+                              fields:
+                                id:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                name:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                image:
+                                  optional: true
+                                  schema:
+                                    kind: string
+                          resolvedAt:
+                            optional: false
+                            schema:
+                              kind: string
+                              nullable: true
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: union
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "409":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.reviews.reopen:
+    method: POST
+    path: /editing/reviews/reopen
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+      - 409
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        ids:
+          optional: false
+          schema:
+            kind: array
+            element:
+              kind: string
+    responses:
+      "200":
+        kind: object
+        fields:
+          reviews:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                  status:
+                    optional: false
+                    schema:
+                      kind: enum
+                      values:
+                        - approved
+                        - changes
+                        - open
+                        - outdated
+                        - published-past-review
+                        - withdrawn
+                  version:
+                    optional: false
+                    schema:
+                      kind: number
+                  reviewers:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: object
+                        fields:
+                          id:
+                            optional: false
+                            schema:
+                              kind: string
+                          name:
+                            optional: false
+                            schema:
+                              kind: string
+                          image:
+                            optional: true
+                            schema:
+                              kind: string
+                  requestedBy:
+                    optional: false
+                    schema:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        name:
+                          optional: false
+                          schema:
+                            kind: string
+                        image:
+                          optional: true
+                          schema:
+                            kind: string
+                  note:
+                    optional: false
+                    schema:
+                      kind: string
+                      nullable: true
+                  createdAt:
+                    optional: false
+                    schema:
+                      kind: string
+                  decidedBy:
+                    optional: false
+                    schema:
+                      kind: object
+                      nullable: true
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        name:
+                          optional: false
+                          schema:
+                            kind: string
+                        image:
+                          optional: true
+                          schema:
+                            kind: string
+                  decisionNote:
+                    optional: false
+                    schema:
+                      kind: string
+                      nullable: true
+                  decidedAt:
+                    optional: false
+                    schema:
+                      kind: string
+                      nullable: true
+                  comments:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: object
+                        fields:
+                          id:
+                            optional: false
+                            schema:
+                              kind: string
+                          path:
+                            optional: false
+                            schema:
+                              kind: string
+                          text:
+                            optional: false
+                            schema:
+                              kind: string
+                          by:
+                            optional: false
+                            schema:
+                              kind: object
+                              fields:
+                                id:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                name:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                image:
+                                  optional: true
+                                  schema:
+                                    kind: string
+                          createdAt:
+                            optional: false
+                            schema:
+                              kind: string
+                          resolvedBy:
+                            optional: false
+                            schema:
+                              kind: object
+                              nullable: true
+                              fields:
+                                id:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                name:
+                                  optional: false
+                                  schema:
+                                    kind: string
+                                image:
+                                  optional: true
+                                  schema:
+                                    kind: string
+                          resolvedAt:
+                            optional: false
+                            schema:
+                              kind: string
+                              nullable: true
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: union
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "409":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.reviews.comment:
+    method: POST
+    path: /editing/reviews/comments
+    statuses:
+      - 201
+      - 401
+      - 403
+      - 404
+      - 409
+      - 422
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        review:
+          optional: false
+          schema:
+            kind: string
+        path:
+          optional: false
+          schema:
+            kind: string
+        text:
+          optional: false
+          schema:
+            kind: string
+    responses:
+      "201":
+        kind: object
+        fields:
+          id:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - approved
+                - changes
+                - open
+                - outdated
+                - published-past-review
+                - withdrawn
+          version:
+            optional: false
+            schema:
+              kind: number
+          reviewers:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                  name:
+                    optional: false
+                    schema:
+                      kind: string
+                  image:
+                    optional: true
+                    schema:
+                      kind: string
+          requestedBy:
+            optional: false
+            schema:
+              kind: object
+              fields:
+                id:
+                  optional: false
+                  schema:
+                    kind: string
+                name:
+                  optional: false
+                  schema:
+                    kind: string
+                image:
+                  optional: true
+                  schema:
+                    kind: string
+          note:
+            optional: false
+            schema:
+              kind: string
+              nullable: true
+          createdAt:
+            optional: false
+            schema:
+              kind: string
+          decidedBy:
+            optional: false
+            schema:
+              kind: object
+              nullable: true
+              fields:
+                id:
+                  optional: false
+                  schema:
+                    kind: string
+                name:
+                  optional: false
+                  schema:
+                    kind: string
+                image:
+                  optional: true
+                  schema:
+                    kind: string
+          decisionNote:
+            optional: false
+            schema:
+              kind: string
+              nullable: true
+          decidedAt:
+            optional: false
+            schema:
+              kind: string
+              nullable: true
+          comments:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                  path:
+                    optional: false
+                    schema:
+                      kind: string
+                  text:
+                    optional: false
+                    schema:
+                      kind: string
+                  by:
+                    optional: false
+                    schema:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        name:
+                          optional: false
+                          schema:
+                            kind: string
+                        image:
+                          optional: true
+                          schema:
+                            kind: string
+                  createdAt:
+                    optional: false
+                    schema:
+                      kind: string
+                  resolvedBy:
+                    optional: false
+                    schema:
+                      kind: object
+                      nullable: true
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        name:
+                          optional: false
+                          schema:
+                            kind: string
+                        image:
+                          optional: true
+                          schema:
+                            kind: string
+                  resolvedAt:
+                    optional: false
+                    schema:
+                      kind: string
+                      nullable: true
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: union
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "409":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "422":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.reviews.resolveComment:
+    method: POST
+    path: /editing/reviews/comments/:id/resolve
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+      - 409
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          id:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - approved
+                - changes
+                - open
+                - outdated
+                - published-past-review
+                - withdrawn
+          version:
+            optional: false
+            schema:
+              kind: number
+          reviewers:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                  name:
+                    optional: false
+                    schema:
+                      kind: string
+                  image:
+                    optional: true
+                    schema:
+                      kind: string
+          requestedBy:
+            optional: false
+            schema:
+              kind: object
+              fields:
+                id:
+                  optional: false
+                  schema:
+                    kind: string
+                name:
+                  optional: false
+                  schema:
+                    kind: string
+                image:
+                  optional: true
+                  schema:
+                    kind: string
+          note:
+            optional: false
+            schema:
+              kind: string
+              nullable: true
+          createdAt:
+            optional: false
+            schema:
+              kind: string
+          decidedBy:
+            optional: false
+            schema:
+              kind: object
+              nullable: true
+              fields:
+                id:
+                  optional: false
+                  schema:
+                    kind: string
+                name:
+                  optional: false
+                  schema:
+                    kind: string
+                image:
+                  optional: true
+                  schema:
+                    kind: string
+          decisionNote:
+            optional: false
+            schema:
+              kind: string
+              nullable: true
+          decidedAt:
+            optional: false
+            schema:
+              kind: string
+              nullable: true
+          comments:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                  path:
+                    optional: false
+                    schema:
+                      kind: string
+                  text:
+                    optional: false
+                    schema:
+                      kind: string
+                  by:
+                    optional: false
+                    schema:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        name:
+                          optional: false
+                          schema:
+                            kind: string
+                        image:
+                          optional: true
+                          schema:
+                            kind: string
+                  createdAt:
+                    optional: false
+                    schema:
+                      kind: string
+                  resolvedBy:
+                    optional: false
+                    schema:
+                      kind: object
+                      nullable: true
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        name:
+                          optional: false
+                          schema:
+                            kind: string
+                        image:
+                          optional: true
+                          schema:
+                            kind: string
+                  resolvedAt:
                     optional: false
                     schema:
                       kind: string
@@ -11817,6 +13467,10 @@ tools:
   editing.reviews.list: editing_reviews_list
   editing.reviews.request: editing_reviews_request
   editing.reviews.decide: editing_reviews_decide
+  editing.reviews.withdraw: editing_reviews_withdraw
+  editing.reviews.reopen: editing_reviews_reopen
+  editing.reviews.comment: editing_reviews_comment
+  editing.reviews.resolveComment: editing_reviews_resolve_comment
 content:
   collection:articles:
     kind: collection
