@@ -54,6 +54,11 @@ export interface FieldFormProps {
      * marked where it sits.
      */
     missing?: readonly string[];
+    /**
+     * What shows first in the sidebar, above any field that sits there. With
+     * it, the sidebar shows even when no field does.
+     */
+    aside?: ReactNode;
     ref?: Ref<FieldFormHandle>;
 }
 
@@ -85,7 +90,7 @@ export const changesForWire = (changes: Record<string, unknown>): Record<string,
  * collapsibles, with the sidebar beside them when the form is wide enough. A
  * change saves to the draft a moment after typing stops.
  */
-export function FieldForm({ fields, layout, draft, onSave, onState, changed, pointed, missing, ref }: FieldFormProps) {
+export function FieldForm({ fields, layout, draft, onSave, onState, changed, pointed, missing, aside, ref }: FieldFormProps) {
     const [values, setValues] = useState<Record<string, unknown>>({});
     const [shownTabs, setShownTabs] = useState<Readonly<Record<string, string>>>({});
     const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
@@ -411,14 +416,17 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
             );
         });
 
+    const hasSidebar = (aside !== undefined && aside !== null && aside !== false) || arranged.sidebar.length > 0;
+
     return (
         <div className="k-form">
-            <div className="k-form__columns" data-sidebar={arranged.sidebar.length > 0}>
+            <div className="k-form__columns" data-sidebar={hasSidebar}>
                 <div className="k-form__main">
                     <div className="k-form__fields k-stack">{shown(arranged.main, 'k-stack', section)}</div>
                 </div>
-                {arranged.sidebar.length > 0 ? (
+                {hasSidebar ? (
                     <aside className="k-form__sidebar k-stack" aria-label="Sidebar">
+                        {aside}
                         {shown(arranged.sidebar, 'k-stack', section)}
                     </aside>
                 ) : null}
