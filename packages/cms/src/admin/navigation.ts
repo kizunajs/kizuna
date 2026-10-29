@@ -13,6 +13,13 @@ export type Screen =
           kind: 'pages';
       }
     | {
+          kind: 'media';
+          /**
+           * The image whose details are open beside the library.
+           */
+          id?: string;
+      }
+    | {
           kind: 'collection';
           name: string;
       }
@@ -32,6 +39,7 @@ export type Screen =
 
 export const hrefOf = (screen: Screen): string => {
     if (screen.kind === 'pages') return '#/pages';
+    if (screen.kind === 'media') return screen.id === undefined ? '#/media' : `#/media/${encodeURIComponent(screen.id)}`;
     if (screen.kind === 'collection') return `#/collections/${encodeURIComponent(screen.name)}`;
     if (screen.kind === 'document') return `#/edit/${encodeURIComponent(screen.ref)}`;
     if (screen.kind === 'view') return `#/views/${encodeURIComponent(screen.name)}`;
@@ -45,6 +53,16 @@ export const screenOf = (hash: string): Screen => {
         return {
             kind: 'pages',
         };
+    }
+    if (first === 'media') {
+        return second === undefined || second === ''
+            ? {
+                  kind: 'media',
+              }
+            : {
+                  kind: 'media',
+                  id: decodeURIComponent(second),
+              };
     }
     if (first === 'collections' && second !== undefined && second !== '') {
         return {
@@ -108,7 +126,7 @@ export interface NavigationSection {
 export const CONTENT_GROUP = 'Content';
 
 /**
- * The sidebar's headings: Content first, with the pages, then each `group`
+ * The sidebar's headings: Content first, with the pages and the media, then each `group`
  * in the order the globals, collections and views first name it.
  */
 export const navigationOf = (options: {
@@ -125,6 +143,12 @@ export const navigationOf = (options: {
                     label: 'Pages',
                     screen: {
                         kind: 'pages',
+                    },
+                },
+                {
+                    label: 'Media',
+                    screen: {
+                        kind: 'media',
                     },
                 },
             ],
@@ -182,6 +206,7 @@ export const isCurrent = (entry: Screen, shown: Screen): boolean => {
     if (entry.kind === 'view') {
         return (shown.kind === 'view' && shown.name === entry.name) || (shown.kind === 'record' && shown.view === entry.name);
     }
+    if (entry.kind === 'media') return shown.kind === 'media';
     if (entry.kind === 'pages') return shown.kind === 'pages' || (shown.kind === 'document' && shown.ref.startsWith('page:'));
     return shown.kind === 'dashboard';
 };

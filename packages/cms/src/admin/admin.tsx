@@ -10,6 +10,7 @@ import { connectOverHttp } from './connection.js';
 import { Dashboard, type WaitingReview } from './dashboard.js';
 import { DocumentScreen } from './document.js';
 import { CollectionList, PagesList } from './list.js';
+import { MediaLibrary } from './media.js';
 import {
     CONTENT_GROUP,
     hrefOf,
@@ -175,6 +176,9 @@ export function Admin({ config }: { config: AdminConfig }) {
 
     const shown = (() => {
         if (screen.kind === 'pages') return <PagesList connection={connection} routes={config.routes} />;
+        if (screen.kind === 'media') {
+            return <MediaLibrary connection={connection} selectedId={screen.id} people={people} collectionLabel={collectionLabel} />;
+        }
         if (screen.kind === 'collection') {
             const collection = collections?.find((candidate) => candidate.name === screen.name);
             if (collection === undefined) {

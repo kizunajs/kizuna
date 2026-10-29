@@ -65,7 +65,7 @@ const FEWEST_PER_PAGE = Math.min(...PER_PAGE_CHOICES);
  * How far into the rows the page is, the pages to step through when there is
  * more than one, and how many rows a page holds when that could matter.
  */
-function Pager({
+export function Pager({
     page,
     pageCount,
     first,

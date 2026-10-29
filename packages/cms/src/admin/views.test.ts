@@ -56,7 +56,7 @@ describe('views in the admin', () => {
             },
         });
         expect(sections.map((section) => [section.label, section.entries.map((entry) => entry.label)])).toEqual([
-            ['Content', ['Pages', 'App users']],
+            ['Content', ['Pages', 'Media', 'App users']],
             ['Shop', ['Orders']],
         ]);
     });

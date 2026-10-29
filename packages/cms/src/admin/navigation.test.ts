@@ -18,6 +18,13 @@ describe('the admin navigation', () => {
                 kind: 'document',
                 ref: 'item:articles:a/1',
             },
+            {
+                kind: 'media',
+            },
+            {
+                kind: 'media',
+                id: 'med_3f2a9c1e8b7d4a5f6c0e1d2b',
+            },
         ];
         for (const screen of screens) expect(screenOf(hrefOf(screen))).toEqual(screen);
         expect(screenOf('')).toEqual({
@@ -53,7 +60,7 @@ describe('the admin navigation', () => {
             },
         });
         expect(sections.map((section) => [section.label, section.entries.map((entry) => entry.label)])).toEqual([
-            ['Content', ['Pages', 'Site', 'Articles']],
+            ['Content', ['Pages', 'Media', 'Site', 'Articles']],
             ['People', ['Employees']],
         ]);
     });

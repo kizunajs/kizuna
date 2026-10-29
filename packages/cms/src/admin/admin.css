@@ -2954,22 +2954,20 @@
     /* The button is as large as the picture, so a click's place in it is the focal point. */
     .k-media-details__frame {
         position: relative;
-        display: inline-flex;
-        max-width: 100%;
+        display: block;
         padding: 0;
         border: 0;
         border-radius: 8px;
-        background: none;
+        background: var(--k-control);
         cursor: crosshair;
     }
 
     .k-media-details__frame img {
         display: block;
-        max-width: 100%;
-        max-height: 360px;
-        width: auto;
-        height: auto;
+        width: 100%;
+        height: 100%;
         border-radius: 8px;
+        object-fit: cover;
     }
 
     .k-media-details__uses {

@@ -56,6 +56,7 @@ describe('the admin search', () => {
         expect(placesOf(sections).map((place) => [place.label, place.detail])).toEqual([
             ['Dashboard', ''],
             ['Pages', 'Content'],
+            ['Media', 'Content'],
             ['Site', 'Content'],
             ['Articles', 'Content'],
             ['Employees', 'Team'],
@@ -79,7 +80,7 @@ describe('the admin search', () => {
             places: placesOf(sections),
             documents,
         });
-        expect(empty.places).toHaveLength(6);
+        expect(empty.places).toHaveLength(7);
         expect(empty.documents).toEqual([]);
 
         const found = searchOf({
