@@ -37,6 +37,34 @@ export namespace API {
             available: boolean;
         };
 
+        export type Block = {
+            /**
+             * What an item of the list stores under its block key.
+             */
+            name: string;
+            /**
+             * What editors see the block called.
+             */
+            label?: string;
+            /**
+             * What the block is for, read when choosing one.
+             */
+            description?: string;
+            /**
+             * The block's fields, in the order editors see them, named as the item holds them.
+             */
+            fields: Array<{
+                name: string;
+                label?: string;
+                /**
+                 * For an enum, the label editors see for each value.
+                 */
+                options?: Record<string, string>;
+                description?: string;
+                required: boolean;
+            }>;
+        };
+
         export type ChartWidget = {
             type: "chart";
             label: string;
@@ -298,6 +326,10 @@ export namespace API {
              */
             block?: string;
             /**
+             * For a list of blocks, the blocks an item may be. Each item names its block under 'block', beside that block's fields.
+             */
+            blocks?: Array<CMS.Block>;
+            /**
              * The path of the block field this one sits in.
              */
             parent?: string;
@@ -372,6 +404,9 @@ export namespace API {
              * The default alt text, used where a field sets none.
              */
             alt: string;
+            /**
+             * The default focal point, used where a field sets none.
+             */
             focalPoint?: {
                 /**
                  * Across, from the left edge, as a fraction of the width.
@@ -387,7 +422,68 @@ export namespace API {
         };
 
         export type MediaList = {
-            media: Array<CMS.Media>;
+            media: Array<CMS.MediaSummary>;
+            /**
+             * The largest file an upload accepts.
+             */
+            maxBytes: number;
+        };
+
+        export type MediaSummary = {
+            id: string;
+            url: string;
+            contentType: string;
+            size: number;
+            width: number;
+            height: number;
+            filename: string;
+            /**
+             * The default alt text, used where a field sets none.
+             */
+            alt: string;
+            /**
+             * The default focal point, used where a field sets none.
+             */
+            focalPoint?: {
+                /**
+                 * Across, from the left edge, as a fraction of the width.
+                 */
+                x: number;
+                /**
+                 * Down, from the top edge, as a fraction of the height.
+                 */
+                y: number;
+            };
+            uploadedAt: string;
+            uploadedBy: string;
+            /**
+             * How many pages, globals and items hold it, published or in a draft.
+             */
+            uses: number;
+        };
+
+        export type MediaUse = {
+            /**
+             * The document holding the image, like page:frontPage or item:articles:k3j9x2.
+             */
+            ref: string;
+            /**
+             * An item's title, or the page's or global's label.
+             */
+            label: string | null;
+            /**
+             * The fields holding it, as dotted paths.
+             */
+            fieldPaths: Array<string>;
+            /**
+             * Whether the published content shows it. False when only the draft holds it.
+             */
+            published: boolean;
+        };
+
+        export type MediaUses = {
+            id: string;
+            uses: Array<CMS.MediaUse>;
         };
 
         export type MissingFields = {
@@ -581,6 +677,9 @@ export namespace API {
 
         export type UpdateMedia = {
             alt?: string;
+            /**
+             * The default focal point, used where a field sets none. `null` clears it.
+             */
             focalPoint?: {
                 /**
                  * Across, from the left edge, as a fraction of the width.
@@ -590,7 +689,7 @@ export namespace API {
                  * Down, from the top edge, as a fraction of the height.
                  */
                 y: number;
-            };
+            } | null;
         };
 
         export type Upload = {
@@ -791,7 +890,8 @@ export namespace API {
                             href: string;
                         }>;
                     };
-                    statement?: {
+                    sections: Array<{
+                        block: "statement";
                         eyebrow?: string;
                         /**
                          * One or two sentences. Wrap the words to lean on in *asterisks* to set them in italics.
@@ -814,8 +914,8 @@ export namespace API {
                              */
                             href: string;
                         };
-                    };
-                    categories?: {
+                    } | {
+                        block: "categories";
                         eyebrow?: string;
                         /**
                          * Under 8 words. Wrap a word in *asterisks* to set it in italics.
@@ -835,8 +935,8 @@ export namespace API {
                              */
                             href: string;
                         }>;
-                    };
-                    products?: {
+                    } | {
+                        block: "products";
                         eyebrow?: string;
                         /**
                          * Under 8 words. Wrap a word in *asterisks* to set it in italics.
@@ -853,8 +953,8 @@ export namespace API {
                              */
                             href: string;
                         };
-                    };
-                    photo?: {
+                    } | {
+                        block: "media";
                         image: {
                             id: string;
                             url: string;
@@ -865,8 +965,9 @@ export namespace API {
                         caption?: string;
                         heading?: string;
                         body?: string;
-                    };
-                    columns?: {
+                        tone: "forest" | "sage";
+                    } | {
+                        block: "content";
                         eyebrow?: string;
                         heading?: string;
                         columns: Array<{
@@ -903,8 +1004,8 @@ export namespace API {
                                 };
                             }>;
                         }>;
-                    };
-                    articles?: {
+                    } | {
+                        block: "archive";
                         eyebrow?: string;
                         /**
                          * Under 8 words. Wrap a word in *asterisks* to set it in italics.
@@ -912,8 +1013,8 @@ export namespace API {
                         heading: string;
                         topic?: "care" | "season" | "growers";
                         articles: Array<ArticleId>;
-                    };
-                    callToAction?: {
+                    } | {
+                        block: "callToAction";
                         eyebrow?: string;
                         /**
                          * One or two sentences. Wrap the words to lean on in *asterisks* to set them in italics.
@@ -930,7 +1031,8 @@ export namespace API {
                              */
                             href: string;
                         }>;
-                    };
+                        tone: "forest" | "sage";
+                    }>;
                     seo: {
                         /**
                          * What search results show as the title. 30 to 60 characters show in full.
@@ -942,9 +1044,6 @@ export namespace API {
                         description: string;
                     };
                     heroImpact: "high" | "medium" | "low";
-                    sections: Array<"statement" | "categories" | "products" | "photo" | "columns" | "articles" | "callToAction">;
-                    photoTone: "forest" | "sage";
-                    callToActionTone: "forest" | "sage";
                 };
             }; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
@@ -2209,6 +2308,20 @@ export namespace API {
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
     }
 
+    export namespace EditingMediaUses {
+        export type Params = {
+            id: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.MediaUses; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
     export namespace EditingMediaGetFile {
         export type Params = {
             id: string;
@@ -2238,6 +2351,20 @@ export namespace API {
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingMediaDelete {
+        export type Params = {
+            id: string;
+        };
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
     }
 
     export namespace EditingMediaCreateUpload {
@@ -3457,7 +3584,7 @@ export interface Client {
         };
         media: {
             /**
-             * List uploaded media
+             * List uploaded media, with how many pages hold each image
              *
              * @example
              * const result = await client.editing.media.list();
@@ -3482,6 +3609,21 @@ export interface Client {
                 fetchOptions?: RequestInit;
             }, API.EditingMediaGet.Result>;
             /**
+             * List the pages, globals and items that hold an image, and the fields holding it
+             *
+             * @example
+             * const result = await client.editing.media.uses({
+             *     params: {
+             *         id: '1',
+             *     },
+             * });
+             */
+            uses: ClientMethod<'GET', false, {
+                params: API.EditingMediaUses.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingMediaUses.Result>;
+            /**
              * The stored file of a media item, as uploaded, for copying between environments
              *
              * @example
@@ -3497,7 +3639,7 @@ export interface Client {
                 fetchOptions?: RequestInit;
             }, API.EditingMediaGetFile.Result>;
             /**
-             * Set the alt text or focal point of a media item
+             * Set the default alt text or focal point of a media item, which every use without its own shows
              *
              * @example
              * const result = await client.editing.media.update({
@@ -3512,6 +3654,23 @@ export interface Client {
                 headers?: Record<string, string>;
                 fetchOptions?: RequestInit;
             }, API.EditingMediaUpdate.Result>;
+            /**
+             * Delete an image and its stored file
+             *
+             * Pages, globals and items that hold it lose the image, so list its uses first. The person confirms before this runs.
+             *
+             * @example
+             * const result = await client.editing.media.delete({
+             *     params: {
+             *         id: '1',
+             *     },
+             * });
+             */
+            delete: ClientMethod<'DELETE', false, {
+                params: API.EditingMediaDelete.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingMediaDelete.Result>;
             /**
              * Start an upload: a presigned URL the browser sends the file to
              *
@@ -4399,6 +4558,16 @@ const routes: GeneratedRoutes = {
                     404: {},
                 },
             },
+            uses: {
+                method: 'GET',
+                path: '/editing/media/:id/uses',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                },
+            },
             getFile: {
                 method: 'GET',
                 path: '/editing/media/:id/file',
@@ -4418,6 +4587,16 @@ const routes: GeneratedRoutes = {
                     403: {},
                     404: {},
                     400: {},
+                },
+            },
+            delete: {
+                method: 'DELETE',
+                path: '/editing/media/:id',
+                responses: {
+                    204: {},
+                    401: {},
+                    403: {},
+                    404: {},
                 },
             },
             createUpload: {

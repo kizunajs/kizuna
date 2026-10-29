@@ -139,6 +139,49 @@ routes:
     responses:
       "200":
         kind: union
+        discriminator: kind
+        options:
+          login:
+            kind: object
+            fields:
+              kind:
+                optional: false
+                schema:
+                  kind: enum
+                  values:
+                    - login
+              at:
+                optional: false
+                schema:
+                  kind: string
+              ipAddress:
+                optional: false
+                schema:
+                  kind: string
+              userAgent:
+                optional: false
+                schema:
+                  kind: string
+          logout:
+            kind: object
+            fields:
+              kind:
+                optional: false
+                schema:
+                  kind: enum
+                  values:
+                    - logout
+              at:
+                optional: false
+                schema:
+                  kind: string
+              reason:
+                optional: false
+                schema:
+                  kind: enum
+                  values:
+                    - session_expired
+                    - signed_out
       "404":
         kind: object
         fields:
@@ -939,6 +982,42 @@ routes:
     deprecated: false
     body:
       kind: union
+      discriminator: channel
+      options:
+        email:
+          kind: object
+          fields:
+            channel:
+              optional: false
+              schema:
+                kind: enum
+                values:
+                  - email
+            to:
+              optional: false
+              schema:
+                kind: string
+            subject:
+              optional: false
+              schema:
+                kind: string
+        sms:
+          kind: object
+          fields:
+            channel:
+              optional: false
+              schema:
+                kind: enum
+                values:
+                  - sms
+            phone:
+              optional: false
+              schema:
+                kind: string
+            text:
+              optional: false
+              schema:
+                kind: string
     responses:
       "202":
         kind: object
