@@ -3,13 +3,14 @@ import { dirname, join, resolve } from 'node:path';
 import { pluginExportsOf } from 'kizunajs/adapter';
 import type { CmsExports } from './setup.js';
 import { CmsHttpError, type CmsService } from './cms.js';
-import type { EnvironmentOptions } from './options.js';
+import { DEFAULT_SITE, type EnvironmentOptions } from './options.js';
 import { defaultPagesOutput, discoverPages, findAppDir, renderPagesModule } from './discovery.js';
 import { mediaIdsOf } from './media/resolve.js';
 import { refsOf } from './content.js';
 import type { MediaRecord } from './media/media.js';
 import { formatRef, type DocumentRef } from './refs.js';
 import { servesCollection } from './page.js';
+import { orphansOf, renameSite, type TableCounts } from './site-storage.js';
 
 /**
  * What the kizuna CLI hands a plugin's commands.
@@ -33,9 +34,11 @@ Commands:
              Store every document at its latest migration step, so reads stop migrating it.
   check      List published content that fails its schema. Exits 1 when there is some.
   pages      List every page's path and name.
-  orphans    List stored page content no page claims, after a rename. Exits 1 when there is some.
+  orphans    List stored content nothing in the config claims, per site and table. Exits 1 when there is some.
   rename-page <from> <to>
              Move a renamed page's stored content and history to its new name.
+  rename-site <from> <to>
+             Move everything a site stores, with its history, to a new site key.
   push       Copy one page into another environment as a draft, with its media.
   pull       Copy every published page, global and item, with media, into local.
 
@@ -46,6 +49,7 @@ Options:
   --write            pages: also write the pages module the config imports.
   --out <file>       pages --write: where. Default: cms.pages.ts beside the app directory
   --site <name>      push, rename-page: the site the page belongs to, when several apps share the CMS.
+  --dry-run          rename-site: print what would move, and move nothing.
   --to <env>         push: the target environment. pull: the destination. Default: local
   --from <env>       push: the source environment. Default: local. pull: the source, required.
 `;
@@ -53,6 +57,8 @@ Options:
 class CliError extends Error {}
 
 type Flags = Record<string, string | boolean>;
+
+const BOOLEAN_FLAGS = ['json', 'write', 'dry-run'];
 
 const parse = (argv: readonly string[]): { command: string | undefined; positional: string[]; flags: Flags } => {
     const flags: Flags = {};
@@ -65,7 +71,7 @@ const parse = (argv: readonly string[]): { command: string | undefined; position
         }
         const name = argument.slice(2);
         const next = argv[index + 1];
-        if (next === undefined || next.startsWith('--') || name === 'json' || name === 'write') {
+        if (next === undefined || next.startsWith('--') || BOOLEAN_FLAGS.includes(name)) {
             flags[name] = true;
             continue;
         }
@@ -225,6 +231,11 @@ const missingRelationshipIds = async (service: CmsService, refs: ReturnType<type
     return missing;
 };
 
+const TABLES: ReadonlyArray<keyof TableCounts> = ['cms_documents', 'cms_versions', 'cms_refs', 'cms_reviews', 'cms_review_comments'];
+
+const tableLines = (counts: TableCounts, indent: string): string[] =>
+    TABLES.map((table) => `${indent}${table.padEnd(21)}${String(counts[table]).padStart(6)}`);
+
 const runMigrate = async (context: PluginCliContext, flags: Flags): Promise<Record<string, unknown>> => {
     const service = await serviceOf(context);
     const out = resolve(context.cwd, typeof flags['out'] === 'string' ? flags['out'] : 'drizzle');
@@ -326,6 +337,20 @@ const runPush = async (context: PluginCliContext, positional: string[], flags: F
     };
 };
 
+const siteRoute = (site: string | undefined): string =>
+    site === undefined || site === DEFAULT_SITE ? '' : `/sites/${encodeURIComponent(site)}`;
+
+/**
+ * Where a document is edited, under the `editing` routes: a site's own
+ * pages, globals and items under `/sites/<site>`, shared content at the root.
+ */
+const editingRouteOf = (ref: DocumentRef): string => {
+    if (ref.type === 'item') {
+        return `${siteRoute(ref.site)}/collections/${encodeURIComponent(ref.collection)}/items/${encodeURIComponent(ref.id)}`;
+    }
+    return `${siteRoute(ref.site)}/${ref.type === 'page' ? 'pages' : 'globals'}/${encodeURIComponent(ref.name)}`;
+};
+
 const runPull = async (context: PluginCliContext, flags: Flags): Promise<Record<string, unknown>> => {
     if (typeof flags['from'] !== 'string') throw new CliError('Pass --from <env>.');
     const service = await serviceOf(context);
@@ -369,45 +394,51 @@ const runPull = async (context: PluginCliContext, flags: Flags): Promise<Record<
             .filter((item) => item.status === 'published' || item.status === 'changed')
             .map((item) => item.id);
     };
+    const onSite = (site: string): { site?: string } =>
+        site === DEFAULT_SITE
+            ? {}
+            : {
+                  site,
+              };
     for (const [site, pages] of Object.entries(service.sites)) {
-        for (const [name, entry] of Object.entries(pages)) {
-            if (servesCollection(entry.page)) continue;
-            await copy(
-                {
-                    type: 'page',
-                    name,
-                    ...(site === 'default'
-                        ? {}
-                        : {
-                              site,
-                          }),
-                },
-                site === 'default'
-                    ? `/pages/${encodeURIComponent(name)}`
-                    : `/sites/${encodeURIComponent(site)}/pages/${encodeURIComponent(name)}`
-            );
+        for (const name of Object.keys(pages)) {
+            if (servesCollection(pages[name]!.page)) continue;
+            const ref: DocumentRef = {
+                type: 'page',
+                name,
+                ...onSite(site),
+            };
+            await copy(ref, editingRouteOf(ref));
         }
     }
-    for (const name of Object.keys(service.globals)) {
-        await copy(
-            {
-                type: 'global',
-                name,
-            },
-            `/globals/${encodeURIComponent(name)}`
-        );
+    const globals: Array<[site: string, name: string]> = [
+        ...Object.keys(service.globals).map((name): [string, string] => [DEFAULT_SITE, name]),
+        ...Object.entries(service.siteGlobals).flatMap(([site, owned]) => Object.keys(owned).map((name): [string, string] => [site, name])),
+    ];
+    for (const [site, name] of globals) {
+        const ref: DocumentRef = {
+            type: 'global',
+            name,
+            ...onSite(site),
+        };
+        await copy(ref, editingRouteOf(ref));
     }
-    for (const name of Object.keys(service.collections)) {
-        const route = `/collections/${encodeURIComponent(name)}`;
+    const collections: Array<[site: string, name: string]> = [
+        ...Object.keys(service.collections).map((name): [string, string] => [DEFAULT_SITE, name]),
+        ...Object.entries(service.siteCollections).flatMap(([site, owned]) =>
+            Object.keys(owned).map((name): [string, string] => [site, name])
+        ),
+    ];
+    for (const [site, name] of collections) {
+        const route = `${siteRoute(site)}/collections/${encodeURIComponent(name)}`;
         for (const id of await itemsOf(route)) {
-            await copy(
-                {
-                    type: 'item',
-                    collection: name,
-                    id,
-                },
-                `${route}/items/${encodeURIComponent(id)}`
-            );
+            const ref: DocumentRef = {
+                type: 'item',
+                collection: name,
+                id,
+                ...onSite(site),
+            };
+            await copy(ref, editingRouteOf(ref));
         }
     }
     return {
@@ -470,19 +501,35 @@ export const run = async (argv: readonly string[], context: PluginCliContext): P
             }
             case 'orphans': {
                 const service = await serviceOf(context);
-                const orphans = await service.orphanedPages();
+                const orphans = await orphansOf(service);
+                const found = orphans.sites.length + orphans.documents.length + orphans.collections.length;
                 context.stdout(
                     json
                         ? JSON.stringify(orphans, null, 2)
-                        : orphans.length === 0
-                          ? 'Every stored page has a page.'
+                        : found === 0
+                          ? 'The config claims everything stored.'
                           : [
-                                'Stored content no page claims:',
-                                ...orphans.map((orphan) => `  ${orphan.site === 'default' ? '' : `${orphan.site}:`}${orphan.name}`),
-                                'Move it with kizuna cms rename-page <from> <to>.',
+                                ...(orphans.sites.length === 0
+                                    ? []
+                                    : [
+                                          'Stored under a site the config does not declare:',
+                                          ...orphans.sites.flatMap((orphan) => [`  ${orphan.site}`, ...tableLines(orphan.tables, '    ')]),
+                                          'Move it with kizuna cms rename-site <from> <to>.',
+                                      ]),
+                                ...(orphans.documents.length + orphans.collections.length === 0
+                                    ? []
+                                    : [
+                                          'Stored content nothing in the config claims:',
+                                          ...orphans.documents.map((orphan) => `  ${orphan.ref}`),
+                                          ...orphans.collections.map(
+                                              (orphan) =>
+                                                  `  collection ${orphan.site === 'default' ? '' : `${orphan.site}:`}${orphan.collection}, ${orphan.items} ${orphan.items === 1 ? 'item' : 'items'}`
+                                          ),
+                                          'Move a renamed page with kizuna cms rename-page <from> <to>.',
+                                      ]),
                             ].join('\n')
                 );
-                return orphans.length === 0 ? 0 : 1;
+                return found === 0 ? 0 : 1;
             }
             case 'rename-page': {
                 const [from, to] = positional;
@@ -507,6 +554,36 @@ export const run = async (argv: readonly string[], context: PluginCliContext): P
                               2
                           )
                         : `Moved the content of ${from} to ${to}.`
+                );
+                return 0;
+            }
+            case 'rename-site': {
+                const [from, to] = positional;
+                if (from === undefined || to === undefined) throw new CliError('Name both sites: kizuna cms rename-site <from> <to>.');
+                const service = await serviceOf(context);
+                const dryRun = flags['dry-run'] === true;
+                let moved: TableCounts;
+                try {
+                    moved = await renameSite(service, from, to, {
+                        dryRun,
+                    });
+                } catch (error) {
+                    if (error instanceof CmsHttpError) throw new CliError(error.message);
+                    throw error;
+                }
+                context.stdout(
+                    json
+                        ? JSON.stringify(
+                              {
+                                  from,
+                                  to,
+                                  dryRun,
+                                  moved,
+                              },
+                              null,
+                              2
+                          )
+                        : [`${dryRun ? 'Would move' : 'Moved'} the content of ${from} to ${to}:`, ...tableLines(moved, '  ')].join('\n')
                 );
                 return 0;
             }
