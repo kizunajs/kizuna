@@ -1149,13 +1149,17 @@ describe('relationships', () => {
         });
         revalidated.length = 0;
         const response = await asEditor(request(app).post('/invalidate')).send({
-            relationship: 'products',
+            brand: 'ProductId',
             id: 'prod_1',
         });
         expect(response.body).toEqual({
             pages: ['frontPage'],
         });
         expect(revalidated).toEqual([['kizuna-cms:page:frontPage']]);
-        expect((await asEditor(request(app).post('/invalidate')).send({ relationship: 'orders', id: 'order_1' })).status).toBe(404);
+        const unknown = await asEditor(request(app).post('/invalidate')).send({
+            brand: 'OrderId',
+            id: 'order_1',
+        });
+        expect(unknown.status).toBe(404);
     });
 });

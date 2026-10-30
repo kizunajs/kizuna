@@ -694,6 +694,13 @@ export const CmsPluginOptionsSchema = z
     .superRefine((options, context) => {
         const declared = Object.keys(options.sites?.entries ?? {});
         for (const [name, partner] of Object.entries(options.partners ?? {})) {
+            if (declared.includes(name)) {
+                context.addIssue({
+                    code: 'custom',
+                    message: `has the name of a site. A partner and a site are refreshed by name, so give the partner another`,
+                    path: ['partners', name],
+                });
+            }
             for (const site of partner.reads) {
                 if (declared.includes(site)) continue;
                 context.addIssue({

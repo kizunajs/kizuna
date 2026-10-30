@@ -8,6 +8,8 @@ import type { DeclaredSites } from './site.js';
 import type { Collection, Global } from './definitions.js';
 import { servesCollection } from './page.js';
 import { latestMigration } from './content.js';
+import { refreshJobs, type CmsJobs } from './refresh.js';
+import type { Jobs } from 'kizunajs/adapter';
 
 /**
  * Every page, global and collection, for the snapshot and `kizuna diff`.
@@ -98,13 +100,19 @@ export function cms<
         globals?: Globals;
         collections?: Collections;
     }
-): ContentProvider<CmsContent<Pages, Globals, Collections, Sites>, CmsRoutes>;
-export function cms(options: CmsPluginOptions): ContentProvider<unknown, CmsRoutes> {
+): ContentProvider<CmsContent<Pages, Globals, Collections, Sites>, CmsRoutes, [Sites] extends [undefined] ? Jobs : CmsJobs>;
+export function cms(options: CmsPluginOptions): ContentProvider<unknown, CmsRoutes, Jobs> {
     const plugin = cmsPluginDeclaration(options);
     return defineContentProvider({
         plugin,
         routes: cmsRoutes(plugin),
         reader: ({ api, runtime }) => createReader((pluginExportsOf(api)[plugin.slug] as CmsExports).service, runtime),
         documents: () => documentsOf(options),
+        // Each publish refreshes the other deployments and the partners, so a CMS with sites runs jobs.
+        ...(options.sites === undefined
+            ? {}
+            : {
+                  jobs: refreshJobs(plugin.slug),
+              }),
     });
 }

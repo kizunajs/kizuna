@@ -128,6 +128,13 @@ export interface Description {
             name: string;
             path: string;
         }>;
+        /**
+         * The partners that read it, by their label.
+         */
+        partners: Array<{
+            key: string;
+            label: string;
+        }>;
     };
     status: DocumentStatus;
     version: number;

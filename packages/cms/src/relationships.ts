@@ -41,7 +41,7 @@ export interface RelationshipOptionsInput<Id> {
 
 export interface RelationshipDefinition<Name extends string = string, Id extends z.ZodType = z.ZodType> {
     /**
-     * What the relationship is called, in the content overview and `invalidate`.
+     * What the relationship is called, in the content overview.
      */
     name: Name;
     /**

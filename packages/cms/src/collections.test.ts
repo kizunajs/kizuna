@@ -190,6 +190,7 @@ describe('globals', () => {
         expect(described.body.usedOn).toEqual({
             everywhere: true,
             pages: [],
+            partners: [],
         });
     });
 });
@@ -290,6 +291,7 @@ describe('collections', () => {
                     path: '/contact',
                 },
             ],
+            partners: [],
         });
         const contacts = (await asEditor(request(app).get('/editing/describe').query({ url: '/contact' }))).body.fields[0];
         expect(contacts.brand).toBe('EmployeeId');

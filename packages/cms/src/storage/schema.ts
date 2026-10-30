@@ -139,3 +139,37 @@ export const cmsReviewComments = pgTable(
     },
     (table) => [index('cms_review_comments_review').on(table.reviewId, table.createdAt)]
 );
+
+/**
+ * One site's or partner's refresh after a document published, unpublished or
+ * was deleted, and how it went. One publish adds a row per target under one
+ * `batch`.
+ */
+export const cmsRefreshes = pgTable(
+    'cms_refreshes',
+    {
+        id: text('id').primaryKey(),
+        batch: text('batch').notNull(),
+        ref: text('ref').notNull(),
+        target: text('target').notNull(),
+        /**
+         * What the call names, like `OfficeId:k3j9x2` or `global:footer`.
+         */
+        subject: text('subject').notNull(),
+        status: text('status').notNull(),
+        attempts: integer('attempts').notNull().default(0),
+        createdAt: timestamp('created_at', {
+            withTimezone: true,
+            mode: 'date',
+        }).notNull(),
+        updatedAt: timestamp('updated_at', {
+            withTimezone: true,
+            mode: 'date',
+        }).notNull(),
+    },
+    (table) => [
+        index('cms_refreshes_subject').on(table.target, table.subject),
+        index('cms_refreshes_ref').on(table.ref, table.createdAt),
+        index('cms_refreshes_updated').on(table.updatedAt),
+    ]
+);

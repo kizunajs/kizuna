@@ -15,6 +15,7 @@ import { declareSites, SiteSchema } from './site.js';
 import { DocumentStore } from './storage/store.js';
 import { memoryMediaStorage } from './media/storage.js';
 import { ImageSchema } from './image.js';
+import { heldJobs } from './held-jobs.fixture.js';
 
 const k = new Kizuna();
 const editor = k.identity
@@ -56,6 +57,7 @@ const storage = memoryMediaStorage();
 const pglite = new PGlite();
 const db = drizzle(pglite);
 const config = defineConfig({
+    jobRunner: heldJobs,
     adapter: expressAdapter(),
     auth: {
         identities: {

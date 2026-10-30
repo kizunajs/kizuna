@@ -1,9 +1,19 @@
 import { z } from 'zod';
 import type { ContentRuntime, PluginApi } from 'kizunajs/plugin';
-import { flattenRoutes } from 'kizunajs/adapter';
+import {
+    adapterContextOf,
+    authenticate,
+    flattenRoutes,
+    JOBS_META,
+    jobFnAt,
+    jobRunnerFrom,
+    type JobFnByKey,
+    type JobsMeta,
+} from 'kizunajs/adapter';
+import { CONTENT_JOBS_KEY } from 'kizunajs/plugin';
 import { HANDLER } from './handler-key.js';
 import { encodeForWire, readDef, readMetaBrand, toToolName, unwrapOptionalWrappers } from 'kizunajs/generator';
-import type { RouteDefinition, Roles } from 'kizunajs';
+import type { RouteAuth, RouteDefinition, Roles } from 'kizunajs';
 import {
     describeFields,
     describeLayout,
@@ -32,6 +42,7 @@ import { s3MediaStorage } from './media/s3.js';
 import { mediaIdsOf, mediaUsesOf, resolveContent } from './media/resolve.js';
 import { pathRefusal, type Caller } from './rules.js';
 import { EditorAccess } from './site-access.js';
+import { queueRefreshes, refreshTargets, REFRESH_JOB } from './refresh.js';
 import {
     DocumentStore,
     VersionConflictError,
@@ -41,7 +52,7 @@ import {
     type ListField,
     type Migration,
 } from './storage/store.js';
-import { previewSecret, signPreviewToken, verifyPreviewToken } from './preview-token.js';
+import { previewSecret, signPreviewToken, verifyPreviewToken, verifyRefresh } from './preview-token.js';
 import { DraftNotices } from './draft-notices.js';
 import { descendantsOf, loadParents, loopRefusal, parentIn, placeInTree } from './tree.js';
 import { ITEM_STATUSES, type ItemCondition, type ItemListQuery } from './item-list.js';
@@ -281,6 +292,8 @@ export interface Target {
      */
     shared?: DocumentRef;
 }
+
+const isList = (value: unknown): value is readonly string[] => Array.isArray(value);
 
 /**
  * Whether a value counts as set, so a site's empty value shows the shared
@@ -1714,6 +1727,7 @@ export class CmsService {
             throw new CmsHttpError(404, { detail: `There is no item '${id}' in '${listing.name}'.` });
         }
         await this.revalidateDocument(ref);
+        await queueRefreshes(this, ref);
     }
 
     /**
@@ -1782,20 +1796,6 @@ export class CmsService {
                 if (typeof brand === 'string' && !this.holdsIds(brand)) delete context.jsonSchema.brand;
             },
         }) as Record<string, unknown>;
-    }
-
-    /**
-     * The relationship with a name, for `invalidate`.
-     */
-    relationship(name: string): CmsRelationship {
-        const found = (this.options.relationships ?? []).find((relationship) => relationship.name === name);
-        if (found === undefined) {
-            const known = (this.options.relationships ?? []).map((relationship) => relationship.name);
-            throw new CmsHttpError(404, {
-                detail: `There is no relationship named '${name}'.${known.length === 0 ? ' Define one with defineRelationship().' : ` The CMS knows ${known.join(', ')}.`}`,
-            });
-        }
-        return found;
     }
 
     /**
@@ -2039,11 +2039,18 @@ export class CmsService {
     async usedOn(
         ref: DocumentRef,
         sees: (site: string) => boolean = () => true
-    ): Promise<{ everywhere: boolean; pages: Array<{ name: string; path: string }> }> {
+    ): Promise<{ everywhere: boolean; pages: Array<{ name: string; path: string }>; partners: Array<{ key: string; label: string }> }> {
+        const partners = refreshTargets(this, ref)
+            .filter((target) => target.kind === 'partner')
+            .map((target) => ({
+                key: target.key,
+                label: target.label,
+            }));
         if (ref.type === 'global') {
             return {
                 everywhere: true,
                 pages: [],
+                partners,
             };
         }
         const brand = this.listingOf(ref)?.brand;
@@ -2051,10 +2058,12 @@ export class CmsService {
             return {
                 everywhere: false,
                 pages: [],
+                partners,
             };
         }
         return {
             everywhere: false,
+            partners,
             pages: (await this.whereUsed(brand, ref.id))
                 .filter((used) => sees(used.site))
                 .map((used) => ({
@@ -2284,6 +2293,7 @@ export class CmsService {
         await this.assertNoLoop(ref, state.row?.draft, 'published');
         await this.store.publish(state.target.kind, state.target.key, author, state.target.site);
         await this.revalidateDocument(ref);
+        await queueRefreshes(this, ref);
         return this.draftState(ref);
     }
 
@@ -2304,6 +2314,7 @@ export class CmsService {
             });
         }
         await this.revalidateDocument(ref);
+        await queueRefreshes(this, ref);
         return this.draftState(ref);
     }
 
@@ -2612,20 +2623,6 @@ export class CmsService {
     }
 
     /**
-     * Drops the cached renders of every page holding one of a relationship's ids,
-     * and returns their names.
-     */
-    async invalidateRelationship(name: string, id: string): Promise<string[]> {
-        const brand = brandOf(this.relationship(name).id);
-        if (brand === undefined) {
-            throw new CmsHttpError(500, {
-                detail: `The ${name} relationship's id has no brand. Make it with Kizuna.brand.`,
-            });
-        }
-        return this.invalidate(brand, id);
-    }
-
-    /**
      * Drops the cached renders of every page holding the id, and returns
      * their names.
      */
@@ -2669,12 +2666,74 @@ export class CmsService {
         return names.length === 0 ? [DEFAULT_SITE] : names;
     }
 
+    private jobsMeta(): JobsMeta | undefined {
+        return (this.api as unknown as Record<typeof JOBS_META, JobsMeta | undefined>)[JOBS_META];
+    }
+
+    /**
+     * The refresh job, once the api has assembled, or `undefined` for a
+     * CMS that declares none.
+     */
+    refreshJob(): JobFnByKey | undefined {
+        return jobFnAt(jobRunnerFrom(this.jobsMeta()), `${CONTENT_JOBS_KEY}.${REFRESH_JOB}`);
+    }
+
+    /**
+     * Whether a transport carries the refresh jobs, so a failed one is tried
+     * again. In process, a failure is the only attempt.
+     */
+    retriesRefreshes(): boolean {
+        return this.jobsMeta()?.transport !== undefined;
+    }
+
     /**
      * Whether a preview token was signed with this CMS's secret and has not
      * expired.
      */
     verifiesPreview(token: string): boolean {
         return verifyPreviewToken(previewSecret(this.options.previewSecret), token);
+    }
+
+    /**
+     * Whether another deployment signed a refresh with the preview secret.
+     */
+    verifiesRefresh(signature: string, body: Record<string, unknown>): boolean {
+        return verifyRefresh(previewSecret(this.options.previewSecret), signature, body);
+    }
+
+    /**
+     * Whether a request carries what a route's `auth` asks for, checked by
+     * hand where a route takes another way in as well.
+     */
+    async allows(auth: RouteAuth, args: Record<string, unknown>): Promise<boolean> {
+        if (auth === false) return true;
+        const listOf = (value: string | readonly string[] | undefined): readonly string[] =>
+            value === undefined ? [] : typeof value === 'string' ? [value] : value;
+        const spelled = typeof auth === 'string' || isList(auth) ? undefined : auth;
+        const names = spelled === undefined ? listOf(auth as string | readonly string[]) : listOf(spelled.identity);
+        const accepted = listOf(spelled?.roles);
+        const requires = spelled?.requires;
+        for (const name of names) {
+            const context = await authenticate(
+                this.api,
+                name,
+                {
+                    headers: args['headers'] as Record<string, string | string[] | undefined>,
+                    query: args['query'],
+                },
+                adapterContextOf(args)
+            );
+            if (context === undefined) continue;
+            const role = context['role'];
+            const held = role === undefined ? [] : Array.isArray(role) ? role : [role];
+            if (accepted.length > 0 && !held.some((candidate) => accepted.includes(candidate as string))) continue;
+            const permissions = Array.isArray(context['permissions']) ? (context['permissions'] as string[]) : [];
+            const missing = Object.entries(requires ?? {}).some(([resource, verbs]) =>
+                (verbs as readonly string[]).some((verb) => !permissions.includes(`${resource}:${verb}`))
+            );
+            if (!missing) return true;
+        }
+        return false;
     }
 
     previewToken(): string {

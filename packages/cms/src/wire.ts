@@ -225,6 +225,14 @@ export const UsedOnSchema = z
                 path: z.string(),
             })
         ),
+        partners: z
+            .array(
+                z.object({
+                    key: z.string(),
+                    label: z.string(),
+                })
+            )
+            .describe('The partners that read it, which a publish refreshes too.'),
     })
     .describe('Where else the document appears, to say before changing shared content.');
 
@@ -579,9 +587,46 @@ export const ImageQuerySchema = z.object({
     h: z.int().min(1).max(4096).optional().describe('The height to render at; with w, the image is cropped to fit around the focal point.'),
 });
 
-export const InvalidateBodySchema = z.object({
-    relationship: z.string().min(1).describe('The name of the relationship, like products.'),
-    id: z.string().min(1).describe('The id of the one that changed.'),
+export const InvalidateBodySchema = z.union([
+    z
+        .object({
+            brand: z.string().min(1).describe("The brand of the id, like 'ProductId'."),
+            id: z.string().min(1).describe('The id of the one that changed.'),
+        })
+        .strict(),
+    z
+        .object({
+            global: z.string().min(1).describe("The global that changed, like 'header'."),
+        })
+        .strict(),
+    z
+        .object({
+            page: z.string().min(1).describe("The page that changed, like 'frontPage'."),
+        })
+        .strict(),
+]);
+
+/**
+ * What one refresh calls a site's or a partner's `invalidate` with.
+ */
+export type InvalidateBody = z.output<typeof InvalidateBodySchema>;
+
+export const RefreshListSchema = Kizuna.model({
+    title: 'CMS.Refreshes',
+    schema: z.object({
+        refreshes: z.array(
+            z.object({
+                target: z.string().describe('The site or partner, by its key.'),
+                kind: z.enum(['site', 'partner']),
+                label: z.string(),
+                status: z
+                    .enum(['queued', 'answered', 'retrying', 'failed'])
+                    .describe('`retrying` failed and waits for another attempt; `failed` will not be tried again.'),
+                attempts: z.int(),
+                updatedAt: z.iso.datetime(),
+            })
+        ),
+    }),
 });
 
 export const PeopleSchema = Kizuna.model({

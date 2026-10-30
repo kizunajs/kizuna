@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, inArray, isNotNull, lt, max, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, lt, max, ne, sql } from 'drizzle-orm';
 import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
-import { cmsDocuments, cmsRefs, cmsReviewComments, cmsReviews, cmsVersions } from './schema.js';
+import { cmsDocuments, cmsRefreshes, cmsRefs, cmsReviewComments, cmsReviews, cmsVersions } from './schema.js';
 import { CMS_MIGRATION_SQL, likePrefix, type IndexType } from './migration.js';
 
 /**
@@ -74,6 +74,34 @@ export interface ReviewRow {
 /**
  * A comment on one field of a review's draft.
  */
+/**
+ * Where one refresh stands: waiting to run, answered, failed and waiting to
+ * be tried again, or failed for good.
+ */
+export type RefreshStatus = 'queued' | 'answered' | 'retrying' | 'failed';
+
+export interface RefreshRow {
+    id: string;
+    batch: string;
+    ref: string;
+    target: string;
+    subject: string;
+    status: RefreshStatus;
+    attempts: number;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+/**
+ * A refresh that ran, for the dashboard.
+ */
+export interface RefreshRecord {
+    target: string;
+    status: 'answered' | 'failed' | 'retrying';
+    attempts: number;
+    at: Date;
+}
+
 export interface ReviewCommentRow {
     id: string;
     reviewId: string;
@@ -443,6 +471,82 @@ export class DocumentStore {
                 resolvedAt: new Date(),
             })
             .where(eq(cmsReviewComments.id, id));
+    }
+
+    async addRefreshes(rows: ReadonlyArray<Pick<RefreshRow, 'batch' | 'ref' | 'target' | 'subject'>>): Promise<void> {
+        if (rows.length === 0) return;
+        const now = new Date();
+        await this.db.insert(cmsRefreshes).values(
+            rows.map((row) => ({
+                ...row,
+                id: randomUUID(),
+                status: 'queued',
+                attempts: 0,
+                createdAt: now,
+                updatedAt: now,
+            }))
+        );
+    }
+
+    /**
+     * Records an attempt at refreshing one target for one subject, on every
+     * row still waiting for it, since a queue may fold several publishes into
+     * one call.
+     */
+    async recordRefresh(target: string, subject: string, outcome: 'answered' | 'retrying' | 'failed', attemptsAllowed = 1): Promise<void> {
+        await this.db
+            .update(cmsRefreshes)
+            .set({
+                // The attempt the transport makes last fails for good.
+                status:
+                    outcome === 'retrying'
+                        ? sql`case when ${cmsRefreshes.attempts} + 1 >= ${attemptsAllowed} then 'failed' else 'retrying' end`
+                        : outcome,
+                attempts: sql`${cmsRefreshes.attempts} + 1`,
+                updatedAt: new Date(),
+            })
+            .where(and(eq(cmsRefreshes.target, target), eq(cmsRefreshes.subject, subject), ne(cmsRefreshes.status, 'answered')));
+    }
+
+    /**
+     * The refreshes of a document's latest publish, unpublish or delete.
+     */
+    async latestRefreshes(ref: string): Promise<RefreshRow[]> {
+        const [latest] = await this.db
+            .select({
+                batch: cmsRefreshes.batch,
+            })
+            .from(cmsRefreshes)
+            .where(eq(cmsRefreshes.ref, ref))
+            .orderBy(desc(cmsRefreshes.createdAt))
+            .limit(1);
+        if (latest === undefined) return [];
+        const rows = await this.db
+            .select()
+            .from(cmsRefreshes)
+            .where(eq(cmsRefreshes.batch, latest.batch))
+            .orderBy(asc(cmsRefreshes.target));
+        return rows.map((row) => ({
+            ...row,
+            status: row.status as RefreshStatus,
+        }));
+    }
+
+    /**
+     * Every refresh that ran since a time, the latest attempt's time as `at`.
+     */
+    async refreshesSince(from: Date): Promise<RefreshRecord[]> {
+        const rows = await this.db
+            .select()
+            .from(cmsRefreshes)
+            .where(and(gte(cmsRefreshes.updatedAt, from), ne(cmsRefreshes.status, 'queued')))
+            .orderBy(asc(cmsRefreshes.updatedAt));
+        return rows.map((row) => ({
+            target: row.target,
+            status: row.status as RefreshRecord['status'],
+            attempts: row.attempts,
+            at: row.updatedAt,
+        }));
     }
 
     async latestVersion(documentId: string): Promise<number> {

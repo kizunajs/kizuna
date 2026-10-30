@@ -12,6 +12,7 @@ import { cms } from './provider.js';
 import { DocumentStore, type Ref } from './storage/store.js';
 import type { CmsExports } from './setup.js';
 import { run } from './cli.js';
+import { heldJobs } from './held-jobs.fixture.js';
 
 const k = new Kizuna();
 const editor = k.identity
@@ -109,6 +110,7 @@ const siteFields = (key: string) => ({
  */
 const configWith = (content: { sites?: ReturnType<typeof declareSites>; collections?: boolean }) =>
     defineConfig({
+        jobRunner: heldJobs,
         auth: {
             identities: {
                 editor,
@@ -528,6 +530,7 @@ describe('kizuna cms orphans', () => {
 
 describe('kizuna cms pull', () => {
     const pulling = defineConfig({
+        jobRunner: heldJobs,
         auth: {
             identities: {
                 editor,

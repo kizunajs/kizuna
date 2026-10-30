@@ -19,6 +19,7 @@ import { DocumentStore } from './storage/store.js';
 import { memoryMediaStorage } from './media/storage.js';
 import type { CmsExports } from './setup.js';
 import type { AdminConfig } from './admin/config.js';
+import { heldJobs } from './held-jobs.fixture.js';
 
 const k = new Kizuna();
 const roles = Kizuna.roles(['editor', 'admin']);
@@ -166,6 +167,7 @@ const sites = declareSites(SiteSchema, {
 const pglite = new PGlite();
 const db = drizzle(pglite);
 const config = defineConfig({
+    jobRunner: heldJobs,
     adapter: expressAdapter(),
     auth: {
         identities: {
@@ -628,6 +630,7 @@ describe('auth.sites', () => {
             }));
         expect(() =>
             defineConfig({
+                jobRunner: heldJobs,
                 auth: {
                     identities: {
                         editor: editorsOnly,

@@ -179,14 +179,14 @@ describe('a config that holds the CMS alone', () => {
             },
         });
         const refreshed = await request(server).post('/invalidate').set('x-cms-key', 'app-key').send({
-            relationship: 'products',
+            brand: 'ProductId',
             id: 'prod_tulips',
         });
         expect(refreshed.status).toBe(200);
         expect(refreshed.body.pages).toEqual(['frontPage']);
         expect(revalidated).toEqual([['kizuna-cms:page:frontPage']]);
         const refused = await asEditor(request(server).post('/invalidate')).send({
-            relationship: 'products',
+            brand: 'ProductId',
             id: 'prod_tulips',
         });
         expect(refused.status).toBe(401);

@@ -54,7 +54,9 @@ import {
 } from './wire.js';
 import { UploadRejectedError } from './media/media.js';
 import { parseFields, parseFilter } from './item-list.js';
-import { ImageQuerySchema, InvalidateBodySchema } from './wire.js';
+import { ImageQuerySchema, InvalidateBodySchema, RefreshListSchema, type InvalidateBody } from './wire.js';
+import { invalidate as invalidateDocument, refreshTargets } from './refresh.js';
+import { REFRESH_SIGNATURE_HEADER } from './preview-token.js';
 import { sameContent } from './same-content.js';
 import {
     assertReviewed,
@@ -1903,6 +1905,55 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             })) as never
         );
 
+    const listRefreshes = route({
+        method: 'GET',
+        path: `${editingBase}/refreshes`,
+        auth: editor,
+        summary: 'List how the sites and partners that show a document took its latest publish',
+        description:
+            'One entry per site or partner, from its last publish, unpublish or delete. `queued` waits for its turn, `retrying` did not answer and is tried again, `failed` will not be.',
+        tool: {
+            readOnlyHint: true,
+        },
+        query: z.object({
+            ref: z
+                .string()
+                .describe("A document: page:<name>, global:<name> or item:<collection>:<id>, with the site first for a site's own."),
+        }),
+        responses: {
+            200: {
+                body: RefreshListSchema,
+                cache: 'no-store',
+            },
+            400: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const value = (args.query as { ref: string }).ref;
+            const ref = parseRef(value);
+            if (ref === undefined) throw new CmsHttpError(400, { detail: `'${value}' is not a ref.` });
+            const access = cms.access(args.auth);
+            access.assertSeesRef(ref);
+            const known = new Map(refreshTargets(cms, ref).map((target) => [target.key, target]));
+            return {
+                status: 200,
+                body: {
+                    refreshes: (await cms.store.latestRefreshes(formatRef(ref)))
+                        .filter((row) => known.get(row.target)?.kind === 'partner' || access.sees(row.target))
+                        .map((row) => ({
+                            target: row.target,
+                            kind: known.get(row.target)?.kind ?? 'site',
+                            label: known.get(row.target)?.label ?? row.target,
+                            status: row.status,
+                            attempts: row.attempts,
+                            updatedAt: row.updatedAt.toISOString(),
+                        })),
+                },
+            };
+        }) as never
+    );
+
     const whereUsed = route({
         method: 'GET',
         path: `${editingBase}/refs/:brand/:id`,
@@ -2335,26 +2386,46 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         }) as never
     );
 
+    const invalidateAuth = options.auth.invalidate ?? editor;
+    // Your own deployments call each other with a signature, which no identity of the app's verifies, so the handler checks.
+    const signedInvalidate = siteEntries.length > 0;
     const invalidate = route({
         method: 'POST',
         path: `${base}/invalidate`,
-        auth: options.auth.invalidate ?? editor,
-        summary: 'Refresh every page that shows one item of a relationship',
-        description:
-            'For the app API: call it when a product, a person or anything else pages hold by id changes, so the pages showing it render fresh. Answers with the pages it refreshed.',
+        auth: signedInvalidate ? false : invalidateAuth,
+        summary: 'Refresh every page that shows an id, a global or a page',
+        description: signedInvalidate
+            ? `For the app API, and for the CMS's other deployments: \`{ brand, id }\` refreshes the pages holding an id, \`{ global }\` a global and \`{ page }\` a page. Takes the credential \`auth.invalidate\` names, or the ${REFRESH_SIGNATURE_HEADER} header another deployment signs. Answers with the pages it refreshed.`
+            : 'For the app API: `{ brand, id }` refreshes the pages holding an id that changed, like a product, `{ global }` a global and `{ page }` a page. Answers with the pages it refreshed.',
         body: InvalidateBodySchema,
         responses: {
             200: z.object({
                 pages: z.array(z.string()),
             }),
+            404: ProblemDetailsSchema,
+            // A guarded route has its 401 from the guard.
+            ...((signedInvalidate
+                ? {
+                      401: ProblemDetailsSchema,
+                  }
+                : {}) as object),
         },
     }).handler(
         guarded(async (cms, args) => {
-            const body = args.body as z.output<typeof InvalidateBodySchema>;
+            const body = args.body as InvalidateBody;
+            if (signedInvalidate) {
+                const signature = args.headers[REFRESH_SIGNATURE_HEADER];
+                const signed = typeof signature === 'string' && cms.verifiesRefresh(signature, body);
+                if (!signed && !(await cms.allows(invalidateAuth, args as unknown as Record<string, unknown>))) {
+                    throw new CmsHttpError(401, {
+                        detail: `Sign the call with the ${REFRESH_SIGNATURE_HEADER} header, or send the credential auth.invalidate names.`,
+                    });
+                }
+            }
             return {
                 status: 200,
                 body: {
-                    pages: await cms.invalidateRelationship(body.relationship, body.id),
+                    pages: await invalidateDocument(cms, body),
                 },
             };
         }) as never
@@ -2437,6 +2508,11 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 guarded,
             }),
             whereUsed,
+            ...(siteEntries.length === 0
+                ? {}
+                : {
+                      refreshes: listRefreshes,
+                  }),
             searchItems,
             createPreview,
             people: {

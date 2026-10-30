@@ -16,6 +16,7 @@ import { DocumentStore } from './storage/store.js';
 import { formatRef, parseRef, type DocumentRef } from './refs.js';
 import { stripPaths } from './source-path.js';
 import type { CmsExports } from './setup.js';
+import { heldJobs } from './held-jobs.fixture.js';
 
 const k = new Kizuna();
 const editor = k.identity
@@ -117,6 +118,7 @@ const showing = {
 const pglite = new PGlite();
 const db = drizzle(pglite);
 const config = defineConfig({
+    jobRunner: heldJobs,
     adapter: expressAdapter(),
     auth: {
         identities: {

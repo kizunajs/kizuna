@@ -14,6 +14,7 @@ import { definePages } from './options.js';
 import { memoryMediaStorage } from './media/storage.js';
 import { DocumentStore } from './storage/store.js';
 import { stripPaths } from './source-path.js';
+import { heldJobs } from './held-jobs.fixture.js';
 
 const revalidated: string[][] = [];
 
@@ -121,6 +122,7 @@ const content = cms({
 });
 const config = defineConfig({
     adapter: expressAdapter(),
+    jobRunner: heldJobs,
     auth: {
         identities: {
             editor,
@@ -204,6 +206,7 @@ describe('several sites sharing one CMS', () => {
     it('takes pages for one site or sites for several, not both', () => {
         expect(() =>
             defineConfig({
+                jobRunner: heldJobs,
                 auth: {
                     identities: {
                         editor,
@@ -237,6 +240,7 @@ const Events = defineCollection({
 
 const configWith = (siteSites: ReturnType<typeof declareSites>) =>
     defineConfig({
+        jobRunner: heldJobs,
         auth: {
             identities: {
                 editor,
@@ -370,6 +374,7 @@ describe('two sites sharing one pages module', () => {
         },
     });
     const shared = defineConfig({
+        jobRunner: heldJobs,
         adapter: expressAdapter(),
         auth: {
             identities: {

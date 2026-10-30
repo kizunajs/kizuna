@@ -75,6 +75,24 @@ create table if not exists cms_review_comments (
 );
 
 create index if not exists cms_review_comments_review on cms_review_comments (review_id, created_at);
+
+create table if not exists cms_refreshes (
+    id text primary key,
+    batch text not null,
+    ref text not null,
+    target text not null,
+    subject text not null,
+    status text not null,
+    attempts int not null default 0,
+    created_at timestamptz not null,
+    updated_at timestamptz not null
+);
+
+create index if not exists cms_refreshes_subject on cms_refreshes (target, subject);
+
+create index if not exists cms_refreshes_ref on cms_refreshes (ref, created_at);
+
+create index if not exists cms_refreshes_updated on cms_refreshes (updated_at);
 `;
 
 /**

@@ -51,3 +51,40 @@ export const verifyPreviewToken = (secret: string, token: string, now = Date.now
     const expires = Number(Buffer.from(payload, 'base64url').toString('utf8'));
     return Number.isFinite(expires) && expires > now;
 };
+
+/**
+ * The header a refresh between your own deployments carries, signed with the
+ * preview secret every deployment shares.
+ */
+export const REFRESH_SIGNATURE_HEADER = 'kizuna-cms-signature';
+
+/**
+ * How long a signed refresh is accepted.
+ */
+const REFRESH_TTL_SECONDS = 300;
+
+/**
+ * A refresh's body as one string, its keys sorted, so the receiving end
+ * signs what it parsed the same way.
+ */
+const canonical = (body: Record<string, unknown>): string =>
+    JSON.stringify(Object.fromEntries(Object.entries(body).sort(([left], [right]) => left.localeCompare(right))));
+
+/**
+ * Signs one refresh's body, valid for five minutes.
+ */
+export const signRefresh = (secret: string, body: Record<string, unknown>, now = Date.now()): string => {
+    const expires = String(now + REFRESH_TTL_SECONDS * 1000);
+    return `${expires}.${signature(secret, `refresh.${expires}.${canonical(body)}`)}`;
+};
+
+/**
+ * Whether a refresh's signature was made with the secret for this body and
+ * has not expired.
+ */
+export const verifyRefresh = (secret: string, header: string, body: Record<string, unknown>, now = Date.now()): boolean => {
+    const [expires, given] = header.split('.');
+    if (expires === undefined || given === undefined || !(Number(expires) > now)) return false;
+    const expected = signature(secret, `refresh.${expires}.${canonical(body)}`);
+    return expected.length === given.length && timingSafeEqual(Buffer.from(expected), Buffer.from(given));
+};

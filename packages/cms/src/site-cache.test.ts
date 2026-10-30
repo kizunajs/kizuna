@@ -13,6 +13,7 @@ import { declareSites, SiteSchema } from './site.js';
 import { DocumentStore } from './storage/store.js';
 import type { CmsExports } from './setup.js';
 import type { DocumentRef } from './refs.js';
+import { heldJobs } from './held-jobs.fixture.js';
 
 const cachedTags: string[][] = [];
 const revalidated: string[] = [];
@@ -107,6 +108,7 @@ const showing = {
 const pglite = new PGlite();
 const db = drizzle(pglite);
 const config = defineConfig({
+    jobRunner: heldJobs,
     adapter: {
         name: 'test',
         mount: () => undefined,

@@ -10,6 +10,7 @@ import type { RoutePath } from './types.js';
 export type { RoutePath };
 export type { ApiContext } from './configured.js';
 export {
+    CONTENT_JOBS_KEY,
     defineContentProvider,
     isContentProvider,
     type ContentProvider,
