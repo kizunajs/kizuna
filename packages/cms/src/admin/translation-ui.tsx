@@ -274,6 +274,7 @@ export function TranslateMode({
     onChange,
     onTranslate,
     onKeep,
+    onDone,
 }: {
     document: Description;
     steps: ReadonlyArray<{
@@ -292,6 +293,7 @@ export function TranslateMode({
     onChange: (path: string, value: unknown) => void;
     onTranslate: (path: string) => void;
     onKeep: (path: string) => void;
+    onDone: () => void;
 }) {
     const locales = document.locale!;
     const step = steps[current];
@@ -391,7 +393,11 @@ export function TranslateMode({
                         </button>
                     ) : null}
                     <span className="k-translate-mode__grow" />
-                    {current + 1 < steps.length ? (
+                    {steps.every((entry) => outcomes[entry.field.path] !== undefined) ? (
+                        <button type="button" className="k-button k-button--primary k-button--small" onClick={onDone}>
+                            Done
+                        </button>
+                    ) : current + 1 < steps.length ? (
                         <button type="button" className="k-text-button k-translate-mode__next" onClick={() => onGo(current + 1)}>
                             Next
                             <ArrowDown {...ICON} />

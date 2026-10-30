@@ -1399,9 +1399,11 @@ export function DocumentScreen({
                     {translating === TRANSLATING_ALL ? 'Translating…' : 'Translate everything'}
                 </button>
             ) : null}
-            <button type="button" className="k-button k-button--secondary" onClick={finishTranslating}>
-                Done
-            </button>
+            {done < steps.length ? (
+                <button type="button" className="k-button k-button--secondary" onClick={finishTranslating}>
+                    Close
+                </button>
+            ) : null}
         </>
     );
 
@@ -1667,6 +1669,7 @@ export function DocumentScreen({
                             }))
                         }
                         onTranslate={(path) => void translateSteps([path], path)}
+                        onDone={finishTranslating}
                         onKeep={(path) => {
                             void keepFields([path]).then((kept) => {
                                 if (!kept) return;
