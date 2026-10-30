@@ -189,7 +189,7 @@
         display: flex;
         flex: 1;
         align-items: center;
-        gap: 12px;
+        gap: 11px;
         min-width: 0;
         color: var(--k-muted);
     }
@@ -200,7 +200,7 @@
         align-items: center;
         gap: 8px;
         /* The padding gives the hover room, and the margins take it back, so the first slash sits as far from the mark as every other. */
-        margin: 0 -12px 0 -8px;
+        margin: 0 -11px 0 -8px;
         padding: 4px 8px;
         border: 0;
         border-radius: 8px;
@@ -228,7 +228,7 @@
     .k-path-bar__step {
         display: inline-flex;
         align-items: center;
-        gap: 12px;
+        gap: 11px;
         min-width: 0;
     }
 
