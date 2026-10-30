@@ -15,9 +15,11 @@
     "kizuna:generate": "kizuna generate --config kizuna.cms.config.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.91",
     "@electric-sql/pglite": "^0.5.8",
     "@kizunajs/mcp": "workspace:*",
     "@kizunajs/next": "workspace:*",
+    "ai": "^7.0.156",
     "better-auth": "^1.7.6",
     "drizzle-orm": "^0.45.3",
     "postgres": "^3.4.9"

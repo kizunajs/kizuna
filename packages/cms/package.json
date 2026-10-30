@@ -130,6 +130,7 @@
     "sharp": "^0.35.5"
   },
   "peerDependencies": {
+    "ai": ">=7.0.0",
     "drizzle-orm": ">=0.44.0",
     "kizunajs": "workspace:*",
     "next": ">=16.0.0",
@@ -137,6 +138,9 @@
     "zod": "^4.0.0"
   },
   "peerDependenciesMeta": {
+    "ai": {
+      "optional": true
+    },
     "next": {
       "optional": true
     },
@@ -153,6 +157,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "ai": "^7.0.156",
     "drizzle-orm": "^0.45.3",
     "express": "catalog:",
     "kizunajs": "workspace:*",
