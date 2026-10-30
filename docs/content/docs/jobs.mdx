@@ -117,7 +117,22 @@ The identity `k.jobs` names carries its own guard, so nothing else is wired here
 
 ## Jobs from the CMS
 
-A [CMS with several sites](/docs/cms/sites#running-the-refreshes) adds a job of its own beside yours, `content.refreshSite`, which refreshes each site and partner after a publish. A config that has it names `jobRunner` even when it declares no jobs. `mode: 'in-process'` runs it with nothing else. With `mode: 'http'`, the endpoints need an identity and the CMS's job declares none, so jobs of your own name it, and that identity guards `content.refreshSite` too.
+A [CMS with several sites](/docs/cms/sites#running-the-refreshes) adds a job of its own beside yours, `content.refreshSite`, which refreshes each site and partner after a publish. A config that has it names `jobRunner` even when it declares no jobs. `mode: 'in-process'` runs it with nothing else. With `mode: 'http'`, the endpoints need an identity. The CMS's job runs as the one your own jobs name, and a config with no jobs of its own names it on `cms()`:
+
+```ts title="kizuna.config.ts"
+content: cms({
+    db,
+    sites,
+    jobs: {
+        identity: 'scheduler',
+    },
+    auth: {
+        identity: 'editor',
+    },
+}),
+```
+
+One identity guards both endpoints, so when your jobs name one as well, it is the same.
 
 ## Schedules
 

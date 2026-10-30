@@ -263,6 +263,53 @@ describe('jobs a content provider declares', () => {
         expect(flattenJobs(api.jobs as Jobs).map(({ jobKey }) => jobKey)).toEqual(['sendDigests', 'content.refreshSite']);
     });
 
+    it('guards them with their own identity when the app declares no jobs', () => {
+        const { api } = defineConfig({
+            auth: {
+                identities: {
+                    scheduler: k.identity.bearer({
+                        context: z.object({
+                            invokedBy: z.string(),
+                        }),
+                    }),
+                },
+            },
+            content: contentWithJobs(refreshJobs('scheduler')),
+            jobRunner: {
+                mode: 'http',
+            },
+        });
+
+        expect(flattenJobs(api.jobs as Jobs).map(({ job }) => job.identity)).toEqual(['scheduler']);
+    });
+
+    it('says where the identity goes when neither the provider nor the app names one', () => {
+        expect(() =>
+            defineConfig({
+                content: contentWithJobs(refreshJobs()),
+                jobRunner: {
+                    mode: 'http',
+                },
+            })
+        ).toThrow(
+            "The jobs under `content` declare no identity, so `/jobs/dispatch` and `/jobs/run` would let anyone trigger them. Name the identity the CMS's refresh job runs as with `jobs: { identity }` on cms(), or declare app jobs with one."
+        );
+    });
+
+    it('names `k.jobs` when an app job declares no identity', () => {
+        expect(() =>
+            defineConfig({
+                jobs: k.jobs({
+                    sendDigests: k.job({}),
+                }),
+                content: contentWithJobs(refreshJobs()),
+                jobRunner: {
+                    mode: 'http',
+                },
+            })
+        ).toThrow('Pass an identity to `k.jobs`');
+    });
+
     it('requires jobRunner.mode, as app jobs do', () => {
         expect(() =>
             defineConfig({

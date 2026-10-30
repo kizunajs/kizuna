@@ -506,3 +506,111 @@ describe('a CMS with one site', () => {
         expect(Object.keys((several.api.jobs as Record<string, object>)['content']!)).toEqual(['refreshSite']);
     });
 });
+
+describe("the refresh job's identity", () => {
+    const scheduler = k.identity.bearer({
+        context: z.object({
+            invokedBy: z.string(),
+        }),
+    });
+    const identityOf = (jobs: unknown) =>
+        (jobs as Record<string, Record<string, { identity: string | undefined }>>)['content']!['refreshSite']!.identity;
+
+    it('runs as the identity cms() names, so the job routes serve with no app jobs', () => {
+        const served = defineConfig({
+            jobRunner: {
+                mode: 'http',
+            },
+            auth: {
+                identities: {
+                    editor,
+                    scheduler,
+                },
+            },
+            content: cms({
+                db,
+                sites,
+                jobs: {
+                    identity: 'scheduler',
+                },
+                auth: {
+                    identity: 'editor',
+                },
+            }),
+        });
+        expect(identityOf(served.api.jobs)).toBe('scheduler');
+    });
+
+    it("runs as the app's jobs do when cms() names none", () => {
+        const served = defineConfig({
+            jobRunner: {
+                mode: 'http',
+            },
+            auth: {
+                identities: {
+                    editor,
+                    scheduler,
+                },
+            },
+            jobs: k.jobs('scheduler', {
+                sendDigests: k.job({}),
+            }),
+            content: cms({
+                db,
+                sites,
+                auth: {
+                    identity: 'editor',
+                },
+            }),
+        });
+        expect(identityOf(served.api.jobs)).toBeUndefined();
+        expect(Object.keys(served.api.jobs as Record<string, object>)).toEqual(['sendDigests', 'content']);
+    });
+
+    it('says where the identity goes when neither cms() nor the app names one', () => {
+        expect(() =>
+            defineConfig({
+                jobRunner: {
+                    mode: 'http',
+                },
+                auth: {
+                    identities: {
+                        editor,
+                    },
+                },
+                content: cms({
+                    db,
+                    sites,
+                    auth: {
+                        identity: 'editor',
+                    },
+                }),
+            })
+        ).toThrow("Name the identity the CMS's refresh job runs as with `jobs: { identity }` on cms(), or declare app jobs with one.");
+    });
+
+    it('refuses an identity the config does not declare', () => {
+        expect(() =>
+            defineConfig({
+                jobRunner: {
+                    mode: 'http',
+                },
+                auth: {
+                    identities: {
+                        editor,
+                    },
+                },
+                content: cms({
+                    db,
+                    sites,
+                    jobs: {
+                        identity: 'scheduler',
+                    },
+                    auth: {
+                        identity: 'editor',
+                    },
+                }),
+            })
+        ).toThrow("cms() runs its refresh job as the identity 'scheduler', which `auth.identities` does not declare.");
+    });
+});

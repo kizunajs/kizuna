@@ -8,7 +8,7 @@ import { assertValidCache } from './cache.js';
 import { assertValidViews } from './tool-view.js';
 import { injectGuardResponses } from './guard-responses.js';
 import { flattenRoutes, type RoutesWithHandlerContext } from './handler-pipeline.js';
-import { assertJobRunner, jobClaims, withContentJobs, type Jobs, type JobsArg, type JobRunnerConfig } from './jobs.js';
+import { assertJobRunner, flattenJobs, jobClaims, withContentJobs, type Jobs, type JobsArg, type JobRunnerConfig } from './jobs.js';
 import type { GroupOptions, GroupSet } from './groups.js';
 import type { AssembledRoutes } from './group-routes.js';
 import { assembleRoutes } from './routes.js';
@@ -426,7 +426,7 @@ export const defineConfig = <
     const pluginRoutes = pluginRouteTree(plugins);
 
     assertNoPathCollisions([...routeClaims(routes), ...routeClaims(pluginRoutes, 'Plugin route'), ...jobClaims(jobs, options.jobRunner)]);
-    assertJobRunner(jobs, options.jobRunner);
+    assertJobRunner(jobs, options.jobRunner, flattenJobs((options.jobs ?? {}) as Jobs).length === 0);
     assertValidDeprecationDates(routes);
     assertValidDeprecationDates(pluginRoutes);
     assertDeclaredGroups(routes, options.groups as GroupSet | undefined);

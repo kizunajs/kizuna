@@ -235,10 +235,11 @@ const k = new Kizuna();
 
 /**
  * The jobs the CMS declares under `content` once it serves several sites:
- * one refresh per site or partner that shows a document.
+ * one refresh per site or partner that shows a document. Without an
+ * identity, they run as the app's jobs do.
  */
-export const refreshJobs = (slug: string) =>
-    k.jobs({
+export const refreshJobs = (slug: string, identity: string | undefined) => {
+    const definitions = {
         refreshSite: k
             .job({
                 summary: "Refresh one site's or partner's pages after a document changed",
@@ -261,7 +262,9 @@ export const refreshJobs = (slug: string) =>
                     },
                 });
             }),
-    });
+    };
+    return identity === undefined ? k.jobs(definitions) : k.jobs(identity, definitions);
+};
 
 /**
  * The jobs `cms()` hands `content`.

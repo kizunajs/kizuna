@@ -436,9 +436,10 @@ export const isCompiledJob = (value: unknown): value is CompiledJob => {
  */
 /**
  * Throw when declared jobs do not say how they run, or when the job endpoints
- * would be served with no identity guarding them.
+ * would be served with no identity guarding them. `contentOnly` says every job
+ * is the content provider's, so the error names where its identity goes.
  */
-export const assertJobRunner = (jobs: Jobs | undefined, config: JobsConfig | undefined): void => {
+export const assertJobRunner = (jobs: Jobs | undefined, config: JobsConfig | undefined, contentOnly = false): void => {
     const flattened = jobs ? flattenJobs(jobs) : [];
     if (flattened.length === 0) return;
     if (config?.mode === undefined) {
@@ -457,6 +458,12 @@ export const assertJobRunner = (jobs: Jobs | undefined, config: JobsConfig | und
     }
     if (identities.length > 0) return;
     const base = config.path ?? DEFAULT_JOBS_PATH;
+    if (contentOnly) {
+        throw new Error(
+            `The jobs under \`content\` declare no identity, so \`${base}/dispatch\` and \`${base}/run\` would let anyone trigger them. ` +
+                "Name the identity the CMS's refresh job runs as with `jobs: { identity }` on cms(), or declare app jobs with one."
+        );
+    }
     throw new Error(
         `The jobs declare no identity, so \`${base}/dispatch\` and \`${base}/run\` would let anyone trigger them. ` +
             "Pass an identity to `k.jobs`, or set `jobRunner: { mode: 'in-process' }` when the jobs run in this process with `startJobs`."
