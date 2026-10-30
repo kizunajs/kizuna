@@ -35,9 +35,9 @@ export const sites = declareSites(Site, {
 
 | On a site     | Description                                                                                                  |
 | ------------- | ------------------------------------------------------------------------------------------------------------ |
-| `label`       | What editors see, in the site switcher and wherever a field is marked as the site's                          |
+| `label`       | What editors see, in the admin's sidebar and place finder and wherever a field is marked as the site's       |
 | `url`         | Where the site is. Draft mode opens it, and publishing calls its `invalidate` at `url`, `apiPath` and `path` |
-| `icon`        | The site's icon in the switcher and the admin's browser tab: a path on the site or a full URL                |
+| `icon`        | The site's mark in the admin when no other site shares it, and the browser tab's icon: a path or a full URL  |
 | `locales`     | Optional. The languages it serves, from those on `cms()`. The first is its default                           |
 | `status`      | Optional. `'live'`, or `'offline'` while it is built                                                         |
 | `pages`       | The pages module of the app that renders it, kept in the content package. Two sites may name the same one    |

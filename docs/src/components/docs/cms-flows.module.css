@@ -2,54 +2,107 @@
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: 14px;
-    border-radius: 14px;
-    background: var(--k-popup);
-    box-shadow: var(--k-popup-shadow);
-    padding: 14px;
+    gap: 10px;
 }
 
-.group {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+.finder {
+    max-width: 280px;
 }
 
-.groupTitle {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0;
-    white-space: nowrap;
-    padding: 0 8px 4px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--k-muted);
+.separator {
+    height: 1px;
+    margin: 4px 6px;
+    background: var(--k-line);
 }
 
-.note {
-    margin: 6px 0 4px;
-    letter-spacing: 0;
-    text-transform: none;
-    font-weight: 500;
-}
-
-.entry {
-    display: flex;
+.mark {
+    display: inline-flex;
+    flex-shrink: 0;
     align-items: center;
-    gap: 8px;
-    border-radius: 8px;
-    padding: 7px 8px;
-    font-size: 13.5px;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    background: var(--k-control);
     color: var(--k-ink);
 }
 
-.entry svg {
-    width: 15px;
-    height: 15px;
+.mark svg {
+    width: 13px;
+    height: 13px;
+}
+
+.pathBar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    min-width: 0;
+    font-size: 13.5px;
+}
+
+.pathPlace {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    color: var(--k-ink);
+}
+
+.chevron {
+    width: 14px;
+    height: 14px;
     color: var(--k-muted);
+}
+
+.pathStep {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--k-muted);
+}
+
+.pathCurrent {
+    color: var(--k-ink);
+}
+
+.pathSeparator {
+    color: var(--k-line-strong);
+}
+
+.documentHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+}
+
+.documentAction {
+    margin-left: auto;
+}
+
+.owner {
+    margin-left: 8px;
+    font-weight: 400;
+    color: var(--k-muted);
+}
+
+.count {
+    font-size: 12px;
+    color: var(--k-muted);
+}
+
+.useShared {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12.5px;
+    color: var(--k-muted);
+}
+
+.useShared svg {
+    width: 13px;
+    height: 13px;
 }
 
 .footnote {
@@ -62,17 +115,6 @@
 .muted {
     font-size: 13px;
     color: var(--k-muted);
-}
-
-.banner {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
-    border-radius: var(--k-radius-control);
-    background: var(--k-surface);
-    box-shadow: var(--k-elevation);
-    padding: 10px 12px;
 }
 
 .bannerLabel {
@@ -263,21 +305,6 @@
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--k-muted);
-}
-
-.partNote {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-weight: 500;
-    letter-spacing: 0;
-    text-transform: none;
-    white-space: nowrap;
-}
-
-.partNote svg {
-    width: 12px;
-    height: 12px;
 }
 
 .legend {

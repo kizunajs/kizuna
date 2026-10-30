@@ -1,125 +1,119 @@
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
-import { Check, Clock, FileText, Globe, Library, Lock, Search } from 'lucide-react';
+import {
+    Check,
+    ChevronsUpDown,
+    Clock,
+    FileText,
+    Flower2,
+    Globe,
+    Layers,
+    Leaf,
+    Library,
+    Search,
+    TreePine,
+    Undo2,
+    type LucideIcon,
+} from 'lucide-react';
 import { Button, Editor, Footer, FormSection, Help, Row, Shell, TextInput } from '@/components/landing-page/cms/cms-editor-mock';
 import editor from '@/components/landing-page/cms/cms-editor.module.css';
 import styles from './cms-flows.module.css';
 
-interface Entry {
+interface Place {
     label: string;
-    icon: 'page' | 'collection' | 'global';
-    note?: string;
+    mark: LucideIcon;
 }
 
-interface Heading {
-    title: string;
-    note?: string;
-    entries: Entry[];
-}
-
-const icons = {
-    page: FileText,
-    collection: Library,
-    global: Globe,
+const overview: Place = {
+    label: 'Overview',
+    mark: Layers,
 };
 
-const shared: Heading = {
-    title: 'Shared',
-    entries: [
-        {
-            label: 'Employees',
-            icon: 'collection',
-        },
-        {
-            label: 'Offices',
-            icon: 'collection',
-        },
-        {
-            label: 'Privacy Policy',
-            icon: 'global',
-        },
-    ],
+const shared: Place = {
+    label: 'Shared',
+    mark: Library,
 };
 
-const hagenGroup: Heading = {
-    title: 'Hagen Group',
-    entries: [
-        {
-            label: 'Front Page',
-            icon: 'page',
-        },
-    ],
+const hagenGroup: Place = {
+    label: 'Hagen Group',
+    mark: Leaf,
 };
 
-const uk: Heading = {
-    title: 'Hagen UK',
-    entries: [
-        {
-            label: 'Front Page',
-            icon: 'page',
-        },
-        {
-            label: 'Events',
-            icon: 'collection',
-        },
-    ],
+const uk: Place = {
+    label: 'Hagen UK',
+    mark: Flower2,
 };
 
-const norway: Heading = {
-    title: 'Hagen Norge',
-    entries: [
-        {
-            label: 'Front Page',
-            icon: 'page',
-        },
-    ],
+const norway: Place = {
+    label: 'Hagen Norge',
+    mark: TreePine,
 };
 
 /**
- * What the editor's switcher lists: an admin over every site sees the shared
- * content and every site, a site's editor sees the shared content and their
- * own site.
+ * A place's mark: a site's own icon, or Overview's and Shared's.
+ */
+function Mark({ place }: { place: Place }) {
+    const Icon = place.mark;
+    return (
+        <span className={styles.mark} aria-hidden>
+            <Icon />
+        </span>
+    );
+}
+
+/**
+ * The bar across the top of a screen: the place, which opens the finder,
+ * then the steps to the screen.
+ */
+function PathBar({ place, steps }: { place: Place; steps: readonly string[] }) {
+    return (
+        <div className={styles.pathBar}>
+            <span className={styles.pathPlace}>
+                <Mark place={place} />
+                {place.label}
+                <ChevronsUpDown className={styles.chevron} aria-hidden />
+            </span>
+            {steps.map((step, index) => (
+                <span key={step} className={clsx(styles.pathStep, index === steps.length - 1 && styles.pathCurrent)}>
+                    <span className={styles.pathSeparator} aria-hidden>
+                        /
+                    </span>
+                    {step}
+                </span>
+            ))}
+        </div>
+    );
+}
+
+/**
+ * The finder the path bar's place opens: an admin over every site picks
+ * among Overview, every site and Shared, a site's editor among their own
+ * site and Shared.
  */
 export function Switcher({ as }: { as: 'admin' | 'site' }) {
-    const headings: Heading[] =
-        as === 'admin'
-            ? [shared, hagenGroup, uk, norway]
-            : [
-                  {
-                      ...shared,
-                      note: 'You draft, an admin publishes',
-                  },
-                  uk,
-              ];
+    const places = as === 'admin' ? [overview, hagenGroup, uk, norway] : [uk];
+    const option = (place: Place) => (
+        <div key={place.label} className={clsx(editor.option, place === uk && editor.optionActive)}>
+            <Mark place={place} />
+            {place.label}
+            {place === uk ? <Check className={editor.check} aria-hidden /> : null}
+        </div>
+    );
 
     return (
         <Editor className={styles.switcher}>
-            <div className={editor.search}>
-                <Search aria-hidden />
-                <span className={styles.muted}>Find a page or an item</span>
-            </div>
-            {headings.map((heading) => (
-                <div key={heading.title} className={styles.group}>
-                    <div className={styles.groupTitle}>
-                        <span>{heading.title}</span>
-                        {heading.note === undefined ? null : (
-                            <span className={clsx(styles.chip, styles.note)}>
-                                <Lock aria-hidden />
-                                {heading.note}
-                            </span>
-                        )}
-                    </div>
-                    {heading.entries.map((entry) => {
-                        const Icon = icons[entry.icon];
-                        return (
-                            <div key={entry.label} className={styles.entry}>
-                                <Icon aria-hidden />
-                                {entry.label}
-                            </div>
-                        );
-                    })}
+            <PathBar place={uk} steps={['Dashboard']} />
+            <div className={clsx(editor.popup, styles.finder)}>
+                <div className={editor.search}>
+                    <Search aria-hidden />
+                    <span className={styles.muted}>Find a site</span>
                 </div>
-            ))}
+                <div className={editor.options}>
+                    {places.map(option)}
+                    <div className={styles.separator} role="separator" />
+                    {option(shared)}
+                </div>
+            </div>
             {as === 'site' ? <p className={styles.footnote}>Hagen Group and Hagen Norge are not listed.</p> : null}
         </Editor>
     );
@@ -145,34 +139,83 @@ export function Switchers() {
 }
 
 /**
- * Hagen UK's values on a shared office: the UK's editor writes and publishes
- * them, and only the UK refreshes.
+ * A document as the admin opens it: the path bar, then its title and where
+ * it stands, with its action on the right.
+ */
+function DocumentMock({
+    place,
+    steps,
+    title,
+    action,
+    children,
+}: {
+    place: Place;
+    steps: readonly string[];
+    title: string;
+    action: string;
+    children: ReactNode;
+}) {
+    return (
+        <Editor className={editor.shell}>
+            <PathBar place={place} steps={steps} />
+            <div className={styles.documentHead}>
+                <span className={editor.titleName}>{title}</span>
+                <span className={editor.status}>Unpublished changes</span>
+                <span className={styles.documentAction}>
+                    <Button variant="primary">{action}</Button>
+                </span>
+            </div>
+            {children}
+        </Editor>
+    );
+}
+
+/**
+ * A field's label, with the site or Shared whose value it is.
+ */
+function OwnedRow({ label, owner, children }: { label: string; owner: string; children: ReactNode }) {
+    return (
+        <div className={editor.row}>
+            <span className={editor.label}>
+                {label}
+                <span className={styles.owner}>{owner}</span>
+            </span>
+            <div className={editor.inputs}>{children}</div>
+        </div>
+    );
+}
+
+/**
+ * Hagen UK's tab of a shared office: only the UK's own values, which the
+ * UK's editor writes and publishes, and only the UK refreshes.
  */
 export function OwnItem() {
     return (
-        <Shell title="Harbour Office" status="Unpublished changes" saved>
-            <div className={styles.banner}>
-                <span className={styles.bannerLabel}>Site</span>
-                <span className={styles.chip}>
-                    <Globe aria-hidden />
+        <DocumentMock place={shared} steps={['Offices', 'Harbour Office']} title="Harbour Office" action="Publish">
+            <div className={editor.tabs}>
+                <span className={editor.tab}>
+                    <Mark place={shared} />
+                    Shared
+                </span>
+                <span className={clsx(editor.tab, editor.tabActive)}>
+                    <Mark place={uk} />
                     Hagen UK
+                    <span className={styles.count}>2</span>
                 </span>
             </div>
             <FormSection>
-                <Row label="Phone">
+                <OwnedRow label="Phone" owner="Hagen UK">
                     <TextInput value="+44 20 0000 0111" mark="changed" />
-                    <Help>Hagen UK. Clear it to show the shared number.</Help>
-                </Row>
-                <Row label="Opening hours">
+                    <span className={styles.useShared}>
+                        <Undo2 aria-hidden />
+                        Use shared
+                    </span>
+                </OwnedRow>
+                <OwnedRow label="Opening hours" owner="Hagen UK">
                     <TextInput value="Mon to Fri, 08:00 to 16:00" />
-                    <Help>Hagen UK</Help>
-                </Row>
+                </OwnedRow>
             </FormSection>
-            <Footer>
-                <span />
-                <Button variant="primary">Publish</Button>
-            </Footer>
-        </Shell>
+        </DocumentMock>
     );
 }
 
@@ -182,27 +225,13 @@ export function OwnItem() {
  */
 export function SharedItem() {
     return (
-        <Shell title="Privacy Policy" status="Unpublished changes" saved>
-            <div className={styles.banner}>
-                <span className={styles.chip}>
-                    <Library aria-hidden />
-                    Shared
-                </span>
-                <span className={styles.partNote}>
-                    <Lock aria-hidden />
-                    You draft, an admin publishes
-                </span>
-            </div>
+        <DocumentMock place={shared} steps={['Privacy Policy']} title="Privacy Policy" action="Ask for review">
             <FormSection>
-                <Row label="Contact email">
+                <OwnedRow label="Contact email" owner="Shared">
                     <TextInput value="privacy@hagen.example.com" mark="changed" />
-                </Row>
+                </OwnedRow>
             </FormSection>
-            <Footer>
-                <span />
-                <Button variant="primary">Ask for review</Button>
-            </Footer>
-        </Shell>
+        </DocumentMock>
     );
 }
 

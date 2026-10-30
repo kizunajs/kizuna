@@ -124,7 +124,7 @@ export const Orders = defineView({
 });
 ```
 
-Pages sit under Content, and so does anything without a `group`. A view the editor may not see is left out, along with whatever else their [access](/docs/cms/editing/access) keeps from them.
+Pages sit under Content, and so does anything without a `group`. A view the editor may not see is left out, along with whatever else their [access](/docs/cms/editing/access) keeps from them. With several sites, the sidebar lists the screens of the place open instead, as [Sites](#sites) shows.
 
 ⌘K, or Ctrl+K off a Mac, searches everything in the sidebar and every page and item by its title, with pages and each collection's items under a heading of their own. The arrow keys move through what it finds, Enter opens it, ⌘Enter opens it in a new tab, and Escape closes the search.
 
@@ -136,26 +136,42 @@ Every screen opens with the same header: the trail back to the dashboard, the sc
 
 ## Sites
 
-With [several sites](/docs/cms/sites), a switcher at the top of the sidebar lists each site the editor belongs to, with its label and icon. The sidebar below it shows the site open, with its pages, its own globals and collections and its images, and then the shared content under a heading of its own, **Shared**.
+With [several sites](/docs/cms/sites), the admin has places: each site, **Shared** for the shared library, and **Overview** for every site at once. Only an admin over every site has Overview.
 
-An admin over every site opens `/admin` on **All sites**: the [overview](/docs/cms/dashboard#the-overview), and a sidebar listing every site, then Shared. The switcher offers All sites first. An editor of some sites who opens `/admin` lands on their first site.
+Under the logo, the sidebar shows the place open, its mark and its name, then that place's screens in one list:
+
+| Place    | Its screens                                                                        |
+| -------- | ---------------------------------------------------------------------------------- |
+| A site   | Dashboard, Pages, the site's own collections and globals, and Media for its images |
+| Shared   | The shared collections, globals and views, then Media for the shared images        |
+| Overview | Dashboard, Pages for every site's pages, and each collection a site has of its own |
+
+The bar across the top of each screen starts with the place, then the way to the screen, as in **Hagen UK / Dashboard / Events**. Shared has no dashboard, so its path starts at the list, as in **Shared / Offices / Harbour Office**. The search sits at the bar's right end, and the bar stands in for the trail in each screen's header.
+
+The place at the start of the bar is the only way to another place. A click on it opens a finder: **Find a site**, then Overview, the sites, and Shared, with the place open ticked. Picking a place opens the same screen there when it has one, like Hagen Norge's front page from Hagen UK's, and otherwise its dashboard, or Shared's images.
+
+Past six sites, the finder lists the pinned sites, the three opened most recently, and the rest under **By country**, folded by the country each serves, from the region of its first locale. The pin beside a site keeps it among the pinned, and the first three sites start pinned. **Find a site** searches every site by its label or key.
+
+A site's mark is its own icon when no other site uses the same one. Sites that share an icon each show a grey tile with a code of two or three letters, made from the words that set its label apart, like **OS** for Hagen Oslo Sentrum. A `code` field, added to the site's schema, sets the letters itself.
+
+An admin over every site opens `/admin` on Overview and its [dashboard](/docs/cms/dashboard#the-overview). An editor of some sites who opens `/admin` lands on their first site.
 
 Each site has its screens under its key, at `/admin/<site>/...`:
 
-| Screen                       | Address                                |
-| ---------------------------- | -------------------------------------- |
-| The UK's dashboard           | `/admin/uk`                            |
-| The UK's front page          | `/admin/uk/pages/frontPage`            |
-| The UK's events              | `/admin/uk/collections/events`         |
-| The UK's images              | `/admin/uk/media`                      |
-| A shared office              | `/admin/collections/offices/k3j9x2`    |
-| The same office, from the UK | `/admin/uk/collections/offices/k3j9x2` |
+| Screen                         | Address                                |
+| ------------------------------ | -------------------------------------- |
+| The UK's dashboard             | `/admin/uk`                            |
+| The UK's front page            | `/admin/uk/pages/frontPage`            |
+| The UK's events                | `/admin/uk/collections/events`         |
+| The UK's images                | `/admin/uk/media`                      |
+| A shared office                | `/admin/collections/offices/k3j9x2`    |
+| The UK's values on that office | `/admin/uk/collections/offices/k3j9x2` |
 
-A shared item whose collection has [per-site fields](/docs/cms/fields#per-site) shows tabs under its header, one for the shared values and one for each site's, as in **Shared · Hagen Group · Hagen UK · Hagen Norge**. A site's tab shows the shared fields locked around that site's own values, and its address is the item's address under the site.
+A shared global or item with [per-site fields](/docs/cms/fields#per-site) shows tabs under its header: **Shared**, then each site the editor may open that sets values on it. The Shared tab edits the shared document. A site's tab holds only that site's own values: its per-site fields, and the fields whose `sites` name it. Each field shows the shared value as its placeholder until the site sets its own, and a field the site sets offers **Use shared**, which clears the site's value so the shared one shows again. Each site's tab counts the values it sets, and its address is the document's address under the site.
 
-Past six sites, the switcher takes a search, **Find a site**, and groups the sites by the country each serves, from the region of its first locale. In All sites, each site's group in the sidebar folds, and past six sites they all start folded.
+Overview's Pages lists every site's pages, with a **Site** column and a filter by it. A site's document opened from Overview names its site under the title, as **Site: Hagen UK**. Everywhere else the path bar names the place, so a document has no Site line.
 
-The browser tab shows the current site's icon, and the tab titles and the sign-in screen use the current site's label in place of `name`, so an editor with three sites open in three tabs tells them apart.
+The browser tab shows the site's icon, and the tab titles and the sign-in screen use the site's label in place of `name`, so an editor with three sites open in three tabs tells them apart.
 
 ## Lists
 
@@ -212,7 +228,7 @@ The library's alt text and focal point are the image's own, and each use can set
 
 ## Editing
 
-A document opens with its title large and its actions on the right: **Save draft**, **Publish**, and a `…` menu. Someone asked to review it also gets **Review**, which puts what is live beside the draft, field by field, with the request's note and each reviewer's answer, as in [Reviews](/docs/cms/editing/reviews). Under the title a line says where it stands, when it last changed and who saved it, and who owns it, where you can pick another owner. The menu holds **Ask for review**, which sends it to someone to look at first as in [Reviews](/docs/cms/editing/reviews), **Unpublish** once it is live, whose message offers **Undo** to publish it again when the draft held no changes, and for an item **Duplicate**, the collection's own [actions](/docs/cms/collections#actions) and **Delete**.
+A document opens with its title large and its actions on the right: **Save draft**, **Publish**, and a `…` menu. Someone asked to review it also gets **Review**, which puts what is live beside the draft, field by field, with the request's note and each reviewer's answer, as in [Reviews](/docs/cms/editing/reviews). Under the title a line says where it stands, and when it last changed and who saved it. The menu holds **Ask for review**, which sends it to someone to look at first as in [Reviews](/docs/cms/editing/reviews), **Unpublish** once it is live, whose message offers **Undo** to publish it again when the draft held no changes, and for an item **Duplicate**, the collection's own [actions](/docs/cms/collections#actions) and **Delete**.
 
 The draft saves a moment after you stop typing, and the header says when it last did. **Save draft** saves at once, and **Publish** lists every change and asks you to confirm. While a required field is empty, Publish waits and says which field it waits for, like "Fill in Department before publishing". A click on that line takes you to the field, which says it is needed.
 
@@ -220,7 +236,7 @@ When a save does not reach the CMS, **Save draft** reads **Not saved**, with why
 
 A document your role may not change says so, with the way back to its list, and an address that names no document, like a deleted article, offers its list and the search.
 
-Under the title, **Edit** shows the fields and **Versions** counts the saved versions. At the other end of that row, **Live Preview** puts the site beside the fields and **Info** lists the document's status, owner, page, and when it was created, last updated and last published.
+Under the title, **Edit** shows the fields and **Versions** counts the saved versions. At the other end of that row, **Live Preview** puts the site beside the fields and **Info** lists the document's owner, where you can pick another, its page, and when it was created, last updated and last published.
 
 - **Edit** lays the fields out with their [layout](/docs/cms/fields#layout): tabs over the fields, rows side by side, collapsible sections, and the fields marked `position: 'sidebar'` in a column on the right. A document with no sidebar fields gives the main column the full width.
 - **Versions** lists every saved version, newest first and ten to a page, with where it stood and who saved it. **Compare** opens a version beside the current draft, side by side or inline, and **Only changed fields** hides the fields they share. The other versions are listed beside it to compare with instead. **Restore this version** asks first, then makes that version the draft, which you [publish](/docs/cms/editing/drafts) as usual. The draft you had stays under Versions, and **Undo** on the message that follows brings it back until you change the draft again.

@@ -188,10 +188,10 @@ fields: [
 ],
 ```
 
-- **`perSite: true`** lets each site set its own value. A site that leaves it empty shows the shared one, and the editor shows the shared value as the placeholder, with the field marked **Shared** or with the site's label.
+- **`perSite: true`** lets each site set its own value. A site that leaves it empty shows the shared one. In the admin, the office has a tab for each site, which holds that site's own values with the shared value as each field's placeholder, as [The admin](/docs/cms/editing/admin#sites) shows.
 - **`sites: ['uk']`** shows and stores the field on those sites alone. A page takes `sites` too, so the countries app's events page exists on the UK alone.
 
-A site's values are that site's draft. Its editors publish them, and only that site refreshes. When a site's editor changes a shared field of the same office too, the editor shows two pending changes: the site's values, which they publish, and the shared change, which goes to review for an admin over every site.
+A site's values are that site's draft. Its editors publish them, and only that site refreshes. The office's shared fields stay on its Shared tab, where a site's editor drafts a change and asks for a review by an admin over every site.
 
 `perSite` cannot go on the id, the slug, or a unique or indexed field, and `defineConfig` throws when it does, since those fields find a document and have to be the same on every site.
 
@@ -217,6 +217,26 @@ auth: {
 | `editor` with no site   | Draft, and ask for a review | None                    | Not shown         |
 
 Inside a site, the [one-site rules](/docs/cms/editing/permissions#on-one-site) apply as they are. Shared content reaches every site, so an admin over every site publishes it. A site's editor never sees another site, in the admin, the API or MCP. [Who can do what](/docs/cms/editing/permissions#with-several-sites) shows each editor's screen.
+
+### Inviting people
+
+Overview's People lists everyone from [`people.list`](/docs/cms/editing/reviews#people) with their role on each site. An admin over every site invites people to any site and changes their roles there. An admin of a site does the same on that site alone. The CMS stores no users, so it hands both to your app:
+
+```ts title="packages/content/kizuna.cms.config.ts"
+people: {
+    list: editors,
+    invite: async ({ email, sites }) => {
+        await createEditor(email, sites);
+        return {
+            id: email,
+            link: await signInLinkFor(email),
+        };
+    },
+    setSites: ({ id, sites }) => updateEditorSites(id, sites),
+},
+```
+
+`invite` returns the new person's id, and a `link` that signs them in when your app sends no email of its own. The admin shows the link for the inviter to copy. `setSites` receives every site the person keeps, so a site left out is one they no longer edit.
 
 ## Images
 
@@ -249,7 +269,7 @@ export const Articles = defineCollection({
 });
 ```
 
-It adds a `showsOn` field to the sidebar, **Shows on: Hagen UK, Hagen Norge**, holding site keys. A site lists and reads only the articles that show on it, and an item shows on no site until one is picked. `showsOn` is a shared field, so an admin over every site publishes a change to it, and a site's editor proposes adding their own site, which goes to review like any shared change.
+It adds a `showsOn` field to the form's sidebar, **Shows on**, with a toggle for each site, holding site keys. A site lists and reads only the articles that show on it, and an item shows on no site until one is picked. `showsOn` is a shared field, so an admin over every site publishes a change to it, and a site's editor proposes adding their own site, which goes to review like any shared change.
 
 `perSite` fields hold what differs by shop, like a note about the local shop, and each language is a [translation](/docs/cms/localization#translating) of the same article. `showsOn` decides which items appear on a site, and `sites` on a field decides which fields exist there, independently of each other.
 
@@ -305,7 +325,7 @@ A config with sites gets the CMS's own job, `content.refreshSite`, beside your [
 
 ## Partners
 
-A partner is a business outside Hagen that shows Hagen's content on its own website. A travel agency sells Hagen UK's garden workshops as day trips, so it reads the UK's events and offices. A partner only reads, so it has no pages or editors here, and the site switcher leaves it out.
+A partner is a business outside Hagen that shows Hagen's content on its own website. A travel agency sells Hagen UK's garden workshops as day trips, so it reads the UK's events and offices. A partner only reads, so it has no pages, editors or place in the admin.
 
 ```ts title="packages/content/kizuna.cms.config.ts"
 content: cms({

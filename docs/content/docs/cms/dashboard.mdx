@@ -49,7 +49,7 @@ Each review waiting names who asked for it and when. Until there is a number to 
 
 ## Numbers from your code
 
-A `stat` or `chart` gets its numbers from your function, which runs on your server when the dashboard opens. Revenue can come from Stripe and orders from your own database, since the CMS never needs to hold them. Each function receives `editor`, `plugins`, `period` and, with [sites](#several-sites), `site`.
+A `stat`, `chart`, `list` or `funnel` gets its numbers from your function, which runs on your server when the dashboard opens. Revenue can come from Stripe and orders from your own database, since the CMS never needs to hold them. Each function receives `editor`, `plugins`, `period` and, with [sites](#several-sites), `site`.
 
 ### The period
 
@@ -235,7 +235,7 @@ The built-in widgets follow the editor's own [access](/docs/cms/editing/access):
 
 ## Several sites
 
-With [sites](/docs/cms/sites) declared, each site has its own dashboard at its address in the admin, like `/admin/uk`. The `dashboard` list runs for the site open, and every stat and chart function receives that `site`: its key and the fields `declareSites()` gave it. Pass the sites to `DashboardContext` to type them:
+With [sites](/docs/cms/sites) declared, each site has its own dashboard at its address in the admin, like `/admin/uk`. The `dashboard` list runs for the site open, and every function receives that `site`: its key and the fields `declareSites()` gave it. Pass the sites to `DashboardContext` to type them:
 
 ```ts title="src/dashboard.ts"
 export async function visits({ site, period }: DashboardContext<typeof sites>) {
@@ -248,7 +248,7 @@ export async function visits({ site, period }: DashboardContext<typeof sites>) {
 }
 ```
 
-`sites` on a stat or a chart shows it on some sites alone, the way it does on a field:
+`sites` on a `stat`, `chart`, `list`, `funnel` or `waiting` widget shows it on some sites alone, the way it does on a field:
 
 ```ts title="kizuna.config.ts"
 {
@@ -265,7 +265,7 @@ On a site's dashboard, `reviews` lists what waits on you there, and `collections
 
 ### The overview
 
-An admin over every site opens `/admin` on the overview, which compares the sites. List its widgets under `overview` on `cms()`:
+An admin over every site opens `/admin` on Overview, whose dashboard compares the sites. List its widgets under `overview` on `cms()`:
 
 ```ts title="kizuna.config.ts"
 content: cms({
@@ -321,9 +321,9 @@ export async function salesAcrossShops(context: OverviewContext<typeof sites>) {
 }
 ```
 
-The `sites` widget draws a row per site, with its icon, name and address. It runs the site dashboard's own functions once per site, so each number is written once. The chart is a small line in each row, under the heading its `label` names, and each stat is a column. A stat with a `change` gets a column for it beside its value, and a site the stat leaves out shows a dash.
+The `sites` widget draws a row per site, with its [mark](/docs/cms/editing/admin#sites), name and address. It runs the site dashboard's own functions once per site, so each number is written once. The chart is a small line in each row, under the heading its `label` names, and each stat is a column. A stat with a `change` gets a column for it beside its value, and a site the stat leaves out shows a dash.
 
-A list row's `site` names the site it belongs to, and the row shows that site's icon and name, like a page in a list across the sites:
+A list row's `site` names the site it belongs to, and the row shows that site's mark and name, like a page in a list across the sites:
 
 ```ts title="src/dashboard.ts"
 export async function topPagesAcrossSites(context: OverviewContext<typeof sites>) {
@@ -350,7 +350,7 @@ With more than six sites, the rows group by country, from the region of each sit
 },
 ```
 
-The overview has widgets of its own, from what the CMS records:
+Overview's dashboard has widgets of its own:
 
 | `type`      | Shows                                                                                        |
 | ----------- | -------------------------------------------------------------------------------------------- |
@@ -361,8 +361,8 @@ The overview has widgets of its own, from what the CMS records:
 | `reach`     | Shared items by how many pages show them, on how many sites, with unpublished changes marked |
 | `editors`   | Each editor's changes this period, with their role and when they were last active            |
 
-Without `overview`, the overview shows `reviews`, `refreshes` and `reach`.
+`collections` works there too. Without `overview`, Overview's dashboard shows `reviews`, `refreshes` and `reach`.
 
-Nobody else sees the overview, so an editor on one site never sees another site's numbers. An editor of some sites who opens `/admin` lands on their first site's dashboard. An editor with no site of their own gets the shared content's `reviews` and `collections` there, without stats or charts, since those count for one site.
+Nobody else sees Overview, so an editor on one site never sees another site's numbers. An editor of some sites who opens `/admin` lands on their first site's dashboard. An editor with no site of their own gets the shared content's `reviews` and `collections` there, without stats or charts, since those count for one site.
 
 The `editors` widget names each person's site role from `sites` on what [`people.list`](/docs/cms/editing/reviews#people) returns, like `{ uk: 'editor' }`.
