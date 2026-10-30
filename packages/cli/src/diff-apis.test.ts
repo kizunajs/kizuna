@@ -399,3 +399,100 @@ describe('brands, which a generated client names its types after', () => {
         expect(diffSnapshots(unbranded, toSnapshot(branded))).toEqual([]);
     });
 });
+
+describe('a diff of some groups', () => {
+    const siteApi = (options: { articleTitle: z.ZodType; draftNotes: z.ZodType }) =>
+        defineConfig({
+            routes: [
+                {
+                    content: {
+                        getArticle: k.route({
+                            method: 'GET',
+                            path: '/content/articles/:id',
+                            tool: true,
+                            summary: 'Read an article',
+                            responses: {
+                                200: z.object({
+                                    title: options.articleTitle,
+                                }),
+                            },
+                        }),
+                    },
+                    editing: {
+                        getDraft: k.route({
+                            method: 'GET',
+                            path: '/editing/drafts/:id',
+                            tool: true,
+                            summary: 'Read a draft',
+                            responses: {
+                                200: z.object({
+                                    notes: options.draftNotes,
+                                }),
+                            },
+                        }),
+                    },
+                },
+            ],
+        }).api;
+    const before = toSnapshot(
+        siteApi({
+            articleTitle: z.string(),
+            draftNotes: z.string(),
+        })
+    );
+
+    it('leaves out a breaking change to a route outside the groups', () => {
+        const after = toSnapshot(
+            siteApi({
+                articleTitle: z.string(),
+                draftNotes: z.number(),
+            })
+        );
+
+        expect(hasBreakingChange(diffSnapshots(before, after))).toBe(true);
+        expect(
+            diffSnapshots(before, after, {
+                groups: ['content'],
+            })
+        ).toEqual([]);
+    });
+
+    it('reports a breaking change to a route in the groups', () => {
+        const after = toSnapshot(
+            siteApi({
+                articleTitle: z.number(),
+                draftNotes: z.string(),
+            })
+        );
+
+        expect(
+            summaries(
+                diffSnapshots(before, after, {
+                    groups: ['content'],
+                })
+            )
+        ).toEqual(['GET /content/articles/:id 200.title is number instead of string']);
+    });
+
+    it('compares only the tools the groups publish', () => {
+        const after = {
+            ...before,
+            tools: {},
+        };
+
+        expect(
+            diffSnapshots(before, after, {
+                tools: true,
+                groups: ['content'],
+            }).map((change) => change.key)
+        ).toEqual(['content.getArticle']);
+    });
+
+    it('throws on a group neither snapshot has a route in', () => {
+        expect(() =>
+            diffSnapshots(before, before, {
+                groups: ['contents'],
+            })
+        ).toThrow("No route's key starts with 'contents'.");
+    });
+});

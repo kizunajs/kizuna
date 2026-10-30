@@ -1,4 +1,5 @@
 import type { ApiDefinition } from 'kizunajs';
+import { isInGroups } from 'kizunajs/generator';
 import { diffSchemas, type Direction } from './diff-schemas.js';
 import { toSnapshot, type ApiSnapshot, type SchemaNode } from './snapshot.js';
 
@@ -44,6 +45,13 @@ export interface DiffOptions {
      * @default false
      */
     dottedKeys?: boolean;
+    /**
+     * Compare only the routes in these groups, each a dotted route key prefix
+     * like `content.sites.uk`, and the tools they publish. Jobs and content
+     * are left out, since no generated client holds them. Pass a published
+     * client's `groups`, so a change elsewhere does not fail its release.
+     */
+    groups?: readonly string[];
 }
 
 /**
@@ -145,8 +153,36 @@ const routesWithoutBrands = (routes: ApiSnapshot['routes']): ApiSnapshot['routes
         })
     );
 
-export const diffSnapshots = (before: ApiSnapshot, latest: ApiSnapshot, options: DiffOptions = {}): Change[] => {
+/**
+ * The snapshot narrowed to the routes in the groups, and the tools they
+ * publish.
+ */
+const inGroups = (snapshot: ApiSnapshot, groups: readonly string[]): ApiSnapshot => ({
+    ...snapshot,
+    routes: Object.fromEntries(Object.entries(snapshot.routes).filter(([key]) => isInGroups(key, groups))),
+    jobs: [],
+    tools: Object.fromEntries(Object.entries(snapshot.tools ?? {}).filter(([key]) => isInGroups(key, groups))),
+    content: undefined,
+});
+
+/**
+ * Throw on a group neither snapshot has a route in, so a misspelt prefix
+ * fails instead of passing an empty comparison.
+ */
+const assertGroupsMatch = (groups: readonly string[], snapshots: readonly ApiSnapshot[]): void => {
+    const keys = snapshots.flatMap((snapshot) => Object.keys(snapshot.routes));
+    for (const group of groups) {
+        if (keys.some((key) => isInGroups(key, [group]))) continue;
+        throw new Error(`No route's key starts with '${group}'. Each group is a dotted route key prefix, like 'content'.`);
+    }
+};
+
+export const diffSnapshots = (fullBefore: ApiSnapshot, fullLatest: ApiSnapshot, options: DiffOptions = {}): Change[] => {
     const changes: Change[] = [];
+
+    if (options.groups !== undefined) assertGroupsMatch(options.groups, [fullBefore, fullLatest]);
+    const before = options.groups === undefined ? fullBefore : inGroups(fullBefore, options.groups);
+    const latest = options.groups === undefined ? fullLatest : inGroups(fullLatest, options.groups);
 
     // A snapshot from before brands were recorded says nothing about them.
     const after =

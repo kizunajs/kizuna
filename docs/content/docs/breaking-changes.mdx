@@ -117,6 +117,16 @@ A breaking change blocks the pull request until someone adds the `breaking chang
 
 A rename is spotted by matching a departed key against an arrived one on the same method and path, so it reads as one breaking change rather than a removal and an addition. Renaming `users.patchUser` to `users.updateUser` leaves the method, the path and every schema alone, and still changes the client method, the MCP tool name, and the method names in the generated Swift and Kotlin clients.
 
+## A published client
+
+A client generated with [`groups`](/docs/clients/fetch#only-some-groups) and published as a package holds only those routes. Gate its releases on them alone, so a change to a route it does not hold passes:
+
+```bash
+kizuna diff --against v1.4.0 --groups content.sites.uk,content.globals
+```
+
+Routes and the tools they publish are compared as usual. Jobs and content are left out, since no client holds them, so keep a plain `kizuna diff` in the pipeline for those.
+
 ## Content
 
 With [`content`](/docs/config#content) on the config, the snapshot records every page, global and collection with its schema and its latest `migrate` step. Stored content outlives the code that declared it, so a change the stored copies cannot read is breaking even though no caller sees it:

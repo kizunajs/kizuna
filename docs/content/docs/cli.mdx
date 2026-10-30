@@ -136,6 +136,14 @@ Two snapshots can also be compared directly, with no git and no config:
 kizuna diff --from base.yaml --to .kizuna/snapshot.yaml
 ```
 
+A client you publish as a package holds only some groups, so a change elsewhere cannot break it. `--groups` compares only the routes under those dotted keys, and the tools they publish, leaving jobs and content out:
+
+```bash
+kizuna diff --against v1.4.0 --groups content.sites.uk,content.globals
+```
+
+Pass the same list the client's `groups` holds. A name no route's key starts with fails the command.
+
 ## Scripts
 
 ```json title="package.json"

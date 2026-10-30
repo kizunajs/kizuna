@@ -37,6 +37,9 @@ diff:
                     Exits 1 when a change breaks callers.
   --from <path>     Compare two snapshots directly, with no git and no
   --to <path>       config. Pass both.
+  --groups <list>   Compare only the routes in these groups, comma-separated
+                    dotted key prefixes like content.sites.uk,content.globals.
+                    For a published client generated with the same groups.
 `;
 
 const COMMANDS = ['generate', 'routes', 'diff'];
@@ -157,16 +160,46 @@ const runRoutes = async (values: { config?: string; json?: boolean }): Promise<v
     process.exit(1);
 };
 
-const runDiff = async (values: { config?: string; json?: boolean; against?: string; from?: string; to?: string }): Promise<void> => {
+/**
+ * `--groups content,content.globals` as a list, or `undefined` without it.
+ */
+const groupsFrom = (given: string | undefined): string[] | undefined => {
+    if (given === undefined) return undefined;
+    const groups = given
+        .split(',')
+        .map((group) => group.trim())
+        .filter((group) => group !== '');
+    if (groups.length === 0) die('Pass --groups a comma-separated list of dotted route keys, like content,content.globals.');
+    return groups;
+};
+
+const runDiff = async (values: {
+    config?: string;
+    json?: boolean;
+    against?: string;
+    from?: string;
+    to?: string;
+    groups?: string;
+}): Promise<void> => {
     let changes;
+    const groups = groupsFrom(values.groups);
+    const narrowed =
+        groups === undefined
+            ? {}
+            : {
+                  groups,
+              };
 
     if (values.from !== undefined || values.to !== undefined) {
         if (values.from === undefined || values.to === undefined) die('Pass --from and --to together, or neither.');
-        changes = diffSnapshots(readSnapshot(values.from!), readSnapshot(values.to!));
+        changes = diffSnapshots(readSnapshot(values.from!), readSnapshot(values.to!), narrowed);
     } else {
         const configPath = configPathFrom(values.config);
         const config = await loadOrDie(configPath);
-        changes = diffAgainst(values.against ?? 'main', snapshotPathFor(configPath), config.diff);
+        changes = diffAgainst(values.against ?? 'main', snapshotPathFor(configPath), {
+            ...config.diff,
+            ...narrowed,
+        });
     }
 
     if (values.json) {
@@ -254,6 +287,9 @@ const main = async (): Promise<void> => {
                 type: 'string',
             },
             to: {
+                type: 'string',
+            },
+            groups: {
                 type: 'string',
             },
         },
