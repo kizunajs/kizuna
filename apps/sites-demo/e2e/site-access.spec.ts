@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { urls } from '../playwright.config';
-import { adminSites, signIn, siteChoices } from './admin';
+import { adminSites, places, signIn } from './admin';
 
 /**
  * The London shop's id, as the signed-in editor lists the shared offices.
@@ -58,7 +58,7 @@ const londonOnTheUk = async (page: Page) => {
 test.describe("a UK editor's sites", () => {
     test('are Hagen UK and Shared alone', async ({ page }) => {
         await signIn(page, urls.uk, 'sam@hagen.example.com');
-        await expect(await siteChoices(page)).toHaveText(['Hagen UK', 'Shared']);
+        await expect(places(page)).toHaveText(['Hagen UK', 'Shared']);
         expect(await adminSites(page, urls.uk)).toEqual(['uk']);
     });
 
@@ -103,7 +103,7 @@ test.describe("a UK editor's sites", () => {
 test.describe("a Norway editor's sites", () => {
     test('are Hagen Norge alone', async ({ page }) => {
         await signIn(page, urls.norway, 'kari@hagen.example.com');
-        await expect(await siteChoices(page)).toHaveText(['Hagen Norge', 'Shared']);
+        await expect(places(page)).toHaveText(['Hagen Norge', 'Shared']);
         expect(await adminSites(page, urls.norway)).toEqual(['norway']);
         const id = await londonId(page, urls.norway);
         expect((await page.request.get(`${urls.norway}/admin/uk/collections/offices/${id}`)).status()).toBe(404);
@@ -124,7 +124,7 @@ test.describe('an admin over every site', () => {
     ]) {
         test(`${admin.email} sees every site`, async ({ page }) => {
             await signIn(page, urls.group, admin.email, admin.password);
-            await expect(await siteChoices(page)).toHaveText(['Hagen Group', 'Hagen UK', 'Hagen Norge', 'Shared']);
+            await expect(places(page)).toHaveText([/^(All sites|Overview)$/, 'Hagen Group', 'Hagen UK', 'Hagen Norge', 'Shared']);
             expect(await adminSites(page, urls.group)).toEqual(['group', 'uk', 'norway']);
         });
     }

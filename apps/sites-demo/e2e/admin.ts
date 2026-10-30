@@ -41,15 +41,7 @@ export const adminSites = async (page: Page, url: string): Promise<string[]> => 
 };
 
 /**
- * The sites the switcher at the top of the sidebar offers, opened from the
- * admin's home, where it shows Shared.
+ * The places at the top of the sidebar: the overview of every site for an
+ * admin over them all, the editor's sites, and Shared.
  */
-export const siteChoices = async (page: Page) => {
-    await adminNav(page)
-        .getByRole('button', {
-            name: 'Shared',
-            exact: true,
-        })
-        .click();
-    return page.getByRole('menuitem');
-};
+export const places = (page: Page) => adminNav(page).locator('.k-places a');
