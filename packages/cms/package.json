@@ -114,7 +114,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/schemas.ts src/next.tsx src/next-preview.tsx src/next-config.ts src/cli.ts --format esm,cjs --dts --clean --shims --external kizunajs --external zod --external drizzle-orm --external next --external react --external react-dom --external @kizunajs/cms/next/preview --external next/headers --external next/navigation --external next/cache --external next/server --external sharp --external @aws-sdk/client-s3 --external @aws-sdk/s3-request-presigner --external @vercel/stega --external @base-ui/react --external lucide-react --external @portabletext/react --external @portabletext/editor --external @portabletext/editor/plugins --external @portabletext/editor/selectors --external @portabletext/types && node scripts/build-view.mjs",
+    "build": "tsdown src/index.ts src/schemas.ts src/next.tsx src/next-preview.tsx src/next-config.ts src/cli.ts --format esm,cjs --dts --clean --shims --external kizunajs --external zod --external drizzle-orm --external next --external react --external react-dom --external ai --external @kizunajs/cms/next/preview --external next/headers --external next/navigation --external next/cache --external next/server --external sharp --external @aws-sdk/client-s3 --external @aws-sdk/s3-request-presigner --external @vercel/stega --external @base-ui/react --external lucide-react --external @portabletext/react --external @portabletext/editor --external @portabletext/editor/plugins --external @portabletext/editor/selectors --external @portabletext/types && node scripts/build-view.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
