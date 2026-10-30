@@ -3,6 +3,64 @@ title: Sites
 description: 'Several sites over one shared library: what every site reads, what each site has of its own, and who edits what.'
 ---
 
+## Which shape fits
+
+Three businesses that sell in more than one country need three different setups. Pick the one that sounds like yours.
+
+### One company, one market, several languages
+
+Nordvik sells outdoor equipment in Norway, Sweden and Denmark from one webshop, and the same people edit everything. That is one site in three languages, so it takes `locales` and no `sites`:
+
+```ts title="kizuna.config.ts"
+content: cms({
+    name: 'Nordvik',
+    db,
+    pages,
+    locales: ['nb', 'sv', 'da'],
+}),
+```
+
+[Localization](/docs/cms/localization) covers the rest.
+
+### A group with markets that share a library
+
+Hagen is a group with a shop in each country. The shops show the same offices and people, and each shop has editors of its own. That takes `declareSites`, and the rest of this page walks through it.
+
+### Separate markets with separate teams
+
+Nordvik's three countries are run by three companies, with their own editors and their own content. They share the code and the components, and no content. Deploy the same config with one site once per country, each with its own database, and pick the country from an environment variable:
+
+```ts title="kizuna.config.ts"
+const countries: Record<string, { label: string; locales: string[] }> = {
+    norway: {
+        label: 'Nordvik Norge',
+        locales: ['nb'],
+    },
+    sweden: {
+        label: 'Nordvik Sverige',
+        locales: ['sv'],
+    },
+    denmark: {
+        label: 'Nordvik Danmark',
+        locales: ['da'],
+    },
+};
+
+const country = countries[process.env.COUNTRY ?? ''];
+if (country === undefined) throw new Error('Set COUNTRY to norway, sweden or denmark.');
+
+content: cms({
+    name: country.label,
+    db,
+    pages,
+    locales: country.locales,
+}),
+```
+
+Each deployment sets `COUNTRY` and its own `DATABASE_URL`, and the config has no `sites`. A country that needs another's content reads it through a [published client](/docs/cms/api#publishing-a-client), the way a [partner](#partners) does.
+
+## A group with markets
+
 Your business runs more than one website. Hagen is a group of plant shops with a group site, a shop in the UK and a shop in Norway. All three show the same people, offices and privacy policy, and each has pages of its own. The UK runs events as well.
 
 That shared library is written once, on `cms()`, and the sites sit beside each other over it:
