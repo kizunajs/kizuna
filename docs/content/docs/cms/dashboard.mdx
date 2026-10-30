@@ -33,12 +33,15 @@ content: cms({
 
 A widget is a plain object with a `type`, the way a [layout](/docs/cms/fields#layout) item is, and the dashboard shows them in the order listed.
 
-| `type`        | Shows                                                                                                        | Takes                                   |
-| ------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------- |
-| `stat`        | One number                                                                                                   | `label`, `value`                        |
-| `chart`       | Bars or a line over time                                                                                     | `label`, `data`, `style`, `description` |
-| `reviews`     | The reviews waiting on the person signed in                                                                  |                                         |
-| `collections` | Every collection and view they may open, by group, with a count and, on a collection, a **+** for a new item |                                         |
+| `type`        | Shows                                                                                                        | Takes                                     |
+| ------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
+| `stat`        | One number                                                                                                   | `label`, `value`                          |
+| `chart`       | Bars or a line over time                                                                                     | `label`, `data`, `style`, `description`   |
+| `list`        | Rows ranked by a number, each with a bar                                                                     | `label`, `data`, `columns`, `description` |
+| `funnel`      | Steps that each keep some of the step before, like a checkout                                                | `label`, `data`, `columns`, `description` |
+| `waiting`     | How many reviews wait on the person signed in, as a tile beside the stats                                    |                                           |
+| `reviews`     | The reviews waiting on the person signed in                                                                  |                                           |
+| `collections` | Every collection and view they may open, by group, with a count and, on a collection, a **+** for a new item |                                           |
 
 Without `dashboard`, the admin shows `reviews` and `collections`.
 
@@ -153,6 +156,77 @@ export async function salesPerDay({ period }: DashboardContext) {
 }
 ```
 
+### Lists
+
+`data` returns the rows, ranked the way you want them shown:
+
+```ts title="src/cms/dashboard.ts"
+export async function topPages({ period }: DashboardContext) {
+    const pages = await countVisitorsByPage(period.from, period.to);
+    return pages.slice(0, 7).map((page) => ({
+        label: page.title,
+        detail: page.path,
+        value: page.visitors,
+    }));
+}
+```
+
+Each row draws a bar from its `value`, as a share of the largest in the list. `columns` names the headings over the labels and the values:
+
+```ts title="kizuna.config.ts"
+{
+    type: 'list',
+    label: 'Top pages',
+    columns: {
+        label: 'Page',
+        value: 'Visitors',
+    },
+    data: topPages,
+},
+```
+
+A row shows its value as a number. `formatted` gives the words for it instead, like "£1,240". `of` fills the bar to a whole of the row's own, like a workshop's seats:
+
+```ts title="src/cms/dashboard.ts"
+export async function workshops({ period }: DashboardContext) {
+    const upcoming = await upcomingWorkshops(period.to);
+    return upcoming.map((workshop) => ({
+        label: workshop.title,
+        value: workshop.booked,
+        formatted: `${workshop.booked} of ${workshop.seats}`,
+        of: workshop.seats,
+    }));
+}
+```
+
+`change` adds a column for how far each value moved since the period before, as a fraction, the way a stat's does.
+
+### Funnels
+
+A `funnel`'s `data` returns its steps, the first one every visitor takes:
+
+```ts title="src/cms/dashboard.ts"
+export async function checkout({ period }: DashboardContext) {
+    const counts = await countCheckoutSteps(period.from, period.to);
+    return [
+        {
+            label: 'Visit',
+            value: counts.visits,
+        },
+        {
+            label: 'Cart',
+            value: counts.carts,
+        },
+        {
+            label: 'Paid',
+            value: counts.orders,
+        },
+    ];
+}
+```
+
+Each step's bar is its share of the first, and beside it is the share of the step before that went on to it.
+
 ## Who sees a widget
 
 `auth` on a widget keeps it to some editors, written the way a [route's `auth`](/docs/access-control) is: `roles`, or `requires` for permissions. In the config above, editors never see revenue. The server checks it, so a widget's function never runs for someone who may not see it.
@@ -204,7 +278,14 @@ content: cms({
             value: salesAcrossShops,
         },
         {
+            type: 'waiting',
+        },
+        {
             type: 'sites',
+            chart: {
+                label: 'Week',
+                data: visitsPerDay,
+            },
             stats: [
                 {
                     label: 'Visits',
@@ -219,10 +300,6 @@ content: cms({
                     ],
                 },
             ],
-            chart: {
-                label: 'Visits per day',
-                data: visitsPerDay,
-            },
         },
         {
             type: 'reviews',
@@ -234,7 +311,7 @@ content: cms({
 }),
 ```
 
-A `stat` or `chart` in `overview` receives `sites`, every site, in place of one. A sum across sites is yours to write, since only your code knows how pounds and kroner add up:
+A `stat`, `chart`, `list` or `funnel` in `overview` receives `sites`, every site, in place of one. A sum across sites is yours to write, since only your code knows how pounds and kroner add up:
 
 ```ts title="src/dashboard.ts"
 export async function salesAcrossShops(context: OverviewContext<typeof sites>) {
@@ -244,13 +321,41 @@ export async function salesAcrossShops(context: OverviewContext<typeof sites>) {
 }
 ```
 
-The `sites` widget draws a column per site. It runs the site dashboard's own functions once per site, so each number is written once. The first stat is drawn large over the chart, and the chart is drawn on one scale for every site. Under them, each column shows its reviews waiting, its last publish and its last refresh.
+The `sites` widget draws a row per site, with its icon, name and address. It runs the site dashboard's own functions once per site, so each number is written once. The chart is a small line in each row, under the heading its `label` names, and each stat is a column. A stat with a `change` gets a column for it beside its value, and a site the stat leaves out shows a dash.
+
+A list row's `site` names the site it belongs to, and the row shows that site's icon and name, like a page in a list across the sites:
+
+```ts title="src/dashboard.ts"
+export async function topPagesAcrossSites(context: OverviewContext<typeof sites>) {
+    const { period } = context;
+    const pages = await Promise.all(context.sites.map((site) => countVisitorsByPage(site.key, period.from, period.to)));
+    return pages
+        .flat()
+        .sort((first, second) => second.visitors - first.visitors)
+        .map((page) => ({
+            label: page.title,
+            site: page.site,
+            value: page.visitors,
+        }));
+}
+```
+
+With more than six sites, the rows group by country, from the region of each site's first locale, and a site without one leads. A stat's `total` fills its column in the row heading each country, and receives that country's sites as `sites`:
+
+```ts title="kizuna.config.ts"
+{
+    label: 'Visits',
+    value: visits,
+    total: visitsAcrossSites,
+},
+```
 
 The overview has widgets of its own, from what the CMS records:
 
 | `type`      | Shows                                                                                        |
 | ----------- | -------------------------------------------------------------------------------------------- |
-| `sites`     | The sites side by side, from the `stats` and the `chart` it names                            |
+| `sites`     | A row per site, from the `stats` and the `chart` it names                                    |
+| `waiting`   | How many reviews wait, and on which sites                                                    |
 | `reviews`   | Every review waiting, the shared ones first, then each site's                                |
 | `refreshes` | Each site's and partner's last refresh after a publish, and how many answered                |
 | `reach`     | Shared items by how many pages show them, on how many sites, with unpublished changes marked |

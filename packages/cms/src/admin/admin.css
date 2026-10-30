@@ -974,6 +974,41 @@
         overflow-wrap: anywhere;
     }
 
+    /* The number, with its small line beside it at the right. */
+    .k-stat__body {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+        min-width: 0;
+    }
+
+    .k-stat__body .k-stat__value {
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+
+    /* The line gives way to the number, down to nothing on a narrow tile. */
+    .k-stat__body .k-sparkline {
+        flex: 0 1 96px;
+        min-width: 0;
+        margin-bottom: 4px;
+    }
+
+    .k-stat--link {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .k-stat--link:hover {
+        background: var(--k-control);
+    }
+
+    .k-sparkline {
+        display: block;
+        min-width: 0;
+    }
+
     .k-stat__detail {
         font-size: 12.5px;
         font-variant-numeric: tabular-nums;
@@ -1005,6 +1040,11 @@
     }
 
     /* Panels pair up, the first of a pair the wider when the columns do not split evenly, and one left alone spans the row. */
+    /* A panel is as tall as its rows, so a short one beside a long one leaves no empty card. */
+    .k-dashboard__panels {
+        align-items: start;
+    }
+
     .k-dashboard__panels > * {
         min-width: 0;
     }
@@ -1162,8 +1202,8 @@
     }
 
     .k-dashboard-table td.k-dashboard-table__bar {
-        width: 28%;
-        min-width: 64px;
+        width: 140px;
+        min-width: 140px;
     }
 
     .k-ranked__track {
@@ -1180,65 +1220,21 @@
         opacity: 0.85;
     }
 
-    /* The sites as columns: each site's name heads its column, its chart under the name, and each measure a row across them. */
-    .k-sites__table {
-        table-layout: fixed;
+    /* The sites table: a site's small line in a narrow column, and a row heading each country's sites with its totals. */
+    .k-dashboard-table td.k-sites__spark {
+        width: 104px;
+        min-width: 80px;
     }
 
-    .k-sites__measure {
-        width: 132px;
-    }
-
-    .k-sites__table th[data-kind='number'],
-    .k-sites__table td[data-kind='number'] {
-        width: auto;
-        overflow: hidden;
-    }
-
-    .k-sites__name {
-        display: inline-flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 8px;
-        max-width: 100%;
-        min-width: 0;
-        vertical-align: middle;
-    }
-
-    .k-sites__label {
-        font-size: 13.5px;
-        font-weight: 600;
+    .k-table.k-dashboard-table .k-sites__country td {
+        height: 36px;
+        padding-top: 12px;
+        background: none;
         color: var(--k-ink);
     }
 
-    .k-sites__url {
-        font-weight: 400;
-    }
-
-    .k-sites__name .k-site-icon {
-        border-radius: 5px;
-    }
-
-    .k-table.k-sites__table thead th {
-        height: 44px;
-    }
-
-    .k-table.k-sites__table .k-sites__charts td {
-        padding-block: 10px 6px;
-        vertical-align: top;
-    }
-
-    .k-table.k-sites__table .k-sites__charts th {
-        vertical-align: top;
-        padding-top: 14px;
-    }
-
-    .k-sites__publish:hover .k-ellipsis {
-        text-decoration: underline;
-    }
-
-    .k-sites__when {
-        flex-shrink: 0;
+    .k-sites__country .k-heading {
+        padding: 0;
     }
 
     /* On a phone, a dashboard table stays a table, which the collection list stacks into cards. */
@@ -1288,12 +1284,8 @@
         }
 
         .k-dashboard .k-dashboard-table td.k-dashboard-table__bar {
-            width: 22%;
-            min-width: 40px;
-        }
-
-        .k-sites__table {
-            min-width: 560px;
+            width: 64px;
+            min-width: 64px;
         }
     }
 
@@ -1380,7 +1372,8 @@
     }
 
     /* The chart's paints, in the ink at the strengths the marks need, so light and dark follow the theme. */
-    .k-chart__frame {
+    .k-chart__frame,
+    .k-sparkline {
         --k-chart-bar: color-mix(in srgb, var(--k-ink) 85%, transparent);
         --k-chart-bar-active: var(--k-ink);
         --k-chart-previous: color-mix(in srgb, var(--k-ink) 30%, transparent);
@@ -1390,7 +1383,7 @@
         color: var(--k-muted);
     }
 
-    :root[data-theme='light'] .k-chart__frame {
+    :root[data-theme='light'] :is(.k-chart__frame, .k-sparkline) {
         --k-chart-area: color-mix(in srgb, var(--k-ink) 6.2%, transparent);
     }
 

@@ -185,6 +185,11 @@ export interface ListRow {
      * How far the value moved since the period before, as a signed fraction.
      */
     change?: number;
+    /**
+     * The site the row belongs to, shown by its icon and name beside the
+     * label, like a page in a list across the sites.
+     */
+    site?: string;
 }
 
 /**
@@ -313,6 +318,13 @@ export interface ReviewsWidget extends WidgetAccess {
 }
 
 /**
+ * How many reviews wait on the person signed in, as a tile beside the stats.
+ */
+export interface WaitingWidget extends WidgetAccess {
+    type: 'waiting';
+}
+
+/**
  * Every collection and view the person may open, with a count.
  */
 export interface CollectionsWidget extends WidgetAccess {
@@ -328,6 +340,7 @@ export type DashboardWidget<Sites = undefined> =
     | ListWidget<Sites>
     | FunnelWidget<Sites>
     | ReviewsWidget
+    | (WaitingWidget & SiteScope<Sites>)
     | CollectionsWidget;
 
 /**
@@ -387,10 +400,9 @@ export interface OverviewFunnelWidget<Sites = undefined> extends WidgetAccess {
 }
 
 /**
- * The sites side by side, a column each: its chart on one scale for every
- * site, then a row for each stat it names, the reviews waiting, the last
- * publish and the last refresh. The functions are the site dashboard's own,
- * run once per site.
+ * The sites as the rows of a table: each site's small line, then a column
+ * for each stat it names. The functions are the site dashboard's own, run
+ * once per site. Past six sites, the rows group by country.
  *
  * @example
  * {
@@ -402,7 +414,7 @@ export interface OverviewFunnelWidget<Sites = undefined> extends WidgetAccess {
  *         },
  *     ],
  *     chart: {
- *         label: 'Visits per day',
+ *         label: 'Week',
  *         data: visitsPerDay,
  *     },
  * }
@@ -410,20 +422,24 @@ export interface OverviewFunnelWidget<Sites = undefined> extends WidgetAccess {
 export interface SitesWidget<Sites = undefined> extends WidgetAccess {
     type: 'sites';
     /**
-     * A row each, in the order listed.
+     * A column each, in the order listed.
      */
     stats: ReadonlyArray<
         SiteScope<Sites> & {
             label: string;
             value: (context: DashboardContext<Sites>) => StatValue | Promise<StatValue>;
+            /**
+             * The stat over a country's sites, for the row that sums them up
+             * once there are more than six sites. It receives those sites.
+             */
+            total?: (context: OverviewContext<Sites>) => StatValue | Promise<StatValue>;
         }
     >;
     /**
-     * Drawn small under each site's name, on one scale across the sites.
+     * A small line in each site's row, its label the column's heading.
      */
     chart?: SiteScope<Sites> & {
         label: string;
-        style?: 'bar' | 'line';
         data: (context: DashboardContext<Sites>) => readonly ChartBar[] | Promise<readonly ChartBar[]>;
     };
 }
@@ -459,6 +475,7 @@ export type OverviewWidget<Sites = undefined> =
     | OverviewFunnelWidget<Sites>
     | SitesWidget<Sites>
     | ReviewsWidget
+    | WaitingWidget
     | RefreshesWidget
     | ReachWidget
     | EditorsWidget
@@ -574,6 +591,9 @@ export const DashboardWidgetSchema = z.discriminatedUnion('type', [
         sites: SiteNamesSchema,
     }),
     builtIn('reviews'),
+    builtIn('waiting').extend({
+        sites: SiteNamesSchema,
+    }),
     builtIn('collections'),
 ]);
 
@@ -609,13 +629,17 @@ export const OverviewWidgetSchema = z.discriminatedUnion('type', [
                 value: z.custom<StatWidget<AnySites>['value']>(isFunction, {
                     error: 'must be a function returning what the stat shows',
                 }),
+                total: z
+                    .custom<OverviewStatWidget<AnySites>['value']>(isFunction, {
+                        error: "must be a function returning the stat over a country's sites",
+                    })
+                    .optional(),
                 sites: SiteNamesSchema,
             })
         ),
         chart: z
             .object({
                 label: z.string().min(1),
-                style: z.enum(['bar', 'line']).optional(),
                 data: z.custom<ChartWidget<AnySites>['data']>(isFunction, {
                     error: "must be a function returning the chart's points",
                 }),
@@ -625,6 +649,7 @@ export const OverviewWidgetSchema = z.discriminatedUnion('type', [
         auth: WidgetAuthSchema,
     }),
     builtIn('reviews'),
+    builtIn('waiting'),
     builtIn('refreshes'),
     builtIn('reach'),
     builtIn('editors'),

@@ -230,6 +230,51 @@ const compared = mount(
     ])
 );
 
+const listed = mount(
+    assemble([
+        {
+            type: 'list',
+            label: 'Workshops',
+            columns: {
+                label: 'Workshop',
+                value: 'Booked',
+            },
+            data: () => [
+                {
+                    label: 'Wreath evening',
+                    detail: 'Thu 10 Dec',
+                    value: 9,
+                    formatted: '9 of 16',
+                    of: 16,
+                },
+                {
+                    label: 'Repotting without the mess',
+                    value: 1240,
+                    change: Number.POSITIVE_INFINITY,
+                    site: 'uk',
+                },
+            ],
+        },
+        {
+            type: 'funnel',
+            label: 'Checkout',
+            data: () => [
+                {
+                    label: 'Visit',
+                    value: 1000,
+                },
+                {
+                    label: 'Paid',
+                    value: 21,
+                },
+            ],
+        },
+        {
+            type: 'waiting',
+        },
+    ])
+);
+
 const as = (who: 'ada' | 'grace', call: request.Test) => call.set('authorization', `Bearer ${who}-token`);
 
 beforeAll(async () => {
@@ -392,6 +437,53 @@ describe('the dashboard', () => {
                 },
             ],
         });
+    });
+
+    it("sends a list's rows, numbering a value without its own words, and a funnel's steps", async () => {
+        const response = await as('ada', request(listed).get('/editing/dashboard'));
+        expect(response.body.widgets.slice(0, 3)).toEqual([
+            {
+                type: 'list',
+                label: 'Workshops',
+                columns: {
+                    label: 'Workshop',
+                    value: 'Booked',
+                },
+                rows: [
+                    {
+                        label: 'Wreath evening',
+                        detail: 'Thu 10 Dec',
+                        value: 9,
+                        formatted: '9 of 16',
+                        of: 16,
+                    },
+                    {
+                        label: 'Repotting without the mess',
+                        value: 1240,
+                        formatted: '1,240',
+                    },
+                ],
+            },
+            {
+                type: 'funnel',
+                label: 'Checkout',
+                steps: [
+                    {
+                        label: 'Visit',
+                        value: 1000,
+                    },
+                    {
+                        label: 'Paid',
+                        value: 21,
+                    },
+                ],
+            },
+            {
+                type: 'waiting',
+                count: 0,
+                sites: [],
+            },
+        ]);
     });
 
     it('counts over the last 7 days without `period`, and sends the period it counted over', async () => {

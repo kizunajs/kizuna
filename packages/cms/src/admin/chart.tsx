@@ -13,6 +13,7 @@ import {
     type ChartPoint,
 } from '@tanstack/charts';
 import { Chart as TanStackChart } from '@tanstack/charts/react/tooltip';
+import { Chart as PlainChart } from '@tanstack/charts/react';
 import { scaleBand } from '@tanstack/charts/scales/band';
 import { scaleLinear } from '@tanstack/charts/scales/linear';
 import { tooltip } from '@tanstack/charts/tooltip';
@@ -501,5 +502,85 @@ export function Chart({
                 </tbody>
             </table>
         </div>
+    );
+}
+
+/**
+ * How far a sparkline's stroke reaches past its points, kept inside the
+ * frame.
+ */
+const SPARK_INSET = 2;
+
+/**
+ * A small line of values oldest first, from its own lowest to its highest,
+ * with no axis, beside the number it belongs to. It shows a shape, so a
+ * screen reader hears its summary and the number carries the value.
+ */
+export function Sparkline({ label, values, height = 28 }: { label: string; values: readonly number[]; height?: number }) {
+    const definition = useMemo(() => {
+        const rows = values.map((value, index) => ({
+            index,
+            value,
+        }));
+        const low = Math.min(...values);
+        const high = Math.max(...values);
+        const floor = low === high ? low - 1 : low - (high - low) * 0.15;
+        return defineChart({
+            marks: [
+                areaY(rows, {
+                    x: 'index',
+                    y1: floor,
+                    y2: 'value',
+                    fill: 'var(--k-chart-area)',
+                    fillOpacity: 1,
+                    curve: monotone,
+                }),
+                lineY(rows, {
+                    x: 'index',
+                    y: 'value',
+                    stroke: 'var(--k-ink)',
+                    strokeWidth: 1.5,
+                    curve: monotone,
+                }),
+            ],
+            scales: {
+                x: {
+                    scale: scaleLinear().domain([0, Math.max(1, values.length - 1)]),
+                    axis: false,
+                },
+                y: {
+                    scale: scaleLinear().domain([floor, low === high ? high + 1 : high]),
+                    axis: false,
+                },
+            },
+            margin: {
+                top: SPARK_INSET,
+                right: SPARK_INSET,
+                bottom: 0,
+                left: SPARK_INSET,
+            },
+            pointer: false,
+            keyboard: false,
+            focusRing: false,
+            tooltip: false,
+        });
+    }, [values]);
+    if (values.length < 2) return null;
+    return (
+        <PlainChart
+            definition={definition}
+            className="k-sparkline"
+            ariaLabel={chartSummary(
+                label,
+                values.map((value, index) => ({
+                    label: `day ${index + 1}`,
+                    value,
+                })),
+                'point'
+            )}
+            height={height}
+            initialWidth={96}
+            tabIndex={-1}
+        />
     );
 }

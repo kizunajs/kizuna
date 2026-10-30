@@ -1,7 +1,7 @@
-import { and, desc, eq, gte, inArray, isNotNull, lte, ne, or } from 'drizzle-orm';
+import { and, eq, gte, inArray, lte, ne, or } from 'drizzle-orm';
 import type { CmsService } from './cms.js';
 import { DEFAULT_SITE } from './options.js';
-import { formatRef, type DocumentRef } from './refs.js';
+import { formatRef } from './refs.js';
 import { documentLabel, peopleOf } from './reviews.js';
 import { cmsDocuments, cmsRefs, cmsVersions } from './storage/schema.js';
 import type { RefreshRecord } from './storage/store.js';
@@ -38,72 +38,6 @@ export const refreshSummaries = (
         });
     }
     return summaries;
-};
-
-/**
- * The ref of a stored document.
- */
-const refOfStored = (row: { kind: string; site: string; key: string }): DocumentRef | undefined => {
-    const site =
-        row.site === DEFAULT_SITE
-            ? {}
-            : {
-                  site: row.site,
-              };
-    if (row.kind === 'page' || row.kind === 'global') {
-        return {
-            type: row.kind,
-            name: row.key,
-            ...site,
-        };
-    }
-    if (row.kind !== 'item') return undefined;
-    const slash = row.key.indexOf('/');
-    return {
-        type: 'item',
-        collection: row.key.slice(0, slash),
-        id: row.key.slice(slash + 1),
-        ...site,
-    };
-};
-
-/**
- * What editors call a stored document, or `undefined` for one the config no
- * longer declares.
- */
-const labelOf = async (cms: CmsService, ref: DocumentRef): Promise<string | undefined> => {
-    const state = await cms.draftState(ref).catch(() => undefined);
-    return state === undefined ? undefined : documentLabel(state);
-};
-
-/**
- * Each site's latest publish: the document, who published it and when.
- */
-export const lastPublishes = async (
-    cms: CmsService,
-    sites: readonly string[]
-): Promise<Map<string, { ref: string; label: string; by: string | null; at: string }>> => {
-    const found = new Map<string, { ref: string; label: string; by: string | null; at: string }>();
-    if (sites.length === 0) return found;
-    const rows = await cms.options.db
-        .selectDistinctOn([cmsDocuments.site])
-        .from(cmsDocuments)
-        .where(and(inArray(cmsDocuments.site, [...sites]), ne(cmsDocuments.kind, 'media'), isNotNull(cmsDocuments.publishedAt)))
-        .orderBy(cmsDocuments.site, desc(cmsDocuments.publishedAt));
-    const people = await peopleOf(cms);
-    for (const row of rows) {
-        const ref = refOfStored(row);
-        if (ref === undefined || row.publishedAt === null) continue;
-        // The publisher is the last to write the row, unless a draft came after.
-        const publisher = row.updatedAt.getTime() === row.publishedAt.getTime() ? row.updatedBy : undefined;
-        found.set(row.site, {
-            ref: formatRef(ref),
-            label: (await labelOf(cms, ref)) ?? row.key,
-            by: publisher === undefined ? null : (people.find((person) => person.id === publisher)?.name ?? publisher),
-            at: row.publishedAt.toISOString(),
-        });
-    }
-    return found;
 };
 
 /**

@@ -139,7 +139,7 @@ export const adminConfigFor = (
 /**
  * The country of a locale's region, like `NO` for `nb-NO`.
  */
-const countryOf = (locale: string | undefined): string | null => {
+export const countryOf = (locale: string | undefined): string | null => {
     if (locale === undefined) return null;
     try {
         return new Intl.Locale(locale).region ?? null;

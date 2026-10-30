@@ -30,6 +30,14 @@ const visits = ({ site }: DashboardContext<typeof sites>) => site.key.length;
 
 const visitsAcrossSites = ({ sites: shown }: OverviewContext<typeof sites>) => shown.length;
 
+const topPages = ({ site }: DashboardContext<typeof sites>) => [
+    {
+        label: 'Front page',
+        site: site.key,
+        value: 6120,
+    },
+];
+
 describe('dashboard functions', () => {
     it('receive the site they count for, with its fields', () => {
         expectTypeOf<DashboardContext<typeof sites>['site']['key']>().toEqualTypeOf<'uk' | 'norway'>();
@@ -55,6 +63,30 @@ describe('dashboard functions', () => {
                     value: visits,
                     sites: ['uk'],
                 },
+                {
+                    type: 'list',
+                    label: 'Top pages',
+                    data: topPages,
+                    columns: {
+                        label: 'Page',
+                        value: 'Visitors',
+                    },
+                },
+                {
+                    type: 'funnel',
+                    label: 'Checkout',
+                    data: () => [
+                        {
+                            label: 'Visit',
+                            value: 1000,
+                        },
+                    ],
+                    sites: ['norway'],
+                },
+                {
+                    type: 'waiting',
+                    sites: ['uk'],
+                },
             ],
             overview: [
                 {
@@ -68,8 +100,16 @@ describe('dashboard functions', () => {
                         {
                             label: 'Visits',
                             value: visits,
+                            total: visitsAcrossSites,
                         },
                     ],
+                    chart: {
+                        label: 'Week',
+                        data: () => [],
+                    },
+                },
+                {
+                    type: 'waiting',
                 },
             ],
         });
@@ -86,6 +126,24 @@ describe('dashboard functions', () => {
                     value: visits,
                     // @ts-expect-error sweden is not declared
                     sites: ['sweden'],
+                },
+                {
+                    type: 'waiting',
+                    // @ts-expect-error sweden is not declared
+                    sites: ['sweden'],
+                },
+            ],
+            overview: [
+                {
+                    type: 'sites',
+                    stats: [
+                        {
+                            label: 'Visits',
+                            value: visits,
+                            // @ts-expect-error a total receives every site, not one
+                            total: visits,
+                        },
+                    ],
                 },
             ],
         });

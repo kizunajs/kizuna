@@ -194,6 +194,10 @@ const config = defineConfig({
                 sites: ['uk'],
             },
             {
+                type: 'waiting',
+                sites: ['uk'],
+            },
+            {
                 type: 'reviews',
             },
             {
@@ -205,6 +209,9 @@ const config = defineConfig({
                 type: 'stat',
                 label: 'Visits',
                 value: visitsAcrossSites,
+            },
+            {
+                type: 'waiting',
             },
             {
                 type: 'sites',
@@ -223,6 +230,16 @@ const config = defineConfig({
                     label: 'Visits per day',
                     data: visitsPerDay,
                 },
+            },
+            {
+                type: 'list',
+                label: 'Top pages',
+                data: ({ sites: shown }) =>
+                    shown.map((site) => ({
+                        label: 'Front page',
+                        site: site.key,
+                        value: site.key === 'uk' ? 6120 : 5880,
+                    })),
             },
             {
                 type: 'reviews',
@@ -367,7 +384,16 @@ describe("a site's dashboard", () => {
 describe('the overview', () => {
     it('shows to an admin over every site, without a site', async () => {
         const widgets = await dashboardOf(grace);
-        expect(widgets.map((widget) => widget.type)).toEqual(['stat', 'sites', 'reviews', 'refreshes', 'reach', 'editors']);
+        expect(widgets.map((widget) => widget.type)).toEqual([
+            'stat',
+            'waiting',
+            'sites',
+            'list',
+            'reviews',
+            'refreshes',
+            'reach',
+            'editors',
+        ]);
         expect(widgets[0]).toMatchObject({
             label: 'Visits',
             value: 'uk and norway',
@@ -384,12 +410,21 @@ describe('the overview', () => {
         const compared = (await dashboardOf(grace)).find((widget) => widget.type === 'sites')!;
         expect(compared.chart).toEqual({
             label: 'Visits per day',
-            style: 'bar',
         });
+        expect(compared.stats).toEqual([
+            {
+                label: 'Visits',
+            },
+            {
+                label: 'Workshop bookings',
+            },
+        ]);
+        expect(compared.countries).toBeNull();
         expect(
             compared.sites.map((site: Widget) => ({
                 key: site.key,
                 icon: site.icon,
+                country: site.country,
                 stats: site.stats,
                 chart: site.chart,
             }))
@@ -397,14 +432,13 @@ describe('the overview', () => {
             {
                 key: 'uk',
                 icon: 'https://hagen.example.co.uk/icons/uk.svg',
+                country: null,
                 stats: [
                     {
-                        label: 'Visits',
                         value: '21460',
                         change: 0.1,
                     },
                     {
-                        label: 'Workshop bookings',
                         value: '46',
                     },
                 ],
@@ -418,15 +452,13 @@ describe('the overview', () => {
             {
                 key: 'norway',
                 icon: 'https://hagen.example.no/icons/norway.svg',
+                country: null,
                 stats: [
                     {
-                        label: 'Visits',
                         value: '16910',
                         change: 0.1,
                     },
-                    {
-                        label: 'Workshop bookings',
-                    },
+                    {},
                 ],
                 chart: [
                     {
@@ -438,16 +470,36 @@ describe('the overview', () => {
         ]);
     });
 
-    it("names each site's waiting reviews and last publish", async () => {
+    it('names the site of each list row by its icon and label', async () => {
+        const list = (await dashboardOf(grace)).find((widget) => widget.type === 'list')!;
+        expect(list.rows).toEqual([
+            {
+                label: 'Front page',
+                value: 6120,
+                formatted: '6,120',
+                site: {
+                    key: 'uk',
+                    label: 'Hagen UK',
+                    icon: 'https://hagen.example.co.uk/icons/uk.svg',
+                },
+            },
+            {
+                label: 'Front page',
+                value: 5880,
+                formatted: '5,880',
+                site: {
+                    key: 'norway',
+                    label: 'Hagen Norge',
+                    icon: 'https://hagen.example.no/icons/norway.svg',
+                },
+            },
+        ]);
+    });
+
+    it('counts the reviews waiting, and names the sites they wait on', async () => {
         await grace.patch('/editing/sites/uk/pages/frontPage/draft').send({
             changes: {
                 heading: 'Hello',
-            },
-        });
-        await grace.post('/editing/sites/uk/pages/frontPage/publish').send({});
-        await grace.patch('/editing/sites/uk/pages/frontPage/draft').send({
-            changes: {
-                heading: 'Hello again',
             },
         });
         await grace.post('/editing/reviews').send({
@@ -455,22 +507,26 @@ describe('the overview', () => {
             reviewers: ['sam'],
         });
         const widgets = await dashboardOf(grace);
-        const [uk, norway] = widgets.find((widget) => widget.type === 'sites')!.sites;
-        expect(uk).toMatchObject({
-            waiting: 1,
-            lastPublish: {
-                ref: 'page:uk:frontPage',
-                label: 'Front',
-            },
-            lastRefresh: null,
-        });
-        expect(norway).toMatchObject({
-            waiting: 0,
-            lastPublish: null,
+        expect(widgets.find((widget) => widget.type === 'waiting')).toEqual({
+            type: 'waiting',
+            count: 1,
+            sites: [
+                {
+                    key: 'uk',
+                    label: 'Hagen UK',
+                    icon: 'https://hagen.example.co.uk/icons/uk.svg',
+                },
+            ],
         });
         const reviews = widgets.find((widget) => widget.type === 'reviews')!;
         expect(reviews.reviews.map((review: { ref: string }) => review.ref)).toEqual(['page:uk:frontPage']);
         expect(reviews.sites.map((site: { key: string }) => site.key)).toEqual(['uk', 'norway']);
+        expect((await dashboardOf(sam, 'uk')).find((widget) => widget.type === 'waiting')).toEqual({
+            type: 'waiting',
+            count: 1,
+            sites: [],
+        });
+        expect((await dashboardOf(grace, 'norway')).some((widget) => widget.type === 'waiting')).toBe(false);
     });
 
     it('ranks shared items by the pages and sites that show them', async () => {
@@ -629,15 +685,137 @@ describe('the overview', () => {
                     total: 1,
                 },
             ]);
-            const [, norway] = widgets.find((widget) => widget.type === 'sites')!.sites;
-            expect(norway.lastRefresh).toEqual({
-                status: 'retrying',
-                at: records[2]!.at.toISOString(),
-                attempts: 3,
-            });
         } finally {
             ran.mockRestore();
         }
+    });
+});
+
+describe('the overview of many sites', () => {
+    const shop = (label: string, host: string, locale: string) => ({
+        label,
+        url: `https://${host}`,
+        icon: '/icon.svg',
+        pages: countryPages,
+        locales: [locale],
+    });
+    const many = declareSites(SiteSchema, {
+        group: {
+            label: 'Hagen Group',
+            url: 'https://hagengroup.example',
+            icon: '/icon.svg',
+            pages: countryPages,
+        },
+        london: shop('Hagen London', 'london.hagen.example', 'en-GB'),
+        leeds: shop('Hagen Leeds', 'leeds.hagen.example', 'en-GB'),
+        oslo: shop('Hagen Oslo', 'oslo.hagen.example', 'nb-NO'),
+        bergen: shop('Hagen Bergen', 'bergen.hagen.example', 'nb-NO'),
+        tromso: shop('Hagen Tromsø', 'tromso.hagen.example', 'nb-NO'),
+        stockholm: shop('Hagen Stockholm', 'stockholm.hagen.example', 'sv-SE'),
+    });
+    const VISITORS: Record<string, number> = {
+        group: 600,
+        london: 4000,
+        leeds: 1000,
+        oslo: 3000,
+        bergen: 2000,
+        tromso: 500,
+        stockholm: 1500,
+    };
+    const manyConfig = defineConfig({
+        adapter: expressAdapter(),
+        jobRunner: heldJobs,
+        auth: {
+            identities: {
+                editor,
+            },
+        },
+        content: cms({
+            db,
+            sites: many,
+            locales: ['en-GB', 'nb-NO', 'sv-SE'],
+            site: () => 'group',
+            auth: {
+                identity: 'editor',
+                roles: ['editor', 'admin'],
+            },
+            overview: [
+                {
+                    type: 'sites',
+                    stats: [
+                        {
+                            label: 'Visitors',
+                            value: ({ site }) => VISITORS[site.key]!,
+                            total: ({ sites: shown }) => shown.reduce((total, site) => total + VISITORS[site.key]!, 0),
+                        },
+                        {
+                            label: 'Conversion',
+                            value: () => '2.0%',
+                        },
+                    ],
+                },
+            ],
+            revalidate: () => undefined,
+        }),
+    });
+    const manyApp = express();
+    manyConfig.api.mount(manyApp);
+
+    it('groups the sites by the country of their first locale, each with its totals', async () => {
+        const response = await request(manyApp).get('/editing/dashboard').set('authorization', 'Bearer grace-token');
+        expect(response.status).toBe(200);
+        const [widget] = response.body.widgets;
+        expect(widget.sites.map((site: { key: string; country: string | null }) => [site.key, site.country])).toEqual([
+            ['group', null],
+            ['london', 'GB'],
+            ['leeds', 'GB'],
+            ['oslo', 'NO'],
+            ['bergen', 'NO'],
+            ['tromso', 'NO'],
+            ['stockholm', 'SE'],
+        ]);
+        expect(widget.countries).toEqual([
+            {
+                country: null,
+                sites: ['group'],
+                stats: [
+                    {
+                        value: '600',
+                    },
+                    {},
+                ],
+            },
+            {
+                country: 'GB',
+                sites: ['london', 'leeds'],
+                stats: [
+                    {
+                        value: '5000',
+                    },
+                    {},
+                ],
+            },
+            {
+                country: 'NO',
+                sites: ['oslo', 'bergen', 'tromso'],
+                stats: [
+                    {
+                        value: '5500',
+                    },
+                    {},
+                ],
+            },
+            {
+                country: 'SE',
+                sites: ['stockholm'],
+                stats: [
+                    {
+                        value: '1500',
+                    },
+                    {},
+                ],
+            },
+        ]);
     });
 });
 

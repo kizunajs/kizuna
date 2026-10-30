@@ -11,9 +11,9 @@ import { handlerContext, type EditingArgs, type Guarded } from './action-routes.
 import { waitingReviews } from './reviews.js';
 import { WaitingReviewsSchema } from './wire.js';
 import { parseRef } from './refs.js';
-import { siteIconOf } from './admin/route.js';
+import { countryOf, siteIconOf } from './admin/route.js';
 import { DEFAULT_SITE } from './options.js';
-import { editorsOf, lastPublishes, reachOf, refreshesSince, refreshSummaries } from './dashboard-data.js';
+import { editorsOf, reachOf, refreshesSince, refreshSummaries } from './dashboard-data.js';
 import type { RefreshRecord } from './storage/store.js';
 import {
     DashboardPeriodKeySchema,
@@ -66,6 +66,12 @@ export const ChartWidgetSchema = Kizuna.model({
     }),
 });
 
+const SiteNameSchema = z.object({
+    key: z.string(),
+    label: z.string(),
+    icon: z.string().nullable().describe("The site's icon as a full URL."),
+});
+
 const WidgetColumnsSchema = z
     .object({
         label: z.string(),
@@ -90,9 +96,19 @@ export const ListWidgetSchema = Kizuna.model({
                     formatted: z.string().describe('The value as the row shows it.'),
                     of: z.number().optional().describe('The most the value can reach, which the bar fills to.'),
                     change: z.number().optional().describe('How far the value moved since the period before, as a signed fraction.'),
+                    site: SiteNameSchema.optional().describe('The site the row belongs to.'),
                 })
             )
             .describe('The rows, in the order your function ranked them.'),
+    }),
+});
+
+export const WaitingWidgetSchema = Kizuna.model({
+    title: 'CMS.WaitingWidget',
+    schema: z.object({
+        type: z.literal('waiting'),
+        count: z.int().describe('How many reviews wait.'),
+        sites: z.array(SiteNameSchema).describe('On the overview, the sites they wait on.'),
     }),
 });
 
@@ -112,12 +128,6 @@ export const FunnelWidgetSchema = Kizuna.model({
             )
             .describe('The steps, the first one every visitor takes.'),
     }),
-});
-
-const SiteNameSchema = z.object({
-    key: z.string(),
-    label: z.string(),
-    icon: z.string().nullable().describe("The site's icon as a full URL."),
 });
 
 export const ReviewsWidgetSchema = Kizuna.model({
@@ -183,6 +193,10 @@ const RefreshStateSchema = z.object({
     attempts: z.int(),
 });
 
+const SiteStatSchema = StatFieldsSchema.partial({
+    value: true,
+});
+
 export const SitesWidgetSchema = Kizuna.model({
     title: 'CMS.SitesWidget',
     schema: z.object({
@@ -190,35 +204,34 @@ export const SitesWidgetSchema = Kizuna.model({
         chart: z
             .object({
                 label: z.string(),
-                style: z.enum(['bar', 'line']),
             })
             .nullable()
-            .describe("The chart each site draws, on one scale for every site's."),
+            .describe("The small line in each site's row, its label the column's heading."),
+        stats: z
+            .array(
+                z.object({
+                    label: z.string(),
+                })
+            )
+            .describe('The columns, in the order listed.'),
         sites: z.array(
             SiteNameSchema.extend({
                 url: z.string(),
-                stats: z
-                    .array(
-                        StatFieldsSchema.partial({
-                            value: true,
-                        }).extend({
-                            label: z.string(),
-                        })
-                    )
-                    .describe('The stats named, without a value on a site the stat leaves out.'),
+                country: z.string().nullable().describe("The country of the site's first locale, like NO."),
+                stats: z.array(SiteStatSchema).describe('A value for each column, without one on a site the stat leaves out.'),
                 chart: ChartPointsSchema.nullable().describe('Null on a site the chart leaves out.'),
-                waiting: z.int().describe('How many reviews wait on the site.'),
-                lastPublish: z
-                    .object({
-                        ref: z.string(),
-                        label: z.string(),
-                        by: z.string().nullable(),
-                        at: z.iso.datetime(),
-                    })
-                    .nullable(),
-                lastRefresh: RefreshStateSchema.nullable(),
             })
         ),
+        countries: z
+            .array(
+                z.object({
+                    country: z.string().nullable(),
+                    sites: z.array(z.string()).describe("The country's sites, by key."),
+                    stats: z.array(SiteStatSchema).describe("Each column's total over the country's sites, where the stat has one."),
+                })
+            )
+            .nullable()
+            .describe('The sites by country, once there are more than six. Null until then.'),
     }),
 });
 
@@ -308,6 +321,7 @@ export const DashboardSchema = Kizuna.model({
                     ListWidgetSchema,
                     FunnelWidgetSchema,
                     ReviewsWidgetSchema,
+                    WaitingWidgetSchema,
                     CollectionsWidgetSchema,
                     SitesWidgetSchema,
                     RefreshesWidgetSchema,
@@ -405,7 +419,7 @@ const headOf = (widget: Headed) => ({
           }),
 });
 
-const listBody = (widget: Headed, rows: readonly ListRow[]): WidgetBody => ({
+const listBody = (cms: CmsService, widget: Headed, rows: readonly ListRow[]): WidgetBody => ({
     type: 'list',
     ...headOf(widget),
     rows: rows.map((row) => ({
@@ -427,6 +441,11 @@ const listBody = (widget: Headed, rows: readonly ListRow[]): WidgetBody => ({
                   change: row.change,
               }
             : {}),
+        ...(row.site === undefined || cms.options.sites?.values[row.site] === undefined
+            ? {}
+            : {
+                  site: siteNameOf(cms, row.site),
+              }),
     })),
 });
 
@@ -520,48 +539,55 @@ const siteNameOf = (cms: CmsService, key: string) => {
 };
 
 /**
- * The `sites` widget: each site's stats and chart from the site dashboard's
- * own functions, beside what the CMS records of it.
+ * More sites than this, and the `sites` widget groups them by country.
+ */
+const GROUPED_PAST = 6;
+
+const siteStatOf = (result: StatValue) => {
+    const { trend: _, ...fields } = statFields(result);
+    return fields;
+};
+
+/**
+ * The `sites` widget: a row per site from the site dashboard's own
+ * functions, and past six sites each country's totals.
  */
 const sitesBody = async (
     cms: CmsService,
     widget: SitesWidget<AnySites>,
     sites: readonly string[],
     contextOf: (site: string) => DashboardContext<AnySites>,
-    reviewRefs: readonly string[],
-    refreshes: readonly RefreshRecord[]
+    overviewOf: (sites: readonly string[]) => OverviewContext<AnySites>
 ): Promise<WidgetBody> => {
-    const published = await lastPublishes(cms, sites);
-    const refreshed = refreshSummaries(refreshes);
-    const columns = await Promise.all(
+    const rows = await Promise.all(
         sites.map(async (site) => {
             const context = contextOf(site);
             const values = cms.options.sites!.values[site]!;
-            const last = refreshed.get(site)?.last;
             return {
                 ...siteNameOf(cms, site),
                 url: values.url,
+                country: countryOf(values.locales?.[0]),
                 stats: await Promise.all(
-                    widget.stats.map(async (stat) => {
-                        if (!shownOn(stat, site)) {
-                            return {
-                                label: stat.label,
-                            };
-                        }
-                        const { trend: _, ...fields } = statFields(await stat.value(context));
-                        return {
-                            label: stat.label,
-                            ...fields,
-                        };
-                    })
+                    widget.stats.map(async (stat) => (shownOn(stat, site) ? siteStatOf(await stat.value(context)) : {}))
                 ),
                 chart: widget.chart === undefined || !shownOn(widget.chart, site) ? null : pointsOf(await widget.chart.data(context)),
-                waiting: reviewRefs.filter((ref) => parseRef(ref)?.site === site).length,
-                lastPublish: published.get(site) ?? null,
-                lastRefresh: last === undefined ? null : refreshState(last),
             };
         })
     );
+    const byCountry = new Map<string | null, string[]>();
+    for (const row of rows) byCountry.set(row.country, [...(byCountry.get(row.country) ?? []), row.key]);
+    const countries =
+        sites.length <= GROUPED_PAST
+            ? null
+            : await Promise.all(
+                  [...byCountry].map(async ([country, keys]) => ({
+                      country,
+                      sites: keys,
+                      stats: await Promise.all(
+                          widget.stats.map(async (stat) => (stat.total === undefined ? {} : siteStatOf(await stat.total(overviewOf(keys)))))
+                      ),
+                  }))
+              );
     return {
         type: 'sites',
         chart:
@@ -569,9 +595,12 @@ const sitesBody = async (
                 ? null
                 : {
                       label: widget.chart.label,
-                      style: widget.chart.style ?? 'bar',
                   },
-        sites: columns,
+        stats: widget.stats.map((stat) => ({
+            label: stat.label,
+        })),
+        sites: rows,
+        countries,
     };
 };
 
@@ -673,9 +702,13 @@ export const dashboardRoute = (input: DashboardRouteInput) =>
                     period,
                     sites: sites.map((name) => cms.siteInfo(name) as OverviewContext<AnySites>['sites'][number]),
                 };
-                const needsReviews = listed.some((widget) => widget.type === 'reviews' || widget.type === 'sites');
+                const overviewOf = (keys: readonly string[]): OverviewContext<AnySites> => ({
+                    ...overviewContext,
+                    sites: keys.map((name) => cms.siteInfo(name) as OverviewContext<AnySites>['sites'][number]),
+                });
+                const needsReviews = listed.some((widget) => widget.type === 'reviews' || widget.type === 'waiting');
                 const waiting = needsReviews ? await waitingReviews(cms, undefined, sees) : [];
-                const needsRefreshes = listed.some((widget) => widget.type === 'refreshes' || widget.type === 'sites');
+                const needsRefreshes = listed.some((widget) => widget.type === 'refreshes');
                 const refreshes = needsRefreshes ? await refreshesSince(cms, period.from) : [];
                 widgets = await Promise.all(
                     listed.map(async (widget): Promise<WidgetBody> => {
@@ -687,23 +720,24 @@ export const dashboardRoute = (input: DashboardRouteInput) =>
                             };
                         }
                         if (widget.type === 'chart') return chartBody(widget, await widget.data(overviewContext));
-                        if (widget.type === 'list') return listBody(widget, await widget.data(overviewContext));
+                        if (widget.type === 'list') return listBody(cms, widget, await widget.data(overviewContext));
                         if (widget.type === 'funnel') return funnelBody(widget, await widget.data(overviewContext));
                         if (widget.type === 'sites') {
-                            return sitesBody(
-                                cms,
-                                widget,
-                                sites,
-                                contextOf,
-                                waiting.map((review) => review.ref),
-                                refreshes
-                            );
+                            return sitesBody(cms, widget, sites, contextOf, overviewOf);
                         }
                         if (widget.type === 'reviews') {
                             return {
                                 type: 'reviews',
                                 reviews: waiting,
                                 sites: sites.map((name) => siteNameOf(cms, name)),
+                            };
+                        }
+                        if (widget.type === 'waiting') {
+                            const waitedOn = new Set(waiting.map((review) => parseRef(review.ref)?.site));
+                            return {
+                                type: 'waiting',
+                                count: waiting.length,
+                                sites: sites.filter((name) => waitedOn.has(name)).map((name) => siteNameOf(cms, name)),
                             };
                         }
                         if (widget.type === 'refreshes') return refreshesBody(cms, refreshes);
@@ -742,9 +776,16 @@ export const dashboardRoute = (input: DashboardRouteInput) =>
                             };
                         }
                         if (widget.type === 'chart') return chartBody(widget, await widget.data(context));
-                        if (widget.type === 'list') return listBody(widget, await widget.data(context));
+                        if (widget.type === 'list') return listBody(cms, widget, await widget.data(context));
                         if (widget.type === 'funnel') return funnelBody(widget, await widget.data(context));
                         if (widget.type === 'reviews') return reviewsBody();
+                        if (widget.type === 'waiting') {
+                            return {
+                                type: 'waiting',
+                                count: (await waitingReviews(cms, author, (ref) => sees(ref) && onShown(ref))).length,
+                                sites: [],
+                            };
+                        }
                         if (widget.type === 'collections') return collectionsBody();
                         throw new Error(`The dashboard cannot draw a widget of type '${(widget as { type: string }).type}'.`);
                     })

@@ -4,12 +4,12 @@ import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
 import { Hint } from '../view/hint.js';
 import { parseRef } from '../refs.js';
-import { Chart, Legend } from './chart.js';
+import { Chart, Legend, Sparkline } from './chart.js';
 import {
-    agoOf,
     askedOf,
     barShareOf,
     changeOf,
+    changeColumnsOf,
     collectionSectionsOf,
     funnelRowsOf,
     DEFAULT_PERIOD,
@@ -22,7 +22,7 @@ import {
     reviewGroupsOf,
     roleOf,
     runsOf,
-    sharedScaleOf,
+    siteRowsOf,
     tileColumnsOf,
     type ChartWidgetBody,
     type DashboardPeriod,
@@ -39,9 +39,10 @@ import {
     type RefreshesWidgetBody,
     type RefreshState,
     type ReviewsWidgetBody,
-    type SiteColumn,
+    type SiteStat,
     type SitesWidgetBody,
     type StatWidgetBody,
+    type WaitingWidgetBody,
     type WaitingReview,
 } from './dashboard-widgets.js';
 import { createItem } from './list.js';
@@ -93,9 +94,30 @@ function StatTile({ widget }: { widget: StatWidgetBody }) {
                 <span className="k-stat__label">{widget.label}</span>
                 <ChangeBadge change={widget.change} />
             </span>
-            <strong className="k-stat__value">{widget.value}</strong>
+            <span className="k-stat__body">
+                <strong className="k-stat__value">{widget.value}</strong>
+                {widget.trend === undefined ? null : <Sparkline label={widget.label} values={widget.trend} />}
+            </span>
             {widget.detail === undefined ? null : <span className="k-stat__detail">{widget.detail}</span>}
         </div>
+    );
+}
+
+/**
+ * How many reviews wait, as a tile among the stats, with the sites they
+ * wait on.
+ */
+function WaitingTile({ widget }: { widget: WaitingWidgetBody }) {
+    return (
+        <a className="k-stat k-stat--link" href="#k-admin-waiting">
+            <span className="k-stat__head">
+                <span className="k-stat__label">Waiting for review</span>
+            </span>
+            <strong className="k-stat__value">{WHOLE.format(widget.count)}</strong>
+            {widget.sites.length === 0 ? null : (
+                <span className="k-stat__detail k-ellipsis">{widget.sites.map((site) => site.label).join(', ')}</span>
+            )}
+        </a>
     );
 }
 
@@ -244,114 +266,92 @@ function NumberCell({ value, change }: { value: ReactNode; change?: number | und
 }
 
 /**
- * The sites as the columns of one table: each site's name heads its column,
- * its chart sits under the name on the scale every column shares, and each
- * measure is a row across them.
+ * The sites as the rows of the collection list's table: each site's name and
+ * address, its small line, then a column for each stat, with a change column
+ * after a stat that has one. Past six sites, a row heads each country with
+ * its totals.
  */
 function SitesCard({ widget }: { widget: SitesWidgetBody }) {
-    const domain = sharedScaleOf(widget.sites);
-    const chart = widget.chart;
-    const measures = widget.sites[0]?.stats.map((stat) => stat.label) ?? [];
+    const changes = changeColumnsOf(widget);
+    const rows = siteRowsOf(widget);
+    const valueCells = (stats: ReadonlyArray<SiteStat | undefined>) =>
+        widget.stats.flatMap((stat, index) => {
+            const shown = stats[index];
+            return [
+                <NumberCell key={stat.label} value={shown?.value ?? '–'} />,
+                ...(changes[index] === true ? [<NumberCell key={`${stat.label} change`} value={null} change={shown?.change} />] : []),
+            ];
+        });
     return (
-        <section className="k-panel k-sites" aria-labelledby="k-admin-sites">
-            <div className="k-panel__head">
-                <h2 id="k-admin-sites" className="k-panel__title">
-                    Sites
-                </h2>
-            </div>
-            <div className="k-panel__table">
-                <table className="k-table k-dashboard-table k-sites__table">
-                    <colgroup>
-                        <col className="k-sites__measure" />
-                        {widget.sites.map((site) => (
-                            <col key={site.key} />
-                        ))}
-                    </colgroup>
-                    <thead>
-                        <tr>
-                            <th scope="col">
-                                <span className="k-visually-hidden">Measure</span>
-                            </th>
-                            {widget.sites.map((site) => (
-                                <th key={site.key} scope="col" data-kind="number">
-                                    <span className="k-sites__name">
-                                        <WidgetSiteIcon site={site} />
-                                        <span className="k-sites__label k-ellipsis">{site.label}</span>
-                                        <span className="k-sites__url k-ellipsis">{hostOf(site.url)}</span>
+        <PanelCard label="Sites" description={widget.sites.length > 1 ? `${widget.sites.length} sites` : undefined}>
+            <PanelTable
+                label="Sites"
+                headings={[
+                    {
+                        text: 'Site',
+                    },
+                    ...(widget.chart === null
+                        ? []
+                        : [
+                              {
+                                  text: widget.chart.label,
+                              },
+                          ]),
+                    ...widget.stats.flatMap((stat, index) => [
+                        {
+                            text: stat.label,
+                            number: true,
+                        },
+                        ...(changes[index] === true
+                            ? [
+                                  {
+                                      text: 'Change',
+                                      number: true,
+                                  },
+                              ]
+                            : []),
+                    ]),
+                ]}
+                empty="No sites yet.">
+                {rows.map((row) =>
+                    row.kind === 'country' ? (
+                        <tr key={`country ${row.label}`} className="k-sites__country">
+                            <td className="k-dashboard-table__name">
+                                <span className="k-heading">
+                                    {row.label} · {row.count}
+                                </span>
+                            </td>
+                            {widget.chart === null ? null : <td />}
+                            {valueCells(row.stats)}
+                        </tr>
+                    ) : (
+                        <tr key={row.site.key} className="k-table__row">
+                            <td className="k-dashboard-table__name">
+                                <span className="k-dashboard-table__person">
+                                    <WidgetSiteIcon site={row.site} />
+                                    <span className="k-table__name">
+                                        <span className="k-table__link k-ellipsis">{row.site.label}</span>
+                                        <span className="k-table__detail k-ellipsis">{hostOf(row.site.url)}</span>
                                     </span>
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {chart === null ? null : (
-                            <tr className="k-sites__charts">
-                                <th scope="row">{chart.label}</th>
-                                {widget.sites.map((site) => (
-                                    <td key={site.key}>
-                                        {site.chart === null ? null : site.chart.length === 0 ? (
-                                            <span className="k-table__detail">No numbers yet</span>
-                                        ) : (
-                                            <Chart
-                                                label={`${chart.label}, ${site.label}`}
-                                                style={chart.style}
-                                                data={site.chart}
-                                                domain={domain}
-                                                height={104}
-                                            />
-                                        )}
-                                    </td>
-                                ))}
-                            </tr>
-                        )}
-                        {measures.map((measure, index) => (
-                            <tr key={measure} className="k-table__row">
-                                <th scope="row">{measure}</th>
-                                {widget.sites.map((site) => {
-                                    const stat = site.stats[index];
-                                    return <NumberCell key={site.key} value={stat?.value ?? '–'} change={stat?.change} />;
-                                })}
-                            </tr>
-                        ))}
-                        <tr className="k-table__row">
-                            <th scope="row">Waiting</th>
-                            {widget.sites.map((site) => (
-                                <NumberCell key={site.key} value={site.waiting === 0 ? '–' : WHOLE.format(site.waiting)} />
-                            ))}
-                        </tr>
-                        <tr className="k-table__row">
-                            <th scope="row">Last publish</th>
-                            {widget.sites.map((site) => {
-                                const published = site.lastPublish;
-                                if (published === null) return <NumberCell key={site.key} value="–" />;
-                                return (
-                                    <td key={site.key} data-kind="number">
-                                        <a
-                                            className="k-dashboard-table__number k-sites__publish"
-                                            title={`${published.label}, published ${published.by === null ? '' : `by ${published.by} `}${relativeTimeOf(published.at)}`}
-                                            href={hrefOf({
-                                                kind: 'document',
-                                                ref: published.ref,
-                                            })}>
-                                            <span className="k-ellipsis">{published.label}</span>
-                                            <span className="k-sites__when">· {agoOf(published.at)}</span>
-                                        </a>
-                                    </td>
-                                );
-                            })}
-                        </tr>
-                        <tr className="k-table__row">
-                            <th scope="row">Last refresh</th>
-                            {widget.sites.map((site) => (
-                                <td key={site.key} data-kind="number">
-                                    <RefreshFact refresh={site.lastRefresh} />
+                                </span>
+                            </td>
+                            {widget.chart === null ? null : (
+                                <td className="k-sites__spark">
+                                    {row.site.chart === null ? null : (
+                                        <Sparkline
+                                            label={`${widget.chart.label}, ${row.site.label}`}
+                                            values={row.site.chart.map((point) => point.value)}
+                                            height={26}
+                                        />
+                                    )}
                                 </td>
-                            ))}
+                            )}
+                            {valueCells(row.site.stats)}
                         </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
+                    )
+                )}
+            </PanelTable>
+        </PanelCard>
     );
 }
 
@@ -581,7 +581,6 @@ function EditorsCard({ widget }: { widget: EditorsWidgetBody }) {
 
 function ListCard({ widget }: { widget: ListWidgetBody }) {
     const changes = widget.rows.some((row) => row.change !== undefined);
-    const measured = widget.rows.some((row) => row.of !== undefined);
     return (
         <PanelCard label={widget.label} description={widget.description}>
             <PanelTable
@@ -593,13 +592,9 @@ function ListCard({ widget }: { widget: ListWidgetBody }) {
                               {
                                   text: widget.columns.label,
                               },
-                              ...(measured
-                                  ? [
-                                        {
-                                            text: '',
-                                        },
-                                    ]
-                                  : []),
+                              {
+                                  text: '',
+                              },
                               {
                                   text: widget.columns.value,
                                   number: true,
@@ -617,12 +612,24 @@ function ListCard({ widget }: { widget: ListWidgetBody }) {
                 empty="Nothing yet.">
                 {widget.rows.map((row, index) => (
                     <tr key={`${row.label} ${index}`} className="k-table__row">
-                        <NameCell label={row.label} detail={row.detail} />
-                        {measured ? (
-                            <td className="k-dashboard-table__bar">
-                                <ShareBar share={barShareOf(row, widget.rows)} />
+                        {row.site === undefined ? (
+                            <NameCell label={row.label} detail={row.detail} />
+                        ) : (
+                            <td className="k-dashboard-table__name">
+                                <span className="k-dashboard-table__person">
+                                    <WidgetSiteIcon site={row.site} />
+                                    <span className="k-table__name">
+                                        <span className="k-table__link k-ellipsis">{row.label}</span>
+                                        <span className="k-table__detail k-ellipsis">
+                                            {row.detail === undefined ? row.site.label : `${row.site.label} · ${row.detail}`}
+                                        </span>
+                                    </span>
+                                </span>
                             </td>
-                        ) : null}
+                        )}
+                        <td className="k-dashboard-table__bar">
+                            <ShareBar share={barShareOf(row, widget.rows)} />
+                        </td>
                         <NumberCell value={row.formatted} />
                         {changes ? <NumberCell value={null} change={row.change} /> : null}
                     </tr>
@@ -888,9 +895,13 @@ export function Dashboard({
             if (run.kind === 'stats') {
                 return (
                     <div key={index} className="k-dashboard__tiles">
-                        {run.widgets.map((widget, position) => (
-                            <StatTile key={position} widget={widget} />
-                        ))}
+                        {run.widgets.map((widget, position) =>
+                            widget.type === 'waiting' ? (
+                                <WaitingTile key={position} widget={widget} />
+                            ) : (
+                                <StatTile key={position} widget={widget} />
+                            )
+                        )}
                     </div>
                 );
             }

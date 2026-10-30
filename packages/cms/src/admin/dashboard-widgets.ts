@@ -171,6 +171,10 @@ export interface ListRowBody {
      */
     of?: number;
     change?: number;
+    /**
+     * The site the row belongs to.
+     */
+    site?: DashboardSiteName;
 }
 
 /**
@@ -207,6 +211,15 @@ export interface DashboardSiteName {
     key: string;
     label: string;
     icon: string | null;
+}
+
+export interface WaitingWidgetBody {
+    type: 'waiting';
+    count: number;
+    /**
+     * On the overview, the sites the reviews wait on.
+     */
+    sites: DashboardSiteName[];
 }
 
 export interface ReviewsWidgetBody {
@@ -248,35 +261,43 @@ export interface RefreshState {
     attempts: number;
 }
 
-export interface SiteColumn extends DashboardSiteName {
+/**
+ * A value in a site's row, absent on a site the stat leaves out.
+ */
+export interface SiteStat {
+    value?: string;
+    detail?: string;
+    change?: number;
+}
+
+export interface SiteRow extends DashboardSiteName {
     url: string;
-    stats: Array<{
-        label: string;
-        /**
-         * Absent on a site the stat leaves out.
-         */
-        value?: string;
-        detail?: string;
-        change?: number;
-    }>;
+    /**
+     * The country of the site's first locale, like `NO`.
+     */
+    country: string | null;
+    stats: SiteStat[];
     chart: ChartBar[] | null;
-    waiting: number;
-    lastPublish: {
-        ref: string;
-        label: string;
-        by: string | null;
-        at: string;
-    } | null;
-    lastRefresh: RefreshState | null;
 }
 
 export interface SitesWidgetBody {
     type: 'sites';
     chart: {
         label: string;
-        style: 'bar' | 'line';
     } | null;
-    sites: SiteColumn[];
+    stats: Array<{
+        label: string;
+    }>;
+    sites: SiteRow[];
+    /**
+     * The sites by country, with each column's total, once there are more
+     * than six.
+     */
+    countries: Array<{
+        country: string | null;
+        sites: string[];
+        stats: SiteStat[];
+    }> | null;
 }
 
 export interface RefreshesWidgetBody {
@@ -331,6 +352,7 @@ export type DashboardWidgetBody =
     | ListWidgetBody
     | FunnelWidgetBody
     | ReviewsWidgetBody
+    | WaitingWidgetBody
     | CollectionsWidgetBody
     | SitesWidgetBody
     | RefreshesWidgetBody
@@ -356,7 +378,7 @@ export type PanelWidgetBody =
 export type WidgetRun =
     | {
           kind: 'stats';
-          widgets: StatWidgetBody[];
+          widgets: Array<StatWidgetBody | WaitingWidgetBody>;
       }
     | {
           kind: 'panels';
@@ -389,7 +411,7 @@ export const runsOf = (widgets: readonly DashboardWidgetBody[]): WidgetRun[] => 
                 kind: 'sites',
                 widget,
             });
-        } else if (widget.type === 'stat') {
+        } else if (widget.type === 'stat' || widget.type === 'waiting') {
             if (previous?.kind === 'stats') previous.widgets.push(widget);
             else {
                 runs.push({
@@ -497,7 +519,9 @@ export const changeOf = (change: number): { text: string; spoken: string; direct
 export const isNewOf = (widgets: readonly DashboardWidgetBody[]): boolean =>
     widgets.every(
         (widget) =>
-            widget.type === 'collections' || (widget.type === 'reviews' && widget.reviews.length === 0 && widget.sites === undefined)
+            widget.type === 'collections' ||
+            (widget.type === 'waiting' && widget.count === 0) ||
+            (widget.type === 'reviews' && widget.reviews.length === 0 && widget.sites === undefined)
     );
 
 /**
@@ -582,14 +606,62 @@ export const refreshWordsOf = (refresh: RefreshState): { text: string; detail?: 
     };
 };
 
+const COUNTRY_NAMES = new Intl.DisplayNames(['en'], {
+    type: 'region',
+});
+
 /**
- * Every value the sites' charts draw, so each column's axis covers the
- * others' and the charts share one scale.
+ * A country's name from its code, like "Norway" for `NO`.
  */
-export const sharedScaleOf = (sites: readonly SiteColumn[]): number[] =>
-    sites.flatMap((site) =>
-        (site.chart ?? []).flatMap((point) => [point.value, ...(point.previous === undefined ? [] : [point.previous])])
-    );
+export const countryNameOf = (country: string): string => {
+    try {
+        return COUNTRY_NAMES.of(country) ?? country;
+    } catch {
+        return country;
+    }
+};
+
+/**
+ * The rows of the sites table: each site, and once the widget groups them,
+ * a row heading each country's sites with its totals. Sites without a
+ * country lead, under no heading.
+ */
+export const siteRowsOf = (
+    widget: Pick<SitesWidgetBody, 'sites' | 'countries'>
+): Array<{ kind: 'site'; site: SiteRow } | { kind: 'country'; label: string; count: number; stats: SiteStat[] }> => {
+    if (widget.countries === null) {
+        return widget.sites.map((site) => ({
+            kind: 'site',
+            site,
+        }));
+    }
+    const ordered = [...widget.countries].sort((first, second) => (first.country === null ? -1 : second.country === null ? 1 : 0));
+    return ordered.flatMap((group) => {
+        const sites = widget.sites
+            .filter((site) => group.sites.includes(site.key))
+            .map((site) => ({
+                kind: 'site' as const,
+                site,
+            }));
+        if (group.country === null) return sites;
+        return [
+            {
+                kind: 'country' as const,
+                label: countryNameOf(group.country),
+                count: sites.length,
+                stats: group.stats,
+            },
+            ...sites,
+        ];
+    });
+};
+
+/**
+ * Which of the sites table's columns carry a change, which then gets a
+ * column of its own after the value.
+ */
+export const changeColumnsOf = (widget: Pick<SitesWidgetBody, 'sites' | 'stats'>): boolean[] =>
+    widget.stats.map((_, index) => widget.sites.some((site) => site.stats[index]?.change !== undefined));
 
 /**
  * How much of its track a list row's bar fills, from 0 to 1: its share of
@@ -624,25 +696,4 @@ export const funnelRowsOf = (
             kept: before === undefined || before <= 0 ? undefined : PERCENT.format(step.value / before),
         };
     });
-};
-
-/**
- * How long ago something happened, short enough for one line beside a
- * title: "now", "4 min", "2 h", "3 d", and the day after a week.
- */
-export const agoOf = (iso: string, now: Date = new Date()): string => {
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return '';
-    const elapsed = Math.max(0, now.getTime() - date.getTime());
-    const minutes = Math.round(elapsed / 60_000);
-    if (minutes < 1) return 'now';
-    if (minutes < 60) return `${minutes} min`;
-    const hours = Math.round(minutes / 60);
-    if (hours < 24) return `${hours} h`;
-    const days = Math.round(hours / 24);
-    if (days < 7) return `${days} d`;
-    return new Intl.DateTimeFormat('en-GB', {
-        day: 'numeric',
-        month: 'short',
-    }).format(date);
 };

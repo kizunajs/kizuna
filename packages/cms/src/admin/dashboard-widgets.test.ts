@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
     askedOf,
+    barShareOf,
+    changeColumnsOf,
     changeOf,
+    collectionSectionsOf,
+    countryNameOf,
+    funnelRowsOf,
     groupsOf,
     isNewOf,
     periodOfSearch,
@@ -10,11 +15,11 @@ import {
     reviewGroupsOf,
     roleOf,
     runsOf,
-    sharedScaleOf,
+    siteRowsOf,
     tileColumnsOf,
     type DashboardCollection,
     type DashboardWidgetBody,
-    type SiteColumn,
+    type SiteRow,
 } from './dashboard-widgets.js';
 
 const revenue: DashboardWidgetBody = {
@@ -293,9 +298,23 @@ describe('the overview', () => {
         const sites: DashboardWidgetBody = {
             type: 'sites',
             chart: null,
+            stats: [],
             sites: [],
+            countries: null,
         };
         expect(runsOf([revenue, sites, ordersPerDay]).map((run) => run.kind)).toEqual(['stats', 'sites', 'panels']);
+    });
+
+    it('puts the reviews waiting among the stat tiles', () => {
+        const waiting: DashboardWidgetBody = {
+            type: 'waiting',
+            count: 2,
+            sites: [uk],
+        };
+        expect(runsOf([revenue, waiting, ordersPerDay]).map((run) => [run.kind, 'widgets' in run ? run.widgets.length : 1])).toEqual([
+            ['stats', 2],
+            ['panels', 1],
+        ]);
     });
 
     it('groups the reviews by site, the shared ones first, leaving out a site nothing waits on', () => {
@@ -369,20 +388,205 @@ describe('the overview', () => {
         });
     });
 
-    it("puts every site's chart on one scale", () => {
-        const column = (key: string, values: number[]): SiteColumn => ({
+    it('lists the sites in the order sent until they group by country', () => {
+        const row = (key: string, country: string | null): SiteRow => ({
             ...uk,
             key,
             url: 'https://hagen.example.co.uk',
+            country,
             stats: [],
-            chart: values.map((value) => ({
-                label: 'Mon',
-                value,
-            })),
-            waiting: 0,
-            lastPublish: null,
-            lastRefresh: null,
+            chart: null,
         });
-        expect(sharedScaleOf([column('uk', [400, 600]), column('norway', [300])])).toEqual([400, 600, 300]);
+        const sites = [row('group', null), row('london', 'GB'), row('oslo', 'NO'), row('leeds', 'GB')];
+        expect(
+            siteRowsOf({
+                sites,
+                countries: null,
+            }).map((entry) => (entry.kind === 'site' ? entry.site.key : entry.label))
+        ).toEqual(['group', 'london', 'oslo', 'leeds']);
+        const grouped = siteRowsOf({
+            sites,
+            countries: [
+                {
+                    country: 'GB',
+                    sites: ['london', 'leeds'],
+                    stats: [
+                        {
+                            value: '5,000',
+                        },
+                    ],
+                },
+                {
+                    country: null,
+                    sites: ['group'],
+                    stats: [],
+                },
+                {
+                    country: 'NO',
+                    sites: ['oslo'],
+                    stats: [],
+                },
+            ],
+        });
+        expect(grouped.map((entry) => (entry.kind === 'site' ? entry.site.key : `${entry.label} · ${entry.count}`))).toEqual([
+            'group',
+            'United Kingdom · 2',
+            'london',
+            'leeds',
+            'Norway · 1',
+            'oslo',
+        ]);
+        expect(grouped[1]).toMatchObject({
+            stats: [
+                {
+                    value: '5,000',
+                },
+            ],
+        });
+    });
+
+    it('gives a change column only to a stat that has a change', () => {
+        expect(
+            changeColumnsOf({
+                stats: [
+                    {
+                        label: 'Visitors',
+                    },
+                    {
+                        label: 'Revenue',
+                    },
+                ],
+                sites: [
+                    {
+                        ...uk,
+                        url: 'https://hagen.example.co.uk',
+                        country: 'GB',
+                        stats: [
+                            {
+                                value: '22,258',
+                                change: 0.128,
+                            },
+                            {
+                                value: '244 571 kr',
+                            },
+                        ],
+                        chart: null,
+                    },
+                ],
+            })
+        ).toEqual([true, false]);
+    });
+
+    it('names a country from its code', () => {
+        expect(countryNameOf('NO')).toBe('Norway');
+        expect(countryNameOf('not a country')).toBe('not a country');
+    });
+});
+
+describe('lists and funnels', () => {
+    it("fills a row's bar to the list's largest value, or to its own whole", () => {
+        const rows = [
+            {
+                value: 6120,
+            },
+            {
+                value: 3060,
+            },
+        ];
+        expect(barShareOf(rows[1]!, rows)).toBe(0.5);
+        expect(
+            barShareOf(
+                {
+                    value: 9,
+                    of: 12,
+                },
+                rows
+            )
+        ).toBe(0.75);
+        expect(
+            barShareOf(
+                {
+                    value: 0,
+                },
+                rows
+            )
+        ).toBe(0);
+    });
+
+    it('sizes each step by the first, and says how much of the step before went on', () => {
+        expect(
+            funnelRowsOf([
+                {
+                    label: 'Visit',
+                    value: 1000,
+                },
+                {
+                    label: 'Cart',
+                    value: 250,
+                },
+                {
+                    label: 'Paid',
+                    value: 100,
+                },
+            ])
+        ).toEqual([
+            {
+                label: 'Visit',
+                value: 1000,
+                share: 1,
+                kept: undefined,
+            },
+            {
+                label: 'Cart',
+                value: 250,
+                share: 0.25,
+                kept: '25%',
+            },
+            {
+                label: 'Paid',
+                value: 100,
+                share: 0.1,
+                kept: '40%',
+            },
+        ]);
+    });
+});
+
+describe('the collection sections', () => {
+    const collection = (name: string, site: DashboardCollection['site']): DashboardCollection => ({
+        kind: 'collection',
+        name,
+        label: name,
+        group: null,
+        count: 0,
+        site,
+    });
+
+    it("puts a site's own collections under its label, then the shared ones once", () => {
+        const sections = collectionSectionsOf(
+            [
+                collection('events', {
+                    key: 'uk',
+                    label: 'Hagen UK',
+                }),
+                collection('employees', null),
+                collection('offices', null),
+            ],
+            'Shared'
+        );
+        expect(sections.map((section) => [section.heading, section.collections.map((entry) => entry.name)])).toEqual([
+            ['Hagen UK', ['events']],
+            ['Shared', ['employees', 'offices']],
+        ]);
+    });
+
+    it('lists them under Shared alone on a site with none of its own', () => {
+        expect(collectionSectionsOf([collection('employees', null)], 'Shared').map((section) => section.heading)).toEqual(['Shared']);
+    });
+
+    it('lists them under Collections without sites', () => {
+        expect(collectionSectionsOf([collection('employees', undefined)], 'Shared').map((section) => section.heading)).toEqual([
+            'Collections',
+        ]);
     });
 });

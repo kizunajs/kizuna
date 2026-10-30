@@ -71,6 +71,7 @@ export {
     type SitesWidget,
     type StatValue,
     type StatWidget,
+    type WaitingWidget,
 } from './dashboard.js';
 export { resolvedSchema, ResolvedImageSchema } from './content-schema.js';
 export {
