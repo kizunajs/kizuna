@@ -30,7 +30,11 @@
     ".next/uk/types/**/*.ts",
     ".next/uk/dev/types/**/*.ts",
     ".next/norway/types/**/*.ts",
-    ".next/norway/dev/types/**/*.ts"
+    ".next/norway/dev/types/**/*.ts",
+    ".next-e2e/uk/types/**/*.ts",
+    ".next-e2e/uk/dev/types/**/*.ts",
+    ".next-e2e/norway/types/**/*.ts",
+    ".next-e2e/norway/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"
