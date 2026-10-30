@@ -7,7 +7,7 @@ import { toolsFor, type Connection, type ToolAnswer } from '../view/connection.j
 import { EditorContext, ICON, type EditorContextValue } from '../view/context.js';
 import { FieldForm, fieldDomId, type FieldFormHandle, type SaveFailure, type SaveState } from '../view/form.js';
 import { OwnerControl, type People } from '../view/people.js';
-import { PublishReview, changeViewsOf, type Changes, type PublishReviewHandle } from '../view/review.js';
+import { PublishReview, changeViewsOf, type AskedReview, type Changes, type PublishReviewHandle } from '../view/review.js';
 import { documentTitle, valueAt, type Description, type Draft, type ReviewState } from '../view/schema.js';
 import { sameContent } from '../same-content.js';
 import { parseRef } from '../refs.js';
@@ -44,6 +44,15 @@ import type { PaletteAction } from './search.js';
  * What `translating` holds while the whole translation is drafted.
  */
 const TRANSLATING_ALL = '*';
+
+const NAMES = new Intl.ListFormat('en', {
+    type: 'conjunction',
+});
+
+/**
+ * Names as a sentence lists them: "Nils", "Nils and Kari".
+ */
+const listOfNames = (names: readonly string[]): string => NAMES.format(names);
 
 /**
  * How often the screen checks whether someone else, or a model, changed the
@@ -673,6 +682,41 @@ export function DocumentScreen({
             remount: false,
         });
         return true;
+    };
+
+    /**
+     * Says who was just asked for a review, with Withdraw, which takes the
+     * request back.
+     */
+    const confirmAsked = (asked: AskedReview): void => {
+        const id: string = toasts.add({
+            description: asked.names.length === 0 ? 'Asked for review' : `Asked ${listOfNames(asked.names)} for review`,
+            ...(asked.ids.length === 0
+                ? {}
+                : {
+                      actionProps: {
+                          children: 'Withdraw',
+                          onClick: () => {
+                              toasts.close(id);
+                              void connection
+                                  .call('editing_reviews_withdraw', {
+                                      body: {
+                                          ids: asked.ids,
+                                      },
+                                  })
+                                  .then(() => {
+                                      onReviewsChanged();
+                                      const current = latest.current;
+                                      if (current !== undefined) {
+                                          void describe(current.ref, {
+                                              remount: false,
+                                          });
+                                      }
+                                  });
+                          },
+                      },
+                  }),
+        });
     };
 
     /**
@@ -1353,6 +1397,7 @@ export function DocumentScreen({
                                             if (refs.includes(document.ref)) void describe(document.ref);
                                         }}
                                         onPublished={() => void reportRefreshes(document.ref)}
+                                        onAsked={confirmAsked}
                                     />
                                 )}
                                 {more}
@@ -1484,11 +1529,12 @@ export function DocumentScreen({
                     owner={document.owner}
                     people={people}
                     changeCount={draftChanges?.views.length}
-                    onSent={() => {
+                    onSent={(asked) => {
                         onReviewsChanged();
                         void describe(document.ref, {
                             remount: false,
                         });
+                        confirmAsked(asked);
                     }}
                 />
                 <ConfirmDialog

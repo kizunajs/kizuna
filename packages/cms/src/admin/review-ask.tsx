@@ -4,6 +4,7 @@ import { Check, CircleAlert, X } from 'lucide-react';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
 import { Avatar, type People } from '../view/people.js';
+import type { AskedReview } from '../view/review.js';
 import type { PersonView } from '../view/schema.js';
 import { problemOf } from './parts.js';
 
@@ -53,7 +54,7 @@ export function AskForReview({
      * How many fields the draft changes, or undefined while they load.
      */
     changeCount: number | undefined;
-    onSent: () => void;
+    onSent: (asked: AskedReview) => void;
 }) {
     const me = people?.me;
     const offered = reviewersToOffer(people?.people ?? [], owner?.id ?? null, me);
@@ -99,7 +100,10 @@ export function AskForReview({
             return;
         }
         onOpenChange(false);
-        onSent();
+        onSent({
+            names: offered.filter((person) => chosen.has(person.id)).map((person) => person.name),
+            ids: ((answer.body as { reviews?: Array<{ id: string }> } | undefined)?.reviews ?? []).map((review) => review.id),
+        });
     };
 
     const fields = changeCount === 1 ? 'changed field' : 'changed fields';

@@ -353,7 +353,21 @@ export interface PublishReviewProps {
      * Called once everything listed is published.
      */
     onPublished: (titles: string[]) => void;
+    /**
+     * Called once a review is asked for, with who was asked and the reviews
+     * it opened. With it, asking closes the dialog.
+     */
+    onAsked?: (asked: AskedReview) => void;
     ref?: Ref<PublishReviewHandle>;
+}
+
+/**
+ * A review just asked for: the names of the people asked, and the reviews
+ * it opened, which withdrawing it closes.
+ */
+export interface AskedReview {
+    names: string[];
+    ids: string[];
 }
 
 export interface PublishReviewHandle {
@@ -383,6 +397,7 @@ export function PublishReview({
     describedBy,
     onChanged,
     onPublished,
+    onAsked,
     ref,
 }: PublishReviewProps) {
     const [open, setOpen] = useState(false);
@@ -563,6 +578,14 @@ export function PublishReview({
             return;
         }
         onChanged(selected.map((document) => document.ref));
+        if (onAsked !== undefined) {
+            setOpen(false);
+            onAsked({
+                names: [...reviewers].map((id) => people?.people.find((person) => person.id === id)?.name ?? id),
+                ids: ((answer.body as { reviews?: Array<{ id: string }> } | undefined)?.reviews ?? []).map((review) => review.id),
+            });
+            return;
+        }
         setStep('changes');
         await load();
     };
