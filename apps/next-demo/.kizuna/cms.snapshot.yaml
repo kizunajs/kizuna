@@ -229,6 +229,7 @@ routes:
                                 kind: array
                                 element:
                                   kind: string
+                                  brand: ProductId
                             link:
                               optional: true
                               schema:
@@ -482,6 +483,7 @@ routes:
                                 kind: array
                                 element:
                                   kind: string
+                                  brand: ArticleId
                         callToAction:
                           kind: object
                           fields:
@@ -618,6 +620,7 @@ routes:
                   optional: true
                   schema:
                     kind: string
+                    brand: ArticleId
       "404":
         kind: object
         fields:
@@ -710,6 +713,7 @@ routes:
                     kind: array
                     element:
                       kind: string
+                      brand: EmployeeId
       "404":
         kind: object
         fields:
@@ -1185,6 +1189,13 @@ routes:
       - 200
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -1534,12 +1545,14 @@ routes:
                     optional: true
                     schema:
                       kind: string
+                      brand: EmployeeId
                   related:
                     optional: false
                     schema:
                       kind: array
                       element:
                         kind: string
+                        brand: ArticleId
                   id:
                     optional: false
                     schema:
@@ -1575,6 +1588,13 @@ routes:
       - 200
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -1777,12 +1797,14 @@ routes:
             optional: true
             schema:
               kind: string
+              brand: EmployeeId
           related:
             optional: false
             schema:
               kind: array
               element:
                 kind: string
+                brand: ArticleId
           id:
             optional: false
             schema:
@@ -1813,6 +1835,13 @@ routes:
       - 200
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
     query:
       kind: object
       fields:
@@ -2569,6 +2598,13 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -2697,6 +2733,13 @@ routes:
       - 409
       - 422
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -2904,6 +2947,13 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -2992,6 +3042,13 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -3078,6 +3135,13 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -3214,6 +3278,17 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
+        version:
+          optional: false
+          schema:
+            kind: number
     responses:
       "200":
         kind: object
@@ -3309,6 +3384,13 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -3611,6 +3693,13 @@ routes:
       - 404
       - 422
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -3787,6 +3876,13 @@ routes:
       - 404
       - 409
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -3944,6 +4040,13 @@ routes:
       - 404
       - 409
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields: {}
@@ -4094,6 +4197,13 @@ routes:
       - 409
       - 422
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -4210,6 +4320,13 @@ routes:
       - 404
       - 409
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -4451,6 +4568,13 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -4579,6 +4703,13 @@ routes:
       - 409
       - 422
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -4786,6 +4917,13 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -4874,6 +5012,13 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -4960,6 +5105,13 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -5096,6 +5248,17 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
+        version:
+          optional: false
+          schema:
+            kind: number
     responses:
       "200":
         kind: object
@@ -5191,6 +5354,13 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -5493,6 +5663,13 @@ routes:
       - 404
       - 422
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -5669,6 +5846,13 @@ routes:
       - 404
       - 409
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -5826,6 +6010,13 @@ routes:
       - 404
       - 409
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields: {}
@@ -5976,6 +6167,13 @@ routes:
       - 409
       - 422
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -6092,6 +6290,13 @@ routes:
       - 404
       - 409
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -6314,6 +6519,13 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     query:
       kind: object
       fields:
@@ -6509,6 +6721,13 @@ routes:
       - 409
       - 422
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -6701,6 +6920,17 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "204":
         kind: void
@@ -6770,6 +7000,17 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -6898,6 +7139,17 @@ routes:
       - 409
       - 422
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
+        id:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -7105,6 +7357,17 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -7193,6 +7456,17 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -7279,6 +7553,17 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -7415,6 +7700,21 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
+        id:
+          optional: false
+          schema:
+            kind: string
+        version:
+          optional: false
+          schema:
+            kind: number
     responses:
       "200":
         kind: object
@@ -7510,6 +7810,17 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -7812,6 +8123,17 @@ routes:
       - 404
       - 422
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
+        id:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -7988,6 +8310,17 @@ routes:
       - 404
       - 409
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
+        id:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -8145,6 +8478,17 @@ routes:
       - 404
       - 409
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
+        id:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields: {}
@@ -8295,6 +8639,17 @@ routes:
       - 409
       - 422
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
+        id:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -8411,6 +8766,17 @@ routes:
       - 404
       - 409
     deprecated: false
+    params:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
+        id:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -8681,6 +9047,13 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -8804,6 +9177,13 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -8904,6 +9284,13 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: custom
@@ -8973,6 +9360,13 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -9117,6 +9511,13 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "204":
         kind: void
@@ -9308,6 +9709,13 @@ routes:
       - 403
       - 422
     deprecated: false
+    params:
+      kind: object
+      fields:
+        uploadId:
+          optional: false
+          schema:
+            kind: string
     responses:
       "201":
         kind: object
@@ -9453,6 +9861,13 @@ routes:
       - 404
       - 409
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "204":
         kind: void
@@ -9778,6 +10193,13 @@ routes:
       - 403
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -10079,6 +10501,13 @@ routes:
       - 409
       - 422
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
     body:
       kind: object
       fields:
@@ -10447,6 +10876,13 @@ routes:
       - 404
       - 409
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -11169,6 +11605,17 @@ routes:
       - 401
       - 403
     deprecated: false
+    params:
+      kind: object
+      fields:
+        brand:
+          optional: false
+          schema:
+            kind: string
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -11254,6 +11701,13 @@ routes:
       - 404
       - 502
     deprecated: false
+    params:
+      kind: object
+      fields:
+        brand:
+          optional: false
+          schema:
+            kind: string
     query:
       kind: object
       fields:
@@ -13117,6 +13571,13 @@ routes:
       - 404
       - 409
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -13562,6 +14023,13 @@ routes:
       - 200
     deprecated: false
     hidden: true
+    params:
+      kind: object
+      fields:
+        section:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: unknown
@@ -13572,6 +14040,17 @@ routes:
       - 200
     deprecated: false
     hidden: true
+    params:
+      kind: object
+      fields:
+        section:
+          optional: false
+          schema:
+            kind: string
+        name:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: unknown
@@ -13582,6 +14061,21 @@ routes:
       - 200
     deprecated: false
     hidden: true
+    params:
+      kind: object
+      fields:
+        section:
+          optional: false
+          schema:
+            kind: string
+        name:
+          optional: false
+          schema:
+            kind: string
+        id:
+          optional: false
+          schema:
+            kind: string
     responses:
       "200":
         kind: unknown
@@ -13693,6 +14187,10 @@ routes:
             optional: false
             schema:
               kind: string
+brands:
+  - ArticleId
+  - EmployeeId
+  - ProductId
 jobs: []
 tools:
   editing.describe: editing_describe

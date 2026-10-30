@@ -31,6 +31,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      brand: UserId
                   name:
                     optional: false
                     schema:
@@ -107,6 +108,14 @@ routes:
       - 200
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+            brand: UserId
     responses:
       "200":
         kind: custom
@@ -136,6 +145,14 @@ routes:
       - 200
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+            brand: UserId
     responses:
       "200":
         kind: union
@@ -237,6 +254,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      brand: UserId
                   name:
                     optional: false
                     schema:
@@ -305,6 +323,14 @@ routes:
       - 200
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+            brand: UserId
     headers:
       kind: object
       fields:
@@ -320,6 +346,7 @@ routes:
             optional: false
             schema:
               kind: string
+              brand: UserId
           name:
             optional: false
             schema:
@@ -402,6 +429,18 @@ routes:
       - 200
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+            brand: UserId
+        year:
+          optional: false
+          schema:
+            kind: number
     responses:
       "200":
         kind: object
@@ -410,6 +449,7 @@ routes:
             optional: false
             schema:
               kind: string
+              brand: UserId
           year:
             optional: false
             schema:
@@ -444,6 +484,14 @@ routes:
       - 200
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+            brand: UserId
     responses:
       "200":
         kind: object
@@ -452,6 +500,7 @@ routes:
             optional: false
             schema:
               kind: string
+              brand: UserId
           name:
             optional: false
             schema:
@@ -561,6 +610,7 @@ routes:
             optional: false
             schema:
               kind: string
+              brand: UserId
           name:
             optional: false
             schema:
@@ -642,6 +692,14 @@ routes:
     statuses:
       - 200
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+            brand: UserId
     body:
       kind: object
       fields:
@@ -717,6 +775,14 @@ routes:
       - 404
     deprecated: true
     sunset: 2027-01-01
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+            brand: UserId
     responses:
       "200":
         kind: object
@@ -751,6 +817,14 @@ routes:
       - 200
       - 201
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+            brand: UserId
     responses:
       "200":
         kind: object
@@ -765,6 +839,7 @@ routes:
             optional: false
             schema:
               kind: string
+              brand: UserId
       "201":
         kind: object
         fields:
@@ -776,6 +851,7 @@ routes:
             optional: false
             schema:
               kind: string
+              brand: UserId
   users.uploadAvatar:
     method: POST
     path: /avatar
@@ -811,6 +887,14 @@ routes:
     statuses:
       - 204
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+            brand: UserId
     body:
       kind: void
     responses:
@@ -851,6 +935,14 @@ routes:
       - 200
       - 404
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+            brand: UserId
     responses:
       "200":
         kind: object
@@ -1457,6 +1549,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      brand: UserId
                   name:
                     optional: false
                     schema:
@@ -1593,6 +1686,7 @@ routes:
             optional: false
             schema:
               kind: string
+              brand: UserId
           name:
             optional: false
             schema:
@@ -2171,6 +2265,13 @@ routes:
     statuses:
       - 200
     deprecated: false
+    params:
+      kind: object
+      fields:
+        city:
+          optional: false
+          schema:
+            kind: string
     query:
       kind: object
       fields:
@@ -2470,6 +2571,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      brand: ProductId
                   name:
                     optional: false
                     schema:
@@ -2501,6 +2603,7 @@ routes:
             kind: array
             element:
               kind: string
+              brand: ProductId
     responses:
       "200":
         kind: object
@@ -2516,6 +2619,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      brand: ProductId
                   label:
                     optional: false
                     schema:
@@ -2536,6 +2640,14 @@ routes:
       - 401
       - 403
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+            brand: ProductId
     responses:
       "200":
         kind: object
@@ -2544,6 +2656,7 @@ routes:
             optional: false
             schema:
               kind: string
+              brand: ProductId
           name:
             optional: false
             schema:
@@ -2620,6 +2733,14 @@ routes:
       - 401
       - 403
     deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+            brand: ProductId
     body:
       kind: object
       fields:
@@ -2635,6 +2756,7 @@ routes:
             optional: false
             schema:
               kind: string
+              brand: ProductId
           name:
             optional: false
             schema:
@@ -2759,6 +2881,9 @@ routes:
     responses:
       "200":
         kind: unknown
+brands:
+  - ProductId
+  - UserId
 jobs:
   - users.indexUser
   - users.sendDigests
