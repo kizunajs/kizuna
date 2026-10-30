@@ -35,7 +35,8 @@ import { servesCollection } from './page.js';
 import { fillPath, matchPath, routesOf, type ServedRoute } from './dynamic.js';
 import { DEFAULT_SITE, routePrefix, sitesOf, type PageEntry, type PageMap, type ResolvedCmsOptions } from './options.js';
 import { formatRef, parseRef, sourceRefOf, type DocumentRef } from './refs.js';
-import { translationOf, withTranslation } from './locales.js';
+import { isTranslated, sourceValueOf, translationOf, withTranslation } from './locales.js';
+import { sameContent } from './same-content.js';
 import { CMS_MIGRATION_SQL, indexSql, type IndexType, type IndexedField } from './storage/migration.js';
 import { MediaService, type MediaRecord } from './media/media.js';
 import { memoryMediaStorage, type MediaStorage } from './media/storage.js';
@@ -1288,6 +1289,73 @@ export class CmsService {
     }
 
     /**
+     * The fields of a translation whose source changed since they were
+     * translated, each with the source value it was translated from.
+     */
+    async behindOf(target: Target, row: DocumentRow | undefined): Promise<Map<string, { before: unknown }>> {
+        const behind = new Map<string, { before: unknown }>();
+        if (target.source === undefined || row === undefined) return behind;
+        const source = await this.document(target.source);
+        if (source.row === undefined) return behind;
+        const latest = await this.store.latestVersion(source.row.id);
+        const current = source.row.draft ?? source.row.published;
+        const versions = new Map<number, Record<string, unknown> | undefined>();
+        for (const [name, version] of Object.entries(await this.store.sourceVersions(row.id))) {
+            if (version === latest) continue;
+            if (!versions.has(version)) versions.set(version, (await this.store.version(source.row.id, version))?.data);
+            const before = sourceValueOf(source.target.definition, versions.get(version), name);
+            if (!sameContent(before, sourceValueOf(source.target.definition, current, name))) {
+                behind.set(name, {
+                    before,
+                });
+            }
+        }
+        return behind;
+    }
+
+    /**
+     * The languages a document is written in, with where each copy stands,
+     * or `undefined` for a document in one language.
+     */
+    async documentLocales(ref: DocumentRef): Promise<
+        | {
+              current: string;
+              source: string;
+              locales: Array<{ code: string; status: PageStatus; behind: number }>;
+          }
+        | undefined
+    > {
+        const target = this.target(ref);
+        if (target.shared !== undefined) return undefined;
+        const source = target.source === undefined ? target : this.target(target.source);
+        const [first, ...others] = this.siteLocales(source.site);
+        if (first === undefined || others.length === 0 || translationOf(source.definition) === undefined) return undefined;
+        const locales = [
+            {
+                code: first,
+                status: (await this.draftState(source.ref)).status,
+                behind: 0,
+            },
+        ];
+        for (const code of others) {
+            const state = await this.draftState({
+                ...source.ref,
+                locale: code,
+            });
+            locales.push({
+                code,
+                status: state.status,
+                behind: (await this.behindOf(state.target, state.row)).size,
+            });
+        }
+        return {
+            current: target.source === undefined ? first : target.locale,
+            source: first,
+            locales,
+        };
+    }
+
+    /**
      * The ref the fields shown in a language were written under: the
      * translation's when the language is one, else the source's.
      */
@@ -2206,10 +2274,13 @@ export class CmsService {
         ref: DocumentRef,
         draft: Record<string, unknown> | null,
         caller: Caller,
-        shared?: Record<string, unknown> | null
+        shared?: Record<string, unknown> | null,
+        translation?: { source: Record<string, unknown> | null; behind: ReadonlyMap<string, { before: unknown }> }
     ): z.output<typeof import('./wire.js').DescribedFieldSchema>[] {
         const target = this.target(ref);
         const { definition } = target;
+        const sourceDefinition = target.source === undefined ? undefined : this.target(target.source).definition;
+        const marksTranslated = target.source === undefined && target.shared === undefined && this.siteLocales(target.site).length > 1;
         const listing = this.listingOf(ref);
         const belongsTo =
             this.siteNames().length === 0
@@ -2231,6 +2302,11 @@ export class CmsService {
                 : field.options;
             const sharedValue =
                 target.shared !== undefined && own?.perSite === true ? getAtPath(shared ?? undefined, field.path) : undefined;
+            const sourceValue =
+                own === undefined || sourceDefinition === undefined || translation === undefined
+                    ? undefined
+                    : sourceValueOf(sourceDefinition, translation.source, own.name);
+            const behind = own === undefined ? undefined : translation?.behind.get(own.name);
             const brand = this.referenceBrandOf(field.schema);
             const isList = readDef(unwrapOptionalWrappers(field.schema).inner).type === 'array';
             const roles =
@@ -2316,6 +2392,26 @@ export class CmsService {
                     ? {}
                     : {
                           sharedValue,
+                      }),
+                ...(marksTranslated && own !== undefined && own.sites === undefined && isTranslated(own)
+                    ? {
+                          translated: true,
+                      }
+                    : {}),
+                ...(sourceValue === undefined
+                    ? {}
+                    : {
+                          sourceValue,
+                      }),
+                ...(behind === undefined
+                    ? {}
+                    : {
+                          behind: true,
+                          ...(behind.before === undefined
+                              ? {}
+                              : {
+                                    sourceBefore: behind.before,
+                                }),
                       }),
             });
             for (const inner of field.fields ?? []) push(inner, field.path);

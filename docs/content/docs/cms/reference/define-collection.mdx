@@ -18,6 +18,7 @@ defineCollection(definition: CollectionDefinition): Collection
 | `actions`                                          | `Record<string, Action>`        | Buttons on an item. See [Actions](/docs/cms/collections#actions)                                           |
 | `preview`                                          | `{ url: ({ item }) => string }` | The page the admin's Live Preview shows an item on. See [Live Preview](/docs/cms/collections#live-preview) |
 | `columns`                                          | `string[]`                      | Fields the admin's list shows beside each item's title, until an editor hides them                         |
+| `chooseSites`                                      | `boolean`                       | Each item picks the sites that show it. See [Articles across sites](/docs/cms/sites#articles-across-sites) |
 | `label`, `group`, `requireReview`, `migrate`, `on` |                                 | As on a global                                                                                             |
 
 `Collection.id` is the field schema a page uses to hold one item.

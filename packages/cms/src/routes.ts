@@ -413,6 +413,22 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
 
     const authorOf = (cms: CmsService, args: Args): string => cms.author(args.auth?.[cms.identity]);
 
+    /**
+     * The `locale` every editing route takes, naming a translation to work
+     * on, when cms() lists languages.
+     */
+    const editQuery =
+        (options.locales ?? []).length < 2
+            ? {}
+            : {
+                  query: z.object({
+                      locale: z
+                          .enum(options.locales as [string, ...string[]])
+                          .optional()
+                          .describe("The language of a translation to work on, like 'nb'. Leave it out for the source."),
+                  }),
+              };
+
     // One view for every route that opens the editor, so MCP serves it once.
     const documentView = documentViewFor(options);
 
@@ -422,7 +438,20 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     });
 
     const editingRoutes = (scope: Scope) => {
-        const refOf = (cms: CmsService, args: Args): DocumentRef => cms.access(args.auth).assertSeesRef(scope.refOf(args.params));
+        const refOf = (cms: CmsService, args: Args): DocumentRef => {
+            const ref = scope.refOf(args.params);
+            const locale = localeOf(args);
+            return cms.access(args.auth).assertSeesRef(
+                cms.canonical(
+                    locale === undefined
+                        ? ref
+                        : {
+                              ...ref,
+                              locale,
+                          }
+                )
+            );
+        };
         return {
             getDraft: route({
                 method: 'GET',
@@ -433,6 +462,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     ui: documentView,
                 },
                 pathParams: scope.params,
+                ...editQuery,
                 responses: {
                     200: {
                         body: DraftPageSchema,
@@ -468,6 +498,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                           }
                         : true,
                 pathParams: scope.params,
+                ...editQuery,
                 headers: UpdateDraftHeadersSchema,
                 body: UpdateDraftBodySchema,
                 responses: {
@@ -522,6 +553,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                                     }
                                   : true,
                           pathParams: scope.params,
+                          ...editQuery,
                           body: TranslateBodySchema,
                           responses: {
                               200: {
@@ -567,6 +599,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 summary: `List the fields the draft of ${scope.noun} still needs before it can publish`,
                 tool: true,
                 pathParams: scope.params,
+                ...editQuery,
                 responses: {
                     200: MissingFieldsSchema,
                     404: ProblemDetailsSchema,
@@ -593,6 +626,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 auth: editor,
                 summary: `Read the published content of ${scope.noun} as stored, for copying it elsewhere`,
                 pathParams: scope.params,
+                ...editQuery,
                 responses: {
                     200: {
                         body: StoredContentSchema,
@@ -624,6 +658,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 summary: `List the versions of ${scope.noun}, newest first`,
                 tool: true,
                 pathParams: scope.params,
+                ...editQuery,
                 responses: {
                     200: VersionListSchema,
                     404: ProblemDetailsSchema,
@@ -656,6 +691,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 pathParams: scope.params.extend({
                     version: z.coerce.number().int().min(1),
                 }),
+                ...editQuery,
                 responses: {
                     200: VersionContentSchema,
                     404: ProblemDetailsSchema,
@@ -688,6 +724,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     'Each changed field with what visitors see now and what publishing makes them see. Read it before publishing, so the person knows what goes live.',
                 tool: true,
                 pathParams: scope.params,
+                ...editQuery,
                 responses: {
                     200: {
                         body: DraftChangesSchema,
@@ -718,6 +755,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                           }
                         : true,
                 pathParams: scope.params,
+                ...editQuery,
                 body: RevertBodySchema,
                 responses: {
                     200: DraftPageSchema,
@@ -759,6 +797,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     idempotentHint: true,
                 },
                 pathParams: scope.params,
+                ...editQuery,
                 body: PublishBodySchema,
                 responses: {
                     200: DraftPageSchema,
@@ -798,6 +837,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     idempotentHint: true,
                 },
                 pathParams: scope.params,
+                ...editQuery,
                 body: UnpublishBodySchema,
                 responses: {
                     200: DraftPageSchema,
@@ -823,6 +863,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 description: 'The owner is suggested first when someone asks for a review. Pass null for nobody.',
                 tool: true,
                 pathParams: scope.params,
+                ...editQuery,
                 body: OwnerBodySchema,
                 responses: {
                     204: z.void(),
@@ -855,6 +896,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                               destructiveHint: false,
                           },
                 pathParams: scope.params,
+                ...editQuery,
                 body: RollbackBodySchema,
                 responses: {
                     200: DraftPageSchema,
@@ -1869,14 +1911,19 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         auth: editor,
         summary: 'Describe what is shown at a URL, or any document by its ref: its fields, what the caller may write, and the draft',
         description:
-            'Start here when working from the page someone is looking at, or from a ref a source path or another tool gave you. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it. `usedOn` says where else shared content appears; say so before changing it.',
+            'Start here when working from the page someone is looking at, or from a ref a source path or another tool gave you. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it. `usedOn` says where else shared content appears; say so before changing it. A document in several languages lists them under `locale`: to translate it, describe `<ref>@<code>` and write each field from its `sourceValue` with that `locale`.',
         tool: {
             ui: documentView,
         },
         query: z.object({
             url: z.string().optional().describe('The page URL or path, like https://example.com/blog/spring-sale or /blog/spring-sale.'),
             site: z.string().optional().describe('The site the URL belongs to, when several apps share the CMS.'),
-            ref: z.string().optional().describe('A document: page:<name>, global:<name> or item:<collection>:<id>.'),
+            ref: z
+                .string()
+                .optional()
+                .describe(
+                    'A document: page:<name>, global:<name> or item:<collection>:<id>, with @<locale> for a translation, like page:frontPage@nb.'
+                ),
         }),
         responses: {
             200: DescribedPageSchema,
@@ -1904,11 +1951,21 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             } else {
                 throw new CmsHttpError(400, { detail: 'Pass a url or a ref.' });
             }
+            ref = cms.canonical(ref);
             access.assertSeesRef(ref);
             const caller = access.callerFor(ref);
             const state = await cms.draftState(ref);
             const draft = state.row?.draft ?? state.row?.published ?? null;
             const usedOn = await cms.usedOn(ref, (site) => access.sees(site));
+            const source = state.target.source === undefined ? undefined : await cms.draftState(state.target.source);
+            const translation =
+                source === undefined
+                    ? undefined
+                    : {
+                          source: source.row?.draft ?? source.row?.published ?? null,
+                          behind: await cms.behindOf(state.target, state.row),
+                      };
+            const locale = await cms.documentLocales(ref);
             return {
                 status: 200,
                 body: {
@@ -1921,22 +1978,27 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                               label: state.target.definition.label,
                           }),
                     path: addressOf(state.target, draft) ?? null,
-                    previewPath: previewPathOf(state.target, draft, usedOn),
+                    previewPath: cms.localizedPath(state.target, previewPathOf(state.target, draft, usedOn)),
                     usedOn,
                     status: state.status,
                     version: state.version,
                     complete: state.complete,
                     missing: state.missing,
-                    fields: cms.describe(ref, draft, caller, await sharedContentOf(cms, state)),
+                    fields: cms.describe(ref, draft, caller, await sharedContentOf(cms, state), translation),
                     layout: cms.describeLayout(ref),
                     draft,
                     ...(await reviewFields(cms, state)),
                     canPublish: cms.mayPublish(access, ref),
-                    ...(ref.type === 'item' && state.target.shared === undefined
+                    ...(ref.type === 'item' && state.target.shared === undefined && state.target.source === undefined
                         ? {
                               actions: await itemActions(cms, cms.collection(ref.collection, ref.site), ref, caller),
                           }
                         : {}),
+                    ...(locale === undefined
+                        ? {}
+                        : {
+                              locale,
+                          }),
                 },
                 headers: {
                     etag: state.etag,

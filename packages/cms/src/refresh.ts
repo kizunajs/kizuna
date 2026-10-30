@@ -31,15 +31,17 @@ export interface RefreshTarget {
  * The sites that show a document and the partners that read it: every site
  * and partner for shared content, and for a site's own content or its values
  * on shared content, that site and the partners that read it. A page is
- * its own site's alone.
+ * its own site's alone. `sites` narrows them to an item's `showsOn` and the
+ * partners that read one of those sites.
  */
-export const refreshTargets = (cms: CmsService, ref: DocumentRef): RefreshTarget[] => {
+export const refreshTargets = (cms: CmsService, ref: DocumentRef, sites?: readonly string[]): RefreshTarget[] => {
     const names = cms.siteNames();
     if (names.length === 0) return [];
     const site = cms.target(ref).site;
     const shared = site === DEFAULT_SITE;
+    const reached = shared ? names.filter((name) => sites === undefined || sites.includes(name)) : [site];
     return [
-        ...(shared ? names : [site]).map(
+        ...reached.map(
             (key): RefreshTarget => ({
                 key,
                 kind: 'site',
@@ -47,7 +49,7 @@ export const refreshTargets = (cms: CmsService, ref: DocumentRef): RefreshTarget
             })
         ),
         ...Object.entries(cms.options.partners ?? {})
-            .filter(([, partner]) => shared || partner.reads.includes(site))
+            .filter(([, partner]) => (shared && sites === undefined) || partner.reads.some((read) => reached.includes(read)))
             .map(
                 ([key, partner]): RefreshTarget => ({
                     key,
@@ -89,8 +91,8 @@ const subjectOf = (body: InvalidateBody): string =>
  * Queues one refresh per site and partner that shows a document, after it
  * published, unpublished or was deleted, and records each as queued.
  */
-export const queueRefreshes = async (cms: CmsService, ref: DocumentRef): Promise<void> => {
-    const targets = refreshTargets(cms, ref);
+export const queueRefreshes = async (cms: CmsService, ref: DocumentRef, sites?: readonly string[]): Promise<void> => {
+    const targets = refreshTargets(cms, ref, sites);
     const job = cms.refreshJob();
     if (targets.length === 0 || job === undefined) return;
     const body = invalidateBodyOf(cms, ref);

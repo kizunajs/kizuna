@@ -22,6 +22,8 @@ import {
     DEFAULT_PERIOD,
     periodOf,
     type ChartBar,
+    type FunnelStep,
+    type ListRow,
     type AnySites,
     type DashboardContext,
     type DashboardPeriod,
@@ -61,6 +63,54 @@ export const ChartWidgetSchema = Kizuna.model({
                 })
             )
             .describe('The points, oldest first.'),
+    }),
+});
+
+const WidgetColumnsSchema = z
+    .object({
+        label: z.string(),
+        value: z.string(),
+    })
+    .optional()
+    .describe("The headings over the rows' labels and their values.");
+
+export const ListWidgetSchema = Kizuna.model({
+    title: 'CMS.ListWidget',
+    schema: z.object({
+        type: z.literal('list'),
+        label: z.string(),
+        description: z.string().optional().describe('What the numbers count, like "Views".'),
+        columns: WidgetColumnsSchema,
+        rows: z
+            .array(
+                z.object({
+                    label: z.string(),
+                    detail: z.string().optional().describe('A line under the label.'),
+                    value: z.number().describe("The number the row's bar is drawn from."),
+                    formatted: z.string().describe('The value as the row shows it.'),
+                    of: z.number().optional().describe('The most the value can reach, which the bar fills to.'),
+                    change: z.number().optional().describe('How far the value moved since the period before, as a signed fraction.'),
+                })
+            )
+            .describe('The rows, in the order your function ranked them.'),
+    }),
+});
+
+export const FunnelWidgetSchema = Kizuna.model({
+    title: 'CMS.FunnelWidget',
+    schema: z.object({
+        type: z.literal('funnel'),
+        label: z.string(),
+        description: z.string().optional(),
+        columns: WidgetColumnsSchema,
+        steps: z
+            .array(
+                z.object({
+                    label: z.string(),
+                    value: z.number(),
+                })
+            )
+            .describe('The steps, the first one every visitor takes.'),
     }),
 });
 
@@ -255,6 +305,8 @@ export const DashboardSchema = Kizuna.model({
                 z.discriminatedUnion('type', [
                     StatWidgetSchema,
                     ChartWidgetSchema,
+                    ListWidgetSchema,
+                    FunnelWidgetSchema,
                     ReviewsWidgetSchema,
                     CollectionsWidgetSchema,
                     SitesWidgetSchema,
@@ -325,6 +377,68 @@ const chartBody = (widget: { label: string; description?: string; style?: 'bar' 
     data: pointsOf(points),
 });
 
+const WHOLE = new Intl.NumberFormat('en-GB');
+
+type Headed = {
+    label: string;
+    description?: string;
+    columns?: {
+        label: string;
+        value: string;
+    };
+};
+
+const headOf = (widget: Headed) => ({
+    label: widget.label,
+    ...(widget.description === undefined
+        ? {}
+        : {
+              description: widget.description,
+          }),
+    ...(widget.columns === undefined
+        ? {}
+        : {
+              columns: {
+                  label: widget.columns.label,
+                  value: widget.columns.value,
+              },
+          }),
+});
+
+const listBody = (widget: Headed, rows: readonly ListRow[]): WidgetBody => ({
+    type: 'list',
+    ...headOf(widget),
+    rows: rows.map((row) => ({
+        label: row.label,
+        ...(row.detail === undefined
+            ? {}
+            : {
+                  detail: row.detail,
+              }),
+        value: row.value,
+        formatted: row.formatted ?? WHOLE.format(row.value),
+        ...(isFiniteNumber(row.of) && row.of > 0
+            ? {
+                  of: row.of,
+              }
+            : {}),
+        ...(isFiniteNumber(row.change)
+            ? {
+                  change: row.change,
+              }
+            : {}),
+    })),
+});
+
+const funnelBody = (widget: Headed, steps: readonly FunnelStep[]): WidgetBody => ({
+    type: 'funnel',
+    ...headOf(widget),
+    steps: steps.map((step) => ({
+        label: step.label,
+        value: step.value,
+    })),
+});
+
 const refreshState = (record: RefreshRecord) => ({
     status: record.status,
     at: record.at.toISOString(),
@@ -350,12 +464,19 @@ const shownOn = (widget: { sites?: readonly string[] }, site: string): boolean =
  * the site's own collections on a site's dashboard.
  */
 const openable = async (cms: CmsService, input: DashboardRouteInput, caller: Caller, site: string | undefined) => {
-    const counts = new Map((await cms.collectionSummaries()).map((summary) => [summary.name, summary.count]));
+    const counts = new Map((await cms.collectionSummaries(DEFAULT_SITE, site)).map((summary) => [summary.name, summary.count]));
     const own = site === undefined ? [] : (cms.options.sites?.entries[site]?.collections ?? []);
     const ownCounts = new Map(
         site === undefined || own.length === 0 ? [] : (await cms.collectionSummaries(site)).map((summary) => [summary.name, summary.count])
     );
     const siteLabel = site === undefined ? undefined : cms.options.sites?.values[site]?.label;
+    // With sites, every collection says whose it is, so the shared ones show once, under Shared.
+    const shared =
+        cms.siteNames().length === 0
+            ? {}
+            : {
+                  site: null,
+              };
     return [
         ...own.map((collection) => ({
             kind: 'collection' as const,
@@ -374,11 +495,7 @@ const openable = async (cms: CmsService, input: DashboardRouteInput, caller: Cal
             label: collection.label ?? writtenOut(collection.name),
             group: collection.group ?? null,
             count: counts.get(collection.name) ?? 0,
-            ...(own.length === 0
-                ? {}
-                : {
-                      site: null,
-                  }),
+            ...shared,
         })),
         ...input.views
             .filter((view) => accessRefusal(view.auth, caller, view.name) === undefined)
@@ -388,11 +505,7 @@ const openable = async (cms: CmsService, input: DashboardRouteInput, caller: Cal
                 label: view.label ?? writtenOut(view.name),
                 group: view.group ?? null,
                 count: null,
-                ...(own.length === 0
-                    ? {}
-                    : {
-                          site: null,
-                      }),
+                ...shared,
             })),
     ];
 };
@@ -424,7 +537,6 @@ const sitesBody = async (
         sites.map(async (site) => {
             const context = contextOf(site);
             const values = cms.options.sites!.values[site]!;
-            const chart = widget.chart;
             const last = refreshed.get(site)?.last;
             return {
                 ...siteNameOf(cms, site),
@@ -443,7 +555,7 @@ const sitesBody = async (
                         };
                     })
                 ),
-                chart: chart === undefined || !shownOn(chart, site) ? null : pointsOf(await chart.data(context)),
+                chart: widget.chart === undefined || !shownOn(widget.chart, site) ? null : pointsOf(await widget.chart.data(context)),
                 waiting: reviewRefs.filter((ref) => parseRef(ref)?.site === site).length,
                 lastPublish: published.get(site) ?? null,
                 lastRefresh: last === undefined ? null : refreshState(last),
@@ -575,6 +687,8 @@ export const dashboardRoute = (input: DashboardRouteInput) =>
                             };
                         }
                         if (widget.type === 'chart') return chartBody(widget, await widget.data(overviewContext));
+                        if (widget.type === 'list') return listBody(widget, await widget.data(overviewContext));
+                        if (widget.type === 'funnel') return funnelBody(widget, await widget.data(overviewContext));
                         if (widget.type === 'sites') {
                             return sitesBody(
                                 cms,
@@ -606,15 +720,16 @@ export const dashboardRoute = (input: DashboardRouteInput) =>
                                 ...(await editorsOf(cms, period)),
                             };
                         }
-                        return collectionsBody();
+                        if (widget.type === 'collections') return collectionsBody();
+                        throw new Error(`The overview cannot draw a widget of type '${(widget as { type: string }).type}'.`);
                     })
                 );
             } else {
-                // With sites, a stat or a chart counts for one site, so the shared content's dashboard has none.
+                // With sites, a widget of numbers counts for one site, so the shared content's dashboard has none.
                 const listed = shown(input.widgets ?? DEFAULT_DASHBOARD).filter((widget) =>
-                    widget.type === 'stat' || widget.type === 'chart'
-                        ? declared.length === 0 || (site !== undefined && shownOn(widget, site))
-                        : true
+                    widget.type === 'reviews' || widget.type === 'collections'
+                        ? true
+                        : declared.length === 0 || (site !== undefined && shownOn(widget, site))
                 );
                 const context = contextOf(site);
                 widgets = await Promise.all(
@@ -627,8 +742,11 @@ export const dashboardRoute = (input: DashboardRouteInput) =>
                             };
                         }
                         if (widget.type === 'chart') return chartBody(widget, await widget.data(context));
+                        if (widget.type === 'list') return listBody(widget, await widget.data(context));
+                        if (widget.type === 'funnel') return funnelBody(widget, await widget.data(context));
                         if (widget.type === 'reviews') return reviewsBody();
-                        return collectionsBody();
+                        if (widget.type === 'collections') return collectionsBody();
+                        throw new Error(`The dashboard cannot draw a widget of type '${(widget as { type: string }).type}'.`);
                     })
                 );
             }

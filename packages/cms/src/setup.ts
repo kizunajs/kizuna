@@ -7,7 +7,7 @@ import { brandOf } from './cms.js';
 import { routeProblems } from './dynamic.js';
 import { CmsPluginOptionsSchema, DEFAULT_SITE, sitesOf, type CmsPluginOptions, type PageMap, type ResolvedCmsOptions } from './options.js';
 import type { DeclaredSites } from './site.js';
-import type { Collection, ContentDefinition, Global } from './definitions.js';
+import { choosesSites, type Collection, type ContentDefinition, type Global } from './definitions.js';
 import { describeFields, fieldChain, type DescribedField } from './content.js';
 import { dataFields } from './field.js';
 import { defaultPagesOutput, discoverPages, findAppDir, renderPagesModule } from './discovery.js';
@@ -156,6 +156,13 @@ const validate = (service: CmsService, options: ResolvedCmsOptions, api: PluginA
         throw new Error(
             `cms() gives editors roles on sites, and an admin over every site holds the role 'admin', which ${label} does not declare.`
         );
+    }
+    const jobsIdentity = options.jobs?.identity;
+    if (
+        jobsIdentity !== undefined &&
+        (api as { securitySchemes?: Record<string, unknown> }).securitySchemes?.[jobsIdentity] === undefined
+    ) {
+        throw new Error(`cms() runs its refresh job as the identity '${jobsIdentity}', which \`auth.identities\` does not declare.`);
     }
     const brandSchemas = new Map<string, string>();
     const siteEntries = Object.entries(options.sites?.entries ?? {});
@@ -339,9 +346,23 @@ const assertSiteFields = (service: CmsService, options: ResolvedCmsOptions): voi
             ...(definition.tree === undefined ? [] : [definition.tree]),
         ]);
     }
+    for (const definition of options.collections ?? []) {
+        if (choosesSites(definition) && declared.length === 0) {
+            throw new Error(
+                `Collection '${definition.name}' chooses sites, but cms() declares no sites. Declare them with declareSites().`
+            );
+        }
+    }
     for (const [site, entry] of Object.entries(options.sites?.entries ?? {})) {
         for (const definition of [...(entry.globals ?? []), ...(entry.collections ?? [])]) {
             check(`The ${site} site's '${definition.name}'`, definition, false, []);
+        }
+        for (const definition of entry.collections ?? []) {
+            if (choosesSites(definition)) {
+                throw new Error(
+                    `The ${site} site's '${definition.name}' chooses sites, but only a shared collection shows on several. Take off \`chooseSites\`, or list it under \`collections\` on cms().`
+                );
+            }
         }
         for (const [name, page] of Object.entries(entry.pages ?? {})) {
             if (page.page.sites !== undefined) known(`Page '${name}'`, page.page.sites);

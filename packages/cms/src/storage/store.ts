@@ -141,6 +141,13 @@ export interface ListQuery {
      */
     copy: 'published' | 'draft';
     where?: ReadonlyArray<ListField & { value: unknown }>;
+    /**
+     * A list field that has to hold the value.
+     */
+    holds?: {
+        field: string;
+        value: string;
+    };
     orderBy?: ListField | 'publishedAt' | 'updatedAt';
     direction?: 'asc' | 'desc';
     limit: number;
@@ -1000,6 +1007,9 @@ export class DocumentStore {
                 ? sql`${cmsDocuments.published} is not null`
                 : sql`(${cmsDocuments.draft} is not null or ${cmsDocuments.published} is not null)`,
             ...(input.where ?? []).map((filter) => sql`${read(filter)} = ${filter.type === 'text' ? String(filter.value) : filter.value}`),
+            ...(input.holds === undefined
+                ? []
+                : [sql`coalesce((${copy} -> ${input.holds.field}) @> ${JSON.stringify([input.holds.value])}::jsonb, false)`]),
         ];
         const cursor = input.cursor === undefined ? undefined : decodeCursor(input.cursor);
         if (cursor !== undefined) {

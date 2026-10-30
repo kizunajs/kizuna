@@ -1,6 +1,15 @@
 import { z } from 'zod';
 import { readMetaBrand } from 'kizunajs/generator';
-import { assertFields, dataFields, objectOf, type DataFieldOf, type FieldList, type FieldsCheck, type ShapeOf } from './field.js';
+import {
+    assertFields,
+    dataFields,
+    objectOf,
+    type DataFieldOf,
+    type Field,
+    type FieldList,
+    type FieldsCheck,
+    type ShapeOf,
+} from './field.js';
 import type { PageMigration } from './page.js';
 import { assertActions, type Action } from './action.js';
 import type { Resolved } from './output.js';
@@ -132,7 +141,42 @@ export interface CollectionDefinition<Name extends string, Fields extends FieldL
      * },
      */
     preview?: CollectionPreview<DraftItem<Fields, Id>>;
+    /**
+     * Each item picks the sites that show it, in a `showsOn` field. On a
+     * shared collection, and an item shows on no site until one is picked.
+     */
+    chooseSites?: boolean;
 }
+
+/**
+ * The field `chooseSites` adds: the keys of the sites that show an item.
+ */
+export type ShowsOnField = Field<'showsOn', z.ZodDefault<z.ZodArray<z.ZodString>>>;
+
+/**
+ * A collection's fields, with `showsOn` after them when it chooses sites.
+ */
+export type CollectionFields<Fields extends FieldList, ChooseSites> = ChooseSites extends true
+    ? readonly [...Fields, ShowsOnField]
+    : Fields;
+
+/**
+ * The name of the field `chooseSites` adds.
+ */
+export const SHOWS_ON = 'showsOn';
+
+const showsOnField = (): ShowsOnField => ({
+    name: SHOWS_ON,
+    label: 'Shows on',
+    schema: z.array(z.string()).default([]),
+    position: 'sidebar',
+    localized: false,
+});
+
+/**
+ * Whether a collection's items each pick the sites that show them.
+ */
+export const choosesSites = (definition: { chooseSites?: boolean } | undefined): boolean => definition?.chooseSites === true;
 
 /**
  * Where the admin's Live Preview shows an item.
@@ -231,11 +275,25 @@ export const defineGlobal = <const Name extends string, const Fields extends Fie
  *     indexes: ['name'],
  * });
  */
-export const defineCollection = <const Name extends string, const Fields extends FieldList, const Id extends z.ZodType>(
-    definition: CollectionDefinition<Name, Fields, Id> & FieldsCheck<Fields>
-): Collection<Name, Fields, Id> => {
+export const defineCollection = <
+    const Name extends string,
+    const Fields extends FieldList,
+    const Id extends z.ZodType,
+    const ChooseSites extends boolean = false,
+>(
+    definition: CollectionDefinition<Name, Fields, Id> & {
+        chooseSites?: ChooseSites;
+    } & FieldsCheck<Fields>
+): Collection<Name, CollectionFields<Fields, ChooseSites>, Id> => {
     assertShared(definition, 'defineCollection');
     const owner = `defineCollection('${definition.name}')`;
+    if (definition.chooseSites !== undefined && typeof definition.chooseSites !== 'boolean') {
+        throw new Error(`${owner} has a chooseSites that is not true or false.`);
+    }
+    if (definition.chooseSites === true && dataFields(definition.fields).some((field) => field.name === SHOWS_ON)) {
+        throw new Error(`${owner} chooses sites, which adds the field '${SHOWS_ON}'. Rename its own '${SHOWS_ON}'.`);
+    }
+    const fields: FieldList = definition.chooseSites === true ? [...definition.fields, showsOnField()] : definition.fields;
     if (readMetaBrand(definition.id) === undefined) {
         throw new Error(`${owner} needs an \`id\` made with Kizuna.brand, such as Kizuna.brand('EmployeeId', z.string()).`);
     }
@@ -255,9 +313,10 @@ export const defineCollection = <const Name extends string, const Fields extends
     }
     return {
         ...definition,
+        fields,
         [COLLECTION]: true,
-        schema: objectOf(definition.fields),
-    } as Collection<Name, Fields, Id>;
+        schema: objectOf(fields),
+    } as unknown as Collection<Name, CollectionFields<Fields, ChooseSites>, Id>;
 };
 
 export const isGlobal = (value: unknown): value is Global => typeof value === 'object' && value !== null && GLOBAL in value;
