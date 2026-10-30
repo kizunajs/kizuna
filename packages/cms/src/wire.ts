@@ -205,9 +205,21 @@ export const DescribedFieldSchema = Kizuna.model({
         sharedValue: z.unknown().optional().describe('The shared value, which the site shows while it sets none of its own.'),
         translated: z.boolean().optional().describe('True for a field each language holds its own value of.'),
         sourceValue: z.unknown().optional().describe("In a translation, the source's value, which the field says in its own language."),
-        behind: z.boolean().optional().describe('In a translation, true when the source changed since the field was translated.'),
-        sourceBefore: z.unknown().optional().describe('For a field that is behind, the source value it was translated from.'),
+        sourceChanged: z
+            .boolean()
+            .optional()
+            .describe(
+                'In a translation, true when the source changed since the field was translated. Update the field, or keep it as it is.'
+            ),
+        sourceBefore: z.unknown().optional().describe('For a field whose source changed, the source value it was translated from.'),
     }),
+});
+
+export const KeepSourceBodySchema = z.object({
+    fields: z
+        .array(z.string())
+        .min(1)
+        .describe('The translated fields to keep as they are, by name, from the fields whose `sourceChanged` is true.'),
 });
 
 export const DocumentLocalesSchema = z
@@ -218,7 +230,7 @@ export const DocumentLocalesSchema = z
             z.object({
                 code: z.string(),
                 status: PageStatusSchema,
-                behind: z.int().describe('How many of its fields changed in the source since they were translated.'),
+                sourceChanged: z.int().describe('How many of its fields changed in the source since they were translated or kept.'),
             })
         ),
         translate: z.boolean().optional().describe("True when the translate tool drafts a language from the source's published text."),

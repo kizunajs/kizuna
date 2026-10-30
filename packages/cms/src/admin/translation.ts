@@ -9,6 +9,7 @@ import type { Description } from '../view/schema.js';
 const COPY_TOOLS = [
     'get_draft',
     'update_draft',
+    'keep_source',
     'missing_fields',
     'get_published',
     'history',

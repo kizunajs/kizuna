@@ -152,9 +152,9 @@ describe('a translation in the admin', () => {
     });
 
     it('reads where each copy stands on its tab', () => {
-        expect(localeStatusOf({ code: 'nb', status: 'empty', behind: 0 }, false)).toBe('Not translated');
-        expect(localeStatusOf({ code: 'nb', status: 'published', behind: 2 }, false)).toBe('Behind');
-        expect(localeStatusOf({ code: 'nb', status: 'changed', behind: 0 }, false)).toBe('Unpublished changes');
-        expect(localeStatusOf({ code: 'en', status: 'published', behind: 0 }, true)).toBe('Published');
+        expect(localeStatusOf({ code: 'nb', status: 'empty', sourceChanged: 0 }, false)).toBe('Not translated');
+        expect(localeStatusOf({ code: 'nb', status: 'published', sourceChanged: 2 }, false)).toBe('Source changed');
+        expect(localeStatusOf({ code: 'nb', status: 'changed', sourceChanged: 0 }, false)).toBe('Unpublished changes');
+        expect(localeStatusOf({ code: 'en', status: 'published', sourceChanged: 0 }, true)).toBe('Published');
     });
 });

@@ -1290,13 +1290,13 @@ export class CmsService {
 
     /**
      * The fields of a translation whose source changed since they were
-     * translated, each with the source value it was translated from.
+     * translated or kept, each with the source value it was translated from.
      */
-    async behindOf(target: Target, row: DocumentRow | undefined): Promise<Map<string, { before: unknown }>> {
-        const behind = new Map<string, { before: unknown }>();
-        if (target.source === undefined || row === undefined) return behind;
+    async sourceChangesOf(target: Target, row: DocumentRow | undefined): Promise<Map<string, { before: unknown }>> {
+        const changed = new Map<string, { before: unknown }>();
+        if (target.source === undefined || row === undefined) return changed;
         const source = await this.document(target.source);
-        if (source.row === undefined) return behind;
+        if (source.row === undefined) return changed;
         const latest = await this.store.latestVersion(source.row.id);
         const current = source.row.draft ?? source.row.published;
         const versions = new Map<number, Record<string, unknown> | undefined>();
@@ -1305,12 +1305,46 @@ export class CmsService {
             if (!versions.has(version)) versions.set(version, (await this.store.version(source.row.id, version))?.data);
             const before = sourceValueOf(source.target.definition, versions.get(version), name);
             if (!sameContent(before, sourceValueOf(source.target.definition, current, name))) {
-                behind.set(name, {
+                changed.set(name, {
                     before,
                 });
             }
         }
-        return behind;
+        return changed;
+    }
+
+    /**
+     * Keeps a translation's fields as they are after their source changed,
+     * so they stop showing the change. Their values stay.
+     */
+    async keepSource(input: { ref: DocumentRef; fields: readonly string[]; caller: Caller }): Promise<DraftState> {
+        const { target, row } = await this.document(input.ref);
+        if (target.source === undefined) {
+            throw new CmsHttpError(400, { detail: `'${formatRef(input.ref)}' is a source. Keep the fields of one of its translations.` });
+        }
+        const source = await this.store.get(target.kind, target.key, target.site);
+        if (row === undefined || source === undefined) {
+            throw new CmsHttpError(404, { detail: `'${formatRef(input.ref)}' has no translation yet.` });
+        }
+        for (const field of input.fields) {
+            if (!dataFields(target.definition.fields).some((candidate) => candidate.name === field)) {
+                throw new CmsHttpError(422, {
+                    detail: `'${formatRef(input.ref)}' has no translated field named '${field}'.`,
+                    errors: [
+                        {
+                            code: 'unrecognized_keys',
+                            path: [field],
+                            message: 'Unknown field',
+                        },
+                    ],
+                });
+            }
+            const refusal = pathRefusal(target.definition.fields, field, input.caller);
+            if (refusal !== undefined) throw new CmsHttpError(403, { detail: refusal });
+        }
+        const version = await this.store.latestVersion(source.id);
+        await this.store.recordSourceVersions(row.id, Object.fromEntries(input.fields.map((field) => [field, version])));
+        return this.draftState(input.ref);
     }
 
     /**
@@ -1321,7 +1355,7 @@ export class CmsService {
         | {
               current: string;
               source: string;
-              locales: Array<{ code: string; status: PageStatus; behind: number }>;
+              locales: Array<{ code: string; status: PageStatus; sourceChanged: number }>;
           }
         | undefined
     > {
@@ -1334,7 +1368,7 @@ export class CmsService {
             {
                 code: first,
                 status: (await this.draftState(source.ref)).status,
-                behind: 0,
+                sourceChanged: 0,
             },
         ];
         for (const code of others) {
@@ -1345,7 +1379,7 @@ export class CmsService {
             locales.push({
                 code,
                 status: state.status,
-                behind: (await this.behindOf(state.target, state.row)).size,
+                sourceChanged: (await this.sourceChangesOf(state.target, state.row)).size,
             });
         }
         return {
@@ -2302,7 +2336,7 @@ export class CmsService {
         draft: Record<string, unknown> | null,
         caller: Caller,
         shared?: Record<string, unknown> | null,
-        translation?: { source: Record<string, unknown> | null; behind: ReadonlyMap<string, { before: unknown }> }
+        translation?: { source: Record<string, unknown> | null; changed: ReadonlyMap<string, { before: unknown }> }
     ): z.output<typeof import('./wire.js').DescribedFieldSchema>[] {
         const target = this.target(ref);
         const { definition } = target;
@@ -2333,7 +2367,7 @@ export class CmsService {
                 own === undefined || sourceDefinition === undefined || translation === undefined
                     ? undefined
                     : sourceValueOf(sourceDefinition, translation.source, own.name);
-            const behind = own === undefined ? undefined : translation?.behind.get(own.name);
+            const changed = own === undefined ? undefined : translation?.changed.get(own.name);
             const brand = this.referenceBrandOf(field.schema);
             const isList = readDef(unwrapOptionalWrappers(field.schema).inner).type === 'array';
             const roles =
@@ -2431,14 +2465,14 @@ export class CmsService {
                     : {
                           sourceValue,
                       }),
-                ...(behind === undefined
+                ...(changed === undefined
                     ? {}
                     : {
-                          behind: true,
-                          ...(behind.before === undefined
+                          sourceChanged: true,
+                          ...(changed.before === undefined
                               ? {}
                               : {
-                                    sourceBefore: behind.before,
+                                    sourceBefore: changed.before,
                                 }),
                       }),
             });

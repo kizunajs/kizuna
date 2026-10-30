@@ -644,7 +644,7 @@
         white-space: nowrap;
     }
 
-    .k-source[data-behind='true'] {
+    .k-source[data-changed='true'] {
         color: var(--k-ink);
     }
 

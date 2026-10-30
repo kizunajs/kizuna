@@ -9,7 +9,7 @@ import { ICON } from '../view/context.js';
  */
 export const localeStatusOf = (entry: DocumentLocales['locales'][number], source: boolean): string => {
     if (entry.status === 'empty') return source ? 'Empty' : 'Not translated';
-    if (entry.behind > 0) return 'Behind';
+    if (entry.sourceChanged > 0) return 'Source changed';
     return entry.status === 'published' ? 'Published' : 'Unpublished changes';
 };
 

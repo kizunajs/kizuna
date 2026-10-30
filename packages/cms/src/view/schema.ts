@@ -105,11 +105,12 @@ export interface DescribedField {
     sourceValue?: unknown;
     /**
      * In a translation, true when the source changed since the field was
-     * translated.
+     * translated or kept.
      */
-    behind?: boolean;
+    sourceChanged?: boolean;
     /**
-     * For a field that is behind, the source value it was translated from.
+     * For a field whose source changed, the source value it was translated
+     * from.
      */
     sourceBefore?: unknown;
 }
@@ -123,7 +124,7 @@ export interface DocumentLocales {
     locales: Array<{
         code: string;
         status: DocumentStatus;
-        behind: number;
+        sourceChanged: number;
     }>;
     /**
      * True when a model drafts translations.

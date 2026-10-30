@@ -570,7 +570,7 @@ describe('sites', () => {
     });
 });
 
-describe('a translation behind its source', () => {
+describe('a translation whose source changed', () => {
     it('shows the fields the source changed since, and keeps showing the translation until someone updates it', async () => {
         await publish(norwayFront(), {
             heading: 'Velkommen',
@@ -584,19 +584,19 @@ describe('a translation behind its source', () => {
             {
                 code: 'nb',
                 status: 'published',
-                behind: 0,
+                sourceChanged: 0,
             },
             {
                 code: 'en',
                 status: 'published',
-                behind: 0,
+                sourceChanged: 0,
             },
         ]);
         await publish(norwayFront(), {
             heading: 'Velkommen til Hagen',
         });
         const english = await service.draftState(norwayFront('en'));
-        expect([...(await service.behindOf(english.target, english.row))]).toEqual([
+        expect([...(await service.sourceChangesOf(english.target, english.row))]).toEqual([
             [
                 'heading',
                 {
@@ -615,7 +615,69 @@ describe('a translation behind its source', () => {
             heading: 'Welcome to Hagen',
         });
         const updated = await service.draftState(norwayFront('en'));
-        expect((await service.behindOf(updated.target, updated.row)).size).toBe(0);
+        expect((await service.sourceChangesOf(updated.target, updated.row)).size).toBe(0);
+    });
+
+    it('keeps a field as it is, without changing it, until the source changes again', async () => {
+        await publish(norwayFront(), {
+            heading: 'Velkommen',
+            intro: 'Hagen i Norge.',
+        });
+        await publish(norwayFront('en'), {
+            heading: 'Welcome',
+            intro: 'Hagen in Norway.',
+        });
+        await publish(norwayFront(), {
+            heading: 'Velkommen til Hagen',
+            intro: 'Hagen i Oslo og Bergen.',
+        });
+        const kept = await request(app)
+            .post('/editing/sites/norway/pages/frontPage/keep')
+            .query({
+                locale: 'en',
+            })
+            .set('authorization', 'Bearer token')
+            .send({
+                fields: ['heading'],
+            });
+        expect(kept.status).toBe(200);
+        expect(kept.body.content.heading).toBe('Welcome');
+        const english = await service.draftState(norwayFront('en'));
+        expect([...(await service.sourceChangesOf(english.target, english.row)).keys()]).toEqual(['intro']);
+        const described = await request(app)
+            .get('/editing/describe')
+            .query({
+                ref: 'page:norway:frontPage@en',
+            })
+            .set('authorization', 'Bearer token');
+        expect(described.body.fields.map((field: { path: string; sourceChanged?: boolean }) => [field.path, field.sourceChanged])).toEqual([
+            ['heading', undefined],
+            ['intro', true],
+        ]);
+        expect(described.body.locale.locales[1].sourceChanged).toBe(1);
+        await publish(norwayFront(), {
+            heading: 'Hei',
+        });
+        const again = await service.draftState(norwayFront('en'));
+        expect([...(await service.sourceChangesOf(again.target, again.row)).keys()].sort()).toEqual(['heading', 'intro']);
+    });
+
+    it('keeps only a translation, and only its translated fields', async () => {
+        await publish(norwayFront(), {
+            heading: 'Velkommen',
+        });
+        await expect(service.keepSource({ ref: norwayFront(), fields: ['heading'], caller: {} })).rejects.toMatchObject({
+            status: 400,
+        });
+        await expect(service.keepSource({ ref: norwayFront('en'), fields: ['heading'], caller: {} })).rejects.toMatchObject({
+            status: 404,
+        });
+        await publish(norwayFront('en'), {
+            heading: 'Welcome',
+        });
+        await expect(service.keepSource({ ref: norwayFront('en'), fields: ['order'], caller: {} })).rejects.toMatchObject({
+            status: 422,
+        });
     });
 
     it('lets a model translate through the editing tools: describe, write with `locale`, publish', async () => {
@@ -637,12 +699,12 @@ describe('a translation behind its source', () => {
                 {
                     code: 'nb',
                     status: 'published',
-                    behind: 0,
+                    sourceChanged: 0,
                 },
                 {
                     code: 'en',
                     status: 'empty',
-                    behind: 0,
+                    sourceChanged: 0,
                 },
             ],
         });

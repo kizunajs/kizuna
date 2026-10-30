@@ -417,9 +417,9 @@ export function FieldForm({
         const textOf = (value: unknown): string =>
             typeof value === 'string' ? value : (readOnlyTextOf(field.schema, value, field.options) ?? '');
         return (
-            <p className="k-source" data-behind={field.behind === true}>
+            <p className="k-source" data-changed={field.sourceChanged === true}>
                 <span className="k-source__code">{locales.source.toUpperCase()}</span>
-                {field.behind === true ? (
+                {field.sourceChanged === true ? (
                     <span className="k-source__text">
                         <del>{textOf(field.sourceBefore)}</del> {textOf(field.sourceValue)}
                     </span>

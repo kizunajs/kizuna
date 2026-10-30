@@ -54,7 +54,7 @@ import {
 } from './wire.js';
 import { UploadRejectedError } from './media/media.js';
 import { parseFields, parseFilter } from './item-list.js';
-import { ImageQuerySchema, InvalidateBodySchema, RefreshListSchema, type InvalidateBody } from './wire.js';
+import { ImageQuerySchema, InvalidateBodySchema, KeepSourceBodySchema, RefreshListSchema, type InvalidateBody } from './wire.js';
 import { invalidate as invalidateDocument, refreshTargets } from './refresh.js';
 import { REFRESH_SIGNATURE_HEADER } from './preview-token.js';
 import { sameContent } from './same-content.js';
@@ -530,6 +530,51 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         summary: body.summary,
                         ifMatch: args.headers['if-match'],
                         autosave: body.autosave,
+                    });
+                    return {
+                        status: 200,
+                        body: draftBody(state),
+                        headers: {
+                            etag: state.etag,
+                        },
+                    };
+                }) as never
+            ),
+
+            keepSource: route({
+                method: 'POST',
+                path: `${editingBase}${scope.prefix}/keep`,
+                auth: editor,
+                summary: `Keep fields of a translation of ${scope.noun} as they are after their source changed`,
+                description:
+                    "A translation may differ from its source on purpose. Keeping a field whose `sourceChanged` is true leaves its value as it is and stops showing the change, until the source changes again. Pass the translation's `locale`.",
+                tool:
+                    scope.approveWrites === true
+                        ? {
+                              needsApproval: true,
+                          }
+                        : true,
+                pathParams: scope.params,
+                ...editQuery,
+                body: KeepSourceBodySchema,
+                responses: {
+                    200: {
+                        body: DraftPageSchema,
+                        headers: DraftHeadersSchema,
+                        cache: 'no-store',
+                    },
+                    400: ProblemDetailsSchema,
+                    403: ProblemDetailsSchema,
+                    404: ProblemDetailsSchema,
+                    422: ValidationErrorSchema,
+                },
+            }).handler(
+                guarded(async (cms, args) => {
+                    const ref = refOf(cms, args);
+                    const state = await cms.keepSource({
+                        ref,
+                        fields: (args.body as z.output<typeof KeepSourceBodySchema>).fields,
+                        caller: cms.access(args.auth).callerFor(ref),
                     });
                     return {
                         status: 200,
@@ -1921,7 +1966,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         auth: editor,
         summary: 'Describe what is shown at a URL, or any document by its ref: its fields, what the caller may write, and the draft',
         description:
-            'Start here when working from the page someone is looking at, or from a ref a source path or another tool gave you. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it. `usedOn` says where else shared content appears; say so before changing it. A document in several languages lists them under `locale`: to translate it, describe `<ref>@<code>` and write each field from its `sourceValue` with that `locale`.',
+            'Start here when working from the page someone is looking at, or from a ref a source path or another tool gave you. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it. `usedOn` says where else shared content appears; say so before changing it. A document in several languages lists them under `locale`: to translate it, describe `<ref>@<code>` and write each field from its `sourceValue` with that `locale`. A field whose `sourceChanged` is true is updated, or kept as it is.',
         tool: {
             ui: documentView,
         },
@@ -1973,7 +2018,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     ? undefined
                     : {
                           source: source.row?.draft ?? source.row?.published ?? null,
-                          behind: await cms.behindOf(state.target, state.row),
+                          changed: await cms.sourceChangesOf(state.target, state.row),
                       };
             const locale = await cms.documentLocales(ref);
             return {
