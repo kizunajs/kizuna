@@ -1,16 +1,21 @@
 import kizuna from '@kizunajs-demo/sites-content/config';
 import { EventList, OfficeList, PageIntro } from '@kizunajs-demo/sites-ui';
-import { words } from '../lib/words';
+import { wordsOf } from '../lib/words';
+import { localeOf } from '../lib/locale';
 import styles from './page.module.css';
 
 export default async function FrontPage() {
     const content = kizuna.content.of(['uk', 'norway']);
     const site = await kizuna.content.site.get();
-    const said = words[content.site];
-    const page = await content.pages.frontPage.get();
+    const locale = await localeOf();
+    const said = wordsOf(content.site, locale);
+    const page = await content.pages.frontPage.get({
+        locale,
+    });
     const { items: offices } = await kizuna.content.collections.offices.list({
         orderBy: 'order',
         direction: 'asc',
+        locale,
     });
     const upcoming =
         content.site === 'uk'

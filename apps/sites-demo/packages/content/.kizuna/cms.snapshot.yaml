@@ -887,6 +887,264 @@ routes:
             optional: false
             schema:
               kind: string
+  content.sites.group.collections.articles.list:
+    method: GET
+    path: /content/sites/group/collections/articles
+    statuses:
+      - 200
+      - 400
+      - 401
+      - 403
+    deprecated: false
+    query:
+      kind: object
+      fields:
+        date:
+          optional: true
+          schema:
+            kind: string
+        orderBy:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - date
+              - publishedAt
+              - updatedAt
+        direction:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - asc
+              - desc
+        limit:
+          optional: true
+          schema:
+            kind: number
+        cursor:
+          optional: true
+          schema:
+            kind: string
+        locale:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - en
+    responses:
+      "200":
+        kind: object
+        fields:
+          items:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  title:
+                    optional: false
+                    schema:
+                      kind: string
+                  summary:
+                    optional: false
+                    schema:
+                      kind: string
+                  body:
+                    optional: false
+                    schema:
+                      kind: string
+                  date:
+                    optional: false
+                    schema:
+                      kind: string
+                  showsOn:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: string
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                      brand: ArticleId
+          next:
+            optional: false
+            schema:
+              kind: string
+              nullable: true
+      "400":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.sites.group.collections.articles.get:
+    method: GET
+    path: /content/sites/group/collections/articles/:id
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+    query:
+      kind: object
+      fields:
+        locale:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - en
+    responses:
+      "200":
+        kind: object
+        fields:
+          title:
+            optional: false
+            schema:
+              kind: string
+          summary:
+            optional: false
+            schema:
+              kind: string
+          body:
+            optional: false
+            schema:
+              kind: string
+          date:
+            optional: false
+            schema:
+              kind: string
+          showsOn:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          id:
+            optional: false
+            schema:
+              kind: string
+              brand: ArticleId
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
   content.sites.uk.pages.frontPage:
     method: GET
     path: /content/sites/uk/pages/frontPage
@@ -1726,6 +1984,264 @@ routes:
             schema:
               kind: string
               brand: OfficeId
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.sites.uk.collections.articles.list:
+    method: GET
+    path: /content/sites/uk/collections/articles
+    statuses:
+      - 200
+      - 400
+      - 401
+      - 403
+    deprecated: false
+    query:
+      kind: object
+      fields:
+        date:
+          optional: true
+          schema:
+            kind: string
+        orderBy:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - date
+              - publishedAt
+              - updatedAt
+        direction:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - asc
+              - desc
+        limit:
+          optional: true
+          schema:
+            kind: number
+        cursor:
+          optional: true
+          schema:
+            kind: string
+        locale:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - en
+    responses:
+      "200":
+        kind: object
+        fields:
+          items:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  title:
+                    optional: false
+                    schema:
+                      kind: string
+                  summary:
+                    optional: false
+                    schema:
+                      kind: string
+                  body:
+                    optional: false
+                    schema:
+                      kind: string
+                  date:
+                    optional: false
+                    schema:
+                      kind: string
+                  showsOn:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: string
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                      brand: ArticleId
+          next:
+            optional: false
+            schema:
+              kind: string
+              nullable: true
+      "400":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.sites.uk.collections.articles.get:
+    method: GET
+    path: /content/sites/uk/collections/articles/:id
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+    query:
+      kind: object
+      fields:
+        locale:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - en
+    responses:
+      "200":
+        kind: object
+        fields:
+          title:
+            optional: false
+            schema:
+              kind: string
+          summary:
+            optional: false
+            schema:
+              kind: string
+          body:
+            optional: false
+            schema:
+              kind: string
+          date:
+            optional: false
+            schema:
+              kind: string
+          showsOn:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          id:
+            optional: false
+            schema:
+              kind: string
+              brand: ArticleId
       "401":
         kind: object
         fields:
@@ -2891,6 +3407,266 @@ routes:
             optional: false
             schema:
               kind: string
+  content.sites.norway.collections.articles.list:
+    method: GET
+    path: /content/sites/norway/collections/articles
+    statuses:
+      - 200
+      - 400
+      - 401
+      - 403
+    deprecated: false
+    query:
+      kind: object
+      fields:
+        date:
+          optional: true
+          schema:
+            kind: string
+        orderBy:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - date
+              - publishedAt
+              - updatedAt
+        direction:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - asc
+              - desc
+        limit:
+          optional: true
+          schema:
+            kind: number
+        cursor:
+          optional: true
+          schema:
+            kind: string
+        locale:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - en
+              - nb
+    responses:
+      "200":
+        kind: object
+        fields:
+          items:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  title:
+                    optional: false
+                    schema:
+                      kind: string
+                  summary:
+                    optional: false
+                    schema:
+                      kind: string
+                  body:
+                    optional: false
+                    schema:
+                      kind: string
+                  date:
+                    optional: false
+                    schema:
+                      kind: string
+                  showsOn:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: string
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                      brand: ArticleId
+          next:
+            optional: false
+            schema:
+              kind: string
+              nullable: true
+      "400":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.sites.norway.collections.articles.get:
+    method: GET
+    path: /content/sites/norway/collections/articles/:id
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+    query:
+      kind: object
+      fields:
+        locale:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - en
+              - nb
+    responses:
+      "200":
+        kind: object
+        fields:
+          title:
+            optional: false
+            schema:
+              kind: string
+          summary:
+            optional: false
+            schema:
+              kind: string
+          body:
+            optional: false
+            schema:
+              kind: string
+          date:
+            optional: false
+            schema:
+              kind: string
+          showsOn:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          id:
+            optional: false
+            schema:
+              kind: string
+              brand: ArticleId
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
   content.media.image:
     method: GET
     path: /content/media/:id/image
@@ -3378,6 +4154,10 @@ routes:
                           optional: false
                           schema:
                             kind: number
+                translate:
+                  optional: true
+                  schema:
+                    kind: boolean
           owner:
             optional: false
             schema:
@@ -19458,6 +20238,10 @@ routes:
             kind: array
             element:
               kind: string
+        site:
+          optional: true
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -21925,6 +22709,7 @@ routes:
             schema:
               kind: string
 brands:
+  - ArticleId
   - EmployeeId
   - EventId
   - OfficeId
@@ -22028,6 +22813,34 @@ tools:
   editing.reviews.comment: editing_reviews_comment
   editing.reviews.resolveComment: editing_reviews_resolve_comment
 content:
+  collection:articles:
+    kind: collection
+    migration: 0
+    schema:
+      kind: object
+      fields:
+        title:
+          optional: false
+          schema:
+            kind: string
+        summary:
+          optional: false
+          schema:
+            kind: string
+        body:
+          optional: false
+          schema:
+            kind: string
+        date:
+          optional: false
+          schema:
+            kind: string
+        showsOn:
+          optional: true
+          schema:
+            kind: array
+            element:
+              kind: string
   collection:employees:
     kind: collection
     migration: 0

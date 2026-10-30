@@ -139,6 +139,69 @@ const events = [
     },
 ];
 
+/**
+ * The journal, with the sites each article shows on. Every article shows on
+ * the group's site, which lists them all.
+ */
+const articles = [
+    {
+        title: 'Winter care for houseplants',
+        summary: 'Less water, more light and no radiators: how to see a houseplant through the dark months.',
+        body: `Most houseplants rest from November to February. Water when the top few centimetres of soil are dry, not on a schedule, and stop feeding until the days grow longer.
+
+Move them as close to the window as they will go, and away from radiators, which dry the air and the leaves. A tray of wet gravel under the pot helps ferns and calatheas through the heating season.`,
+        date: '2026-10-20',
+        showsOn: ['uk', 'norway', 'group'],
+    },
+    {
+        title: 'Columbia Road flower market',
+        summary: 'Our London shop sits a few doors from the Sunday market. When to go, and what to bring home.',
+        body: `The market runs every Sunday from eight until early afternoon. Come early for the pick of the stalls, or late for the bargains as the traders pack up.
+
+Bring a bag with a flat bottom for pots, and drop in at the shop for a care card for whatever you found.`,
+        date: '2026-09-14',
+        showsOn: ['uk', 'group'],
+    },
+    {
+        title: 'Juletrær i Oslo',
+        summary: 'From the first Sunday of Advent we sell Christmas trees from Hedmarken in the courtyard on Grünerløkka.',
+        body: `We fetch the trees from the grower the same week we sell them, so they keep their needles until New Year. Choose between Norway spruce, Serbian spruce and Nordmann fir.
+
+We wrap the tree in netting and deliver it to your door in Oslo for 150 kroner.`,
+        date: '2026-11-01',
+        showsOn: ['norway', 'group'],
+    },
+    {
+        title: 'Visiting the growers we buy from',
+        summary: 'Every spring the buyers from all three shops visit the nurseries that grow our plants.',
+        body: `We buy from a handful of growers in Norway, the Netherlands and Kent, and we visit each of them every season. We see how the plants are raised, and we choose next year's together.
+
+It is why every Hagen plant comes with a care card written by the people who grew it.`,
+        date: '2026-04-28',
+        showsOn: ['group'],
+    },
+];
+
+/**
+ * The articles Hagen Norge shows, in Norwegian, by their English title.
+ */
+const articlesInNorwegian: Record<string, Record<string, unknown>> = {
+    'Winter care for houseplants': {
+        title: 'Vinterstell av stueplanter',
+        summary: 'Mindre vann, mer lys og ingen ovner: slik kommer stueplantene gjennom de mørke månedene.',
+        body: `De fleste stueplanter hviler fra november til februar. Vann når de øverste centimeterne av jorda er tørre, ikke etter timeplan, og vent med gjødsel til dagene blir lengre.
+
+Flytt dem så nær vinduet de tåler, og bort fra ovnene, som tørker lufta og bladene. Et fat med våt grus under potta hjelper bregner og kalateaer gjennom fyringssesongen.`,
+    },
+    'Juletrær i Oslo': {
+        title: 'Juletrær i Oslo',
+        summary: 'Fra første søndag i advent selger vi juletrær fra Hedmarken i bakgården på Grünerløkka.',
+        body: `Vi henter trærne hos gartneren samme uke som vi selger dem, så de holder nålene til nyttår. Velg mellom vanlig gran, serbisk gran og edelgran.
+
+Vi pakker treet i nett og leverer det på døren i Oslo for 150 kroner.`,
+    },
+};
+
 const privacyPolicy = {
     heading: 'Privacy policy',
     updatedOn: '2026-10-01',
@@ -239,8 +302,9 @@ We buy from a handful of growers we visit every season, and every plant leaves w
 
 /**
  * Fills in what the demo database is missing: the offices, the people, the
- * privacy policy, the UK's events and every site's pages. Content already
- * there is left alone, so an editor's changes survive a restart.
+ * journal, the privacy policy, the UK's events and every site's pages.
+ * Content already there is left alone, so an editor's changes survive a
+ * restart.
  */
 export const seedContent = async (service: CmsService): Promise<void> => {
     const caller = service.caller({
@@ -393,6 +457,14 @@ export const seedContent = async (service: CmsService): Promise<void> => {
         );
     }
 
+    if ((await service.editorItems('articles')).length === 0) {
+        for (const article of articles) {
+            const created = await service.createItem('articles', article, caller, AUTHOR);
+            await publish(created.target.ref);
+        }
+        console.log(`[demo] seeded ${articles.length} articles`);
+    }
+
     await fill(
         {
             type: 'global',
@@ -420,6 +492,20 @@ export const seedContent = async (service: CmsService): Promise<void> => {
         },
         privacyPolicyInNorwegian
     );
+    const articleItems = await service.editorItems('articles');
+    for (const [title, values] of Object.entries(articlesInNorwegian)) {
+        const found = articleItems.find((article) => article.label === title);
+        if (found === undefined) continue;
+        await fill(
+            {
+                type: 'item',
+                collection: 'articles',
+                id: found.id,
+                locale: 'nb',
+            },
+            values
+        );
+    }
     for (const [name, values] of Object.entries(officesInNorwegian)) {
         await fill(
             {

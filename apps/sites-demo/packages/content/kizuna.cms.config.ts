@@ -7,6 +7,7 @@ import { fetchClient, fetchIds } from '@kizunajs/fetch';
 import { editor } from './src/identities';
 import { Employees } from './src/employees';
 import { Offices } from './src/offices';
+import { Articles } from './src/articles';
 import { PrivacyPolicy } from './src/privacy-policy';
 import { sites } from './src/sites';
 import { db } from './src/db';
@@ -51,7 +52,7 @@ export default defineConfig({
                       model: anthropic('claude-sonnet-5-5'),
                   },
               }),
-        collections: [Employees, Offices],
+        collections: [Employees, Offices, Articles],
         globals: [PrivacyPolicy],
         sites,
         partners,

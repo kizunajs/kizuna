@@ -36,6 +36,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                             href: '/offices',
                         },
                         {
+                            label: 'Journal',
+                            href: '/journal',
+                        },
+                        {
                             label: 'People',
                             href: '/team',
                         },

@@ -1,0 +1,35 @@
+.list {
+    display: grid;
+    gap: 48px;
+}
+
+.article {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);
+    gap: 12px var(--gutter);
+}
+
+.date {
+    color: var(--ink-muted);
+    font-size: 0.9375rem;
+}
+
+.body {
+    display: grid;
+    gap: 10px;
+    max-width: var(--narrow);
+}
+
+.title {
+    font-size: var(--display-s);
+}
+
+.summary {
+    color: var(--ink-muted);
+}
+
+@media (max-width: 767px) {
+    .article {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

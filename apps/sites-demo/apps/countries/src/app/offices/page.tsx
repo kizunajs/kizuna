@@ -1,16 +1,21 @@
 import kizuna from '@kizunajs-demo/sites-content/config';
 import { OfficeList, PageIntro } from '@kizunajs-demo/sites-ui';
-import { words } from '../../lib/words';
+import { wordsOf } from '../../lib/words';
+import { localeOf } from '../../lib/locale';
 
-export const metadata = {
-    title: 'Shops',
-};
+export async function generateMetadata() {
+    return {
+        title: wordsOf(kizuna.content.of(['uk', 'norway']).site, await localeOf()).shops,
+    };
+}
 
 export default async function OfficesPage() {
-    const said = words[kizuna.content.of(['uk', 'norway']).site];
+    const locale = await localeOf();
+    const said = wordsOf(kizuna.content.of(['uk', 'norway']).site, locale);
     const { items: offices } = await kizuna.content.collections.offices.list({
         orderBy: 'order',
         direction: 'asc',
+        locale,
     });
     return (
         <main>

@@ -16,6 +16,11 @@ type KizunaBrand<Name extends string> = {
 
 export namespace API {
     /**
+     * A branded `string`. Responses hand one back, and `toArticleId` makes one from a plain value.
+     */
+    export type ArticleId = string & KizunaBrand<"ArticleId">;
+
+    /**
      * A branded `string`. Responses hand one back, and `toEmployeeId` makes one from a plain value.
      */
     export type EmployeeId = string & KizunaBrand<"EmployeeId">;
@@ -289,6 +294,70 @@ export namespace API {
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
+    export namespace ContentSitesUkCollectionsArticlesList {
+        export type Query = {
+            date?: string;
+            orderBy?: "date" | "publishedAt" | "updatedAt";
+            direction?: "asc" | "desc";
+            limit?: number;
+            /**
+             * The `next` of the previous page.
+             */
+            cursor?: string;
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
+        };
+
+        export type Result =
+            | { status: 200; body: {
+                items: Array<{
+                    title: string;
+                    summary: string;
+                    body: string;
+                    date: string;
+                    showsOn: Array<string>;
+                    id: ArticleId;
+                }>;
+                next: string | null;
+            }; headers: Record<string, string> }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace ContentSitesUkCollectionsArticlesGet {
+        export type Params = {
+            id: string;
+        };
+
+        export type Query = {
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
+        };
+
+        export type Result =
+            | { status: 200; body: {
+                title: string;
+                summary: string;
+                body: string;
+                date: string;
+                showsOn: Array<string>;
+                id: ArticleId;
+            }; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
     export namespace ContentSitesUkCollectionsEventsList {
         export type Query = {
             date?: string;
@@ -476,6 +545,35 @@ export interface Client {
                             fetchOptions?: RequestInit;
                         }, API.ContentSitesUkCollectionsOfficesGet.Result>;
                     };
+                    articles: {
+                        /**
+                         * List the published articles
+                         *
+                         * @example
+                         * const result = await client.content.sites.uk.collections.articles.list();
+                         */
+                        list: ClientMethod<'GET', false, {
+                            query?: API.ContentSitesUkCollectionsArticlesList.Query;
+                            headers?: Record<string, string>;
+                            fetchOptions?: RequestInit;
+                        }, API.ContentSitesUkCollectionsArticlesList.Result>;
+                        /**
+                         * Read one published item of articles
+                         *
+                         * @example
+                         * const result = await client.content.sites.uk.collections.articles.get({
+                         *     params: {
+                         *         id: '1',
+                         *     },
+                         * });
+                         */
+                        get: ClientMethod<'GET', false, {
+                            params: API.ContentSitesUkCollectionsArticlesGet.Params;
+                            query?: API.ContentSitesUkCollectionsArticlesGet.Query;
+                            headers?: Record<string, string>;
+                            fetchOptions?: RequestInit;
+                        }, API.ContentSitesUkCollectionsArticlesGet.Result>;
+                    };
                     events: {
                         /**
                          * List the published events
@@ -599,6 +697,29 @@ const routes: GeneratedRoutes = {
                             },
                         },
                     },
+                    articles: {
+                        list: {
+                            method: 'GET',
+                            path: '/content/sites/uk/collections/articles',
+                            responses: {
+                                200: {},
+                                400: {},
+                                401: {},
+                                403: {},
+                            },
+                        },
+                        get: {
+                            method: 'GET',
+                            path: '/content/sites/uk/collections/articles/:id',
+                            responses: {
+                                200: {},
+                                401: {},
+                                403: {},
+                                404: {},
+                                400: {},
+                            },
+                        },
+                    },
                     events: {
                         list: {
                             method: 'GET',
@@ -643,6 +764,14 @@ export const toOfficeId = (value: string): API.OfficeId => value as API.OfficeId
  * const id = toEmployeeId('1');
  */
 export const toEmployeeId = (value: string): API.EmployeeId => value as API.EmployeeId;
+
+/**
+ * Brands a value from outside the API, like a URL segment, as `API.ArticleId`. A value from a response is branded already.
+ *
+ * @example
+ * const id = toArticleId('1');
+ */
+export const toArticleId = (value: string): API.ArticleId => value as API.ArticleId;
 
 /**
  * Brands a value from outside the API, like a URL segment, as `API.EventId`. A value from a response is branded already.

@@ -44,7 +44,7 @@ test.describe('each site', () => {
         await page.goto(`${urls.uk}/offices`);
         await expect(page).toHaveTitle('Shops | Hagen UK');
         await page.goto(`${urls.norway}/privacy`);
-        await expect(page).toHaveTitle('Privacy policy | Hagen Norge');
+        await expect(page).toHaveTitle('Personvern | Hagen Norge');
     });
 
     test('says its language', async ({ page }) => {
@@ -70,12 +70,15 @@ test.describe('the shared content', () => {
         }
     });
 
-    test('shows one privacy policy on every site', async ({ page }) => {
-        for (const url of Object.values(urls)) {
+    test('shows one privacy policy on every site, in the language it opens in', async ({ page }) => {
+        for (const url of [urls.group, urls.uk]) {
             await page.goto(`${url}/privacy`);
             await expect(heading(page)).toHaveText('Privacy policy');
             await expect(page.getByText('Write to privacy@hagen.example.com')).toBeVisible();
         }
+        await page.goto(`${urls.norway}/privacy`);
+        await expect(heading(page)).toHaveText('Personvern');
+        await expect(page.getByText('Skriv til privacy@hagen.example.com')).toBeVisible();
     });
 });
 
@@ -124,10 +127,12 @@ test.describe("a site's own values on shared content", () => {
 
 test.describe('the images', () => {
     test("show the shared Oslo photo on every site, and the UK's own on its event", async ({ page }) => {
-        for (const url of Object.values(urls)) {
+        for (const url of [urls.group, urls.uk]) {
             await page.goto(`${url}/offices`);
             await expect(page.getByAltText('Close up of fern fronds unfurled in the shade')).toBeVisible();
         }
+        await page.goto(`${urls.norway}/offices`);
+        await expect(page.getByAltText('Nærbilde av bregneblader som har foldet seg ut i skyggen')).toBeVisible();
         await page.goto(`${urls.uk}/events`);
         const image = page.getByAltText('Tall spruce trunks above a green understorey');
         await expect(image).toBeVisible();

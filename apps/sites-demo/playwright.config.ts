@@ -1,12 +1,22 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
+ * The ports a run serves the sites on, which `E2E_GROUP_PORT`,
+ * `E2E_UK_PORT` and `E2E_NORWAY_PORT` move for a run beside another.
+ */
+const ports = {
+    group: process.env.E2E_GROUP_PORT ?? '3043',
+    uk: process.env.E2E_UK_PORT ?? '3044',
+    norway: process.env.E2E_NORWAY_PORT ?? '3045',
+};
+
+/**
  * Where each site answers during a run, beside the ports `pnpm dev` keeps.
  */
 export const urls = {
-    group: 'http://group.localhost:3043',
-    uk: 'http://uk.localhost:3044',
-    norway: 'http://norway.localhost:3045',
+    group: `http://group.localhost:${ports.group}`,
+    uk: `http://uk.localhost:${ports.uk}`,
+    norway: `http://norway.localhost:${ports.norway}`,
 };
 
 /**
@@ -36,7 +46,7 @@ export default defineConfig({
     ],
     webServer: {
         command: 'pnpm run e2e:server',
-        url: 'http://localhost:3045/admin/login',
+        url: `http://localhost:${ports.norway}/admin/login`,
         timeout: 300_000,
         reuseExistingServer: !process.env.CI,
         env: {
@@ -44,9 +54,9 @@ export default defineConfig({
             KIZUNA_GROUP_URL: urls.group,
             KIZUNA_UK_URL: urls.uk,
             KIZUNA_NORWAY_URL: urls.norway,
-            PORT: '3043',
-            UK_PORT: '3044',
-            NORWAY_PORT: '3045',
+            PORT: ports.group,
+            UK_PORT: ports.uk,
+            NORWAY_PORT: ports.norway,
             NEXT_DIST_DIR: '.next-e2e',
             UK_DIST_DIR: '.next-e2e/uk',
             NORWAY_DIST_DIR: '.next-e2e/norway',

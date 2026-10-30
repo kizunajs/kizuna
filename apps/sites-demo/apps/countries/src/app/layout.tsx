@@ -4,7 +4,9 @@ import kizuna from '@kizunajs-demo/sites-content/config';
 import { sites } from '@kizunajs-demo/sites-content';
 import { Footer, Header, type HeaderLink } from '@kizunajs-demo/sites-ui';
 import '@kizunajs-demo/sites-ui/globals.css';
-import { words } from '../lib/words';
+import { wordsOf } from '../lib/words';
+import { localeOf } from '../lib/locale';
+import { pathIn } from '../lib/languages';
 
 export async function generateMetadata(): Promise<Metadata> {
     const site = await kizuna.content.site.get();
@@ -22,23 +24,28 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
     const content = kizuna.content.of(['uk', 'norway']);
     const site = await kizuna.content.site.get();
-    const said = words[content.site];
+    const locale = await localeOf();
+    const said = wordsOf(content.site, locale);
     const links: HeaderLink[] = [
         {
+            label: said.journal,
+            href: pathIn(locale, '/journal'),
+        },
+        {
             label: said.shops,
-            href: '/offices',
+            href: pathIn(locale, '/offices'),
         },
     ];
     if (content.site === 'uk') {
         links.unshift({
             label: said.events,
-            href: '/events',
+            href: pathIn(locale, '/events'),
         });
     }
     return (
-        <html lang={site.locales?.[0] ?? 'en'}>
+        <html lang={locale}>
             <body>
-                <Header label={site.label} icon={site.icon} links={links} />
+                <Header label={site.label} icon={site.icon} home={pathIn(locale, '/')} links={links} />
                 {children}
                 <Footer
                     companyName={site.companyName}
@@ -49,7 +56,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                         },
                         {
                             label: said.privacy,
-                            href: '/privacy',
+                            href: pathIn(locale, '/privacy'),
                         },
                     ]}
                 />
