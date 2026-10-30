@@ -11,7 +11,7 @@ interface Entry {
     note?: string;
 }
 
-interface Group {
+interface Heading {
     title: string;
     note?: string;
     entries: Entry[];
@@ -23,30 +23,40 @@ const icons = {
     global: Globe,
 };
 
-const shared: Group = {
-    title: 'Group',
+const shared: Heading = {
+    title: 'Shared',
     entries: [
+        {
+            label: 'Employees',
+            icon: 'collection',
+        },
+        {
+            label: 'Offices',
+            icon: 'collection',
+        },
         {
             label: 'Privacy Policy',
             icon: 'global',
         },
-        {
-            label: 'Products',
-            icon: 'collection',
-        },
     ],
 };
 
-const uk: Group = {
-    title: 'United Kingdom',
+const hagenGroup: Heading = {
+    title: 'Hagen Group',
     entries: [
         {
             label: 'Front Page',
             icon: 'page',
         },
+    ],
+};
+
+const uk: Heading = {
+    title: 'Hagen UK',
+    entries: [
         {
-            label: 'Offices',
-            icon: 'collection',
+            label: 'Front Page',
+            icon: 'page',
         },
         {
             label: 'Events',
@@ -55,28 +65,25 @@ const uk: Group = {
     ],
 };
 
-const norway: Group = {
-    title: 'Norway',
+const norway: Heading = {
+    title: 'Hagen Norge',
     entries: [
         {
             label: 'Front Page',
             icon: 'page',
         },
-        {
-            label: 'Articles',
-            icon: 'collection',
-        },
     ],
 };
 
 /**
- * What the editor's switcher lists: an admin of the group sees every site,
- * a country's editor sees their own and the shared content.
+ * What the editor's switcher lists: an admin over every site sees the shared
+ * content and every site, a site's editor sees the shared content and their
+ * own site.
  */
-export function Switcher({ as }: { as: 'admin' | 'country' }) {
-    const groups: Group[] =
+export function Switcher({ as }: { as: 'admin' | 'site' }) {
+    const headings: Heading[] =
         as === 'admin'
-            ? [shared, uk, norway]
+            ? [shared, hagenGroup, uk, norway]
             : [
                   {
                       ...shared,
@@ -91,18 +98,18 @@ export function Switcher({ as }: { as: 'admin' | 'country' }) {
                 <Search aria-hidden />
                 <span className={styles.muted}>Find a page or an item</span>
             </div>
-            {groups.map((group) => (
-                <div key={group.title} className={styles.group}>
+            {headings.map((heading) => (
+                <div key={heading.title} className={styles.group}>
                     <div className={styles.groupTitle}>
-                        <span>{group.title}</span>
-                        {group.note === undefined ? null : (
+                        <span>{heading.title}</span>
+                        {heading.note === undefined ? null : (
                             <span className={clsx(styles.chip, styles.note)}>
                                 <Lock aria-hidden />
-                                {group.note}
+                                {heading.note}
                             </span>
                         )}
                     </div>
-                    {group.entries.map((entry) => {
+                    {heading.entries.map((entry) => {
                         const Icon = icons[entry.icon];
                         return (
                             <div key={entry.label} className={styles.entry}>
@@ -113,51 +120,52 @@ export function Switcher({ as }: { as: 'admin' | 'country' }) {
                     })}
                 </div>
             ))}
-            {as === 'country' ? <p className={styles.footnote}>Norway and the other sites are not listed.</p> : null}
+            {as === 'site' ? <p className={styles.footnote}>Hagen Group and Hagen Norge are not listed.</p> : null}
         </Editor>
     );
 }
 
 /**
- * The group's admin beside a country's editor, so the difference is one look.
+ * An admin over every site beside a site's editor, so the difference is one
+ * look.
  */
 export function Switchers() {
     return (
         <div className={styles.pair}>
             <div className={styles.column}>
-                <span className={styles.who}>The group's admin</span>
+                <span className={styles.who}>An admin over every site</span>
                 <Switcher as="admin" />
             </div>
             <div className={styles.column}>
-                <span className={styles.who}>Sam, the UK's editor</span>
-                <Switcher as="country" />
+                <span className={styles.who}>Sam, Hagen UK's editor</span>
+                <Switcher as="site" />
             </div>
         </div>
     );
 }
 
 /**
- * The UK's own office: the UK's editor writes and publishes it.
+ * Hagen UK's values on a shared office: the UK's editor writes and publishes
+ * them, and only the UK refreshes.
  */
 export function OwnItem() {
     return (
         <Shell title="Harbour Office" status="Unpublished changes" saved>
             <div className={styles.banner}>
-                <span className={styles.bannerLabel}>Owned by</span>
+                <span className={styles.bannerLabel}>Site</span>
                 <span className={styles.chip}>
                     <Globe aria-hidden />
-                    United Kingdom
+                    Hagen UK
                 </span>
             </div>
             <FormSection>
-                <Row label="Address">
-                    <TextInput value="12 Harbour Street" />
-                </Row>
                 <Row label="Phone">
                     <TextInput value="+44 20 0000 0111" mark="changed" />
+                    <Help>Hagen UK. Clear it to show the shared number.</Help>
                 </Row>
                 <Row label="Opening hours">
                     <TextInput value="Mon to Fri, 08:00 to 16:00" />
+                    <Help>Hagen UK</Help>
                 </Row>
             </FormSection>
             <Footer>
@@ -169,17 +177,16 @@ export function OwnItem() {
 }
 
 /**
- * The group's Privacy Policy, as the UK's editor sees it: they draft, an
- * admin publishes.
+ * The shared Privacy Policy, as the UK's editor sees it: they draft, an admin
+ * over every site publishes.
  */
-export function GroupItem() {
+export function SharedItem() {
     return (
         <Shell title="Privacy Policy" status="Unpublished changes" saved>
             <div className={styles.banner}>
-                <span className={styles.bannerLabel}>Owned by</span>
                 <span className={styles.chip}>
-                    <Globe aria-hidden />
-                    Group
+                    <Library aria-hidden />
+                    Shared
                 </span>
                 <span className={styles.partNote}>
                     <Lock aria-hidden />
@@ -188,7 +195,7 @@ export function GroupItem() {
             </div>
             <FormSection>
                 <Row label="Contact email">
-                    <TextInput value="privacy@acme.com" mark="changed" />
+                    <TextInput value="privacy@hagen.example.com" mark="changed" />
                 </Row>
             </FormSection>
             <Footer>
@@ -206,26 +213,26 @@ export function SharedReview() {
     return (
         <Editor className={editor.dialog}>
             <p className={editor.dialogTitle}>Publish Privacy Policy?</p>
-            <p className={styles.muted}>Sam, the UK's editor, asked you to review this.</p>
+            <p className={styles.muted}>Sam, Hagen UK's editor, asked you to review this.</p>
             <div className={styles.diff}>
                 <span className={styles.diffLabel}>Contact email</span>
                 <span>
-                    <del>legal@acme.com</del> <ins>privacy@acme.com</ins>
+                    <del>legal@hagen.example.com</del> <ins>privacy@hagen.example.com</ins>
                 </span>
             </div>
             <div className={styles.reachList}>
                 <span className={styles.bannerLabel}>Shows on</span>
                 {[
                     {
-                        site: 'Group',
+                        site: 'Hagen Group',
                         pages: ['Privacy'],
                     },
                     {
-                        site: 'United Kingdom',
+                        site: 'Hagen UK',
                         pages: ['Privacy'],
                     },
                     {
-                        site: 'Norway',
+                        site: 'Hagen Norge',
                         pages: ['Personvern'],
                     },
                 ].map((entry) => (
@@ -255,15 +262,15 @@ export function SharedReview() {
 
 const refreshed = [
     {
-        site: 'Group',
+        site: 'Hagen Group',
         ok: true,
     },
     {
-        site: 'United Kingdom',
+        site: 'Hagen UK',
         ok: true,
     },
     {
-        site: 'Norway',
+        site: 'Hagen Norge',
         ok: false,
     },
 ];
@@ -275,6 +282,7 @@ export function FanOut() {
     return (
         <Editor className={editor.dialog}>
             <p className={editor.dialogTitle}>Published Privacy Policy</p>
+            <p className={styles.muted}>Refreshed 2 of 3 sites. Hagen Norge did not answer, retrying.</p>
             <div className={styles.sites}>
                 {refreshed.map((entry) => (
                     <div key={entry.site} className={clsx(styles.site, !entry.ok && styles.waiting)}>

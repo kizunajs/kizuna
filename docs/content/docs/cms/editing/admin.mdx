@@ -100,7 +100,6 @@ Every screen has an address of its own, so a link to one opens it, and reloading
 | The dashboard            | `/admin`, or `/admin?period=30d`      |
 | Pages                    | `/admin/pages`                        |
 | A page                   | `/admin/pages/frontPage`              |
-| A page of another site   | `/admin/pages/campaign/frontPage`     |
 | A global                 | `/admin/globals/header`               |
 | A collection             | `/admin/collections/employees`        |
 | An item                  | `/admin/collections/employees/k3j9x2` |
@@ -134,6 +133,20 @@ Under **Actions** it offers what the open document's buttons do: **Publish**, **
 On a phone, the sidebar opens as a sheet from the menu button at the top left, with the search beside it on the right.
 
 Every screen opens with the same header: the trail back to the dashboard, the screen's title, a line of facts like a count or when it last changed, and its actions on the right.
+
+## Sites
+
+With [several sites](/docs/cms/sites), a switcher at the top of the sidebar lists each site the editor belongs to, with its label and icon. The sidebar below it shows that site's pages, globals and collections, and the shared content under a heading of its own, **Shared**.
+
+Every address carries the site's key, so a link opens the right site:
+
+| Screen              | Address                         |
+| ------------------- | ------------------------------- |
+| The UK's events     | `/admin/uk/collections/events`  |
+| The UK's front page | `/admin/uk/pages/frontPage`     |
+| Norway's front page | `/admin/norway/pages/frontPage` |
+
+The browser tab shows the current site's icon, so an editor with three sites open in three tabs tells them apart.
 
 ## Lists
 

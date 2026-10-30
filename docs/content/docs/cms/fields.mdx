@@ -29,6 +29,8 @@ A page is a list of fields beside its route. A block is a set of fields several 
 | `position`    | `'sidebar'` puts the field beside the main column. See [Layout](#layout).                                                                   |
 | `width`       | How much of a row the field takes, like `'50%'`.                                                                                            |
 | `condition`   | Shows the field only while a field beside it holds a value: `{ field: 'category', is: 'guide' }`. See [Conditions](#conditions).            |
+| `perSite`     | `true` lets each site set its own value on shared content, and an empty one shows the shared value. See [Per site](#per-site).              |
+| `sites`       | The sites that show and store the field, like `['uk']`. See [Per site](#per-site).                                                          |
 
 A field listed twice fails to compile, and a role the editor identity does not declare fails when the config assembles.
 
@@ -119,6 +121,27 @@ While a field is hidden, the editor leaves it out, along with a tab, row or coll
     article.category === 'guide' && article.difficulty !== undefined ? <Difficulty level={article.difficulty} /> : null;
 }
 ```
+
+## Per site
+
+With [several sites](/docs/cms/sites), a field of shared content can differ by site. Every shop shows the shared offices, the UK answers with its own phone number, and only the UK lists opening hours:
+
+```ts
+fields: [
+    {
+        name: 'phone',
+        schema: z.string().max(30),
+        perSite: true,
+    },
+    {
+        name: 'openingHours',
+        schema: z.string().max(120).optional(),
+        sites: ['uk'],
+    },
+],
+```
+
+With `perSite: true`, a site's value shows in place of the shared one, and a site that leaves it empty shows the shared value. The editor shows the shared value as the placeholder and marks the field **Shared** or with the site's label. A field with `sites` exists on those sites alone. A site's values are its draft, its editors publish them, and only that site refreshes.
 
 ## Limits that keep the design
 

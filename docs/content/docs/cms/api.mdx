@@ -11,7 +11,9 @@ The CMS routes come in three groups:
 | `editing`    | Editors and their agents | Drafts, publishing, versions, reviews, search |
 | `invalidate` | Your app                 | Refreshing pages that hold an id that changed |
 
-`GET /api/content/collections/employees` is the REST API. Every collection also serves `.../options`, and a site's content is under `/content/sites/<site>/...`.
+`GET /api/content/collections/employees` is the REST API, and every collection also serves `.../options`.
+
+With [several sites](/docs/cms/sites), every content route sits under its site, at `/content/sites/<site>/...`. `GET /api/content/sites/uk/collections/offices` answers with the shared offices and the UK's values in place, and `GET /api/content/sites/uk/collections/events` with the UK's events.
 
 ## A client for readers
 
@@ -28,14 +30,22 @@ clients: [
 
 ## Publishing a client
 
-Another repository installs the client as a package. Generate it for the site it serves, put it in a package of its own, and publish it where your packages go. `kizuna diff` fails a release that would break it.
+Another repository, like a [partner's](/docs/cms/sites#partners), installs the client as a package. Generate it for the site it reads, and the client holds that site's routes, with the same paths as `kizuna.content` on that site:
 
-```ts
+```ts title="packages/content/kizuna.cms.config.ts"
 fetchClient({
     output: './packages/uk-content/src/index.ts',
-    groups: ['content.sites.uk', 'content.globals', 'content.collections', 'content.media'],
+    groups: ['content.sites.uk'],
 }),
 ```
+
+The package has two entries: the client, and `./ids` with the Zod brands, like `OfficeId`, so the other repository's own schemas hold your ids. Publish it where your packages go.
+
+`kizuna diff` fails a change that would break a published client, judged by that client's `groups`, so a change to Norway never fails the UK's client. The snapshot records each brand's name, so renaming `EmployeeId` counts as breaking.
+
+## Partners reading
+
+A partner reads with that client and a token from OAuth client credentials. It may read the sites its `reads` names and the shared content, and a read of another site answers `403`, naming the permission it lacks, like `content.sites.norway:read`. A read with a token answers with `Cache-Control: private`. [Partners](/docs/cms/sites#partners) shows the config, the sign-in and how a partner hears a publish.
 
 ## Content in the app API
 
@@ -60,7 +70,7 @@ Set `media.publicPath` to a full URL so image URLs are absolute.
 
 ## Talking to the app
 
-When your app changes a product, it calls `invalidate` with the relationship's name and the id, through the CMS client, as the identity `auth.invalidate` names. Every page that shows the product refreshes.
+When your app changes a product, it calls `invalidate` with the brand's name and the id, `{ brand: 'ProductId', id }`, through the CMS client, as the identity `auth.invalidate` names. Every page that shows the product refreshes.
 
 ## A config of its own
 

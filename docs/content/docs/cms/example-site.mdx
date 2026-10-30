@@ -6,10 +6,10 @@ description: The whole thing, start to finish. Pages, the team, the offices, a b
 ```text
 src/
   cms/
-    content.ts          Site global, Employees, Offices, Articles
+    content.ts          Settings global, Employees, Offices, Articles
     blocks.ts           HeroBlockSchema
   app/
-    layout.tsx          Site global, preview
+    layout.tsx          Settings global, preview
     (front-page)/
       content.ts        frontPage
       page.tsx
@@ -36,8 +36,8 @@ kizuna.config.ts
 ## The content
 
 ```ts title="src/cms/content.ts"
-export const Site = defineGlobal({
-    name: 'site',
+export const Settings = defineGlobal({
+    name: 'settings',
     fields: [
         {
             name: 'name',
@@ -146,14 +146,14 @@ export default defineConfig({
     content: cms({
         db,
         pages,
-        globals: [Site],
+        globals: [Settings],
         collections: [Employees, Offices, Articles],
         auth: {
             identity: 'editor',
             roles: ['editor', 'admin'],
         },
         metadata: {
-            title: ({ title, site }) => `${title} | ${site.name}`,
+            title: ({ title, settings }) => `${title} | ${settings.name}`,
         },
         signInPath: '/login',
         preview: {
@@ -168,16 +168,16 @@ export default defineConfig({
 
 ```tsx title="src/app/layout.tsx"
 export default async function Layout({ children }: { children: React.ReactNode }) {
-    const site = await kizuna.content.globals.site.get();
+    const settings = await kizuna.content.globals.settings.get();
 
     return (
         <html lang="en">
             <body>
                 <header>
-                    <img src={site.logo.url} alt={site.logo.alt} />
+                    <img src={settings.logo.url} alt={settings.logo.alt} />
                 </header>
                 {children}
-                <footer>{site.footerText}</footer>
+                <footer>{settings.footerText}</footer>
                 <KizunaPreview content={kizuna.content} />
             </body>
         </html>

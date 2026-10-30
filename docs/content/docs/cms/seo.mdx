@@ -18,12 +18,12 @@ content: cms({
     db,
     pages,
     metadata: {
-        title: ({ title, site }) => `${title} | ${site.name}`,
+        title: ({ title, settings }) => `${title} | ${settings.name}`,
     },
 }),
 ```
 
-`site` is the `Site` global, so editors rename the site without a deploy. A title that already ends in the site's name, like the front page's "Acme Blog", gets nothing added.
+`settings` is the `Settings` global, so editors rename the site without a deploy. A title that already ends in the site's name, like the front page's "Acme Blog", gets nothing added.
 
 </Step>
 
@@ -132,7 +132,7 @@ Each type reads the item's fields by name:
 
 | Type             | Reads                                          |
 | ---------------- | ---------------------------------------------- |
-| `Organization`   | The `Site` global's `name` and `logo`          |
+| `Organization`   | The `Settings` global's `name` and `logo`      |
 | `LocalBusiness`  | `name`, `address`, `phone`, `openingHours`     |
 | `Person`         | `name`, `title`, `email`, `photo`              |
 | `Article`        | `title`, `author`, `publishedAt`, `cover`      |

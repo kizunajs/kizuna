@@ -20,7 +20,7 @@ export default definePage({
 });
 ```
 
-`name` is how the page is read, `kizuna.content.pages.frontPage`, and how tools address it. Write it in camelCase with a `Page` suffix, unique across the site, and as a literal so discovery can read it.
+`name` is how the page is read, `kizuna.content.pages.frontPage`, and how tools address it. Write it in camelCase with a `Page` suffix, unique within its site, and as a literal so discovery can read it. With [several sites](/docs/cms/sites), page names are per site: every site has its own `frontPage`, with content of its own, even when two sites render the same app.
 
 Content is stored under the page's name, so moving the route's folder keeps it. A new name starts the page afresh, and the old content waits, listed by [`kizuna cms orphans`](/docs/cms/cli#kizuna-cms-orphans), until you move it:
 

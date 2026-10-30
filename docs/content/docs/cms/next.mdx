@@ -29,7 +29,7 @@ export default async function ContactPage() {
 Globals and collections read the same way:
 
 ```tsx title="src/app/team/page.tsx"
-const site = await kizuna.content.globals.site.get();
+const settings = await kizuna.content.globals.settings.get();
 const { items, next } = await kizuna.content.collections.employees.list({
     where: {
         department: 'design',

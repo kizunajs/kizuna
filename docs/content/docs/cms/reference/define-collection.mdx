@@ -20,7 +20,7 @@ defineCollection(definition: CollectionDefinition): Collection
 | `columns`                                          | `string[]`                      | Fields the admin's list shows beside each item's title, until an editor hides them                         |
 | `label`, `group`, `requireReview`, `migrate`, `on` |                                 | As on a global                                                                                             |
 
-`Collection.id` is the field schema a page uses to hold one item. `extendCollection(collection, { fields, overrides })` adds a site's own fields to every item.
+`Collection.id` is the field schema a page uses to hold one item.
 
 ```ts
 export const EmployeeId = Kizuna.brand('EmployeeId', z.string());

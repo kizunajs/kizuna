@@ -10,6 +10,7 @@ content: cms({
     pages,
     sites,
     site,
+    partners,
     locales,
     fallback,
     globals,
@@ -35,53 +36,70 @@ content: cms({
 }),
 ```
 
-| Option          | What it is                                                                                                          |
-| --------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `name`          | What editors call the site, which the sign-in screen and the admin's tab titles show                                |
-| `db`            | The Drizzle database the `cms_` tables live in                                                                      |
-| `pages`         | The pages module `kizuna generate` writes, or one per site under `sites`                                            |
-| `sites`         | `declareSites(Site, { ... })`, or a `defineSite` for admin-created sites                                            |
-| `site`          | Which site this deployment is: `() => process.env.KIZUNA_SITE`, or `({ request }) => ...`                           |
-| `locales`       | The languages, the first being the source                                                                           |
-| `fallback`      | Per locale, what to show when a translation is missing                                                              |
-| `globals`       | `defineGlobal` results, shared by every site                                                                        |
-| `collections`   | `defineCollection` results, shared by every site                                                                    |
-| `relationships` | `defineRelationship` results                                                                                        |
-| `views`         | `defineView` results: data the CMS shows but does not store                                                         |
-| `dashboard`     | The admin's first page: `stat`, `chart`, `reviews` and `collections` widgets                                        |
-| `auth`          | `identity`, `roles`, `sites`, `publish`, `people`, `invalidate`, `signIn`, `signOut`, `chatToken`                   |
-| `reviews`       | `roles` that may approve, `onReviewRequested`                                                                       |
-| `media`         | S3 settings or a `storage`, `publicPath`, `maxBytes`                                                                |
-| `metadata`      | `title` and `og.title` joins for search results                                                                     |
-| `paths`         | `rewrite: true` to serve localized addresses                                                                        |
-| `on`            | `published`, `unpublished`, `deleted` for every document                                                            |
-| `preview`       | `url` of the site, for the editor's preview                                                                         |
-| `signInPath`    | Where a signed-out editor is sent when they sign in elsewhere, in place of `auth.signIn`                            |
-| `signOutPath`   | Where the admin's Sign out link goes, in place of `auth.signOut`                                                    |
-| `adminPath`     | Where the admin is served, default `/admin` under `apiPath` and `path`, with its sign-in screen at `login` under it |
-| `adminCss`      | A stylesheet the admin loads after its own, a path on your site or a full URL                                       |
-| `apiPath`       | Where the config is mounted, default `/api`                                                                         |
-| `path`          | Where the CMS routes sit under it, default `/cms`                                                                   |
-| `revalidate`    | A function that revalidates tags, when the site runs elsewhere                                                      |
-| `environments`  | Named environments for `kizuna cms push` and `pull`                                                                 |
+| Option          | What it is                                                                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`          | What editors call the site, which the sign-in screen and the admin's tab titles show                                                             |
+| `db`            | The Drizzle database the `cms_` tables live in                                                                                                   |
+| `pages`         | The pages module `kizuna generate` writes, for one site. With `sites`, each site names its own                                                   |
+| `sites`         | [`declareSites(Site, { ... })`](/docs/cms/reference/declare-sites), or a [`defineSite`](/docs/cms/reference/define-site) for admin-created sites |
+| `site`          | Which site this deployment is, by its key: `() => process.env.KIZUNA_SITE`, or `({ request }) => ...`                                            |
+| `partners`      | Outside businesses that read your sites and hear their publishes. See [A partner](#a-partner)                                                    |
+| `locales`       | The languages, the first being the source                                                                                                        |
+| `fallback`      | Per locale, what to show when a translation is missing                                                                                           |
+| `globals`       | `defineGlobal` results, the shared content every site reads                                                                                      |
+| `collections`   | `defineCollection` results, the shared content every site reads                                                                                  |
+| `relationships` | `defineRelationship` results                                                                                                                     |
+| `views`         | `defineView` results: data the CMS shows but does not store                                                                                      |
+| `dashboard`     | The admin's first page: `stat`, `chart`, `reviews` and `collections` widgets                                                                     |
+| `auth`          | `identity`, `roles`, `sites`, `publish`, `people`, `invalidate`, `signIn`, `signOut`, `chatToken`                                                |
+| `reviews`       | `roles` that may approve, `onReviewRequested`                                                                                                    |
+| `media`         | S3 settings or a `storage`, `publicPath`, `maxBytes`                                                                                             |
+| `metadata`      | `title` and `og.title` joins for search results                                                                                                  |
+| `paths`         | `rewrite: true` to serve localized addresses                                                                                                     |
+| `on`            | `published`, `unpublished`, `deleted` for every document                                                                                         |
+| `preview`       | `url` of the site, for the editor's preview                                                                                                      |
+| `signInPath`    | Where a signed-out editor is sent when they sign in elsewhere, in place of `auth.signIn`                                                         |
+| `signOutPath`   | Where the admin's Sign out link goes, in place of `auth.signOut`                                                                                 |
+| `adminPath`     | Where the admin is served, default `/admin` under `apiPath` and `path`, with its sign-in screen at `login` under it                              |
+| `adminCss`      | A stylesheet the admin loads after its own, a path on your site or a full URL                                                                    |
+| `apiPath`       | Where the config is mounted, default `/api`                                                                                                      |
+| `path`          | Where the CMS routes sit under it, default `/cms`                                                                                                |
+| `revalidate`    | A function that revalidates tags, when the site runs elsewhere                                                                                   |
+| `environments`  | Named environments for `kizuna cms push` and `pull`                                                                                              |
 
 ## A site
 
 ```ts
 declareSites(Site, {
-    norway: {
+    uk: {
         label,
         url,
-        headers,
-        app,
+        icon,
         locales,
-        fallback,
-        globals,
+        status,
+        pages,
         collections,
-        sites,
+        globals,
         // and the fields Site adds
     },
 }),
 ```
 
-`url` is where the site's API is mounted, which publishing calls. `headers` is what its `invalidate` expects, for a site in another repository. `app` is the app directory that renders it, when sites have different apps. `sites` nests sites under a site that owns content for them.
+`url` is where the site is, which draft mode and publishing call. `icon` is a path on the site or a full URL. `collections` and `globals` are the site's own, and never repeat a name on `cms()`. [`declareSites()`](/docs/cms/reference/declare-sites) describes each one.
+
+## A partner
+
+```ts
+partners: {
+    travelAgency: {
+        label,
+        reads,
+        invalidate: {
+            url,
+            headers,
+        },
+    },
+},
+```
+
+`reads` lists the sites the partner reads, as in `['uk']`, and it reads the shared content with them. `invalidate` is where the CMS sends `{ brand, id }` when a document the partner reads publishes, unpublishes or is deleted, and `headers` returns what that route expects, like the bearer token the partner gave you. See [Partners](/docs/cms/sites#partners).

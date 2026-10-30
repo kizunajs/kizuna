@@ -69,4 +69,4 @@ options: async ({ query, ids }) => {
 
 ## From another service
 
-A Stripe id gets a brand of its own, `StripeProductId`, and `options` calls Stripe with your key. When a product changes there, a webhook route calls `invalidate` with the relationship's name, and every page that holds it refreshes.
+A Stripe id gets a brand of its own, `StripeProductId`, and `options` calls Stripe with your key. When a product changes there, a webhook route calls `invalidate` with the brand's name and the id, as in `{ brand: 'StripeProductId', id: 'prod_tulips' }`, and every page that holds it refreshes.

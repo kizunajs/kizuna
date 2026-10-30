@@ -54,10 +54,10 @@ kizuna cms rename-page pricingPage plansPage
 
 ## `kizuna cms rename-site`
 
-Moves a site's stored pages, globals and collections, with their versions, to a new site name. A project that started with `pages` runs it once when it [adds sites](/docs/cms/sites#starting-with-one-site). The command refuses a name that is still declared, and a target that has content of its own.
+Moves a site's stored pages, globals and collections, and its values on shared content, with their versions, to a new site key. A project that started with one site runs it once when it [adds sites](/docs/cms/sites#starting-with-one-site), to give the pages stored under `default` to their site. The command refuses a key that is still declared, and a target that has content of its own.
 
 ```sh
-kizuna cms rename-site default uk
+kizuna cms rename-site default group
 ```
 
 ## `kizuna cms import-redirects`

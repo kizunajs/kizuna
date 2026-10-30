@@ -136,16 +136,38 @@ A translation remembers the source version it came from. When a translated field
 
 ## With several sites
 
-```ts
-locales: ['en', 'nb', 'de'],
-sites: {
-    norway: {
-        locales: ['nb', 'en'],
-    },
-    switzerland: {
-        locales: ['de'],
-    },
-},
+Each site names the languages it serves, from those on `cms()`:
+
+```ts title="packages/content/kizuna.cms.config.ts"
+content: cms({
+    db,
+    locales: ['en', 'nb'],
+    collections: [Employees, Offices],
+    sites: declareSites(SiteSchema, {
+        group: {
+            label: 'Hagen Group',
+            url: 'https://hagen.example.com',
+            icon: '/icons/group.svg',
+            pages: groupPages,
+            locales: ['en'],
+        },
+        uk: {
+            label: 'Hagen UK',
+            url: 'https://hagen.example.co.uk',
+            icon: '/icons/uk.svg',
+            pages: countryPages,
+            locales: ['en'],
+        },
+        norway: {
+            label: 'Hagen Norge',
+            url: 'https://hagen.example.no',
+            icon: '/icons/norway.svg',
+            pages: countryPages,
+            locales: ['nb', 'en'],
+        },
+    }),
+    site: () => process.env.KIZUNA_SITE,
+}),
 ```
 
-Shared content is written once and translated into every language a site serves. Country editors draft, an admin publishes. Caches are tagged by site and language.
+Shared content is written once and translated into every language a site serves, so the offices get a Norwegian copy for Hagen Norge. A site's editors draft a translation of shared content, and an admin over every site publishes it. Caches are tagged by site and language.

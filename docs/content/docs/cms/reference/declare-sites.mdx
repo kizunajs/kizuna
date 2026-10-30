@@ -1,0 +1,51 @@
+---
+title: declareSites()
+description: 'The sites a config declares in code, each with its pages and its own content.'
+---
+
+```ts
+declareSites(schema, sites);
+```
+
+`schema` is `SiteSchema` from `@kizunajs/cms/schemas`, or an `extend` of it with the fields your pages need. Each key is a site's key, like `uk`, which addresses the site everywhere: `KIZUNA_SITE`, `auth.sites`, `reads`, the admin's addresses and `/content/sites/uk/...`.
+
+```ts title="packages/content/src/sites.ts"
+export const Site = SiteSchema.extend({
+    companyName: z.string(),
+});
+
+export const sites = declareSites(Site, {
+    uk: {
+        label: 'Hagen UK',
+        url: 'https://hagen.example.co.uk',
+        icon: '/icons/uk.svg',
+        pages: countryPages,
+        collections: [Events],
+        companyName: 'Hagen UK Ltd',
+    },
+    norway: {
+        label: 'Hagen Norge',
+        url: 'https://hagen.example.no',
+        icon: '/icons/norway.svg',
+        pages: countryPages,
+        companyName: 'Hagen Norge AS',
+    },
+});
+```
+
+| On a site     | Description                                                                                   |
+| ------------- | --------------------------------------------------------------------------------------------- |
+| `label`       | What editors see, in the site switcher and wherever a field is marked as the site's           |
+| `url`         | Where the site is, which draft mode and publishing call                                       |
+| `icon`        | The site's icon in the switcher and the admin's browser tab: a path on the site or a full URL |
+| `locales`     | Optional. The languages it serves, from those on `cms()`                                      |
+| `status`      | Optional. `'live'`, or `'offline'` while it is built                                          |
+| `pages`       | The pages module of the app that renders it. Two sites may name the same one                  |
+| `collections` | Its own collections, which no other site reads                                                |
+| `globals`     | Its own globals, which no other site reads                                                    |
+
+The fields `schema` adds sit beside these, and every site sets them. A site's own collections and globals never repeat a name on `cms()`, while page names are per site.
+
+`kizuna.content.site.get()` returns the current site, custom fields included. Sites created in the editor take [`defineSite()`](/docs/cms/reference/define-site) instead.
+
+See [Sites](/docs/cms/sites).

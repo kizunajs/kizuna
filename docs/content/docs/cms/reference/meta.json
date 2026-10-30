@@ -10,6 +10,7 @@
         "define-view",
         "define-relationship",
         "define-site",
+        "declare-sites",
         "schemas",
         "next"
     ]
