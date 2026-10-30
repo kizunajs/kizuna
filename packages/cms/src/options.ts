@@ -9,6 +9,7 @@ import { isRelationship, type CmsRelationship } from './relationships.js';
 import { isView, type View } from './view-definition.js';
 import { DashboardWidgetSchema, OverviewWidgetSchema, type DashboardWidget, type OverviewWidget } from './dashboard.js';
 import { isDeclaredSites, type DeclaredSites } from './site.js';
+import type { TranslateOptions } from './translate.js';
 
 /**
  * One discovered page: where it is served, and what it declares.
@@ -382,6 +383,15 @@ export interface CmsPluginOptions<
      */
     fallback?: Readonly<Record<string, readonly string[]>>;
     /**
+     * The model that drafts a translation when an editor asks for one.
+     *
+     * @example
+     * translate: {
+     *     model: anthropic('claude-sonnet-5-5'),
+     * },
+     */
+    translate?: TranslateOptions;
+    /**
      * The site this deployment shows, which `kizuna.content` reads in
      * process.
      *
@@ -626,6 +636,16 @@ export const CmsPluginOptionsSchema = z
             })
             .optional(),
         fallback: z.record(z.string(), z.array(z.string())).optional(),
+        translate: z
+            .object({
+                model: z.custom<TranslateOptions['model']>(
+                    (model) => typeof model === 'string' || (typeof model === 'object' && model !== null),
+                    {
+                        error: 'must be an AI SDK language model',
+                    }
+                ),
+            })
+            .optional(),
         partners: z
             .record(
                 z.string().min(1),
@@ -788,6 +808,10 @@ export const CmsPluginOptionsSchema = z
                 });
             }
         }
+    })
+    .refine((options) => options.translate === undefined || (options.locales ?? []).length > 1, {
+        error: 'translates between languages, but cms() lists fewer than two in `locales`',
+        path: ['translate'],
     })
     .refine((options) => options.auth.sites === undefined || options.sites !== undefined, {
         error: 'gives editors roles on sites, but cms() declares no sites. Declare them with declareSites()',

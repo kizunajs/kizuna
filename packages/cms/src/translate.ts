@@ -213,12 +213,14 @@ export const translateFields = async (input: TranslateInput): Promise<Record<str
         });
         answer = result.output;
     } catch (error) {
-        if (NoObjectGeneratedError.isInstance(error)) {
-            throw new TranslationError(`The model's translation from ${input.from} to ${input.to} does not fit the fields.`, {
+        throw new TranslationError(
+            NoObjectGeneratedError.isInstance(error)
+                ? `The model's translation from ${input.from} to ${input.to} does not fit the fields.`
+                : `The model did not answer: ${error instanceof Error ? error.message : String(error)}`,
+            {
                 cause: error,
-            });
-        }
-        throw error;
+            }
+        );
     }
     const translated: Values = structuredClone(
         Object.fromEntries(found.map((text) => [text.path[0]!, input.values[text.path[0] as string]]))
