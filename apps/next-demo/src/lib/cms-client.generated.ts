@@ -73,7 +73,11 @@ export namespace API {
                  */
                 options?: Record<string, string>;
                 description?: string;
+                /**
+                 * Whether the item needs a value here, while the field shows.
+                 */
                 required: boolean;
+                condition?: CMS.FieldCondition;
             }>;
         };
 
@@ -367,9 +371,14 @@ export namespace API {
             layout?: Array<string>;
             readOnly: boolean;
             /**
-             * Whether the document needs a value here before it can publish.
+             * Whether the document needs a value here before it can publish, while the field shows.
              */
             required: boolean;
+            condition?: CMS.FieldCondition;
+            /**
+             * True when the condition hides the field in the current draft, so publishing does not need it.
+             */
+            hidden?: boolean;
             /**
              * Whether the caller may write this field.
              */
@@ -394,6 +403,21 @@ export namespace API {
              * The current draft value.
              */
             value?: unknown;
+        };
+
+        export type FieldCondition = {
+            /**
+             * The field beside it whose value decides, in the same page, block or item.
+             */
+            field: string;
+            /**
+             * Shown while that field holds the value, or one of the values. A list holds it when it contains it.
+             */
+            is?: string | number | boolean | Array<string | number | boolean>;
+            /**
+             * Shown while that field holds none of the values.
+             */
+            isNot?: string | number | boolean | Array<string | number | boolean>;
         };
 
         export type Layout = {

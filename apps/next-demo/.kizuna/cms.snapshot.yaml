@@ -2041,6 +2041,23 @@ routes:
                                     optional: false
                                     schema:
                                       kind: boolean
+                                  condition:
+                                    optional: true
+                                    schema:
+                                      kind: object
+                                      fields:
+                                        field:
+                                          optional: false
+                                          schema:
+                                            kind: string
+                                        is:
+                                          optional: true
+                                          schema:
+                                            kind: union
+                                        isNot:
+                                          optional: true
+                                          schema:
+                                            kind: union
                   parent:
                     optional: true
                     schema:
@@ -2067,6 +2084,27 @@ routes:
                       kind: boolean
                   required:
                     optional: false
+                    schema:
+                      kind: boolean
+                  condition:
+                    optional: true
+                    schema:
+                      kind: object
+                      fields:
+                        field:
+                          optional: false
+                          schema:
+                            kind: string
+                        is:
+                          optional: true
+                          schema:
+                            kind: union
+                        isNot:
+                          optional: true
+                          schema:
+                            kind: union
+                  hidden:
+                    optional: true
                     schema:
                       kind: boolean
                   writable:
@@ -9841,6 +9879,23 @@ routes:
                                     optional: false
                                     schema:
                                       kind: boolean
+                                  condition:
+                                    optional: true
+                                    schema:
+                                      kind: object
+                                      fields:
+                                        field:
+                                          optional: false
+                                          schema:
+                                            kind: string
+                                        is:
+                                          optional: true
+                                          schema:
+                                            kind: union
+                                        isNot:
+                                          optional: true
+                                          schema:
+                                            kind: union
                   parent:
                     optional: true
                     schema:
@@ -9867,6 +9922,27 @@ routes:
                       kind: boolean
                   required:
                     optional: false
+                    schema:
+                      kind: boolean
+                  condition:
+                    optional: true
+                    schema:
+                      kind: object
+                      fields:
+                        field:
+                          optional: false
+                          schema:
+                            kind: string
+                        is:
+                          optional: true
+                          schema:
+                            kind: union
+                        isNot:
+                          optional: true
+                          schema:
+                            kind: union
+                  hidden:
+                    optional: true
                     schema:
                       kind: boolean
                   writable:
@@ -10111,6 +10187,23 @@ routes:
                                     optional: false
                                     schema:
                                       kind: boolean
+                                  condition:
+                                    optional: true
+                                    schema:
+                                      kind: object
+                                      fields:
+                                        field:
+                                          optional: false
+                                          schema:
+                                            kind: string
+                                        is:
+                                          optional: true
+                                          schema:
+                                            kind: union
+                                        isNot:
+                                          optional: true
+                                          schema:
+                                            kind: union
                   parent:
                     optional: true
                     schema:
@@ -10137,6 +10230,27 @@ routes:
                       kind: boolean
                   required:
                     optional: false
+                    schema:
+                      kind: boolean
+                  condition:
+                    optional: true
+                    schema:
+                      kind: object
+                      fields:
+                        field:
+                          optional: false
+                          schema:
+                            kind: string
+                        is:
+                          optional: true
+                          schema:
+                            kind: union
+                        isNot:
+                          optional: true
+                          schema:
+                            kind: union
+                  hidden:
+                    optional: true
                     schema:
                       kind: boolean
                   writable:
@@ -10434,6 +10548,23 @@ routes:
                                     optional: false
                                     schema:
                                       kind: boolean
+                                  condition:
+                                    optional: true
+                                    schema:
+                                      kind: object
+                                      fields:
+                                        field:
+                                          optional: false
+                                          schema:
+                                            kind: string
+                                        is:
+                                          optional: true
+                                          schema:
+                                            kind: union
+                                        isNot:
+                                          optional: true
+                                          schema:
+                                            kind: union
                   parent:
                     optional: true
                     schema:
@@ -10460,6 +10591,27 @@ routes:
                       kind: boolean
                   required:
                     optional: false
+                    schema:
+                      kind: boolean
+                  condition:
+                    optional: true
+                    schema:
+                      kind: object
+                      fields:
+                        field:
+                          optional: false
+                          schema:
+                            kind: string
+                        is:
+                          optional: true
+                          schema:
+                            kind: union
+                        isNot:
+                          optional: true
+                          schema:
+                            kind: union
+                  hidden:
+                    optional: true
                     schema:
                       kind: boolean
                   writable:
