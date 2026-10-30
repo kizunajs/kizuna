@@ -37,3 +37,5 @@ tests/.generated-client-*.ts
 .next-*/
 test-results/
 playwright-report/
+.env
+.env*.local
