@@ -57,6 +57,7 @@ describe('the admin connection', () => {
         expect(sent[0]!.url).toBe('/cms-api/editing/describe?ref=page%3AfrontPage');
         expect(sent[0]!.init.method).toBe('GET');
         expect(sent[0]!.init.credentials).toBe('same-origin');
+        expect(sent[0]!.init.cache).toBe('no-store');
         expect(sent[0]!.init.body).toBeUndefined();
         expect(answer).toEqual({
             status: 200,

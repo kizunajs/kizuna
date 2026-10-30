@@ -60,6 +60,8 @@ export const connectOverHttp = (options: { apiPath: string; routes: Record<strin
                 const response = await send(`${apiPath}${fillPath(route.path, params)}${searchOf(query)}`, {
                     method: route.method,
                     credentials: 'same-origin',
+                    // The editor always wants what the CMS holds now. A cached answer revalidated by its ETag misses a review asked for since, which changes no draft.
+                    cache: 'no-store',
                     headers:
                         body === undefined
                             ? {
