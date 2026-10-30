@@ -2193,6 +2193,49 @@ export class CmsService {
     }
 
     /**
+     * The declared sites, by name, or none for a single-site project.
+     */
+    siteNames(): string[] {
+        return Object.keys(this.options.sites?.entries ?? {});
+    }
+
+    /**
+     * The site this deployment shows, as `site` on `cms()` names it.
+     */
+    currentSite(): string {
+        const names = this.siteNames();
+        if (names.length === 0) return DEFAULT_SITE;
+        if (this.options.site === undefined) {
+            throw new Error(
+                'cms() serves several sites, so reading content in process needs the one this deployment shows. Name it with `site`, like `site: () => process.env.KIZUNA_SITE`.'
+            );
+        }
+        const picked = this.options.site();
+        if (picked === undefined || picked === '') {
+            throw new Error(
+                `\`site\` on cms() named no site, so the reader cannot tell which to show. It shows one of ${names.join(', ')}.`
+            );
+        }
+        if (!names.includes(picked)) {
+            throw new Error(`\`site\` on cms() named '${picked}', which declareSites() does not declare. It declares ${names.join(', ')}.`);
+        }
+        return picked;
+    }
+
+    /**
+     * A declared site as the reader hands it out: its name as `key`, beside
+     * its fields.
+     */
+    siteInfo(name: string): Record<string, unknown> & { key: string } {
+        const values = this.options.sites?.values[name];
+        if (values === undefined) throw new CmsHttpError(404, { detail: `There is no site named '${name}'.` });
+        return {
+            key: name,
+            ...values,
+        };
+    }
+
+    /**
      * The roles the editor identity declares, once the api has assembled.
      */
     identityRoles(): Roles | undefined {

@@ -47,9 +47,9 @@ export type SiteValues = z.output<typeof SiteSchema>;
  */
 export interface SiteContent {
     /**
-     * The site's pages, as the generated `cms.pages.ts` of its app exports
-     * them. Sites deployed from one app share one module, and each keeps its
-     * own page documents.
+     * The site's pages, made with `definePages()` in the content package.
+     * Sites deployed from one app share one module, and each keeps its own
+     * page documents.
      */
     pages?: PageMap;
     /**
@@ -60,17 +60,6 @@ export interface SiteContent {
      * Collections only this site has. Their names never repeat a shared one.
      */
     collections?: readonly Collection[];
-    /**
-     * The app's `app` directory, relative to the working directory, which
-     * `kizuna generate` scans for `content.ts` files.
-     */
-    app?: string;
-    /**
-     * Where the app's pages module is written.
-     *
-     * @default beside `app`, as `cms.pages.ts`
-     */
-    output?: string;
 }
 
 // Registry-global, so sites declared by another copy of this package still read as sites.
@@ -91,10 +80,20 @@ export interface DeclaredSites<
     /**
      * Each site's fields, as its schema parsed them.
      */
-    readonly values: { readonly [Key in keyof Entries]: Site };
+    readonly values: Readonly<Record<keyof Entries, Site>>;
 }
 
-const CONTENT_KEYS = ['pages', 'globals', 'collections', 'app', 'output'];
+/**
+ * The sites as declared, keyed by name.
+ */
+export type SiteEntriesOf<Sites> = Sites extends { readonly entries: infer Entries } ? Entries : never;
+
+/**
+ * A declared site's fields, as its schema reads them.
+ */
+export type SiteFieldsOf<Sites> = Sites extends { readonly values: Readonly<Record<any, infer Site>> } ? Site : never;
+
+const CONTENT_KEYS = ['pages', 'globals', 'collections'];
 
 /**
  * A site's name: lowercase, like `uk` or `norway`.

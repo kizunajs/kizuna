@@ -93,6 +93,7 @@ export {
 export {
     type CmsContent,
     type CmsReader,
+    type CmsSiteReader,
     type CmsPages,
     type CmsGlobals,
     type CmsCollections,

@@ -29,7 +29,7 @@ export interface CmsExports<
     Pages extends PageMap = PageMap,
     Globals extends readonly Global[] = readonly Global[],
     Collections extends readonly Collection[] = readonly Collection[],
-    Sites extends DeclaredSites | undefined = DeclaredSites | undefined,
+    Sites extends DeclaredSites<any, any> | undefined = DeclaredSites | undefined,
 > {
     /**
      * The pages, as the generated module declared them.
@@ -69,7 +69,7 @@ export interface CmsSetup<
     Pages extends PageMap = PageMap,
     Globals extends readonly Global[] = readonly Global[],
     Collections extends readonly Collection[] = readonly Collection[],
-    Sites extends DeclaredSites | undefined = DeclaredSites | undefined,
+    Sites extends DeclaredSites<any, any> | undefined = DeclaredSites | undefined,
 > {
     exports: CmsExports<Pages, Globals, Collections, Sites>;
 }
@@ -88,27 +88,21 @@ const pagesGenerator = defineGenerator({
 });
 
 /**
- * One pages module per app, however many sites it serves.
+ * The pages module of a single-site project. With several sites, their pages
+ * modules are written by hand in the content package.
  */
 const pagesGenerators = (options: ResolvedCmsOptions) => {
-    const modules = new Map<string, string>();
-    for (const declared of Object.values(sitesOf(options))) {
-        const appDir = declared.app ?? (options.sites === undefined ? findAppDir() : undefined);
-        if (appDir === undefined) continue;
-        const output = declared.output ?? defaultPagesOutput(appDir);
-        const known = modules.get(appDir);
-        if (known !== undefined && known !== output) {
-            throw new Error(`Two sites render the app at ${appDir}, and write its pages module to ${known} and ${output}. Name one output.`);
-        }
-        modules.set(appDir, output);
-    }
-    return [...modules].map(([appDir, output]) =>
+    if (options.sites !== undefined) return [];
+    const appDir = options.appDir ?? findAppDir();
+    if (appDir === undefined) return [];
+    const output = options.pagesOutput ?? defaultPagesOutput(appDir);
+    return [
         pagesGenerator({
             output,
             appDir,
             pagesModule: output,
-        })
-    );
+        }),
+    ];
 };
 
 /**

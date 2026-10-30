@@ -1,6 +1,7 @@
 import { describe, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
 import { declareSites, SiteSchema } from './site.js';
+import type { CmsContent } from './reader.js';
 
 const Site = SiteSchema.extend({
     companyName: z.string(),
@@ -60,5 +61,28 @@ describe('declareSites', () => {
                 },
             }
         );
+    });
+
+    it('reads the current site with its key typed as the declared names', () => {
+        const sites = declareSites(Site, {
+            uk: {
+                label: 'Hagen UK',
+                url: 'https://hagen.example.co.uk',
+                icon: '/icons/uk.svg',
+                companyName: 'Hagen UK Ltd',
+            },
+            norway: {
+                label: 'Hagen Norge',
+                url: 'https://hagen.example.no',
+                icon: '/icons/norway.svg',
+                companyName: 'Hagen Norge AS',
+            },
+        });
+        type Content = CmsContent<{}, readonly [], readonly [], typeof sites>;
+        type Current = Awaited<ReturnType<Content['site']['get']>>;
+        expectTypeOf<Current['key']>().toEqualTypeOf<'uk' | 'norway'>();
+        expectTypeOf<Current['companyName']>().toEqualTypeOf<string>();
+        expectTypeOf<Current['status']>().toEqualTypeOf<'live' | 'offline' | undefined>();
+        expectTypeOf<CmsContent<{}, readonly [], readonly [], undefined>['site']>().toBeNever();
     });
 });

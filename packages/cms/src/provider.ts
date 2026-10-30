@@ -72,7 +72,7 @@ export function cms<
     const Pages extends PageMap = PageMap,
     const Globals extends readonly Global[] = readonly [],
     const Collections extends readonly Collection[] = readonly [],
-    const Sites extends DeclaredSites | undefined = undefined,
+    const Sites extends DeclaredSites<any, any> | undefined = undefined,
 >(
     options: CmsPluginOptions<Pages, Sites> & {
         globals?: Globals;

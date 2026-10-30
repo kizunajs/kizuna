@@ -1,6 +1,6 @@
 import type { ContentRuntime } from 'kizunajs/plugin';
 import { DEFAULT_SITE, type PageMap } from './options.js';
-import type { DeclaredSites } from './site.js';
+import type { DeclaredSites, SiteEntriesOf, SiteFieldsOf } from './site.js';
 import type { Output } from './output.js';
 import { CmsHttpError, collectionCacheTag, documentCacheTag, pageCacheTag, type CmsService } from './cms.js';
 import { servesCollection } from './page.js';
@@ -148,20 +148,34 @@ export interface CmsReader<Pages extends PageMap, Globals = readonly [], Collect
  * What `kizuna.content` holds: the default site's reader, and one per named
  * site when several apps share the CMS.
  */
-export type CmsContent<Pages extends PageMap, Globals, Collections, Sites extends DeclaredSites | undefined> = CmsReader<
+/**
+ * The site this deployment shows, as `kizuna.content.site` reads it.
+ */
+export interface CmsSiteReader<Site, Key extends string> {
+    /**
+     * The declared site: its name as `key`, and its fields.
+     *
+     * @example
+     * const site = await kizuna.content.site.get();
+     */
+    get(): Promise<Site & { key: Key }>;
+}
+
+export type CmsContent<Pages extends PageMap, Globals, Collections, Sites extends DeclaredSites<any, any> | undefined> = CmsReader<
     Pages,
     Globals,
     Collections
 > & {
-    sites: Sites extends DeclaredSites<any, infer Entries>
-        ? {
-              [Site in keyof Entries]: CmsReader<
-                  Entries[Site]['pages'] extends PageMap ? Entries[Site]['pages'] : {},
+    site: [Sites] extends [undefined] ? never : CmsSiteReader<SiteFieldsOf<Sites>, keyof SiteEntriesOf<Sites> & string>;
+    sites: [Sites] extends [undefined]
+        ? {}
+        : {
+              [Site in keyof SiteEntriesOf<Sites>]: CmsReader<
+                  SiteEntriesOf<Sites>[Site] extends { pages: infer Pages extends PageMap } ? Pages : {},
                   Globals,
                   Collections
               >;
-          }
-        : {};
+          };
 };
 
 /**
@@ -404,5 +418,8 @@ export const createReader = (
     }
     return Object.assign(siteReader(service, DEFAULT_SITE), {
         sites,
+        site: {
+            get: async () => service.siteInfo(service.currentSite()),
+        },
     }) as never;
 };

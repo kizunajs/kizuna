@@ -17,6 +17,10 @@ import { stripPaths } from './source-path.js';
 
 const revalidated: string[][] = [];
 
+const showing: { site: string | undefined } = {
+    site: 'campaign',
+};
+
 const k = new Kizuna();
 const editor = k.identity
     .bearer({
@@ -85,7 +89,6 @@ const sites = declareSites(Site, {
                 page: WebFrontPage,
             },
         }),
-        app: 'src/__fixtures__/app',
     },
     campaign: {
         label: 'Hagen Campaign',
@@ -98,13 +101,13 @@ const sites = declareSites(Site, {
                 page: CampaignFrontPage,
             },
         }),
-        app: 'src/__fixtures__/app',
     },
 });
 
 const content = cms({
     db,
     sites,
+    site: () => showing.site,
     globals: [Footer],
     auth: {
         identity: 'editor',
@@ -148,6 +151,7 @@ beforeAll(async () => {
 beforeEach(async () => {
     await pglite.exec('delete from cms_refs; delete from cms_versions; delete from cms_documents;');
     revalidated.length = 0;
+    showing.site = 'campaign';
 });
 
 afterAll(async () => {
@@ -250,6 +254,36 @@ const configWith = (siteSites: ReturnType<typeof declareSites>) =>
         }),
     });
 
+describe('the site a deployment shows', () => {
+    it('reads the site `site` names, with its fields and its key', async () => {
+        const site = await config.content.site.get();
+        expectTypeOf(site.key).toEqualTypeOf<'web' | 'campaign'>();
+        expectTypeOf(site.companyName).toEqualTypeOf<string>();
+        expect(site).toEqual({
+            key: 'campaign',
+            label: 'Hagen Campaign',
+            url: 'https://campaign.hagen.example.com',
+            icon: 'https://cdn.hagen.example.com/campaign.svg',
+            companyName: 'Hagen AS',
+        });
+        showing.site = 'web';
+        expect((await config.content.site.get()).key).toBe('web');
+    });
+
+    it('names the sites it knows when `site` names none of them', async () => {
+        showing.site = undefined;
+        await expect(config.content.site.get()).rejects.toThrow('named no site');
+        showing.site = 'denmark';
+        await expect(config.content.site.get()).rejects.toThrow(
+            "named 'denmark', which declareSites() does not declare. It declares web, campaign."
+        );
+    });
+
+    it('asks for `site` when cms() has none', async () => {
+        await expect(configWith(sites).content.site.get()).rejects.toThrow('Name it with `site`');
+    });
+});
+
 describe('declaring sites', () => {
     it('parses each site against its schema and keeps its fields', () => {
         expect(sites.values.campaign).toEqual({
@@ -351,14 +385,12 @@ describe('two sites sharing one pages module', () => {
                     url: 'https://hagen.example.co.uk',
                     icon: '/icons/uk.svg',
                     pages: countryPages,
-                    app: 'src/__fixtures__/app',
                 },
                 norway: {
                     label: 'Hagen Norge',
                     url: 'https://hagen.example.no',
                     icon: '/icons/norway.svg',
                     pages: countryPages,
-                    app: 'src/__fixtures__/app',
                 },
             }),
             auth: {
@@ -395,31 +427,7 @@ describe('two sites sharing one pages module', () => {
         expect(stripPaths(norway.heading)).toBe('Planter til hvert rom');
     });
 
-    it('generates the app’s pages module once', () => {
-        expect(shared.generators.filter((file) => file.output.endsWith('cms.pages.ts'))).toHaveLength(1);
-    });
-
-    it('refuses one app written to two pages modules', () => {
-        expect(() =>
-            configWith(
-                declareSites(SiteSchema, {
-                    uk: {
-                        label: 'Hagen UK',
-                        url: 'https://hagen.example.co.uk',
-                        icon: '/icons/uk.svg',
-                        pages: countryPages,
-                        app: 'src/__fixtures__/app',
-                    },
-                    norway: {
-                        label: 'Hagen Norge',
-                        url: 'https://hagen.example.no',
-                        icon: '/icons/norway.svg',
-                        pages: countryPages,
-                        app: 'src/__fixtures__/app',
-                        output: 'src/norway.pages.ts',
-                    },
-                })
-            )
-        ).toThrow('Two sites render the app at src/__fixtures__/app');
+    it('generates no pages module, since the content package holds it', () => {
+        expect(shared.generators.filter((file) => file.output.endsWith('cms.pages.ts'))).toHaveLength(0);
     });
 });

@@ -269,7 +269,10 @@ export interface ReviewOptions {
  */
 export const DEFAULT_SITE = 'default';
 
-export interface CmsPluginOptions<Pages extends PageMap = PageMap, Sites extends DeclaredSites | undefined = DeclaredSites | undefined> {
+export interface CmsPluginOptions<
+    Pages extends PageMap = PageMap,
+    Sites extends DeclaredSites<any, any> | undefined = DeclaredSites | undefined,
+> {
     /**
      * What editors call the site, which the admin's sign-in screen asks them
      * to sign in to and its tab titles end with.
@@ -470,8 +473,6 @@ const SiteContentSchema = z.object({
             })
         )
         .optional(),
-    app: z.string().optional(),
-    output: z.string().optional(),
 });
 
 export const CmsPluginOptionsSchema = z
@@ -624,8 +625,8 @@ export const routePrefix = (path: string | undefined): '' | `/${string}` => {
 };
 
 /**
- * One site's pages and where its app is: a declared site's, or the `pages`
- * of a single-site project under the default site.
+ * One site's pages: a declared site's, or the `pages` of a single-site
+ * project under the default site with the app `kizuna generate` scans.
  */
 export interface SitePages {
     pages: PageMap;
@@ -663,16 +664,6 @@ export const sitesOf = (options: {
                   site,
                   {
                       pages: entry.pages ?? {},
-                      ...(entry.app === undefined
-                          ? {}
-                          : {
-                                app: entry.app,
-                            }),
-                      ...(entry.output === undefined
-                          ? {}
-                          : {
-                                output: entry.output,
-                            }),
                   },
               ])
           );
