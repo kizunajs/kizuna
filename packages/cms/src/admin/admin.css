@@ -993,9 +993,12 @@
         padding: 10px var(--k-gutter) 0;
     }
 
+    /* An id is a long code: smaller and quieter than the facts beside it. */
     .k-record__id {
         font-family: var(--k-mono);
-        font-size: 12px;
+        font-size: 11.5px;
+        line-height: 1;
+        color: var(--k-muted);
     }
 
     /* No access and not found: an icon, what happened, and the way on, in the middle of the screen. */
