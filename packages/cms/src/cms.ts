@@ -76,6 +76,13 @@ export class CmsHttpError extends Error {
     }
 }
 
+/**
+ * Whether a field holds nothing a reader sees: no value, empty text or an
+ * empty list.
+ */
+const isEmptyValue = (value: unknown): boolean =>
+    value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0);
+
 const MIGRATION_AUTHOR = 'kizuna-cms';
 
 /**
@@ -1296,12 +1303,20 @@ export class CmsService {
         const changed = new Map<string, { before: unknown }>();
         if (target.source === undefined || row === undefined) return changed;
         const source = await this.document(target.source);
-        if (source.row === undefined) return changed;
-        const latest = await this.store.latestVersion(source.row.id);
-        const current = source.row.draft ?? source.row.published;
+        // A translation follows the published source, which is also what the model translates from.
+        const current = source.row?.published;
+        const publishedVersion = source.row?.publishedVersion;
+        if (
+            source.row === undefined ||
+            current === null ||
+            current === undefined ||
+            publishedVersion === null ||
+            publishedVersion === undefined
+        )
+            return changed;
         const versions = new Map<number, Record<string, unknown> | undefined>();
         for (const [name, version] of Object.entries(await this.store.sourceVersions(row.id))) {
-            if (version === latest) continue;
+            if (version === publishedVersion) continue;
             if (!versions.has(version)) versions.set(version, (await this.store.version(source.row.id, version))?.data);
             const before = sourceValueOf(source.target.definition, versions.get(version), name);
             if (!sameContent(before, sourceValueOf(source.target.definition, current, name))) {
@@ -1342,7 +1357,7 @@ export class CmsService {
             const refusal = pathRefusal(target.definition.fields, field, input.caller);
             if (refusal !== undefined) throw new CmsHttpError(403, { detail: refusal });
         }
-        const version = await this.store.latestVersion(source.id);
+        const version = source.publishedVersion ?? (await this.store.latestVersion(source.id));
         await this.store.recordSourceVersions(row.id, Object.fromEntries(input.fields.map((field) => [field, version])));
         return this.draftState(input.ref);
     }
@@ -1355,7 +1370,7 @@ export class CmsService {
         | {
               current: string;
               source: string;
-              locales: Array<{ code: string; status: PageStatus; sourceChanged: number }>;
+              locales: Array<{ code: string; status: PageStatus; sourceChanged: number; changed: string[]; missing: string[] }>;
           }
         | undefined
     > {
@@ -1363,12 +1378,20 @@ export class CmsService {
         if (target.shared !== undefined) return undefined;
         const source = target.source === undefined ? target : this.target(target.source);
         const [first, ...others] = this.siteLocales(source.site);
-        if (first === undefined || others.length === 0 || translationOf(source.definition) === undefined) return undefined;
+        const translated = translationOf(source.definition);
+        if (first === undefined || others.length === 0 || translated === undefined) return undefined;
+        const sourceState = await this.draftState(source.ref);
+        const sourceContent = sourceState.row?.draft ?? sourceState.row?.published ?? null;
+        const written = dataFields(translated.fields)
+            .map((field) => field.name)
+            .filter((name) => !isEmptyValue(sourceValueOf(source.definition, sourceContent, name)));
         const locales = [
             {
                 code: first,
-                status: (await this.draftState(source.ref)).status,
+                status: sourceState.status,
                 sourceChanged: 0,
+                changed: [] as string[],
+                missing: [] as string[],
             },
         ];
         for (const code of others) {
@@ -1376,10 +1399,14 @@ export class CmsService {
                 ...source.ref,
                 locale: code,
             });
+            const changed = [...(await this.sourceChangesOf(state.target, state.row)).keys()];
+            const own = state.row?.draft ?? state.row?.published ?? null;
             locales.push({
                 code,
                 status: state.status,
-                sourceChanged: (await this.sourceChangesOf(state.target, state.row)).size,
+                sourceChanged: changed.length,
+                changed,
+                missing: written.filter((name) => isEmptyValue(own?.[name])),
             });
         }
         return {
@@ -2661,7 +2688,7 @@ export class CmsService {
                 migration: migrationOf(target.definition),
             });
             if (source !== undefined) {
-                const version = await this.store.latestVersion(source.id);
+                const version = source.publishedVersion ?? (await this.store.latestVersion(source.id));
                 await this.store.recordSourceVersions(
                     saved.document.id,
                     Object.fromEntries([...new Set(paths.map((path) => path.split('.')[0]!))].map((name) => [name, version]))

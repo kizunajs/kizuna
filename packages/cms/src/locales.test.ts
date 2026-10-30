@@ -585,11 +585,15 @@ describe('a translation whose source changed', () => {
                 code: 'nb',
                 status: 'published',
                 sourceChanged: 0,
+                changed: [],
+                missing: [],
             },
             {
                 code: 'en',
                 status: 'published',
                 sourceChanged: 0,
+                changed: [],
+                missing: [],
             },
         ]);
         await publish(norwayFront(), {
@@ -616,6 +620,26 @@ describe('a translation whose source changed', () => {
         });
         const updated = await service.draftState(norwayFront('en'));
         expect((await service.sourceChangesOf(updated.target, updated.row)).size).toBe(0);
+    });
+
+    it('waits for the source to publish before showing its change', async () => {
+        await publish(norwayFront(), {
+            heading: 'Velkommen',
+            intro: 'Hagen i Norge.',
+        });
+        await publish(norwayFront('en'), {
+            heading: 'Welcome',
+            intro: 'Hagen in Norway.',
+        });
+        await write(norwayFront(), {
+            heading: 'Velkommen til Hagen',
+        });
+        const english = await service.draftState(norwayFront('en'));
+        expect((await service.sourceChangesOf(english.target, english.row)).size).toBe(0);
+        await publish(norwayFront(), {
+            heading: 'Velkommen til Hagen',
+        });
+        expect([...(await service.sourceChangesOf(english.target, english.row)).keys()]).toEqual(['heading']);
     });
 
     it('keeps a field as it is, without changing it, until the source changes again', async () => {
@@ -655,6 +679,7 @@ describe('a translation whose source changed', () => {
             ['intro', true],
         ]);
         expect(described.body.locale.locales[1].sourceChanged).toBe(1);
+        expect(described.body.locale.locales[1].changed).toEqual(['intro']);
         await publish(norwayFront(), {
             heading: 'Hei',
         });
@@ -700,11 +725,15 @@ describe('a translation whose source changed', () => {
                     code: 'nb',
                     status: 'published',
                     sourceChanged: 0,
+                    changed: [],
+                    missing: [],
                 },
                 {
                     code: 'en',
                     status: 'empty',
                     sourceChanged: 0,
+                    changed: [],
+                    missing: ['heading', 'intro'],
                 },
             ],
         });

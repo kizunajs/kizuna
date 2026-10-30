@@ -128,11 +128,13 @@ export const config = {
 
 ## Translating
 
-The editor shows one language at a time, with the source beside each field. Ask the model for the rest:
+The language menu beside Live Preview opens another language, and says where each one stands: up to date, how many fields changed in the source, how many are missing. All languages lays every field against every language.
+
+A translation remembers the source version each field came from. When the Norwegian of a field changes and publishes, a dot follows the English field's label. The dot shows the Norwegian before and now, with what changed marked. Update the field, or keep it as it is, since a translation may say it differently on purpose. Until then the page keeps showing the English as it was. Show Norsk puts the source's text under every field.
+
+You can also ask the model in your chat:
 
 > Translate the front page to Norwegian.
-
-A translation remembers the source version each field came from. When the Norwegian of a field changes, the English field shows that its **source changed**. Update it, or keep it as it is, since a translation may say it differently on purpose. Until then the page keeps showing the English as it was.
 
 ## Translating with a model
 
@@ -153,7 +155,9 @@ content: cms({
 
 `model` is an AI SDK language model, from whichever provider your app uses, with `ai` installed beside it.
 
-Translate drafts the language shown from the source's published version: the whole document, or one field. The model writes the text, rich text and alt text, and the slug is made from the translated title. Links, ids and the rich text's structure stay as they are. The result is a draft that a person reads, changes and publishes. Agents call the same route as a tool, `POST /editing/pages/frontPage/translate?locale=en`.
+Translate, beside Show, counts the fields that changed or are missing, and goes through them one at a time: the source above with what changed in it, the translation under it, and Update, Keep or Translate. Translate everything drafts the rest at once. Done brings the drafted text back to the form as unsaved changes, for a person to read, change, save and publish.
+
+The model writes the text, rich text and alt text from the source's published version, and the slug is made from the translated title. Links, ids and the rich text's structure stay as they are. Agents call the same route as a tool, `POST /editing/pages/frontPage/translate?locale=en`, which saves to the draft. With `save: false` it answers the translation without saving it.
 
 ## With several sites
 

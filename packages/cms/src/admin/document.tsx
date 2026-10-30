@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { Popover } from '@base-ui/react/popover';
 import { Tabs } from '@base-ui/react/tabs';
 import { Toast } from '@base-ui/react/toast';
-import { Check, CircleAlert, ExternalLink, Info, PanelRight, RotateCcw, Undo2 } from 'lucide-react';
+import { Check, CircleAlert, ExternalLink, Eye, Info, Languages, PanelRight, RotateCcw, Undo2 } from 'lucide-react';
 import { toolsFor, type Connection, type ToolAnswer } from '../view/connection.js';
 import { EditorContext, ICON, type EditorContextValue } from '../view/context.js';
 import { FieldForm, fieldDomId, type FieldFormHandle, type SaveFailure, type SaveState } from '../view/form.js';
@@ -16,12 +16,23 @@ import { ConfirmDialog } from './confirm.js';
 import { blockerOf, documentDatesOf, menuEntriesOf } from './document-menu.js';
 import { DocumentMore, type DocumentMoreHandle } from './document-more.js';
 import { savedAtOf, type VersionSummary } from './history.js';
-import { hasSites, hrefOf, navigate, siteOf } from './navigation.js';
+import { addressSite, hasSites, hrefOf, navigate, siteOf } from './navigation.js';
 import { SiteFact, SiteTabs } from './site-switcher.js';
 import type { AdminSite } from './config.js';
 import { ShowsOn } from './shows-on.js';
 import { PageHeader, type Crumb } from './page-header.js';
-import { LocaleTabs } from './locale-tabs.js';
+import { refInLocale } from './translation.js';
+import {
+    LanguageMenu,
+    LanguagesGrid,
+    SourceChange,
+    TranslateMode,
+    TranslateProgress,
+    languageNameOf,
+    pendingFieldsOf,
+    type Outcome,
+    type Pending,
+} from './translation-ui.js';
 import { Loading, SaveIndicator, Status, problemOf } from './parts.js';
 import { documentNounOf, documentStateOf, roleSubjectOf, titleOfRef } from './access.js';
 import { OfflineBadge, SaveFailedNotice, retriesSave, useOnline, useRetry, type SaveProblem } from './save-failed.js';
@@ -41,9 +52,16 @@ import type { WaitingReview } from './dashboard.js';
 import type { PaletteAction } from './search.js';
 
 /**
- * What `translating` holds while the whole translation is drafted.
+ * What `translating` holds while every field left in translate mode is
+ * drafted.
  */
 const TRANSLATING_ALL = '*';
+
+/**
+ * The translation the next screen opens in translate mode, set by the
+ * languages grid as it opens it.
+ */
+let translateOnOpen: string | undefined;
 
 const NAMES = new Intl.ListFormat('en', {
     type: 'conjunction',
@@ -258,8 +276,20 @@ export function DocumentScreen({
     const [compared, setCompared] = useState<number | undefined>();
     const [restoring, setRestoring] = useState<number | undefined>();
     const [deciding, setDeciding] = useState(false);
-    // What Translate is drafting: the whole translation, or one field's path.
+    // What the model is drafting: one field's path, or every field left in translate mode.
     const [translating, setTranslating] = useState<string | undefined>();
+    // The translation's own screens: its fields, one field at a time, or every language at once.
+    const [languageView, setLanguageView] = useState<'edit' | 'translate' | 'languages'>('edit');
+    const [showSource, setShowSource] = useState(false);
+    // The field whose source change shows under it, from the dot beside its label.
+    const [openChange, setOpenChange] = useState<string | undefined>();
+    // Fields the model drafted into the form, unsaved until the next save.
+    const [filled, setFilled] = useState<ReadonlySet<string>>(new Set());
+    const [steps, setSteps] = useState<Array<{ field: Description['fields'][number]; pending: Pending }>>([]);
+    const [step, setStep] = useState(0);
+    const [drafts, setDrafts] = useState<Record<string, unknown>>({});
+    const [outcomes, setOutcomes] = useState<Record<string, Outcome>>({});
+    const [revision, setRevision] = useState(0);
     // The field whose review comments the person is replying to on the Edit tab.
     const [replyingOn, setReplyingOn] = useState<string | undefined>();
     const [draftChanges, setDraftChanges] = useState<{ changes: Changes; views: ViewedChange[] } | undefined>();
@@ -812,30 +842,127 @@ export function DocumentScreen({
     };
 
     /**
-     * Drafts the translation from the published source, or one field of it.
+     * Asks the model for the fields given, and answers the values that
+     * differ from the draft, saving nothing.
      */
-    const translate = async (field?: string): Promise<void> => {
+    const askModel = async (paths: readonly string[], busy: string): Promise<Record<string, unknown> | undefined> => {
         const tools = toolsFor(documentRef);
-        if (tools === undefined) return;
-        await form.current?.flush();
-        setTranslating(field ?? TRANSLATING_ALL);
+        if (tools === undefined) return undefined;
+        setTranslating(busy);
         setLinkProblem(undefined);
-        const answer = await connection.call(`${tools.prefix}_translate`, {
+        const answer = await connection.call<{ values: Record<string, unknown> }>(`${tools.prefix}_translate`, {
             params: tools.params,
-            body:
-                field === undefined
-                    ? {}
-                    : {
-                          fields: [field],
-                      },
+            body: {
+                fields: paths,
+                save: false,
+            },
         });
         setTranslating(undefined);
         if (answer.status !== 200) {
             setLinkProblem(problemOf(answer, 'The translation failed'));
-            return;
+            return undefined;
         }
-        await describe(documentRef);
+        if (Object.keys(answer.body.values).length === 0) {
+            toasts.add({
+                description: 'Already up to date',
+            });
+        }
+        return answer.body.values;
     };
+
+    /**
+     * Drafts one field into the form as an unsaved change.
+     */
+    const translateField = async (path: string): Promise<void> => {
+        const values = await askModel([path], path);
+        if (values === undefined) return;
+        setOpenChange(undefined);
+        if (Object.keys(values).length === 0) return;
+        form.current?.fill(values);
+        setFilled((previous) => new Set([...previous, ...Object.keys(values)]));
+    };
+
+    /**
+     * Keeps fields as they are after their source changed.
+     */
+    const keepFields = async (paths: readonly string[]): Promise<boolean> => {
+        const tools = toolsFor(documentRef);
+        if (tools === undefined) return false;
+        setLinkProblem(undefined);
+        const answer = await connection.call(`${tools.prefix}_keep_source`, {
+            params: tools.params,
+            body: {
+                fields: paths,
+            },
+        });
+        if (answer.status !== 200) {
+            setLinkProblem(problemOf(answer, 'The field was not kept'));
+            return false;
+        }
+        setOpenChange(undefined);
+        await describe(documentRef, {
+            remount: false,
+        });
+        return true;
+    };
+
+    /**
+     * Opens translate mode on the fields that wait, one at a time.
+     */
+    const startTranslating = (): void => {
+        const current = latest.current;
+        if (current === undefined) return;
+        setSteps(pendingFieldsOf(current, filled));
+        setStep(0);
+        setDrafts({});
+        setOutcomes({});
+        setOpenChange(undefined);
+        setView('edit');
+        setLanguageView('translate');
+    };
+
+    /**
+     * Drafts fields in translate mode, each into its input there.
+     */
+    const translateSteps = async (paths: readonly string[], busy: string): Promise<void> => {
+        const values = await askModel(paths, busy);
+        if (values === undefined || Object.keys(values).length === 0) return;
+        setDrafts((previous) => ({
+            ...previous,
+            ...values,
+        }));
+        setOutcomes((previous) => ({
+            ...previous,
+            ...Object.fromEntries(Object.keys(values).map((path) => [path, 'updated' as Outcome])),
+        }));
+        setRevision((count) => count + 1);
+    };
+
+    /**
+     * Leaves translate mode, with what it drafted in the form as unsaved
+     * changes.
+     */
+    const finishTranslating = (): void => {
+        const draft = latest.current?.draft ?? {};
+        const changedDrafts = Object.fromEntries(Object.entries(drafts).filter(([path, value]) => !sameContent(value, draft[path])));
+        setLanguageView('edit');
+        if (Object.keys(changedDrafts).length === 0) return;
+        form.current?.fill(changedDrafts);
+        setFilled((previous) => new Set([...previous, ...Object.keys(changedDrafts)]));
+    };
+
+    useEffect(() => {
+        setLanguageView('edit');
+        setOpenChange(undefined);
+        setFilled(new Set());
+    }, [documentRef]);
+
+    // The languages grid opens a translation straight in translate mode.
+    useEffect(() => {
+        if (document === undefined || translateOnOpen !== document.ref) return;
+        translateOnOpen = undefined;
+        startTranslating();
+    }, [document]);
 
     /**
      * Makes an earlier version the draft, once the person confirmed. Undo
@@ -1110,8 +1237,10 @@ export function DocumentScreen({
         sentBackBy === undefined &&
         document.review?.status !== 'open' &&
         (document.status === 'draft' || document.status === 'changed');
-    const publishDisabled = !online || unsaved || saveState === 'failed' || (blocker !== undefined && waiting.length === 0);
-    const saveDraftOffered = normalHeader && shownView !== 'review' && saveProblem === undefined && saveState === 'pending';
+    const publishDisabled =
+        !online || unsaved || filled.size > 0 || saveState === 'failed' || (blocker !== undefined && waiting.length === 0);
+    const saveDraftOffered =
+        normalHeader && shownView !== 'review' && saveProblem === undefined && (saveState === 'pending' || filled.size > 0);
     offered.current = () => {
         const actions: PaletteAction[] = [];
         if (publishShown && !publishDisabled && blocker === undefined) {
@@ -1159,7 +1288,8 @@ export function DocumentScreen({
 
     const fieldLabelOf = (path: string): string => sectionLabelOf(document.fields, document.layout, path, path);
     const ownSite = parseRef(document.ref)?.site;
-    const siteFact = hasSites() ? <SiteFact site={siteOf(ownSite)} /> : undefined;
+    // The path bar names the site or Shared already, so the fact shows only for a site's document opened from Overview.
+    const siteFact = ownSite !== undefined && addressSite() === undefined ? <SiteFact site={siteOf(ownSite)} /> : undefined;
     // The note of whoever sent the draft back, and the open comments, at the top of the sidebar while the changes are made.
     const sentBackNote = document.review?.status === 'changes' && document.review.decisionNote !== null;
     const openComments = document.review?.comments.some((comment) => comment.resolvedAt === null) ?? false;
@@ -1172,6 +1302,113 @@ export function DocumentScreen({
             </section>
         ) : undefined;
 
+    const locales = document.locale;
+    const inTranslation = locales !== undefined && locales.current !== locales.source;
+    const waitingFields = pendingFieldsOf(document, filled);
+    const translateLanguage = (code: string): void => {
+        if (locales === undefined) return;
+        const ref = refInLocale(document.ref, code, locales.source);
+        if (ref === document.ref) {
+            startTranslating();
+            return;
+        }
+        translateOnOpen = ref;
+        navigate(
+            hrefOf({
+                kind: 'document',
+                ref,
+            })
+        );
+    };
+    const translationControls =
+        locales === undefined ? null : (
+            <>
+                {languageView !== 'edit' || !inTranslation || locales.translate !== true || waitingFields.length === 0 ? null : (
+                    <button type="button" className="k-tab k-document__translate" onClick={startTranslating}>
+                        <Languages {...ICON} />
+                        Translate
+                        <span className="k-tab__count">{waitingFields.length}</span>
+                    </button>
+                )}
+                {languageView !== 'edit' || !inTranslation ? null : (
+                    <>
+                        <button
+                            type="button"
+                            className="k-tab k-document__source-toggle"
+                            aria-pressed={showSource}
+                            onClick={() => setShowSource(!showSource)}>
+                            <Eye {...ICON} />
+                            Show {languageNameOf(locales.source)}
+                        </button>
+                        <span className="k-document__divider" aria-hidden="true" />
+                    </>
+                )}
+                <LanguageMenu
+                    locales={locales}
+                    showingAll={languageView === 'languages'}
+                    onOpen={(code) => {
+                        setLanguageView('edit');
+                        navigate(
+                            hrefOf({
+                                kind: 'document',
+                                ref: refInLocale(document.ref, code, locales.source),
+                            })
+                        );
+                    }}
+                    onAll={() => {
+                        setView('edit');
+                        setLanguageView('languages');
+                    }}
+                />
+            </>
+        );
+    const done = Object.keys(outcomes).length;
+    const translateBar =
+        locales === undefined ? null : (
+            <>
+                <TranslateProgress current={step} total={steps.length} done={done} />
+                <span className="k-document__spacer" />
+                <LanguageMenu
+                    locales={locales}
+                    showingAll={false}
+                    onOpen={(code) =>
+                        navigate(
+                            hrefOf({
+                                kind: 'document',
+                                ref: refInLocale(document.ref, code, locales.source),
+                            })
+                        )
+                    }
+                    onAll={() => {
+                        finishTranslating();
+                        setLanguageView('languages');
+                    }}
+                />
+            </>
+        );
+    const translateActions = (
+        <>
+            {locales?.translate === true && done < steps.length ? (
+                <button
+                    type="button"
+                    className="k-button k-button--secondary"
+                    disabled={translating !== undefined}
+                    onClick={() =>
+                        void translateSteps(
+                            steps.filter((entry) => outcomes[entry.field.path] === undefined).map((entry) => entry.field.path),
+                            TRANSLATING_ALL
+                        )
+                    }>
+                    <Languages {...ICON} />
+                    {translating === TRANSLATING_ALL ? 'Translating…' : 'Translate everything'}
+                </button>
+            ) : null}
+            <button type="button" className="k-button k-button--secondary" onClick={finishTranslating}>
+                Done
+            </button>
+        </>
+    );
+
     return (
         <EditorContext.Provider value={editorContext}>
             <Tabs.Root
@@ -1181,102 +1418,117 @@ export function DocumentScreen({
                     if (key !== 'versions') setCompared(undefined);
                 }}
                 className="k-document"
-                data-preview={previewShown}>
+                data-preview={previewShown}
+                data-language-view={languageView === 'edit' ? undefined : languageView}>
                 <PageHeader
                     crumbs={crumbs}
                     title={title}
-                    meta={[
-                        {
-                            label: 'Status',
-                            value:
-                                saveProblem !== undefined ? (
-                                    'Unsaved changes'
-                                ) : document.review === null ? (
-                                    (STATUS_FACT[document.status] ?? document.status)
-                                ) : (
-                                    <PeopleFact {...reviewStatusPartsOf(document.review, me)} />
-                                ),
-                        },
-                        shownView === 'review' && document.review !== null
-                            ? {
-                                  label: 'Requested',
-                                  value: (
-                                      <PeopleFact
-                                          lead={`${relativeTimeOf(document.review.createdAt, now)} by`}
-                                          people={[document.review.requestedBy]}
-                                      />
-                                  ),
-                              }
-                            : updatedAt === null
-                              ? null
-                              : {
-                                    label: 'Updated',
-                                    value:
-                                        updatedByPerson === undefined ? (
-                                            relativeTimeOf(updatedAt, now)
-                                        ) : (
-                                            <PeopleFact lead={`${relativeTimeOf(updatedAt, now)} by`} people={[updatedByPerson]} />
-                                        ),
-                                },
-                        owner === null
-                            ? null
-                            : {
-                                  label: 'Owner',
-                                  value: owner,
-                              },
-                        document.usedOn.everywhere
-                            ? {
-                                  label: 'Shows on',
-                                  value: 'every page',
-                              }
-                            : null,
-                        document.usedOn.partners.length === 0
-                            ? null
-                            : {
-                                  label: 'Partners',
-                                  value: document.usedOn.partners.map((partner) => partner.label).join(', '),
-                              },
-                        siteFact === undefined
-                            ? null
-                            : {
-                                  label: 'Site',
-                                  value: siteFact,
-                              },
-                    ]}
+                    meta={
+                        languageView === 'translate'
+                            ? []
+                            : [
+                                  {
+                                      label: 'Status',
+                                      value:
+                                          saveProblem !== undefined || filled.size > 0 ? (
+                                              'Unsaved changes'
+                                          ) : document.review === null ? (
+                                              (STATUS_FACT[document.status] ?? document.status)
+                                          ) : (
+                                              <PeopleFact {...reviewStatusPartsOf(document.review, me)} />
+                                          ),
+                                  },
+                                  shownView === 'review' && document.review !== null
+                                      ? {
+                                            label: 'Requested',
+                                            value: (
+                                                <PeopleFact
+                                                    lead={`${relativeTimeOf(document.review.createdAt, now)} by`}
+                                                    people={[document.review.requestedBy]}
+                                                />
+                                            ),
+                                        }
+                                      : updatedAt === null
+                                        ? null
+                                        : {
+                                              label: 'Updated',
+                                              value:
+                                                  updatedByPerson === undefined ? (
+                                                      relativeTimeOf(updatedAt, now)
+                                                  ) : (
+                                                      <PeopleFact
+                                                          lead={`${relativeTimeOf(updatedAt, now)} by`}
+                                                          people={[updatedByPerson]}
+                                                      />
+                                                  ),
+                                          },
+                                  owner === null
+                                      ? null
+                                      : {
+                                            label: 'Owner',
+                                            value: owner,
+                                        },
+                                  document.usedOn.everywhere
+                                      ? {
+                                            label: 'Shows on',
+                                            value: 'every page',
+                                        }
+                                      : null,
+                                  document.usedOn.partners.length === 0
+                                      ? null
+                                      : {
+                                            label: 'Partners',
+                                            value: document.usedOn.partners.map((partner) => partner.label).join(', '),
+                                        },
+                                  siteFact === undefined
+                                      ? null
+                                      : {
+                                            label: 'Site',
+                                            value: siteFact,
+                                        },
+                              ]
+                    }
                     tabs={
-                        <>
-                            <Tabs.List className="k-document__views" aria-label="Document">
-                                <Tabs.Tab value="edit" className="k-tab">
-                                    Edit
-                                </Tabs.Tab>
-                                <Tabs.Tab value="versions" className="k-tab">
-                                    Versions
-                                    {versions === undefined || versions.length === 0 ? null : (
-                                        <span className="k-tab__count">{versions.length}</span>
-                                    )}
-                                </Tabs.Tab>
-                            </Tabs.List>
-                            <span className="k-document__spacer" />
-                            {previewPath === null ? null : (
-                                <button
-                                    type="button"
-                                    className="k-tab k-document__preview-toggle"
-                                    aria-pressed={previewShown}
-                                    onClick={() => {
-                                        setPreviewOn(!previewShown);
-                                        setPreviewOpened(true);
-                                        setView('edit');
-                                    }}>
-                                    <PanelRight {...ICON} />
-                                    <span className="k-document__long">Live Preview</span>
-                                    <span className="k-document__short">Preview</span>
-                                </button>
-                            )}
-                            {info}
-                        </>
+                        languageView === 'translate' ? (
+                            translateBar
+                        ) : (
+                            <>
+                                <Tabs.List className="k-document__views" aria-label="Document">
+                                    <Tabs.Tab value="edit" className="k-tab">
+                                        Edit
+                                    </Tabs.Tab>
+                                    <Tabs.Tab value="versions" className="k-tab">
+                                        Versions
+                                        {versions === undefined || versions.length === 0 ? null : (
+                                            <span className="k-tab__count">{versions.length}</span>
+                                        )}
+                                    </Tabs.Tab>
+                                </Tabs.List>
+                                <span className="k-document__spacer" />
+                                {translationControls}
+                                {previewPath === null ? null : (
+                                    <button
+                                        type="button"
+                                        className="k-tab k-document__preview-toggle"
+                                        aria-pressed={previewShown}
+                                        onClick={() => {
+                                            setPreviewOn(!previewShown);
+                                            setPreviewOpened(true);
+                                            setView('edit');
+                                        }}>
+                                        <PanelRight {...ICON} />
+                                        <span className="k-document__long">Live Preview</span>
+                                        <span className="k-document__short">Preview</span>
+                                    </button>
+                                )}
+                                {info}
+                            </>
+                        )
                     }
                     actions={
-                        comparing ? (
+                        languageView === 'translate' ? (
+                            translateActions
+                        ) : comparing ? (
                             <>
                                 <button
                                     type="button"
@@ -1322,7 +1574,7 @@ export function DocumentScreen({
                                     <button
                                         type="button"
                                         className="k-button k-button--secondary k-button--small"
-                                        disabled={saveState !== 'pending'}
+                                        disabled={saveState !== 'pending' && filled.size === 0}
                                         onClick={() => void form.current?.flush()}>
                                         Save draft
                                     </button>
@@ -1408,14 +1660,36 @@ export function DocumentScreen({
                 {siteTabs === undefined ? null : (
                     <SiteTabs documentRef={siteTabs.sharedRef} sites={siteTabs.sites} current={siteTabs.current} counts={siteCounts} />
                 )}
-                {document.locale === undefined ? null : (
-                    <LocaleTabs
-                        documentRef={document.ref}
-                        locales={document.locale}
-                        onTranslate={document.locale.translate === true ? () => void translate() : undefined}
-                        translating={translating === TRANSLATING_ALL}
+                {languageView === 'translate' ? (
+                    <TranslateMode
+                        document={document}
+                        steps={steps}
+                        current={step}
+                        drafts={drafts}
+                        outcomes={outcomes}
+                        busy={translating !== undefined}
+                        revision={revision}
+                        onGo={setStep}
+                        onChange={(path, value) =>
+                            setDrafts((previous) => ({
+                                ...previous,
+                                [path]: value,
+                            }))
+                        }
+                        onTranslate={(path) => void translateSteps([path], path)}
+                        onKeep={(path) => {
+                            void keepFields([path]).then((kept) => {
+                                if (!kept) return;
+                                setOutcomes((previous) => ({
+                                    ...previous,
+                                    [path]: 'kept',
+                                }));
+                                setStep((index) => Math.min(index + 1, steps.length - 1));
+                            });
+                        }}
                     />
-                )}
+                ) : null}
+                {languageView === 'languages' ? <LanguagesGrid document={document} onTranslate={translateLanguage} /> : null}
                 {linkProblem === undefined ? null : (
                     <p className="k-error k-document__problem" role="alert">
                         <CircleAlert {...ICON} />
@@ -1434,12 +1708,25 @@ export function DocumentScreen({
                             onState={(state) => {
                                 typing.current = state === 'pending' || state === 'saving';
                                 setSaveState(state);
+                                if (state === 'saved') setFilled(new Set());
                             }}
                             changed={changed}
                             pointed={pointed}
                             missing={document.complete ? [] : document.missing}
                             locales={document.locale}
-                            onTranslate={document.locale?.translate === true ? (field) => void translate(field.path) : undefined}
+                            showSource={showSource}
+                            onTranslate={document.locale?.translate === true ? (field) => void translateField(field.path) : undefined}
+                            labelAfter={(field) =>
+                                field.parent !== undefined || field.sourceChanged !== true || filled.has(field.path) ? null : (
+                                    <button
+                                        type="button"
+                                        className="k-source-dot"
+                                        aria-label="Source changed"
+                                        aria-expanded={openChange === field.path}
+                                        onClick={() => setOpenChange(openChange === field.path ? undefined : field.path)}
+                                    />
+                                )
+                            }
                             translating={translating}
                             aside={reviewAside}
                             controlFor={(field, input) =>
@@ -1447,6 +1734,30 @@ export function DocumentScreen({
                             }
                             below={(field) => (
                                 <>
+                                    {openChange !== field.path || document.locale === undefined ? null : (
+                                        <div className="k-source-panel">
+                                            <SourceChange field={field} code={document.locale.source.toUpperCase()} />
+                                            <div className="k-source-panel__actions">
+                                                {document.locale.translate === true ? (
+                                                    <button
+                                                        type="button"
+                                                        className="k-button k-button--secondary k-button--small"
+                                                        disabled={translating !== undefined}
+                                                        onClick={() => void translateField(field.path)}>
+                                                        <Languages {...ICON} />
+                                                        {translating === field.path ? 'Translating…' : 'Update'}
+                                                    </button>
+                                                ) : null}
+                                                <button
+                                                    type="button"
+                                                    className="k-text-button"
+                                                    onClick={() => void keepFields([field.path])}>
+                                                    <Check {...ICON} />
+                                                    Keep
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                     {onSiteTab &&
                                     field.parent === undefined &&
                                     field.writable &&

@@ -344,6 +344,19 @@ describe('changeView', () => {
         });
     });
 
+    it('keeps the last word the same when words follow it', () => {
+        expect(wordDiff('Planter som blir hos deg', 'Planter som blir hos deg for alltid')).toEqual([
+            {
+                kind: 'same',
+                text: 'Planter som blir hos deg ',
+            },
+            {
+                kind: 'added',
+                text: 'for alltid',
+            },
+        ]);
+    });
+
     it('shows text with nothing in common as before and after', () => {
         expect(changeView('Spring', 'Summer', unknownShape, noLabels).kind).toBe('replace');
     });

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Connection } from '../view/connection.js';
-import type { DescribedField, Description } from '../view/schema.js';
+import type { DescribedField, Description, DocumentLocales } from '../view/schema.js';
 import { refInLocale, translationConnection, withSourceFields } from './translation.js';
-import { localeStatusOf } from './locale-tabs.js';
+import { languageNameOf, localeStateOf } from './translation-ui.js';
 import { hrefIn, screenOf, setAdminPath } from './navigation.js';
 
 const field = (path: string, extra: Partial<DescribedField> = {}): DescribedField => ({
@@ -151,10 +151,27 @@ describe('a translation in the admin', () => {
         });
     });
 
-    it('reads where each copy stands on its tab', () => {
-        expect(localeStatusOf({ code: 'nb', status: 'empty', sourceChanged: 0 }, false)).toBe('Not translated');
-        expect(localeStatusOf({ code: 'nb', status: 'published', sourceChanged: 2 }, false)).toBe('Source changed');
-        expect(localeStatusOf({ code: 'nb', status: 'changed', sourceChanged: 0 }, false)).toBe('Unpublished changes');
-        expect(localeStatusOf({ code: 'en', status: 'published', sourceChanged: 0 }, true)).toBe('Published');
+    it('reads where each copy stands, in a few words', () => {
+        const entry: DocumentLocales['locales'][number] = {
+            code: 'da',
+            status: 'published',
+            sourceChanged: 0,
+            changed: [],
+            missing: [],
+        };
+        expect(localeStateOf(entry, 'da')).toBe('Source');
+        expect(localeStateOf({ ...entry, status: 'empty' }, 'nb')).toBe('Not translated');
+        expect(localeStateOf(entry, 'nb')).toBe('Up to date');
+        expect(localeStateOf({ ...entry, changed: ['intro', 'button'] }, 'nb')).toBe('2 changed');
+        expect(localeStateOf({ ...entry, changed: ['intro', 'button'], missing: ['deliveryNote', 'metaDescription'] }, 'nb')).toBe(
+            '2 changed, 2 missing'
+        );
+    });
+
+    it('names each language in itself', () => {
+        expect(languageNameOf('nb')).toBe('Norsk');
+        expect(languageNameOf('da')).toBe('Dansk');
+        expect(languageNameOf('sv')).toBe('Svenska');
+        expect(languageNameOf('en')).toBe('English');
     });
 });

@@ -18,6 +18,7 @@ import { ICON } from './context.js';
 import { Control, foldsItems, listsItems, Required } from './controls.js';
 import { Hint } from './hint.js';
 import { lockReasonOf, readOnlyTextOf, readsAsText } from './read-only.js';
+import { richTextOf } from './change-value.js';
 import { labelOf, valueAt, type DescribedField, type DescribedLayout } from './schema.js';
 
 /**
@@ -90,10 +91,19 @@ export interface FieldFormProps {
         source: string;
     };
     /**
-     * Drafts one translated field from the source, offered on its source
-     * line in a translation.
+     * In a translation, shows the source's text under each translated field.
+     */
+    showSource?: boolean;
+    /**
+     * Drafts one empty translated field from the source, offered on its
+     * source line.
      */
     onTranslate?: (field: DescribedField) => void;
+    /**
+     * What follows a field's label, like the mark of a field whose source
+     * changed.
+     */
+    labelAfter?: (field: DescribedField) => ReactNode;
     /**
      * The path of the field being translated.
      */
@@ -115,6 +125,11 @@ export interface FieldFormHandle {
      * Saves what the person typed at once, instead of after the pause.
      */
     flush: () => Promise<void>;
+    /**
+     * Puts values in the fields as unsaved changes, which save with the next
+     * change or Save draft.
+     */
+    fill: (values: Record<string, unknown>) => void;
 }
 
 /**
@@ -149,11 +164,15 @@ export function FieldForm({
     controlFor,
     readOnly,
     locales,
+    showSource,
     onTranslate,
+    labelAfter,
     translating,
     ref,
 }: FieldFormProps) {
     const [values, setValues] = useState<Record<string, unknown>>({});
+    // Bumped for a field `fill` changes, so its input shows the new value even where it reads its value once.
+    const [revisions, setRevisions] = useState<Readonly<Record<string, number>>>({});
     const [shownTabs, setShownTabs] = useState<Readonly<Record<string, string>>>({});
     const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
     const [revealed, setRevealed] = useState<string | undefined>(undefined);
@@ -214,12 +233,29 @@ export function FieldForm({
         [flush]
     );
 
+    const fill = useCallback((filled: Record<string, unknown>): void => {
+        if (Object.keys(filled).length === 0) return;
+        setValues((previous) => ({
+            ...previous,
+            ...filled,
+        }));
+        setRevisions((previous) => ({
+            ...previous,
+            ...Object.fromEntries(Object.keys(filled).map((path) => [path, (previous[path] ?? 0) + 1])),
+        }));
+        pending.current = {
+            ...pending.current,
+            ...filled,
+        };
+    }, []);
+
     useImperativeHandle(
         ref,
         () => ({
             flush,
+            fill,
         }),
-        [flush]
+        [flush, fill]
     );
 
     const valueOf = (path: string): unknown => (path in values ? values[path] : valueAt(draft, path));
@@ -334,6 +370,7 @@ export function FieldForm({
                     )}
                     {custom ?? (
                         <Control
+                            key={revisions[field.path] ?? 0}
                             id={fieldDomId(field.path) + '-input'}
                             name={field.name}
                             label={labelOf(field)}
@@ -399,34 +436,31 @@ export function FieldForm({
     };
 
     /**
-     * The language a translated field holds, beside its label.
-     */
-    const marker = (field: DescribedField): ReactNode =>
-        locales === undefined || field.translated !== true || field.parent !== undefined ? null : (
-            <span className="k-field__locale">{locales.current.toUpperCase()}</span>
-        );
-
-    /**
-     * In a translation, the source's value under a translated field, with
-     * what it was translated from struck out when the source changed since.
+     * In a translation with `showSource`, the source's text under a
+     * translated field. A field still empty offers Translate.
      */
     const sourceLine = (field: DescribedField): ReactNode => {
-        if (locales === undefined || locales.current === locales.source || field.translated !== true || field.parent !== undefined) {
+        if (
+            showSource !== true ||
+            locales === undefined ||
+            locales.current === locales.source ||
+            field.translated !== true ||
+            field.parent !== undefined
+        ) {
             return null;
         }
-        const textOf = (value: unknown): string =>
-            typeof value === 'string' ? value : (readOnlyTextOf(field.schema, value, field.options) ?? '');
+        const text =
+            typeof field.sourceValue === 'string'
+                ? field.sourceValue
+                : (richTextOf(field.sourceValue) ?? readOnlyTextOf(field.schema, field.sourceValue, field.options));
+        if (text === undefined || text === '') return null;
+        const own = valueOf(field.path);
+        const empty = own === undefined || own === null || own === '' || (Array.isArray(own) && own.length === 0);
         return (
-            <p className="k-source" data-changed={field.sourceChanged === true}>
+            <p className="k-source">
                 <span className="k-source__code">{locales.source.toUpperCase()}</span>
-                {field.sourceChanged === true ? (
-                    <span className="k-source__text">
-                        <del>{textOf(field.sourceBefore)}</del> {textOf(field.sourceValue)}
-                    </span>
-                ) : (
-                    <span className="k-source__text">{textOf(field.sourceValue)}</span>
-                )}
-                {onTranslate === undefined || !field.writable ? null : (
+                <span className="k-source__text">{text}</span>
+                {onTranslate === undefined || !field.writable || !empty ? null : (
                     <button
                         type="button"
                         className="k-text-button k-source__translate"
@@ -452,8 +486,8 @@ export function FieldForm({
             <label className="k-field__label" htmlFor={folds ? undefined : fieldDomId(field.path) + '-input'}>
                 {labelOf(field)}
                 {field.required ? <Required /> : null}
+                {labelAfter?.(field)}
                 {field.belongsTo === undefined ? null : <span className="k-field__owner">{field.belongsTo}</span>}
-                {marker(field)}
             </label>
         );
         const needed = field.parent === undefined && missing?.includes(field.name) === true;
@@ -465,8 +499,8 @@ export function FieldForm({
                     <span className="k-field__label" id={fieldDomId(field.path) + '-label'}>
                         {labelOf(field)}
                         {field.required ? <Required /> : null}
+                        {labelAfter?.(field)}
                         {field.belongsTo === undefined ? null : <span className="k-field__owner">{field.belongsTo}</span>}
-                        {marker(field)}
                     </span>
                     <div className="k-field__control" data-changed={isMarked(field.path, changed)}>
                         <p className="k-read-only" aria-labelledby={fieldDomId(field.path) + '-label'} data-empty={text === undefined}>

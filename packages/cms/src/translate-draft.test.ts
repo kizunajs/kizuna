@@ -214,6 +214,24 @@ describe('POST /editing/.../translate', () => {
         });
     });
 
+    it('answers the translation without saving it with save: false', async () => {
+        await publishAbout({
+            title: 'About us',
+            slug: 'about-us',
+            intro: 'We sell plants.',
+        });
+        const response = await asEditor(request(app).post('/editing/pages/aboutPage/translate?locale=nb')).send({
+            fields: ['intro'],
+            save: false,
+        });
+        expect(response.status).toBe(200);
+        expect(response.body.fields).toEqual(['intro']);
+        expect(response.body.values).toEqual({
+            intro: 'Vi selger planter.',
+        });
+        expect(await service.store.get('page', 'aboutPage', 'default', 'nb')).toBeUndefined();
+    });
+
     it('translates only the fields asked for', async () => {
         await publishAbout({
             title: 'About us',

@@ -596,37 +596,15 @@
         color: var(--k-muted);
     }
 
-    /* A translated field's language beside its label. */
-    .k-field__locale {
-        margin-left: 8px;
-        padding: 1px 4px;
-        border-radius: 4px;
-        background: var(--k-control);
-        box-shadow: var(--k-control-elevation);
-        font-family: var(--k-mono);
-        font-size: 10px;
-        font-weight: 600;
-        color: var(--k-ink);
-        vertical-align: 1px;
-    }
-
-    /* In a translation, the source's value under the input, in the source's language. */
-    .k-field__control:has(> .k-source) > .k-field__input .k-input {
-        border-bottom-right-radius: 0;
-        border-bottom-left-radius: 0;
-    }
-
+    /* In a translation with the source shown, its text under a translated field, quiet. */
     .k-source {
         display: flex;
         align-items: baseline;
         gap: 8px;
         min-width: 0;
         margin: 0;
-        padding: 6px 12px;
-        border-radius: 0 0 var(--k-radius-control) var(--k-radius-control);
-        background: var(--k-surface);
-        box-shadow: inset 0 1px 0 var(--k-line);
-        font-size: 12px;
+        font-size: 12.5px;
+        line-height: 18px;
         color: var(--k-muted);
     }
 
@@ -635,82 +613,396 @@
         font-family: var(--k-mono);
         font-size: 11px;
         font-weight: 600;
+        color: var(--k-muted);
     }
 
     .k-source__text {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .k-source__translate {
+        flex-shrink: 0;
+        margin-left: auto;
+    }
+
+    /* The mark after a label whose source changed, which opens the change under the field. */
+    .k-source-dot {
+        flex-shrink: 0;
+        width: 6px;
+        height: 6px;
+        margin-left: 6px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: var(--k-ink);
+        vertical-align: 2px;
+        cursor: pointer;
+    }
+
+    .k-source-dot[aria-expanded='true'] {
+        box-shadow: 0 0 0 4px var(--k-control-hover);
+    }
+
+    .k-source-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .k-source-panel__actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .k-source-change {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+    }
+
+    .k-source-change p {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        margin: 0;
+        font-size: 12.5px;
+        line-height: 18px;
+    }
+
+    .k-source-change__before {
+        color: var(--k-muted);
+    }
+
+    .k-source-change__now {
+        color: var(--k-ink);
+    }
+
+    .k-source-change del {
+        text-decoration: line-through;
+        text-decoration-color: var(--k-muted);
+    }
+
+    .k-source-change ins {
+        padding: 0 2px;
+        border-radius: 3px;
+        background: var(--k-tint);
+        box-shadow: inset 0 -1px 0 var(--k-line-strong);
+        text-decoration: none;
+    }
+
+    /* Translate, Show and the language, beside Live Preview. */
+    .k-document__translate,
+    .k-document__source-toggle,
+    .k-language-menu__trigger {
+        height: 32px;
+        padding: 0 10px 0 8px;
+        border-radius: 8px;
+        font-size: 13.5px;
+        font-weight: 400;
+    }
+
+    .k-document__source-toggle[aria-pressed='true'],
+    .k-language-menu__trigger[data-popup-open] {
+        background: var(--k-control);
+        box-shadow: var(--k-control-elevation);
+        color: var(--k-ink);
+    }
+
+    .k-language-menu__trigger {
+        padding: 0 10px;
+    }
+
+    .k-document__divider {
+        flex-shrink: 0;
+        width: 1px;
+        height: 16px;
+        margin: 0 6px;
+        background: var(--k-line-strong);
+    }
+
+    .k-language-menu {
+        width: 320px;
+        max-height: none;
+        padding: 6px;
+    }
+
+    .k-language-menu__item {
+        gap: 10px;
+        min-height: 36px;
+        font-size: 13.5px;
+    }
+
+    .k-language-menu__check {
+        display: inline-flex;
+        width: 14px;
+        color: var(--k-ink);
+    }
+
+    .k-language-menu__code {
+        display: inline-flex;
+        width: 18px;
+        font-family: var(--k-mono);
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--k-muted);
+    }
+
+    .k-language-menu__name {
+        flex: 1;
+    }
+
+    .k-language-menu__state {
+        font-size: 12.5px;
+        color: var(--k-muted);
+        white-space: nowrap;
+    }
+
+    /* A translation's own screens take the place of its fields. */
+    .k-document[data-language-view] > .k-document__body {
+        display: none;
+    }
+
+    /* Translate mode: the fields that wait on the left, one at a time on the right. */
+    .k-translate-progress {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 13px;
+        color: var(--k-muted);
+    }
+
+    .k-translate-progress b {
+        font-weight: 500;
+        color: var(--k-ink);
+    }
+
+    .k-translate-progress__meter {
+        width: 160px;
+        height: 4px;
+        overflow: hidden;
+        border-radius: 2px;
+        background: var(--k-line);
+    }
+
+    .k-translate-progress__meter i {
+        display: block;
+        height: 100%;
+        border-radius: 2px;
+        background: var(--k-ink);
+        transition: width 0.2s ease;
+    }
+
+    .k-translate-mode {
+        display: grid;
+        grid-template-columns: 232px minmax(0, 720px);
+        gap: 56px;
+        padding: 24px var(--k-gutter, 16px);
+    }
+
+    .k-translate-mode__outline {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .k-translate-mode__row {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        height: 32px;
+        padding: 0 9px;
+        border: 0;
+        border-radius: 8px;
+        background: none;
+        font: inherit;
+        font-size: 13.5px;
+        color: var(--k-muted);
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .k-translate-mode__row[aria-current='step'] {
+        background: var(--k-control);
+        box-shadow: var(--k-control-elevation);
+        font-weight: 500;
+        color: var(--k-ink);
+    }
+
+    .k-translate-mode__mark {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 15px;
+        height: 15px;
+        color: var(--k-muted);
+    }
+
+    .k-translate-mode__dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--k-ink);
+    }
+
+    .k-translate-mode__label {
+        flex: 1;
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
-    .k-source[data-changed='true'] {
-        color: var(--k-ink);
-    }
-
-    .k-source del {
+    .k-translate-mode__state {
+        font-size: 12px;
+        font-weight: 400;
         color: var(--k-muted);
     }
 
-    .k-source__translate {
-        flex-shrink: 0;
-        margin-left: auto;
-        font-size: 12px;
-    }
-
-    .k-locale-bar {
+    .k-translate-mode__focus {
         display: flex;
-        flex-wrap: wrap;
-        align-items: center;
+        flex-direction: column;
         gap: 16px;
-        margin: 12px var(--k-gutter, 16px) 0;
+        min-width: 0;
     }
 
-    .k-locale-bar > .k-locale-tabs {
+    .k-translate-mode__title {
         margin: 0;
+        font-size: 17px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
     }
 
-    /* A document's languages under its header, each with where its copy stands. */
-    .k-locale-tabs {
+    .k-translate-mode__pair {
         display: flex;
-        flex-wrap: wrap;
-        gap: 2px;
-        width: fit-content;
-        max-width: calc(100% - 2 * var(--k-gutter, 16px));
-        margin: 12px var(--k-gutter, 16px) 0;
-        padding: 3px;
-        border-radius: var(--k-radius-control);
-        background: var(--k-surface);
-        box-shadow: var(--k-elevation);
+        flex-direction: column;
+        gap: 6px;
     }
 
-    .k-locale-tabs__tab {
+    .k-translate-mode__caption {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12.5px;
+        color: var(--k-muted);
+    }
+
+    .k-translate-mode__source {
+        align-items: flex-start;
+        line-height: 22px;
+    }
+
+    .k-translate-mode__source .k-source-change {
+        flex: 1;
+    }
+
+    .k-translate-mode__source .k-source-change p {
+        font-size: 14px;
+        line-height: 22px;
+    }
+
+    .k-translate-mode__source .k-source-change__before {
+        opacity: 0.8;
+    }
+
+    .k-translate-mode__source .k-read-only__lock {
+        margin-top: 4px;
+    }
+
+    .k-translate-mode__actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 4px;
+    }
+
+    .k-translate-mode__grow {
+        flex: 1;
+    }
+
+    .k-translate-mode__next {
+        color: var(--k-ink);
+    }
+
+    /* Every translated field against every language. */
+    .k-languages {
+        padding: 20px var(--k-gutter, 16px);
+        overflow-x: auto;
+    }
+
+    .k-languages__grid {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 13.5px;
+        table-layout: fixed;
+    }
+
+    .k-languages__grid th {
+        padding: 6px 12px 12px;
+        box-shadow: inset 0 -1px 0 var(--k-line);
+        font-weight: 500;
+        text-align: left;
+        vertical-align: bottom;
+        white-space: nowrap;
+    }
+
+    .k-languages__grid .k-languages__field-head {
+        width: 170px;
+        font-size: 12.5px;
+        color: var(--k-muted);
+    }
+
+    .k-languages__name {
+        display: block;
+        color: var(--k-ink);
+    }
+
+    .k-languages__state {
+        display: block;
+        margin-top: 2px;
+        font-size: 12.5px;
+        font-weight: 400;
+        color: var(--k-muted);
+    }
+
+    .k-languages__grid td {
+        height: 46px;
+        padding: 0 12px;
+        box-shadow: inset 0 -1px 0 var(--k-line);
+        color: var(--k-muted);
+        white-space: nowrap;
+    }
+
+    .k-languages__grid .k-languages__field {
+        font-weight: 500;
+        color: var(--k-ink);
+    }
+
+    .k-languages__cell {
         display: inline-flex;
         align-items: center;
-        gap: 7px;
-        height: 30px;
-        padding: 0 10px;
-        border-radius: 7px;
-        font-size: 12px;
-        color: var(--k-muted);
-        text-decoration: none;
+        gap: 8px;
+        font-size: 12.5px;
     }
 
-    .k-locale-tabs__tab:hover {
+    .k-languages__cell[data-changed] {
         color: var(--k-ink);
     }
 
-    .k-locale-tabs__tab[aria-current='page'] {
-        background: var(--k-control);
-        box-shadow: var(--k-control-elevation);
-        color: var(--k-ink);
+    .k-languages__dot {
+        width: 6px;
+        height: 6px;
+        margin: 0 4.5px;
+        border-radius: 50%;
+        background: var(--k-ink);
     }
 
-    .k-locale-tabs__code {
-        font-family: var(--k-mono);
-        font-size: 11px;
-        font-weight: 600;
-        color: var(--k-ink);
+    .k-languages__grid tfoot td {
+        height: 56px;
+        box-shadow: none;
     }
 
     /* A field the editor cannot change: its input's shape on the fainter surface fill, muted text, and a lock on the right. */

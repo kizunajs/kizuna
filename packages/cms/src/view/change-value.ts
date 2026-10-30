@@ -308,13 +308,14 @@ export const wordDiff = (before: string, after: string): Piece[] | undefined => 
     const left = before.match(/\S+\s*|\s+/g) ?? [];
     const right = after.match(/\S+\s*|\s+/g) ?? [];
     if (left.length * right.length > 250_000) return undefined;
+    // A word matches without the space after it, so the last word of a text still matches once more follows it.
+    const same = (row: number, column: number): boolean => left[row]!.trimEnd() === right[column]!.trimEnd();
     const table = Array.from({ length: left.length + 1 }, () => new Array<number>(right.length + 1).fill(0));
     for (let row = left.length - 1; row >= 0; row--) {
         for (let column = right.length - 1; column >= 0; column--) {
-            table[row]![column] =
-                left[row] === right[column]
-                    ? table[row + 1]![column + 1]! + 1
-                    : Math.max(table[row + 1]![column]!, table[row]![column + 1]!);
+            table[row]![column] = same(row, column)
+                ? table[row + 1]![column + 1]! + 1
+                : Math.max(table[row + 1]![column]!, table[row]![column + 1]!);
         }
     }
     const pieces: Piece[] = [];
@@ -330,8 +331,8 @@ export const wordDiff = (before: string, after: string): Piece[] | undefined => 
     let row = 0;
     let column = 0;
     while (row < left.length && column < right.length) {
-        if (left[row] === right[column]) {
-            push('same', left[row]!);
+        if (same(row, column)) {
+            push('same', right[column]!);
             row++;
             column++;
         } else if (table[row + 1]![column]! >= table[row]![column + 1]!) {

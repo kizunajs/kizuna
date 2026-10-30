@@ -17,12 +17,14 @@ export const TranslatedDraftSchema = Kizuna.model({
     schema: z.object({
         draft: DraftPageSchema,
         fields: z.array(z.string()).describe('The fields the translation changed. Empty when it already said the same.'),
+        values: z.record(z.string(), z.unknown()).describe('The translated value of each field it changed.'),
     }),
 });
 
 export const TranslateBodySchema = z
     .object({
         fields: z.array(z.string()).min(1).optional().describe('The fields to translate. Without it, every translated field.'),
+        save: z.boolean().optional().describe('False answers the translation without saving it to the draft.'),
     })
     .strict();
 
@@ -32,17 +34,20 @@ export const TranslateBodySchema = z
 export interface TranslatedDraft {
     state: DraftState;
     fields: string[];
+    values: Record<string, unknown>;
 }
 
 /**
  * Drafts a translation from its published source, and records the source
- * version it came from.
+ * version it came from. With `save: false` it answers the translation and
+ * writes nothing.
  */
 export const translateDraft = async (
     cms: CmsService,
     input: {
         ref: DocumentRef;
         fields?: readonly string[];
+        save?: boolean;
         caller: Caller;
         author: string;
     }
@@ -90,15 +95,17 @@ export const translateDraft = async (
     }
     const current = (await cms.document(target.ref)).row?.draft ?? {};
     const written = fields.map((field) => field.name).filter((name) => name in translated && !sameContent(translated[name], current[name]));
-    if (written.length === 0) {
+    const values = Object.fromEntries(written.map((name) => [name, translated[name]]));
+    if (written.length === 0 || input.save === false) {
         return {
             state: await cms.draftState(target.ref),
-            fields: [],
+            fields: written,
+            values,
         };
     }
     const state = await cms.update({
         ref: target.ref,
-        changes: Object.fromEntries(written.map((name) => [name, translated[name]])),
+        changes: values,
         caller: input.caller,
         author: input.author,
         summary: `Translated from ${cms.sourceLocaleOf(target.site)}`,
@@ -107,5 +114,6 @@ export const translateDraft = async (
     return {
         state,
         fields: written,
+        values,
     };
 };

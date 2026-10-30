@@ -125,6 +125,15 @@ export interface DocumentLocales {
         code: string;
         status: DocumentStatus;
         sourceChanged: number;
+        /**
+         * The fields whose source changed since they were translated or kept.
+         */
+        changed: string[];
+        /**
+         * The translated fields the source holds and this language leaves
+         * empty.
+         */
+        missing: string[];
     }>;
     /**
      * True when a model drafts translations.
