@@ -119,7 +119,7 @@ export const SITE_NAME = /^[a-z][a-z0-9-]*$/;
  */
 export const declareSites = <
     Schema extends z.ZodType<SiteValues, any>,
-    const Entries extends { [Key in keyof Entries]: z.input<Schema> & SiteContent },
+    Entries extends { [Key in keyof Entries]: z.input<Schema> & SiteContent },
 >(
     schema: Schema,
     entries: Entries

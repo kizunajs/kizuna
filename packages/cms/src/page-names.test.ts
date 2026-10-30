@@ -86,7 +86,9 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-    await pglite.exec('delete from cms_refs; delete from cms_versions; delete from cms_documents;');
+    await pglite.exec(
+        'delete from cms_review_comments; delete from cms_reviews; delete from cms_refs; delete from cms_versions; delete from cms_documents;'
+    );
 });
 
 afterAll(async () => {
@@ -127,8 +129,22 @@ describe('pages stored by name', () => {
             plansPage: '/pricing',
         });
         expect((await renamed.orphanedPages()).map((orphan) => orphan.name)).toEqual(['pricingPage']);
+        const stored = await renamed.store.get('page', 'pricingPage');
+        await renamed.store.addReviews([
+            {
+                requestId: 'request-1',
+                ref: 'page:pricingPage',
+                documentId: stored!.id,
+                version: 1,
+                reviewers: ['grace'],
+                requestedBy: 'ada',
+                note: null,
+                createdAt: new Date(),
+            },
+        ]);
         await renamed.renamePage('pricingPage', 'plansPage');
         expect(await renamed.orphanedPages()).toEqual([]);
+        expect((await renamed.store.reviewsOf(stored!.id)).map((review) => review.ref)).toEqual(['page:plansPage']);
         const state = await renamed.draftState({
             type: 'page',
             name: 'plansPage',

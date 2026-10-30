@@ -3,7 +3,10 @@ import { z } from 'zod';
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { defineConfig, Kizuna } from 'kizunajs';
-import { contentOf, pluginExportsOf } from 'kizunajs/adapter';
+import { contentOf, flattenRoutes, pluginExportsOf } from 'kizunajs/adapter';
+import express from 'express';
+import request from 'supertest';
+import { expressAdapter } from '@kizunajs/express';
 import { definePage } from './page.js';
 import { defineCollection, defineGlobal } from './definitions.js';
 import { cms } from './provider.js';
@@ -114,6 +117,7 @@ const showing = {
 const pglite = new PGlite();
 const db = drizzle(pglite);
 const config = defineConfig({
+    adapter: expressAdapter(),
     auth: {
         identities: {
             editor,
@@ -148,6 +152,8 @@ const config = defineConfig({
     }),
 });
 const service = (pluginExportsOf(config.api)['cms'] as CmsExports).service;
+const app = express();
+config.api.mount(app);
 
 const event = (title: string, slug: string) => ({
     title,
@@ -378,5 +384,135 @@ describe("the current site's view in process", () => {
 
     it('refuses a view of sites the deployment does not show', () => {
         expect(() => config.content.of(['norway'])).toThrow('This app shows norway, but `site` on cms() names uk.');
+    });
+});
+
+describe('the content routes of each site', () => {
+    it('serves each site under /content/sites/<site>, with the shared content beside its own', () => {
+        const keys = flattenRoutes(config.api.routes as never)
+            .map((entry) => entry.routeKey)
+            .filter((key) => key.startsWith('content.'));
+        expect(keys).toEqual(
+            expect.arrayContaining([
+                'content.sites.uk.pages.frontPage',
+                'content.sites.uk.globals.footer',
+                'content.sites.uk.globals.settings',
+                'content.sites.uk.collections.offices.list',
+                'content.sites.uk.collections.events.get',
+                'content.sites.norway.globals.settings',
+                'content.media.image',
+            ])
+        );
+        expect(keys.filter((key) => !key.startsWith('content.sites.') && key !== 'content.media.image')).toEqual([]);
+    });
+
+    it("reads a site's own items and globals, and the shared ones, over HTTP", async () => {
+        const uk = await service.createItem('events', event('Open day', 'open-day'), {}, 'ada', 'uk');
+        await service.publish(uk.target.ref, 'ada');
+        const office = await service.createItem(
+            'offices',
+            {
+                city: 'London',
+            },
+            {},
+            'ada'
+        );
+        await service.publish(office.target.ref, 'ada');
+        await write(
+            {
+                type: 'global',
+                name: 'settings',
+                site: 'norway',
+            },
+            {
+                phone: '+47 22 00 00 00',
+            }
+        );
+        const ukEvents = await request(app).get('/content/sites/uk/collections/events');
+        expect(ukEvents.body.items.map((item: { title: string }) => item.title)).toEqual(['Open day']);
+        expect((await request(app).get('/content/sites/norway/collections/events')).body.items).toEqual([]);
+        const id = (uk.target.ref as { id: string }).id;
+        expect((await request(app).get(`/content/sites/uk/collections/events/${id}`)).body.title).toBe('Open day');
+        expect((await request(app).get(`/content/sites/norway/collections/events/${id}`)).status).toBe(404);
+        for (const site of ['uk', 'norway']) {
+            const offices = await request(app).get(`/content/sites/${site}/collections/offices`);
+            expect(offices.body.items.map((item: { city: string }) => item.city)).toEqual(['London']);
+        }
+        expect((await request(app).get('/content/sites/norway/globals/settings')).body.content).toEqual({
+            phone: '+47 22 00 00 00',
+        });
+        expect((await request(app).get('/content/sites/uk/globals/settings')).status).toBe(404);
+        expect((await request(app).get('/content/globals/footer')).status).toBe(404);
+    });
+});
+
+describe("editing a site's own globals and items", () => {
+    it('drafts, publishes and versions a global of its own', async () => {
+        const changed = await request(app)
+            .patch('/editing/sites/uk/globals/settings/draft')
+            .send({
+                changes: {
+                    phone: '+44 20 7946 0000',
+                },
+            });
+        expect(changed.status).toBe(200);
+        expect(changed.body.ref).toBe('global:uk:settings');
+        expect((await request(app).post('/editing/sites/uk/globals/settings/publish').send({})).status).toBe(200);
+        expect((await request(app).get('/editing/sites/uk/globals/settings/versions')).body.versions).toHaveLength(1);
+        expect((await request(app).get('/editing/sites/uk/globals')).body.globals).toMatchObject([
+            {
+                name: 'settings',
+                status: 'published',
+            },
+        ]);
+        expect((await request(app).get('/editing/sites/norway/globals/settings/draft')).body.status).toBe('empty');
+        expect((await request(app).get('/editing/globals')).body.globals.map((global: { name: string }) => global.name)).toEqual([
+            'footer',
+        ]);
+    });
+
+    it('adds, lists, publishes and deletes items of its own collection', async () => {
+        const created = await request(app)
+            .post('/editing/sites/uk/collections/events/items')
+            .send({
+                values: event('Open day', 'open-day'),
+            });
+        expect(created.status).toBe(201);
+        const ref = parseRef(created.body.ref);
+        if (ref?.type !== 'item') throw new Error('expected an item');
+        expect(ref.site).toBe('uk');
+        expect((await request(app).post(`/editing/sites/uk/collections/events/items/${ref.id}/publish`).send({})).status).toBe(200);
+        const listed = await request(app).get('/editing/sites/uk/collections/events/items');
+        expect(listed.body.items.map((item: { label: string; status: string }) => [item.label, item.status])).toEqual([
+            ['Open day', 'published'],
+        ]);
+        expect((await request(app).get('/editing/sites/norway/collections/events/items')).body.items).toEqual([]);
+        expect((await request(app).get('/editing/sites/uk/collections')).body.collections).toEqual([
+            {
+                name: 'events',
+                label: 'Events',
+                count: 1,
+            },
+        ]);
+        const described = await request(app).get('/editing/describe').query({
+            ref: created.body.ref,
+        });
+        expect(described.body.fields.map((field: { path: string }) => field.path)).toEqual(['title', 'slug']);
+        expect((await request(app).delete(`/editing/sites/uk/collections/events/items/${ref.id}`)).status).toBe(204);
+        expect((await request(app).get('/editing/sites/uk/collections/events/items')).body.items).toEqual([]);
+    });
+
+    it("publishes the site's editing routes as tools", () => {
+        const tools = flattenRoutes(config.api.routes as never)
+            .filter((entry) => (entry.route as { tool?: unknown }).tool !== undefined)
+            .map((entry) => entry.routeKey);
+        expect(tools).toEqual(
+            expect.arrayContaining([
+                'editing.sites.globals.updateDraft',
+                'editing.sites.globals.publish',
+                'editing.sites.collections.createItem',
+                'editing.sites.collections.history',
+            ])
+        );
     });
 });

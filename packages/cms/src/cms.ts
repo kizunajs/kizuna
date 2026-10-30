@@ -112,13 +112,22 @@ export const pageCacheTag = (name: string, site = DEFAULT_SITE): string =>
     site === DEFAULT_SITE ? `kizuna-cms:page:${name}` : `kizuna-cms:page:${site}:${name}`;
 
 /**
- * The cache tag a document's reads carry.
+ * The cache tag a document's reads carry. With `site`, the tag of a shared
+ * document as that site reads it, which its own values refresh too.
  */
-export const documentCacheTag = (ref: DocumentRef): string => `kizuna-cms:${formatRef(ref)}`;
+export const documentCacheTag = (ref: DocumentRef, site?: string): string =>
+    `kizuna-cms:${formatRef(
+        site === undefined || site === DEFAULT_SITE || ref.type === 'page'
+            ? ref
+            : {
+                  ...ref,
+                  site,
+              }
+    )}`;
 
 /**
- * The cache tag every list of a collection carries, a site's own collection
- * under its site.
+ * The cache tag every list of a collection carries, as the site given reads
+ * it.
  */
 export const collectionCacheTag = (name: string, site = DEFAULT_SITE): string =>
     site === DEFAULT_SITE ? `kizuna-cms:collection:${name}` : `kizuna-cms:collection:${site}:${name}`;
@@ -795,6 +804,17 @@ export class CmsService {
     }
 
     /**
+     * Published content as a site shows it.
+     */
+    async publishedOn(
+        ref: DocumentRef,
+        site: string
+    ): Promise<{ content: Record<string, unknown>; version: number; updatedAt: Date } | undefined> {
+        void site;
+        return this.published(ref);
+    }
+
+    /**
      * Published content as it is stored, image references and crops
      * included, for copying between environments. When the live copy no
      * longer passes its schema, the newest earlier version that went live and
@@ -953,14 +973,26 @@ export class CmsService {
         return summaries.sort((left, right) => left.path.localeCompare(right.path));
     }
 
-    async globalSummaries(): Promise<
+    /**
+     * The shared globals, or with a site, its own, each with its status.
+     */
+    async globalSummaries(
+        site = DEFAULT_SITE
+    ): Promise<
         Array<{ name: string; label: string | null; group: string | null; status: PageStatus; version: number; updatedAt: string | null }>
     > {
         const summaries = [];
-        for (const [name, definition] of Object.entries(this.globals)) {
+        const globals = site === DEFAULT_SITE ? this.globals : this.siteGlobals[site];
+        if (globals === undefined) throw new CmsHttpError(404, { detail: `There is no site named '${site}'.` });
+        for (const [name, definition] of Object.entries(globals)) {
             const state = await this.draftState({
                 type: 'global',
                 name,
+                ...(site === DEFAULT_SITE
+                    ? {}
+                    : {
+                          site,
+                      }),
             });
             summaries.push({
                 name,
@@ -1079,17 +1111,15 @@ export class CmsService {
     }
 
     /**
-     * Every item of a collection as editors list it: drafts and incomplete
-     * items included, with each one's status and, when a page shows it, its
-     * address.
+     * The shared collections, or with a site, its own, with what editors call
+     * each and how many items it holds.
      */
-    /**
-     * Every collection, with what editors call it and how many items it holds.
-     */
-    async collectionSummaries(): Promise<Array<{ name: string; label: string; count: number }>> {
-        const rows = await this.store.list('item', DEFAULT_SITE);
-        return Object.values(this.collections).map((definition) => {
-            const listing = this.listing(definition.name);
+    async collectionSummaries(site = DEFAULT_SITE): Promise<Array<{ name: string; label: string; count: number }>> {
+        const collections = site === DEFAULT_SITE ? this.collections : this.siteCollections[site];
+        if (collections === undefined) throw new CmsHttpError(404, { detail: `There is no site named '${site}'.` });
+        const rows = await this.store.list('item', site);
+        return Object.values(collections).map((definition) => {
+            const listing = this.listing(definition.name, site);
             return {
                 name: definition.name,
                 label:
@@ -2227,7 +2257,7 @@ export class CmsService {
             throw new CmsHttpError(409, { detail: `'${to}' has content of its own. Delete it before moving '${from}' there.` });
         }
         await this.store.rekey('page', from, to, site);
-        await this.revalidateDocument({
+        const moved: DocumentRef = {
             type: 'page',
             name: to,
             ...(site === DEFAULT_SITE
@@ -2235,7 +2265,10 @@ export class CmsService {
                 : {
                       site,
                   }),
-        });
+        };
+        const row = await this.store.get('page', to, site);
+        if (row !== undefined) await this.store.readdressReviews(row.id, formatRef(moved));
+        await this.revalidateDocument(moved);
     }
 
     /**
@@ -2282,13 +2315,31 @@ export class CmsService {
      * collection's lists, and the pages that reference an item.
      */
     async revalidateDocument(ref: DocumentRef): Promise<void> {
-        const tags = ref.type === 'page' ? [pageCacheTag(ref.name, ref.site)] : [documentCacheTag(ref)];
-        if (ref.type === 'item') tags.push(collectionCacheTag(ref.collection, ref.site));
-        const brand = this.listingOf(ref)?.brand;
+        const readers = this.readersOf(ref);
+        const tags = readers.flatMap((site) => [
+            ref.type === 'page' ? pageCacheTag(ref.name, ref.site) : documentCacheTag(ref, site),
+            ...(ref.type === 'item' ? [collectionCacheTag(ref.collection, site)] : []),
+        ]);
+        const brand = ref.type === 'item' ? this.servedListing(ref.collection, ref.site ?? DEFAULT_SITE).brand : undefined;
         if (brand !== undefined && ref.type === 'item') {
-            tags.push(...(await this.whereUsed(brand, ref.id)).map((used) => pageCacheTag(used.name, used.site)));
+            tags.push(
+                ...(await this.whereUsed(brand, ref.id))
+                    .filter((used) => readers.includes(used.site))
+                    .map((used) => pageCacheTag(used.name, used.site))
+            );
         }
         await this.revalidateTags([...new Set(tags)]);
+    }
+
+    /**
+     * The sites that read a document: its own site, or for shared content,
+     * every site.
+     */
+    private readersOf(ref: DocumentRef): string[] {
+        if (ref.site !== undefined && ref.site !== DEFAULT_SITE) return [ref.site];
+        if (ref.type === 'page') return [DEFAULT_SITE];
+        const names = this.siteNames();
+        return names.length === 0 ? [DEFAULT_SITE] : names;
     }
 
     /**

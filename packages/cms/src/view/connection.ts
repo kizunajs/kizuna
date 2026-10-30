@@ -98,18 +98,35 @@ export const toolsFor = (ref: string): { prefix: string; params: Record<string, 
               };
     }
     if (parsed.type === 'global') {
-        return {
-            prefix: 'editing_globals',
-            params: {
-                name: parsed.name,
-            },
-        };
+        return parsed.site === undefined
+            ? {
+                  prefix: 'editing_globals',
+                  params: {
+                      name: parsed.name,
+                  },
+              }
+            : {
+                  prefix: 'editing_sites_globals',
+                  params: {
+                      site: parsed.site,
+                      name: parsed.name,
+                  },
+              };
     }
-    return {
-        prefix: 'editing_collections',
-        params: {
-            name: parsed.collection,
-            id: parsed.id,
-        },
-    };
+    return parsed.site === undefined
+        ? {
+              prefix: 'editing_collections',
+              params: {
+                  name: parsed.collection,
+                  id: parsed.id,
+              },
+          }
+        : {
+              prefix: 'editing_sites_collections',
+              params: {
+                  site: parsed.site,
+                  name: parsed.collection,
+                  id: parsed.id,
+              },
+          };
 };

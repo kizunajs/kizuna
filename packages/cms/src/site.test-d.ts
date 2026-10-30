@@ -184,6 +184,7 @@ const hagen = declareSites(Site, {
         url: 'https://hagen.example.no',
         icon: '/icons/norway.svg',
         pages: countryPages,
+        locales: ['nb', 'en'],
         companyName: 'Hagen Norge AS',
     },
 });
@@ -213,6 +214,7 @@ describe("the current site's view", () => {
             expectTypeOf(countries.collections.events.get).returns.resolves.toHaveProperty('title');
         }
         expectTypeOf((await content.of(['group']).pages.aboutPage.get()).story).toEqualTypeOf<string>();
+        expectTypeOf((await content.of(['norway']).pages.frontPage.get()).heading).toEqualTypeOf<string>();
         // @ts-expect-error denmark is not a declared site
         content.of(['denmark']);
     });

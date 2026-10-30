@@ -5,7 +5,7 @@ import type { RouteAuth } from 'kizunajs';
 import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { addressOf, CmsHttpError, previewPathOf, type CmsService, type DraftState } from './cms.js';
 import { DEFAULT_SITE, routePrefix, sitesOf, type CmsPluginOptions, type PageMap } from './options.js';
-import type { Collection, ContentDefinition } from './definitions.js';
+import type { Collection, ContentDefinition, Global } from './definitions.js';
 import { dataFields } from './field.js';
 import { servesCollection } from './page.js';
 import { addressFieldsOf } from './dynamic.js';
@@ -752,6 +752,15 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         indexes: readonly string[];
         path: `/${string}`;
         collection: string;
+        /**
+         * Where the items are stored: the default site for a shared
+         * collection, the site for its own.
+         */
+        site: string;
+        /**
+         * The site the items are read on.
+         */
+        readingSite: string;
         refOf: (id: string) => DocumentRef;
         plural: string;
         single: string;
@@ -779,14 +788,18 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             }).handler(
                 guarded(async (cms, args) => {
                     const { orderBy, direction, limit, cursor, ...where } = (args.query ?? {}) as Record<string, unknown>;
-                    const result = await cms.listItems(input.collection, {
-                        draft: false,
-                        where: Object.fromEntries(Object.entries(where).filter(([, value]) => value !== undefined)),
-                        ...(typeof orderBy === 'string' ? { orderBy } : {}),
-                        ...(direction === 'asc' || direction === 'desc' ? { direction } : {}),
-                        ...(typeof limit === 'number' ? { limit } : {}),
-                        ...(typeof cursor === 'string' ? { cursor } : {}),
-                    });
+                    const result = await cms.listItems(
+                        input.collection,
+                        {
+                            draft: false,
+                            where: Object.fromEntries(Object.entries(where).filter(([, value]) => value !== undefined)),
+                            ...(typeof orderBy === 'string' ? { orderBy } : {}),
+                            ...(direction === 'asc' || direction === 'desc' ? { direction } : {}),
+                            ...(typeof limit === 'number' ? { limit } : {}),
+                            ...(typeof cursor === 'string' ? { cursor } : {}),
+                        },
+                        input.site
+                    );
                     return {
                         status: 200,
                         body: {
@@ -813,7 +826,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 },
             }).handler(
                 guarded(async (cms, args) => {
-                    const published = await cms.published(input.refOf(args.params['id']!));
+                    const published = await cms.publishedOn(input.refOf(args.params['id']!), input.readingSite);
                     if (published === undefined)
                         throw new CmsHttpError(404, { detail: `No published ${input.single} '${args.params['id']}'.` });
                     return {
@@ -855,15 +868,18 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         },
                     }).handler(
                         guarded(async (cms) => {
-                            const published = await cms.published({
-                                type: 'page',
-                                name,
-                                ...(site === DEFAULT_SITE
-                                    ? {}
-                                    : {
-                                          site,
-                                      }),
-                            });
+                            const published = await cms.publishedOn(
+                                {
+                                    type: 'page',
+                                    name,
+                                    ...(site === DEFAULT_SITE
+                                        ? {}
+                                        : {
+                                              site,
+                                          }),
+                                },
+                                site
+                            );
                             if (published === undefined) throw new CmsHttpError(404, { detail: `${entry.path} is not published.` });
                             return {
                                 status: 200,
@@ -879,81 +895,158 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         );
 
     const sites = sitesOf(options);
-    const pageReads = pageReadsOf(sites[DEFAULT_SITE]?.pages ?? {}, DEFAULT_SITE);
-    const namedSites = Object.entries(sites).filter(([site]) => site !== DEFAULT_SITE);
-    const siteReads = Object.fromEntries(namedSites.map(([site, declared]) => [site, pageReadsOf(declared.pages, site)]));
-
-    const globalReads = Object.fromEntries(
-        (options.globals ?? []).map((definition) => [
-            definition.name,
-            route({
-                method: 'GET',
-                path: `${base}/content/globals/${definition.name}`,
-                auth: false,
-                summary: `Read the published ${words(definition.name)} global`,
-                responses: {
-                    200: {
-                        body: z.object({
-                            version: z.int(),
-                            updatedAt: z.string(),
-                            content: resolvedSchema(definition.schema),
-                        }),
-                        ...(publicCache as object),
-                    },
-                    404: ProblemDetailsSchema,
-                },
-            }).handler(
-                guarded(async (cms) => {
-                    const published = await cms.published({
-                        type: 'global',
-                        name: definition.name,
-                    });
-                    if (published === undefined) throw new CmsHttpError(404, { detail: `The ${definition.name} global is not published.` });
-                    return {
-                        status: 200,
-                        body: {
-                            version: published.version,
-                            updatedAt: published.updatedAt.toISOString(),
-                            content: published.content,
-                        },
-                    };
-                }) as never
-            ),
-        ])
-    );
+    const siteEntries = Object.entries(options.sites?.entries ?? {});
 
     /**
-     * The fields a collection's lists filter and sort by: those its addresses
-     * read, then its `indexes`.
+     * The public read of a global, read on a site.
      */
-    const indexesOf = (definition: Collection): string[] => [
+    const globalRead = (definition: Global, ref: DocumentRef, path: `/${string}`, site: string) =>
+        route({
+            method: 'GET',
+            path,
+            auth: false,
+            summary:
+                site === DEFAULT_SITE
+                    ? `Read the published ${words(definition.name)} global`
+                    : `Read the published ${words(definition.name)} global on the ${site} site`,
+            responses: {
+                200: {
+                    body: z.object({
+                        version: z.int(),
+                        updatedAt: z.string(),
+                        content: resolvedSchema(definition.schema),
+                    }),
+                    ...(publicCache as object),
+                },
+                404: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms) => {
+                const published = await cms.publishedOn(ref, site);
+                if (published === undefined) throw new CmsHttpError(404, { detail: `The ${definition.name} global is not published.` });
+                return {
+                    status: 200,
+                    body: {
+                        version: published.version,
+                        updatedAt: published.updatedAt.toISOString(),
+                        content: published.content,
+                    },
+                };
+            }) as never
+        );
+
+    /**
+     * The public reads of the globals a site shows: the shared ones, and the
+     * site's own.
+     */
+    const globalReadsOf = (site: string, prefix: `/${string}`) =>
+        Object.fromEntries([
+            ...(options.globals ?? []).map((definition) => [
+                definition.name,
+                globalRead(
+                    definition,
+                    {
+                        type: 'global',
+                        name: definition.name,
+                    },
+                    `${prefix}/globals/${definition.name}`,
+                    site
+                ),
+            ]),
+            ...(options.sites?.entries[site]?.globals ?? []).map((definition) => [
+                definition.name,
+                globalRead(
+                    definition,
+                    {
+                        type: 'global',
+                        name: definition.name,
+                        site,
+                    },
+                    `${prefix}/globals/${definition.name}`,
+                    site
+                ),
+            ]),
+        ]);
+
+    /**
+     * The fields a collection's lists filter and sort by: those the given
+     * pages' addresses read, then its `indexes`.
+     */
+    const indexesOf = (definition: Collection, pageMaps: readonly PageMap[]): string[] => [
         ...new Set([
             // A param naming no field is refused when the config assembles, with the field it lacks.
-            ...Object.values(sites)
-                .flatMap((declared) => addressFieldsOf(definition.name, declared.pages))
+            ...pageMaps
+                .flatMap((pages) => addressFieldsOf(definition.name, pages))
                 .filter((field) => dataFields(definition.fields).some((candidate) => candidate.name === field)),
             ...(definition.indexes ?? []),
         ]),
     ];
+    const everySitesPages = Object.values(sites).map((declared) => declared.pages);
 
-    const collectionReads = Object.fromEntries(
-        (options.collections ?? []).map((definition) => [
-            definition.name,
-            listingReads({
-                definition,
-                indexes: indexesOf(definition),
-                path: `${base}/content/collections/${definition.name}`,
-                collection: definition.name,
-                refOf: (id) => ({
-                    type: 'item',
+    /**
+     * The public reads of the collections a site shows: the shared ones, and
+     * the site's own.
+     */
+    const collectionReadsOf = (site: string, prefix: `/${string}`) =>
+        Object.fromEntries([
+            ...(options.collections ?? []).map((definition) => [
+                definition.name,
+                listingReads({
+                    definition,
+                    indexes: indexesOf(definition, everySitesPages),
+                    path: `${prefix}/collections/${definition.name}`,
                     collection: definition.name,
-                    id,
+                    site: DEFAULT_SITE,
+                    readingSite: site,
+                    refOf: (id) => ({
+                        type: 'item',
+                        collection: definition.name,
+                        id,
+                    }),
+                    plural: words(definition.name),
+                    single: `item of ${words(definition.name)}`,
                 }),
-                plural: words(definition.name),
-                single: `item of ${words(definition.name)}`,
-            }),
-        ])
-    );
+            ]),
+            ...(options.sites?.entries[site]?.collections ?? []).map((definition) => [
+                definition.name,
+                listingReads({
+                    definition,
+                    indexes: indexesOf(definition, [sites[site]?.pages ?? {}]),
+                    path: `${prefix}/collections/${definition.name}`,
+                    collection: definition.name,
+                    site,
+                    readingSite: site,
+                    refOf: (id) => ({
+                        type: 'item',
+                        collection: definition.name,
+                        id,
+                        site,
+                    }),
+                    plural: words(definition.name),
+                    single: `item of ${words(definition.name)}`,
+                }),
+            ]),
+        ]);
+
+    // One shape or the other, so the groups type as plain route maps.
+    const contentReads: Record<string, ReturnType<typeof pageReadsOf>> = siteEntries.length === 0
+        ? {
+              pages: pageReadsOf(sites[DEFAULT_SITE]?.pages ?? {}, DEFAULT_SITE),
+              globals: globalReadsOf(DEFAULT_SITE, `${base}/content`),
+              collections: collectionReadsOf(DEFAULT_SITE, `${base}/content`),
+          }
+        : {
+              sites: Object.fromEntries(
+                  siteEntries.map(([site]) => [
+                      site,
+                      {
+                          pages: pageReadsOf(sites[site]?.pages ?? {}, site),
+                          globals: globalReadsOf(site, `${base}/content/sites/${site}`),
+                          collections: collectionReadsOf(site, `${base}/content/sites/${site}`),
+                      },
+                  ])
+              ) as never,
+          };
 
     const pageScope: Scope = {
         prefix: '/pages/:name',
@@ -996,18 +1089,47 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
      */
     const listedCollections = (options.collections ?? [])
         .map((definition) => {
-            const indexes = indexesOf(definition);
+            const indexes = indexesOf(definition, everySitesPages);
             const columns = (definition.columns ?? []).filter((column) => !indexes.includes(column));
             return `${definition.name} filters and sorts by ${indexes.length === 0 ? 'no field' : indexes.join(', ')}${columns.length === 0 ? '' : `, and also shows ${columns.join(', ')}`}.`;
         })
         .join(' ');
-    const itemRoutes = () => ({
+    /**
+     * Where routes for shared content sit, or for one site's own.
+     */
+    interface SiteAt {
+        prefix: '' | '/sites/:site';
+        params: z.ZodObject;
+        siteOf: (params: Record<string, string>) => string;
+    }
+    const shared: SiteAt = {
+        prefix: '',
+        params: z.object({}),
+        siteOf: () => DEFAULT_SITE,
+    };
+    const onSite: SiteAt = {
+        prefix: '/sites/:site',
+        params: z.object({
+            site: z.string(),
+        }),
+        siteOf: (params) => params['site']!,
+    };
+
+    const itemRoutes = (at: SiteAt) => ({
         list: route({
             method: 'GET',
-            path: `${editingBase}/collections`,
+            path: `${editingBase}${at.prefix}/collections`,
             auth: editor,
-            summary: 'List every collection, with how many items it holds',
+            summary:
+                at.prefix === ''
+                    ? 'List every collection, with how many items it holds'
+                    : "List a site's own collections, with how many items each holds",
             tool: true,
+            ...(at.prefix === ''
+                ? {}
+                : {
+                      pathParams: at.params,
+                  }),
             responses: {
                 200: {
                     body: z.object({
@@ -1023,21 +1145,21 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 },
             },
         }).handler(
-            guarded(async (cms) => ({
+            guarded(async (cms, args) => ({
                 status: 200,
                 body: {
-                    collections: await cms.collectionSummaries(),
+                    collections: await cms.collectionSummaries(at.siteOf(args.params)),
                 },
             })) as never
         ),
 
         listItems: route({
             method: 'GET',
-            path: `${editingBase}/collections/:name/items`,
+            path: `${editingBase}${at.prefix}/collections/:name/items`,
             auth: editor,
             summary: 'List every item of a collection, drafts included, with its status and address',
             tool: true,
-            pathParams: z.object({
+            pathParams: at.params.extend({
                 name: z.string(),
             }),
             description: `Pages with \`limit\` and \`offset\`, and counts every item that matches as \`total\`. ${listedCollections}`,
@@ -1088,36 +1210,40 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         detail: parsed.problem,
                     });
                 }
-                const listed = await cms.editorList(args.params['name']!, {
-                    groups: parsed.groups,
-                    fields: parseFields(fields ?? []),
-                    headers: forwardedHeaders(args),
-                    ...(q === undefined
-                        ? {}
-                        : {
-                              search: q,
-                          }),
-                    ...(orderBy === undefined
-                        ? {}
-                        : {
-                              orderBy,
-                          }),
-                    ...(direction === undefined
-                        ? {}
-                        : {
-                              direction,
-                          }),
-                    ...(limit === undefined
-                        ? {}
-                        : {
-                              limit,
-                          }),
-                    ...(offset === undefined
-                        ? {}
-                        : {
-                              offset,
-                          }),
-                });
+                const listed = await cms.editorList(
+                    args.params['name']!,
+                    {
+                        groups: parsed.groups,
+                        fields: parseFields(fields ?? []),
+                        headers: forwardedHeaders(args),
+                        ...(q === undefined
+                            ? {}
+                            : {
+                                  search: q,
+                              }),
+                        ...(orderBy === undefined
+                            ? {}
+                            : {
+                                  orderBy,
+                              }),
+                        ...(direction === undefined
+                            ? {}
+                            : {
+                                  direction,
+                              }),
+                        ...(limit === undefined
+                            ? {}
+                            : {
+                                  limit,
+                              }),
+                        ...(offset === undefined
+                            ? {}
+                            : {
+                                  offset,
+                              }),
+                    },
+                    at.siteOf(args.params)
+                );
                 return {
                     status: 200,
                     body: listed,
@@ -1127,11 +1253,11 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
 
         createItem: route({
             method: 'POST',
-            path: `${editingBase}/collections/:name/items`,
+            path: `${editingBase}${at.prefix}/collections/:name/items`,
             auth: editor,
             summary: 'Add an item to a collection, as a draft',
             tool: true,
-            pathParams: z.object({
+            pathParams: at.params.extend({
                 name: z.string(),
             }),
             body: CreateItemBodySchema,
@@ -1149,7 +1275,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         args.params['name']!,
                         (args.body as z.output<typeof CreateItemBodySchema>)?.values ?? {},
                         cms.caller(args.auth),
-                        authorOf(cms, args)
+                        authorOf(cms, args),
+                        at.siteOf(args.params)
                     )
                 ),
             })) as never
@@ -1157,14 +1284,14 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
 
         deleteItem: route({
             method: 'DELETE',
-            path: `${editingBase}/collections/:name/items/:id`,
+            path: `${editingBase}${at.prefix}/collections/:name/items/:id`,
             auth: editor,
             summary: 'Delete an item of a collection, with its history',
             description: 'Its address stops answering, and pages that reference it stop showing it. The person confirms before this runs.',
             tool: {
                 needsApproval: true,
             },
-            pathParams: z.object({
+            pathParams: at.params.extend({
                 name: z.string(),
                 id: z.string(),
             }),
@@ -1174,7 +1301,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             },
         }).handler(
             guarded(async (cms, args) => {
-                await cms.deleteItem(args.params['name']!, args.params['id']!);
+                await cms.deleteItem(args.params['name']!, args.params['id']!, at.siteOf(args.params));
                 return {
                     status: 204,
                     body: undefined,
@@ -1183,6 +1310,35 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         ),
     });
 
+    const siteGlobalScope: Scope = {
+        prefix: '/sites/:site/globals/:name',
+        params: z.object({
+            site: z.string(),
+            name: z.string(),
+        }),
+        refOf: (params) => ({
+            type: 'global',
+            name: params['name']!,
+            site: params['site']!,
+        }),
+        noun: "a site's own global",
+        approveWrites: true,
+    };
+    const siteItemScope: Scope = {
+        prefix: '/sites/:site/collections/:name/items/:id',
+        params: z.object({
+            site: z.string(),
+            name: z.string(),
+            id: z.string(),
+        }),
+        refOf: (params) => ({
+            type: 'item',
+            collection: params['name']!,
+            id: params['id']!,
+            site: params['site']!,
+        }),
+        noun: "an item of a site's own collection",
+    };
     const itemScope: Scope = {
         prefix: '/collections/:name/items/:id',
         params: z.object({
@@ -1560,37 +1716,46 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         })) as never
     );
 
-    const listGlobals = route({
-        method: 'GET',
-        path: `${editingBase}/globals`,
-        auth: editor,
-        summary: 'List every global, like the footer or site settings, with its status',
-        tool: true,
-        responses: {
-            200: {
-                body: z.object({
-                    globals: z.array(
-                        z.object({
-                            name: z.string(),
-                            label: z.string().nullable(),
-                            group: z.string().nullable(),
-                            status: PageStatusSchema,
-                            version: z.int(),
-                            updatedAt: z.string().nullable(),
-                        })
-                    ),
-                }),
-                cache: 'no-store',
+    const globalsList = (at: SiteAt) =>
+        route({
+            method: 'GET',
+            path: `${editingBase}${at.prefix}/globals`,
+            auth: editor,
+            summary:
+                at.prefix === ''
+                    ? 'List every global, like the footer or site settings, with its status'
+                    : "List a site's own globals, with their status",
+            tool: true,
+            ...(at.prefix === ''
+                ? {}
+                : {
+                      pathParams: at.params,
+                  }),
+            responses: {
+                200: {
+                    body: z.object({
+                        globals: z.array(
+                            z.object({
+                                name: z.string(),
+                                label: z.string().nullable(),
+                                group: z.string().nullable(),
+                                status: PageStatusSchema,
+                                version: z.int(),
+                                updatedAt: z.string().nullable(),
+                            })
+                        ),
+                    }),
+                    cache: 'no-store',
+                },
             },
-        },
-    }).handler(
-        guarded(async (cms) => ({
-            status: 200,
-            body: {
-                globals: await cms.globalSummaries(),
-            },
-        })) as never
-    );
+        }).handler(
+            guarded(async (cms, args) => ({
+                status: 200,
+                body: {
+                    globals: await cms.globalSummaries(at.siteOf(args.params)),
+                },
+            })) as never
+        );
 
     const whereUsed = route({
         method: 'GET',
@@ -1977,14 +2142,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
 
     return {
         content: {
-            pages: pageReads,
-            ...(namedSites.length === 0
-                ? {}
-                : {
-                      sites: siteReads,
-                  }),
-            globals: globalReads,
-            collections: collectionReads,
+            ...contentReads,
             media: {
                 image: getImage,
             },
@@ -1995,19 +2153,27 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 list: listPages,
                 ...editingRoutes(pageScope),
             },
-            ...(namedSites.length === 0
+            ...(siteEntries.length === 0
                 ? {}
                 : {
                       sites: {
                           pages: editingRoutes(sitePageScope),
+                          globals: {
+                              list: globalsList(onSite),
+                              ...editingRoutes(siteGlobalScope),
+                          },
+                          collections: {
+                              ...itemRoutes(onSite),
+                              ...editingRoutes(siteItemScope),
+                          },
                       },
                   }),
             globals: {
-                list: listGlobals,
+                list: globalsList(shared),
                 ...editingRoutes(globalScope),
             },
             collections: {
-                ...itemRoutes(),
+                ...itemRoutes(shared),
                 ...editingRoutes(itemScope),
             },
             media: {

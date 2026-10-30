@@ -294,9 +294,9 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
      */
     const reader = (ref: DocumentRef, fallBack: boolean) => {
         const readPublished = cached(
-            async () => (await service.published(ref))?.content ?? null,
-            keyOf(service.target(ref).definition, 'published', formatRef(ref)),
-            [ref.type === 'page' ? pageCacheTag(ref.name, ref.site) : documentCacheTag(ref)]
+            async () => (await service.publishedOn(ref, site))?.content ?? null,
+            keyOf(service.target(ref).definition, 'published', site === DEFAULT_SITE ? formatRef(ref) : `${site}:${formatRef(ref)}`),
+            [ref.type === 'page' ? pageCacheTag(ref.name, ref.site) : documentCacheTag(ref, site)]
         );
         return async (): Promise<Record<string, unknown> | undefined> => {
             if (await showsDrafts()) {
@@ -344,7 +344,7 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
                     site,
                 })
             ),
-            [collectionCacheTag(listing.name, listing.site)]
+            [collectionCacheTag(listing.name, site)]
         );
         const readAt = async (params: Record<string, string>): Promise<Record<string, unknown> | undefined> => {
             if (!(await showsDrafts())) return (await readPublished(JSON.stringify(params))) ?? undefined;
@@ -404,8 +404,8 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
                     },
                     listing.site
                 ),
-            keyOf(listing.definition, 'list', listing.site === DEFAULT_SITE ? listing.name : `${listing.site}:${listing.name}`),
-            [collectionCacheTag(listing.name, listing.site)]
+            keyOf(listing.definition, 'list', site === DEFAULT_SITE ? listing.name : `${site}:${listing.name}`),
+            [collectionCacheTag(listing.name, site)]
         );
         return async (input: ListInput<unknown> = {}) => {
             if (!(await showsDrafts())) return listPublished(JSON.stringify(input));

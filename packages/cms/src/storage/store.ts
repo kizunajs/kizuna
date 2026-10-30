@@ -952,6 +952,18 @@ export class DocumentStore {
         return moved.length > 0;
     }
 
+    /**
+     * Points every review of a document at the ref it is now addressed by.
+     */
+    async readdressReviews(documentId: string, ref: string): Promise<void> {
+        await this.db
+            .update(cmsReviews)
+            .set({
+                ref,
+            })
+            .where(eq(cmsReviews.documentId, documentId));
+    }
+
     async delete(kind: DocumentKind, key: string, site = SITE): Promise<boolean> {
         return this.db.transaction(async (tx) => {
             const [existing] = await tx
