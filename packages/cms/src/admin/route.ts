@@ -8,6 +8,7 @@ import type { ResolvedCmsOptions } from '../options.js';
 import { mcpRouteOf } from './chat.js';
 import type { AdminConfig, AdminRoute, AdminSite, ChatConnection } from './config.js';
 import { listOptionsOf } from './list-options.js';
+import { dataFields } from '../field.js';
 
 /**
  * Where the admin is served under the CMS's `path`, unless `adminPath` names
@@ -107,7 +108,8 @@ export const adminConfigFor = (
     base: '' | `/${string}`,
     role: string | null = null,
     chatToken: string | null = null,
-    sees: (site: string) => boolean = () => true
+    sees: (site: string) => boolean = () => true,
+    allSites = true
 ): AdminConfig => ({
     siteName: options.name,
     siteUrl: originOf(options.preview?.url),
@@ -127,7 +129,37 @@ export const adminConfigFor = (
     lists: listOptionsOf(options.collections ?? []),
     chat: chatOf(api, options.apiPath ?? '/api', chatToken),
     sites: adminSitesOf(options).filter((site) => sees(site.key)),
+    allSites,
+    siteValues: siteValuesOf(options, sees),
 });
+
+/**
+ * The country of a locale's region, like `NO` for `nb-NO`.
+ */
+const countryOf = (locale: string | undefined): string | null => {
+    if (locale === undefined) return null;
+    try {
+        return new Intl.Locale(locale).region ?? null;
+    } catch {
+        return null;
+    }
+};
+
+/**
+ * The sites that set their own values on each shared global and collection:
+ * every site for a field marked `perSite`, and the sites a field's `sites`
+ * names.
+ */
+const siteValuesOf = (options: ResolvedCmsOptions, sees: (site: string) => boolean): Record<string, string[]> => {
+    const keys = Object.keys(options.sites?.entries ?? {}).filter(sees);
+    return Object.fromEntries(
+        [...(options.globals ?? []), ...(options.collections ?? [])].flatMap((definition) => {
+            const fields = dataFields(definition.fields);
+            const setting = keys.filter((key) => fields.some((field) => field.perSite === true || field.sites?.includes(key) === true));
+            return setting.length === 0 ? [] : [[definition.name, setting]];
+        })
+    );
+};
 
 /**
  * A site's icon as a full URL: a path resolves against the site's own `url`.
@@ -150,6 +182,7 @@ const adminSitesOf = (options: ResolvedCmsOptions): AdminSite[] =>
             key,
             label: values.label,
             icon: siteIconOf(values.icon, values.url),
+            country: countryOf(values.locales?.[0]),
             pages: Object.keys(entry.pages ?? {}),
             globals: (entry.globals ?? []).map((definition) => ({
                 name: definition.name,
@@ -338,8 +371,14 @@ const adminRoute = (service: CmsService, options: ResolvedCmsOptions, api: Plugi
         const page = withStylesheet(
             (await readBuilt('admin.html')).replace(CONFIG_PLACEHOLDER, () =>
                 embedded(
-                    adminConfigFor(options, api, base, editingRoleOf(signedIn?.['role'], service.roles), chatToken, (key) =>
-                        access.sees(key)
+                    adminConfigFor(
+                        options,
+                        api,
+                        base,
+                        editingRoleOf(signedIn?.['role'], service.roles),
+                        chatToken,
+                        (key) => access.sees(key),
+                        access.publishesShared
                     )
                 )
             ),

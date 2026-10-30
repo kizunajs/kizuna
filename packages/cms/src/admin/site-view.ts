@@ -1,17 +1,5 @@
-import { parseRef } from '../refs.js';
-import { valueAt, type DescribedField } from '../view/schema.js';
-
-// TODO(sites): the shape the CMS's describe is expected to answer once fields take `perSite`. Without it the admin edits as it does for one site.
-/**
- * A field as `describe` answers it with sites. `perSite` marks a field of
- * shared content each site may give its own value, and in a site's view it
- * holds the shared value the field falls back to.
- */
-export type SiteField = DescribedField & {
-    perSite?: {
-        shared?: unknown;
-    };
-};
+import { formatRef, parseRef } from '../refs.js';
+import type { Description } from '../view/schema.js';
 
 /**
  * Whether a document is shared content: not a page, and not a site's own
@@ -23,44 +11,70 @@ export const isShared = (ref: string): boolean => {
 };
 
 /**
- * Whether the document has fields a site may give its own value, so a site's
- * view of it differs from the shared one.
+ * The name of a shared global or collection a ref points into.
  */
-export const hasPerSiteFields = (fields: readonly SiteField[]): boolean => fields.some((field) => field.perSite !== undefined);
-
-const isEmpty = (value: unknown): boolean => value === undefined || value === null || value === '';
-
-/**
- * The fields as a site's view of shared content shows them, for the site
- * labelled `siteLabel`: only the fields the site may give its own value,
- * each over the shared one, which an empty field shows faintly. For
- * `undefined`, the shared view, a field a site may override says so.
- */
-export const fieldsInSite = (
-    fields: readonly SiteField[],
-    draft: Record<string, unknown> | null,
-    siteLabel: string | undefined
-): SiteField[] => {
-    if (siteLabel === undefined) return fields.map((field) => (field.perSite === undefined ? field : sharedMarked(field)));
-    const own = fields.filter((field) => field.perSite !== undefined).map((field) => field.path);
-    const isOwn = (field: SiteField): boolean => own.some((path) => field.path === path || field.path.startsWith(`${path}.`));
-    return fields.filter(isOwn).map((field) => {
-        if (field.perSite === undefined) return field;
-        const shared = field.perSite.shared;
-        return {
-            ...field,
-            help: isEmpty(valueAt(draft, field.path)) ? siteLabel : `${siteLabel}. Clear it to show the shared value.`,
-            schema: isEmpty(shared)
-                ? field.schema
-                : {
-                      ...field.schema,
-                      default: shared,
-                  },
-        };
-    });
+export const sharedNameOf = (ref: string): string | undefined => {
+    const parsed = parseRef(ref);
+    if (parsed === undefined || parsed.type === 'page' || parsed.site !== undefined) return undefined;
+    return parsed.type === 'item' ? parsed.collection : parsed.name;
 };
 
-const sharedMarked = (field: SiteField): SiteField => ({
-    ...field,
-    help: 'Shared. Each site may set its own.',
-});
+/**
+ * Where a site keeps its own values on a shared document, like
+ * `item:uk:offices:k3j9x2` for the UK's values on a shared office.
+ */
+export const siteValuesRefOf = (ref: string, site: string): string => {
+    const parsed = parseRef(ref);
+    return parsed === undefined
+        ? ref
+        : formatRef({
+              ...parsed,
+              site,
+          });
+};
+
+/**
+ * A site's values on a shared document as its tab shows them: every field
+ * of the shared document in its place, the site's own editable and every
+ * other locked with the shared value.
+ */
+export const withSharedFields = (values: Description, shared: Description): Description => {
+    const own = new Map(values.fields.map((field) => [field.path, field]));
+    const fields = [
+        ...shared.fields.map(
+            (field) =>
+                own.get(field.path) ?? {
+                    ...field,
+                    writable: false,
+                }
+        ),
+        ...values.fields.filter((field) => !shared.fields.some((candidate) => candidate.path === field.path)),
+    ];
+    return {
+        ...values,
+        fields,
+        layout: shared.layout,
+        draft: withSharedValues(shared.draft, values.fields, values.draft),
+    };
+};
+
+/**
+ * The shared values with a site's own in place of the fields it sets. A
+ * field the site leaves empty stays empty, so its input shows the shared
+ * value faintly.
+ */
+export const withSharedValues = (
+    shared: Record<string, unknown> | null,
+    ownFields: Description['fields'],
+    own: Record<string, unknown> | null
+): Record<string, unknown> => {
+    const merged: Record<string, unknown> = {
+        ...shared,
+    };
+    for (const field of ownFields) {
+        if (field.parent !== undefined) continue;
+        delete merged[field.path];
+        if (own?.[field.path] !== undefined) merged[field.path] = own[field.path];
+    }
+    return merged;
+};

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AdminSite } from './config.js';
 import {
     addressOfHash,
@@ -10,6 +10,8 @@ import {
     screenOf,
     setAdminPath,
     setSites,
+    showSite,
+    siteGroupsOf,
     tabTitleOf,
     type Screen,
 } from './navigation.js';
@@ -220,7 +222,7 @@ describe('the admin navigation with several sites', () => {
     beforeEach(() => setSites(SITES));
     afterEach(() => {
         setSites([]);
-        vi.unstubAllGlobals();
+        showSite(undefined);
     });
 
     it("keeps shared content at the addresses of one site, and puts a site's own under its key", () => {
@@ -315,12 +317,8 @@ describe('the admin navigation with several sites', () => {
         ).toBe('/admin/norway/pages/frontPage');
     });
 
-    it('opens a link to shared content in the site open now', () => {
-        vi.stubGlobal('window', {
-            location: {
-                pathname: '/admin/uk/collections/events',
-            },
-        });
+    it('opens a link to shared content in the site the admin is shown in', () => {
+        showSite('uk');
         expect(
             hrefOf({
                 kind: 'document',
@@ -329,6 +327,13 @@ describe('the admin navigation with several sites', () => {
         ).toBe('/admin/uk/collections/offices/k3j9x2');
         expect(
             hrefIn(undefined, {
+                kind: 'document',
+                ref: 'item:offices:k3j9x2',
+            })
+        ).toBe('/admin/collections/offices/k3j9x2');
+        showSite(undefined);
+        expect(
+            hrefOf({
                 kind: 'document',
                 ref: 'item:offices:k3j9x2',
             })
@@ -395,6 +400,15 @@ describe('the admin navigation with several sites', () => {
             ],
             [
                 {
+                    kind: 'document',
+                    ref: 'item:uk:events:e1',
+                    site: 'uk',
+                },
+                undefined,
+                '/admin/uk/collections/events/e1',
+            ],
+            [
+                {
                     kind: 'collection',
                     name: 'offices',
                     site: 'uk',
@@ -408,7 +422,7 @@ describe('the admin navigation with several sites', () => {
                     site: 'uk',
                 },
                 undefined,
-                '/admin',
+                '/admin/pages',
             ],
             [
                 {
@@ -451,21 +465,21 @@ describe('the admin navigation with several sites', () => {
             site: 'uk',
         });
         expect(sections.map((section) => [section.label, section.entries.map((entry) => entry.label)])).toEqual([
-            ['Hagen UK', ['Pages', 'Settings', 'Events']],
-            ['Shared', ['Media', 'Privacy policy', 'Employees', 'Offices']],
+            ['Hagen UK', ['Pages', 'Events', 'Settings', 'Media']],
+            ['Shared', ['Employees', 'Offices', 'Privacy policy']],
         ]);
         expect(sections.flatMap((section) => section.entries).map((entry) => hrefOf(entry.screen))).toEqual([
             '/admin/uk/pages',
-            '/admin/uk/globals/settings',
             '/admin/uk/collections/events',
+            '/admin/uk/globals/settings',
             '/admin/uk/media',
-            '/admin/uk/globals/privacyPolicy',
             '/admin/uk/collections/employees',
             '/admin/uk/collections/offices',
+            '/admin/uk/globals/privacyPolicy',
         ]);
     });
 
-    it('lists the shared content alone outside every site, with no pages', () => {
+    it("lists each site's own content in All sites, then Shared with the shared media", () => {
         const sections = navigationOf({
             globals: [],
             collections: [
@@ -480,9 +494,23 @@ describe('the admin navigation with several sites', () => {
             },
             sites: SITES,
         });
-        expect(sections.map((section) => [section.label, section.entries.map((entry) => entry.label)])).toEqual([
-            ['Shared', ['Media', 'Employees']],
+        expect(sections.map((section) => [section.label, section.site, section.entries.map((entry) => entry.label)])).toEqual([
+            ['Hagen Group', 'group', ['Pages', 'Media']],
+            ['Hagen UK', 'uk', ['Pages', 'Events', 'Settings', 'Media']],
+            ['Hagen Norge', 'norway', ['Pages', 'Media']],
+            ['Shared', undefined, ['Employees', 'Media']],
         ]);
+        expect(sections.at(-1)!.entries.map((entry) => hrefOf(entry.screen))).toEqual(['/admin/collections/employees', '/admin/media']);
+    });
+
+    it("marks a site's pages current on its own pages alone", () => {
+        const ukPages: Screen = {
+            kind: 'pages',
+            site: 'uk',
+        };
+        expect(isCurrent(ukPages, screenOf('/admin/uk/pages/frontPage'))).toBe(true);
+        expect(isCurrent(ukPages, screenOf('/admin/norway/pages'))).toBe(false);
+        expect(isCurrent(ukPages, screenOf('/admin/pages'))).toBe(false);
     });
 
     it("marks a site's own collection current while one of its items is open", () => {
@@ -496,5 +524,33 @@ describe('the admin navigation with several sites', () => {
                 screenOf('/admin/uk/collections/events/e1')
             )
         ).toBe(true);
+    });
+
+    it('lists a few sites as they are, and many with a search, grouped by the country each serves', () => {
+        expect(siteGroupsOf(SITES, '')).toEqual([
+            {
+                country: undefined,
+                sites: SITES,
+            },
+        ]);
+        const dealers: AdminSite[] = ['Bergen', 'Oslo', 'Malmö', 'Aarhus', 'Tromsø', 'Lund'].map((city) => ({
+            key: city.toLowerCase(),
+            label: `Hagen ${city}`,
+            icon: null,
+            country: ['Malmö', 'Lund'].includes(city) ? 'SE' : city === 'Aarhus' ? 'DK' : 'NO',
+            pages: [],
+            globals: [],
+            collections: [],
+        }));
+        const many = [...SITES, ...dealers];
+        expect(siteGroupsOf(many, '').map((group) => [group.country, group.sites.map((site) => site.key)])).toEqual([
+            [undefined, ['group', 'uk', 'norway']],
+            ['NO', ['bergen', 'oslo', 'tromsø']],
+            ['SE', ['malmö', 'lund']],
+            ['DK', ['aarhus']],
+        ]);
+        expect(siteGroupsOf(many, 'hagen o').map((group) => [group.country, group.sites.map((site) => site.key)])).toEqual([
+            ['NO', ['oslo']],
+        ]);
     });
 });

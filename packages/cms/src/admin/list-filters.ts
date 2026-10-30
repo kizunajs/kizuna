@@ -110,3 +110,17 @@ export const withCondition = (filters: Filters, index: number, condition: Condit
     condition === undefined
         ? filters.filter((_, position) => position !== index)
         : filters.map((current, position) => (position === index ? condition : current));
+
+/**
+ * Whether a row the list holds whole meets the filters: every condition of
+ * one group, each `is` or `isNot` the value `valueOf` reads for its field.
+ */
+export const meetsFilters = (filters: Filters, valueOf: (field: string) => string | undefined): boolean => {
+    const groups = groupsOf(filters);
+    return (
+        groups.length === 0 ||
+        groups.some((group) =>
+            group.every((condition) => (condition.operator === 'isNot') !== (valueOf(condition.field) === condition.value))
+        )
+    );
+};

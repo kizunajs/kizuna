@@ -332,6 +332,9 @@ describe('signing out', () => {
 describe('the sign-in screen of a deployment with several sites', () => {
     const withSites = defineConfig({
         adapter: expressAdapter(),
+        jobRunner: {
+            mode: 'in-process',
+        },
         auth: {
             identities: {
                 editor,

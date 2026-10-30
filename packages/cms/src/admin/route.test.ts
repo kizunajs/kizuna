@@ -282,6 +282,22 @@ const Events = defineCollection({
     ],
 });
 
+const Offices = defineCollection({
+    name: 'offices',
+    id: Kizuna.brand('OfficeId', z.string()),
+    fields: [
+        {
+            name: 'name',
+            schema: z.string(),
+        },
+        {
+            name: 'phone',
+            schema: z.string(),
+            perSite: true,
+        },
+    ],
+});
+
 const FrontPage = definePage({
     name: 'frontPage',
     fields: [
@@ -301,6 +317,9 @@ const countryPages = definePages({
 
 const withSites = defineConfig({
     adapter: expressAdapter(),
+    jobRunner: {
+        mode: 'in-process',
+    },
     auth: {
         identities: {
             editor,
@@ -308,12 +327,13 @@ const withSites = defineConfig({
     },
     content: cms({
         db: drizzle(pglite),
-        collections: [Articles],
+        collections: [Articles, Offices],
         sites: declareSites(SiteSchema, {
             uk: {
                 label: 'Hagen UK',
                 url: 'https://hagen.example.co.uk',
                 icon: '/icons/uk.svg',
+                locales: ['en-GB'],
                 pages: countryPages,
                 collections: [Events],
             },
@@ -344,6 +364,7 @@ describe('the admin with several sites', () => {
                 key: 'uk',
                 label: 'Hagen UK',
                 icon: 'https://hagen.example.co.uk/icons/uk.svg',
+                country: 'GB',
                 pages: ['frontPage'],
                 globals: [],
                 collections: [
@@ -357,11 +378,20 @@ describe('the admin with several sites', () => {
                 key: 'norway',
                 label: 'Hagen Norge',
                 icon: 'https://cdn.hagen.example.no/norway.svg',
+                country: null,
                 pages: ['frontPage'],
                 globals: [],
                 collections: [],
             },
         ]);
+    });
+
+    it('tells the admin which shared content each site sets its own values on, and that an admin opens All sites', async () => {
+        const served = configOf((await request(sitesApp).get('/admin').set('authorization', 'Bearer editor-token')).text);
+        expect(served.siteValues).toEqual({
+            offices: ['uk', 'norway'],
+        });
+        expect(served.allSites).toBe(true);
     });
 
     it("serves a site's view of a shared item, a level deeper than the shared one", async () => {

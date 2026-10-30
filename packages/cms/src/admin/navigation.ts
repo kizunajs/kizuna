@@ -82,11 +82,20 @@ const under = (...segments: string[]): string => `${adminPath}/${segments.map(en
 
 const root = (): string => (adminPath === '' ? '/' : adminPath);
 
+let viewSite: string | undefined;
+
 /**
- * The site of the address open now, which a screen naming no site of its own
- * is shown in.
+ * The site the admin is shown in, or `undefined` for All sites, which a
+ * screen naming no site of its own opens in. The admin sets it as it renders.
  */
-const shownSite = (): string | undefined => (typeof window === 'undefined' ? undefined : screenOf(window.location.pathname).site);
+export const showSite = (site: string | undefined): void => {
+    viewSite = site;
+};
+
+/**
+ * The site of the address open now.
+ */
+const addressSite = (): string | undefined => (typeof window === 'undefined' ? undefined : screenOf(window.location.pathname).site);
 
 /**
  * A screen's address in one site, or in the shared content for `undefined`.
@@ -110,10 +119,11 @@ export const hrefIn = (site: string | undefined, screen: Screen): string => {
 };
 
 /**
- * A screen's address, in the site it names or else the site open now, so a
- * link from the UK's screens to a shared office opens the UK's view of it.
+ * A screen's address, in the site it names or else the site the admin is
+ * shown in, so a link from the UK's screens to a shared office opens it on
+ * the UK's tab.
  */
-export const hrefOf = (screen: Screen): string => hrefIn(screen.site ?? shownSite(), screen);
+export const hrefOf = (screen: Screen): string => hrefIn(screen.site ?? viewSite, screen);
 
 const decodedSegmentsOf = (path: string): string[] | undefined => {
     try {
@@ -243,7 +253,7 @@ export const screenOf = (pathname: string): Screen => {
 };
 
 /**
- * The screen of the same kind in another site, or in the shared content for
+ * The screen of the same kind in another site, or in All sites for
  * `undefined`, which the switcher opens: the same page when that site has
  * one by its name, the same shared document, or the dashboard when the site
  * has nothing like it.
@@ -265,11 +275,9 @@ export const screenInSite = (screen: Screen, key: string | undefined): Screen =>
         return placed(shown);
     }
     if (screen.kind === 'pages') {
-        return site === undefined
-            ? dashboard
-            : placed({
-                  kind: 'pages',
-              });
+        return placed({
+            kind: 'pages',
+        });
     }
     const listOf = (name: string): Screen =>
         placed({
@@ -283,8 +291,14 @@ export const screenInSite = (screen: Screen, key: string | undefined): Screen =>
     if (screen.kind !== 'document') return dashboard;
     const ref = parseRef(screen.ref);
     if (ref === undefined) return dashboard;
+    // All sites shows every site's documents where they are.
+    if (site === undefined) {
+        return {
+            kind: 'document',
+            ref: screen.ref,
+        };
+    }
     if (ref.type === 'page') {
-        if (site === undefined) return dashboard;
         return site.pages.includes(ref.name)
             ? placed({
                   kind: 'document',
@@ -310,7 +324,7 @@ export const screenInSite = (screen: Screen, key: string | undefined): Screen =>
                   kind: 'document',
                   ref: formatRef({
                       type: 'global',
-                      site: site!.key,
+                      site: site.key,
                       name: ref.name,
                   }),
               })
@@ -358,6 +372,16 @@ const currentAddress = (): string => `${window.location.pathname}${window.locati
 export const navigate = (href: string): void => {
     if (href === currentAddress()) return;
     window.history.pushState(null, '', href);
+    window.dispatchEvent(new Event(ADDRESS_CHANGED));
+};
+
+/**
+ * Open `href` in place of the address shown, for an address that leads on
+ * to another, like All sites for an editor of one site.
+ */
+export const replaceAddress = (href: string): void => {
+    if (href === currentAddress()) return;
+    window.history.replaceState(null, '', href);
     window.dispatchEvent(new Event(ADDRESS_CHANGED));
 };
 
@@ -431,6 +455,10 @@ export interface NavigationEntry {
 
 export interface NavigationSection {
     label: string;
+    /**
+     * The site whose own content the heading holds, which can fold.
+     */
+    site?: string;
     entries: NavigationEntry[];
 }
 
@@ -446,12 +474,18 @@ export const CONTENT_GROUP = 'Content';
 export const SHARED_GROUP = 'Shared';
 
 /**
+ * The view of every site at once, which an admin over every site opens.
+ */
+export const ALL_SITES = 'All sites';
+
+/**
  * The sidebar's headings: Content first, with the pages and the media, then each `group`
  * in the order the globals, collections and views first name it.
  *
- * With several sites, the sidebar has two headings: the site shown, under its
- * label, with its pages and its own globals and collections, and then Shared,
- * with the media and every shared global, collection and view.
+ * With several sites, the sidebar has the site shown under its label, with
+ * its pages, its own collections and globals and its media, and then Shared,
+ * with every shared collection, global and view. All sites lists every site
+ * the editor may open that way, then Shared with the shared media.
  */
 export const navigationOf = (options: {
     globals: readonly GlobalSummary[];
@@ -556,85 +590,139 @@ const sharedEntriesOf = (
 
 const siteNavigationOf = (options: Parameters<typeof navigationOf>[0], declared: readonly AdminSite[]): NavigationSection[] => {
     const site = declared.find((candidate) => candidate.key === options.site);
-    const shownIn =
-        site === undefined
-            ? {}
-            : {
-                  site: site.key,
-              };
+    const kindOrder = (entry: NavigationEntry): number => ['collection', 'document', 'view'].indexOf(entry.screen.kind);
+    const sharedEntries = sharedEntriesOf(options, site?.key)
+        .map(({ group: _, ...entry }) => entry)
+        .sort((left, right) => kindOrder(left) - kindOrder(right));
     const shared: NavigationSection = {
         label: SHARED_GROUP,
+        entries:
+            site === undefined
+                ? [
+                      ...sharedEntries,
+                      {
+                          label: 'Media',
+                          screen: {
+                              kind: 'media',
+                          },
+                      },
+                  ]
+                : sharedEntries,
+    };
+    const siteSection = (shown: AdminSite): NavigationSection => ({
+        label: shown.label,
+        site: shown.key,
         entries: [
+            {
+                label: 'Pages',
+                screen: {
+                    kind: 'pages',
+                    site: shown.key,
+                },
+            },
+            ...shown.collections.map((collection) => {
+                const listed = options.collections.find((candidate) => candidate.name === collection.name);
+                return {
+                    label: listed?.label ?? collection.label ?? humanize(collection.name),
+                    screen: {
+                        kind: 'collection' as const,
+                        name: collection.name,
+                        site: shown.key,
+                    },
+                    ...(listed === undefined
+                        ? {}
+                        : {
+                              count: listed.count,
+                          }),
+                };
+            }),
+            ...shown.globals.map((global) => ({
+                label: options.globals.find((candidate) => candidate.name === global.name)?.label ?? global.label ?? humanize(global.name),
+                screen: {
+                    kind: 'document' as const,
+                    ref: formatRef({
+                        type: 'global',
+                        site: shown.key,
+                        name: global.name,
+                    }),
+                    site: shown.key,
+                },
+            })),
             {
                 label: 'Media',
                 screen: {
                     kind: 'media',
-                    ...shownIn,
+                    site: shown.key,
                 },
             },
-            ...sharedEntriesOf(options, site?.key).map(({ group: _, ...entry }) => entry),
         ],
-    };
-    if (site === undefined) return [shared];
-    const own: NavigationEntry[] = [
-        {
-            label: 'Pages',
-            screen: {
-                kind: 'pages',
-                site: site.key,
-            },
-        },
-        ...site.globals.map((global) => ({
-            label: options.globals.find((candidate) => candidate.name === global.name)?.label ?? global.label ?? humanize(global.name),
-            screen: {
-                kind: 'document' as const,
-                ref: formatRef({
-                    type: 'global',
-                    site: site.key,
-                    name: global.name,
-                }),
-                site: site.key,
-            },
-        })),
-        ...site.collections.map((collection) => {
-            const listed = options.collections.find((candidate) => candidate.name === collection.name);
-            return {
-                label: listed?.label ?? collection.label ?? humanize(collection.name),
-                screen: {
-                    kind: 'collection' as const,
-                    name: collection.name,
-                    site: site.key,
-                },
-                ...(listed === undefined
-                    ? {}
-                    : {
-                          count: listed.count,
-                      }),
-            };
-        }),
-    ];
-    return [
-        {
-            label: site.label,
-            entries: own,
-        },
-        shared,
-    ];
+    });
+    return [...(site === undefined ? declared : [site]).map(siteSection), shared];
 };
 
 /**
  * Where every screen's trail starts: the dashboard, or with several sites
- * the site open now, or Shared.
+ * the site whose content it is, Shared, or All sites for the dashboard and
+ * the pages of every site.
  */
-export const trailStart = (): { label: string; href: string } => {
-    const key = shownSite();
-    const site = siteNamed(key);
-    return {
-        label: sites.length === 0 ? 'Dashboard' : (site?.label ?? SHARED_GROUP),
-        href: hrefIn(site?.key, {
-            kind: 'dashboard',
-        }),
-    };
+export const trailStart = (): { label: string; href?: string } => {
+    if (sites.length === 0) {
+        return {
+            label: 'Dashboard',
+            href: root(),
+        };
+    }
+    const site = siteNamed(addressSite());
+    if (site !== undefined) {
+        return {
+            label: site.label,
+            href: under(site.key),
+        };
+    }
+    const shown = typeof window === 'undefined' ? undefined : screenOf(window.location.pathname);
+    return shown?.kind === 'pages' || shown?.kind === 'dashboard'
+        ? {
+              label: ALL_SITES,
+              href: root(),
+          }
+        : {
+              label: SHARED_GROUP,
+          };
+};
+
+/**
+ * How many sites the switcher lists before it offers a search and groups
+ * them by country.
+ */
+export const MANY_SITES = 6;
+
+/**
+ * The sites the switcher lists for a search, grouped by the country each
+ * serves when there are many, in the order the sites first name them. A
+ * site with no country leads, under no heading.
+ */
+export const siteGroupsOf = (shown: readonly AdminSite[], search: string): Array<{ country: string | undefined; sites: AdminSite[] }> => {
+    const term = search.trim().toLowerCase();
+    const found = shown.filter((site) => term === '' || site.label.toLowerCase().includes(term) || site.key.includes(term));
+    if (shown.length <= MANY_SITES) {
+        return [
+            {
+                country: undefined,
+                sites: found,
+            },
+        ];
+    }
+    const groups = new Map<string | undefined, AdminSite[]>([[undefined, []]]);
+    for (const site of found) {
+        const country = site.country ?? undefined;
+        groups.set(country, [...(groups.get(country) ?? []), site]);
+    }
+    return [...groups]
+        .filter(([, sites]) => sites.length > 0)
+        .map(([country, sites]) => ({
+            country,
+            sites,
+        }));
 };
 
 /**
@@ -659,8 +747,11 @@ export const isCurrent = (entry: Screen, shown: Screen): boolean => {
     if (entry.kind === 'view') {
         return (shown.kind === 'view' && shown.name === entry.name) || (shown.kind === 'record' && shown.view === entry.name);
     }
-    if (entry.kind === 'media') return shown.kind === 'media';
-    if (entry.kind === 'pages') return shown.kind === 'pages' || (shown.kind === 'document' && shown.ref.startsWith('page:'));
+    if (entry.kind === 'media') return shown.kind === 'media' && shown.site === entry.site;
+    if (entry.kind === 'pages') {
+        const ref = shown.kind === 'document' ? parseRef(shown.ref) : undefined;
+        return (shown.kind === 'pages' && shown.site === entry.site) || (ref?.type === 'page' && ref.site === entry.site);
+    }
     return shown.kind === 'dashboard';
 };
 

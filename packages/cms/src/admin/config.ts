@@ -66,6 +66,15 @@ export interface AdminConfig {
      * sidebar's switcher lists. Empty for a project with one site.
      */
     sites?: AdminSite[];
+    /**
+     * Whether the editor is an admin over every site, who opens All sites.
+     */
+    allSites?: boolean;
+    /**
+     * The sites that set their own values on each shared global and
+     * collection, by its name, which a shared document's tabs list.
+     */
+    siteValues?: Record<string, string[]>;
 }
 
 /**
@@ -80,6 +89,11 @@ export interface AdminSite {
      * show, or `null` without one.
      */
     icon: string | null;
+    /**
+     * The country the site serves, from the region of its first locale, like
+     * `NO`, which the switcher groups many sites by.
+     */
+    country?: string | null;
     /**
      * The names of the site's pages.
      */

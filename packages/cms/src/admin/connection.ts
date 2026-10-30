@@ -123,3 +123,25 @@ export const withMediaSite = (connection: Connection, site: string | undefined):
                       options
                   ),
           };
+
+/**
+ * A connection whose collection calls reach a site's own collections, like
+ * the UK's events, at the routes under the site.
+ */
+export const withSiteCollections = (connection: Connection, site: string): Connection => ({
+    ...connection,
+    call: (name, input, options) => {
+        if (!name.startsWith('editing_collections_')) return connection.call(name, input, options);
+        return connection.call(
+            name.replace('editing_collections_', 'editing_sites_collections_'),
+            {
+                ...input,
+                params: {
+                    ...((input?.['params'] ?? {}) as Record<string, unknown>),
+                    site,
+                },
+            },
+            options
+        );
+    },
+});

@@ -9,7 +9,7 @@ import { parseRef } from '../refs.js';
 import { humanize } from '../view/schema.js';
 import { BulkFailures, SelectionActions, useBulkRun } from './bulk-bar.js';
 import { bulkSummaryOf, offeredActions, runBulk, type BulkAction, type BulkResult, type BulkTarget } from './bulk.js';
-import type { AdminRoute, ListFilter, ListOptions } from './config.js';
+import type { AdminRoute, AdminSite, ListFilter, ListOptions } from './config.js';
 import { FilterPanel } from './filter-panel.js';
 import {
     DOCUMENT_COLUMNS,
@@ -30,7 +30,16 @@ import {
     type ListColumn,
     type Sort,
 } from './list-columns.js';
-import { NO_FILTERS, activeConditions, conditionsOf, filterEntriesOf, isFiltering, type Filters } from './list-filters.js';
+import {
+    NO_FILTERS,
+    STATUS_FIELD,
+    activeConditions,
+    conditionsOf,
+    filterEntriesOf,
+    isFiltering,
+    meetsFilters,
+    type Filters,
+} from './list-filters.js';
 import { EmptyTable, FlatRows, TreeRows, type TableOptions, type TreeRow } from './list-rows.js';
 import { ColumnsPanel, ListToolbar, SortMenu, type ListPanel } from './list-toolbar.js';
 import { parentAfterDrop, parentChange, type TreePlace } from './list-tree.js';
@@ -605,6 +614,26 @@ const useNames = (connection: Connection): ((id: string) => string) => {
 /**
  * Every page the CMS holds content for, by its path on the site.
  */
+/**
+ * The key of the pages' Site column, and of the filter by it.
+ */
+const SITE_COLUMN = 'site';
+
+/**
+ * The pages' columns in All sites: the title, then the site, then the rest.
+ */
+const SITE_COLUMNS: readonly ListColumn[] = [
+    DOCUMENT_COLUMNS[0]!,
+    {
+        key: SITE_COLUMN,
+        label: 'Site',
+        kind: 'text',
+        shown: true,
+        sortable: true,
+    },
+    ...DOCUMENT_COLUMNS.slice(1),
+];
+
 const siteFactsOf = (siteFact: ReactNode): MetaPair[] =>
     siteFact === undefined
         ? []
@@ -620,6 +649,7 @@ export function PagesList({
     routes,
     site,
     siteFact,
+    sites,
 }: {
     connection: Connection;
     routes?: Readonly<Record<string, AdminRoute>>;
@@ -631,10 +661,16 @@ export function PagesList({
      * Who the pages belong to, for the header's Site, with several sites.
      */
     siteFact?: ReactNode;
+    /**
+     * Every site the editor may open, for the pages of All sites, which
+     * shows each page's site and filters by it.
+     */
+    sites?: readonly AdminSite[] | undefined;
 }) {
     const [rows, setRows] = useState<TreeRow[] | undefined>();
     const [problem, setProblem] = useState<string | undefined>();
     const [loads, setLoads] = useState(0);
+    const [filters, setFilters] = useState<Filters>(NO_FILTERS);
     const nameOf = useNames(connection);
     useEffect(() => {
         void connection.call<{ pages: PageEntry[] }>('editing_pages_list').then((answer) => {
@@ -659,20 +695,63 @@ export function PagesList({
                         status: page.status,
                         updatedAt: page.updatedAt,
                         updatedBy: page.updatedBy ?? undefined,
+                        values: {
+                            [SITE_COLUMN]: parseRef(page.ref)?.site,
+                        },
                     }))
             );
         });
     }, [connection, loads, site]);
     const actions = offeredActions(routes ?? {}, 'editing_pages');
+    // All sites lists every site's pages, each with its site, and filters them by it.
+    const everySite = sites !== undefined && sites.length > 0;
+    const shownRows = useMemo(
+        () =>
+            !everySite || rows === undefined
+                ? rows
+                : rows
+                      .filter((row) =>
+                          meetsFilters(filters, (field) =>
+                              field === STATUS_FIELD ? row.status : (row.values?.[field] as string | undefined)
+                          )
+                      )
+                      .map((row) => ({
+                          ...row,
+                          values: {
+                              [SITE_COLUMN]: sites.find((candidate) => candidate.key === row.values?.[SITE_COLUMN])?.label,
+                          },
+                      })),
+        [everySite, rows, filters, sites]
+    );
     return (
         <ListScreen
             list="pages"
             title="Pages"
             noun="pages"
-            rows={rows}
+            rows={shownRows}
+            total={rows?.length}
             facts={siteFactsOf(siteFact)}
             problem={problem}
-            columns={DOCUMENT_COLUMNS}
+            columns={everySite ? SITE_COLUMNS : DOCUMENT_COLUMNS}
+            filters={
+                !everySite
+                    ? undefined
+                    : {
+                          definitions: [
+                              {
+                                  field: SITE_COLUMN,
+                                  label: 'Site',
+                                  choices: sites.map((candidate) => ({
+                                      value: candidate.key,
+                                      label: candidate.label,
+                                  })),
+                              },
+                          ],
+                          value: filters,
+                          onChange: setFilters,
+                          connection,
+                      }
+            }
             defaultSort={NEWEST_FIRST}
             nameOf={nameOf}
             empty={{
