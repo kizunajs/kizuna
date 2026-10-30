@@ -219,6 +219,24 @@ export namespace API {
              * For an item, the buttons its collection's actions show the caller.
              */
             actions?: Array<CMS.Action>;
+            locale?: {
+                /**
+                 * The language this copy is in.
+                 */
+                current: string;
+                /**
+                 * The language of the source, which every other language translates.
+                 */
+                source: string;
+                locales: Array<{
+                    code: string;
+                    status: "empty" | "draft" | "published" | "changed";
+                    /**
+                     * How many of its fields changed in the source since they were translated.
+                     */
+                    behind: number;
+                }>;
+            };
             /**
              * The person who looks after it, if anyone does.
              */
@@ -457,6 +475,22 @@ export namespace API {
              * The shared value, which the site shows while it sets none of its own.
              */
             sharedValue?: unknown;
+            /**
+             * True for a field each language holds its own value of.
+             */
+            translated?: boolean;
+            /**
+             * In a translation, the source's value, which the field says in its own language.
+             */
+            sourceValue?: unknown;
+            /**
+             * In a translation, true when the source changed since the field was translated.
+             */
+            behind?: boolean;
+            /**
+             * For a field that is behind, the source value it was translated from.
+             */
+            sourceBefore?: unknown;
         };
 
         export type FieldCondition = {
@@ -478,6 +512,13 @@ export namespace API {
             type: "funnel";
             label: string;
             description?: string;
+            /**
+             * The headings over the rows' labels and their values.
+             */
+            columns?: {
+                label: string;
+                value: string;
+            };
             /**
              * The steps, the first one every visitor takes.
              */
@@ -510,6 +551,13 @@ export namespace API {
              * What the numbers count, like "Views".
              */
             description?: string;
+            /**
+             * The headings over the rows' labels and their values.
+             */
+            columns?: {
+                label: string;
+                value: string;
+            };
             /**
              * The rows, in the order your function ranked them.
              */
@@ -893,12 +941,12 @@ export namespace API {
         export type SitesWidget = {
             type: "sites";
             /**
-             * The charts each site draws, each on one scale for every site.
+             * The chart each site draws, on one scale for every site's.
              */
-            charts: Array<{
+            chart: {
                 label: string;
                 style: "bar" | "line";
-            }>;
+            } | null;
             sites: Array<{
                 key: string;
                 label: string;
@@ -923,16 +971,16 @@ export namespace API {
                     label: string;
                 }>;
                 /**
-                 * The points of each chart, in the order of `charts`. Null on a site the chart leaves out.
+                 * Null on a site the chart leaves out.
                  */
-                charts: Array<Array<{
+                chart: Array<{
                     label: string;
                     value: number;
                     /**
                      * The same point in the period before.
                      */
                     previous?: number;
-                }> | null>;
+                }> | null;
                 /**
                  * How many reviews wait on the site.
                  */
@@ -1645,7 +1693,7 @@ export namespace API {
                     };
                     department: "shop" | "care" | "offices" | "online";
                     order: number;
-                    id: string;
+                    id: EmployeeId;
                 }>;
                 next: string | null;
             }; headers: Record<string, string> }
@@ -1677,7 +1725,7 @@ export namespace API {
                 };
                 department: "shop" | "care" | "offices" | "online";
                 order: number;
-                id: string;
+                id: EmployeeId;
             }; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
     }
@@ -1764,7 +1812,7 @@ export namespace API {
                     topic: "care" | "season" | "growers";
                     author?: EmployeeId;
                     related: Array<ArticleId>;
-                    id: string;
+                    id: ArticleId;
                 }>;
                 next: string | null;
             }; headers: Record<string, string> }
@@ -1843,7 +1891,7 @@ export namespace API {
                 topic: "care" | "season" | "growers";
                 author?: EmployeeId;
                 related: Array<ArticleId>;
-                id: string;
+                id: ArticleId;
             }; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
     }
@@ -1868,6 +1916,7 @@ export namespace API {
 
         export type Result =
             | { status: 200; body: Uint8Array; headers: Record<string, string> }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
@@ -1883,7 +1932,7 @@ export namespace API {
              */
             site?: string;
             /**
-             * A document: page:<name>, global:<name> or item:<collection>:<id>.
+             * A document: page:<name>, global:<name> or item:<collection>:<id>, with @<locale> for a translation, like page:frontPage@nb.
              */
             ref?: string;
         };
@@ -3313,7 +3362,7 @@ export interface Client {
         /**
          * Describe what is shown at a URL, or any document by its ref: its fields, what the caller may write, and the draft
          *
-         * Start here when working from the page someone is looking at, or from a ref a source path or another tool gave you. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it. `usedOn` says where else shared content appears; say so before changing it.
+         * Start here when working from the page someone is looking at, or from a ref a source path or another tool gave you. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it. `usedOn` says where else shared content appears; say so before changing it. A document in several languages lists them under `locale`: to translate it, describe `<ref>@<code>` and write each field from its `sourceValue` with that `locale`.
          *
          * @example
          * const result = await client.editing.describe();
@@ -4630,6 +4679,7 @@ const routes: GeneratedRoutes = {
                 path: '/content/media/:id/image',
                 responses: {
                     200: { read: 'bytes' },
+                    403: {},
                     404: {},
                     400: {},
                 },

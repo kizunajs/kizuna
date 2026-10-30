@@ -13,6 +13,7 @@ content: cms({
     partners,
     locales,
     fallback,
+    translate,
     globals,
     collections,
     relationships,
@@ -48,13 +49,14 @@ content: cms({
 | `jobs`          | `identity`, the identity the refresh job runs as. With `jobRunner: { mode: 'http' }`, name it when the app declares no jobs. Otherwise the job runs as the app's jobs do |
 | `locales`       | The languages, the first being the source                                                                                                                                |
 | `fallback`      | Per locale, what to show when a translation is missing                                                                                                                   |
+| `translate`     | `model`, an AI SDK language model that drafts a translation when an editor asks for one                                                                                  |
 | `globals`       | `defineGlobal` results, the shared content every site reads                                                                                                              |
 | `collections`   | `defineCollection` results, the shared content every site reads                                                                                                          |
 | `relationships` | `defineRelationship` results                                                                                                                                             |
 | `views`         | `defineView` results: data the CMS shows but does not store                                                                                                              |
 | `dashboard`     | The admin's first page: `stat`, `chart`, `reviews` and `collections` widgets, run for the site open                                                                      |
 | `overview`      | The sites compared, for an admin over every site: `stat`, `chart`, `sites`, `reviews`, `refreshes`, `reach`, `editors` and `collections` widgets                         |
-| `auth`          | `identity`, `roles`, `sites`, `read`, `author`, `people`, `invalidate`, `signIn`, `signOut`, `chatToken`. `read` names the identity every content route then requires    |
+| `auth`          | `identity`, `roles`, `sites`, `read`, `author`, `people`, `invalidate`, `signIn`, `signOut`, `chatToken`. `read` names the identity content routes but images require    |
 | `reviews`       | `roles` that may approve, `onReviewRequested`                                                                                                                            |
 | `media`         | S3 settings or a `storage`, `publicPath`, `maxBytes`                                                                                                                     |
 | `metadata`      | `title` and `og.title` joins for search results                                                                                                                          |

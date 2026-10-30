@@ -1158,6 +1158,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      brand: EmployeeId
           next:
             optional: false
             schema:
@@ -1266,6 +1267,7 @@ routes:
             optional: false
             schema:
               kind: string
+              brand: EmployeeId
       "404":
         kind: object
         fields:
@@ -1557,6 +1559,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      brand: ArticleId
           next:
             optional: false
             schema:
@@ -1809,6 +1812,7 @@ routes:
             optional: false
             schema:
               kind: string
+              brand: ArticleId
       "404":
         kind: object
         fields:
@@ -1833,6 +1837,7 @@ routes:
     path: /content/media/:id/image
     statuses:
       - 200
+      - 403
       - 404
     deprecated: false
     params:
@@ -1864,6 +1869,25 @@ routes:
     responses:
       "200":
         kind: custom
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "404":
         kind: object
         fields:
@@ -2185,6 +2209,22 @@ routes:
                     optional: true
                     schema:
                       kind: unknown
+                  translated:
+                    optional: true
+                    schema:
+                      kind: boolean
+                  sourceValue:
+                    optional: true
+                    schema:
+                      kind: unknown
+                  behind:
+                    optional: true
+                    schema:
+                      kind: boolean
+                  sourceBefore:
+                    optional: true
+                    schema:
+                      kind: unknown
           layout:
             optional: false
             schema:
@@ -2242,6 +2282,43 @@ routes:
                     optional: false
                     schema:
                       kind: boolean
+          locale:
+            optional: true
+            schema:
+              kind: object
+              fields:
+                current:
+                  optional: false
+                  schema:
+                    kind: string
+                source:
+                  optional: false
+                  schema:
+                    kind: string
+                locales:
+                  optional: false
+                  schema:
+                    kind: array
+                    element:
+                      kind: object
+                      fields:
+                        code:
+                          optional: false
+                          schema:
+                            kind: string
+                        status:
+                          optional: false
+                          schema:
+                            kind: enum
+                            values:
+                              - changed
+                              - draft
+                              - empty
+                              - published
+                        behind:
+                          optional: false
+                          schema:
+                            kind: number
           owner:
             optional: false
             schema:
@@ -10482,6 +10559,22 @@ routes:
                     optional: true
                     schema:
                       kind: unknown
+                  translated:
+                    optional: true
+                    schema:
+                      kind: boolean
+                  sourceValue:
+                    optional: true
+                    schema:
+                      kind: unknown
+                  behind:
+                    optional: true
+                    schema:
+                      kind: boolean
+                  sourceBefore:
+                    optional: true
+                    schema:
+                      kind: unknown
           layout:
             optional: false
             schema:
@@ -10802,6 +10895,22 @@ routes:
                     schema:
                       kind: string
                   sharedValue:
+                    optional: true
+                    schema:
+                      kind: unknown
+                  translated:
+                    optional: true
+                    schema:
+                      kind: boolean
+                  sourceValue:
+                    optional: true
+                    schema:
+                      kind: unknown
+                  behind:
+                    optional: true
+                    schema:
+                      kind: boolean
+                  sourceBefore:
                     optional: true
                     schema:
                       kind: unknown
@@ -11181,6 +11290,22 @@ routes:
                     optional: true
                     schema:
                       kind: unknown
+                  translated:
+                    optional: true
+                    schema:
+                      kind: boolean
+                  sourceValue:
+                    optional: true
+                    schema:
+                      kind: unknown
+                  behind:
+                    optional: true
+                    schema:
+                      kind: boolean
+                  sourceBefore:
+                    optional: true
+                    schema:
+                      kind: unknown
           layout:
             optional: false
             schema:
@@ -11460,6 +11585,19 @@ routes:
                         optional: true
                         schema:
                           kind: string
+                      columns:
+                        optional: true
+                        schema:
+                          kind: object
+                          fields:
+                            label:
+                              optional: false
+                              schema:
+                                kind: string
+                            value:
+                              optional: false
+                              schema:
+                                kind: string
                       rows:
                         optional: false
                         schema:
@@ -11508,6 +11646,19 @@ routes:
                         optional: true
                         schema:
                           kind: string
+                      columns:
+                        optional: true
+                        schema:
+                          kind: object
+                          fields:
+                            label:
+                              optional: false
+                              schema:
+                                kind: string
+                            value:
+                              optional: false
+                              schema:
+                                kind: string
                       steps:
                         optional: false
                         schema:
@@ -11791,24 +11942,23 @@ routes:
                           kind: enum
                           values:
                             - sites
-                      charts:
+                      chart:
                         optional: false
                         schema:
-                          kind: array
-                          element:
-                            kind: object
-                            fields:
-                              label:
-                                optional: false
-                                schema:
-                                  kind: string
-                              style:
-                                optional: false
-                                schema:
-                                  kind: enum
-                                  values:
-                                    - bar
-                                    - line
+                          kind: object
+                          nullable: true
+                          fields:
+                            label:
+                              optional: false
+                              schema:
+                                kind: string
+                            style:
+                              optional: false
+                              schema:
+                                kind: enum
+                                values:
+                                  - bar
+                                  - line
                       sites:
                         optional: false
                         schema:
@@ -11856,28 +12006,26 @@ routes:
                                         optional: false
                                         schema:
                                           kind: string
-                              charts:
+                              chart:
                                 optional: false
                                 schema:
                                   kind: array
+                                  nullable: true
                                   element:
-                                    kind: array
-                                    nullable: true
-                                    element:
-                                      kind: object
-                                      fields:
-                                        label:
-                                          optional: false
-                                          schema:
-                                            kind: string
-                                        value:
-                                          optional: false
-                                          schema:
-                                            kind: number
-                                        previous:
-                                          optional: true
-                                          schema:
-                                            kind: number
+                                    kind: object
+                                    fields:
+                                      label:
+                                        optional: false
+                                        schema:
+                                          kind: string
+                                      value:
+                                        optional: false
+                                        schema:
+                                          kind: number
+                                      previous:
+                                        optional: true
+                                        schema:
+                                          kind: number
                               waiting:
                                 optional: false
                                 schema:

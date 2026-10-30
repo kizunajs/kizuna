@@ -4,6 +4,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { defineConfig, Kizuna } from 'kizunajs';
 import { contentOf, flattenRoutes, pluginExportsOf } from 'kizunajs/adapter';
+import { readMetaBrand } from 'kizunajs/generator';
 import express from 'express';
 import request from 'supertest';
 import { expressAdapter } from '@kizunajs/express';
@@ -410,6 +411,17 @@ describe('the content routes of each site', () => {
             ])
         );
         expect(keys.filter((key) => !key.startsWith('content.sites.') && key !== 'content.media.image')).toEqual([]);
+    });
+
+    it("brands each item's id with its collection's id", () => {
+        const routes = flattenRoutes(config.api.routes as never);
+        const bodyOf = (routeKey: string) => {
+            const response = routes.find((entry) => entry.routeKey === routeKey)!.route.responses[200] as { body: z.ZodObject };
+            return response.body;
+        };
+        const listed = bodyOf('content.sites.uk.collections.offices.list').shape['items'] as z.ZodArray<z.ZodObject>;
+        expect(readMetaBrand(listed.element.shape['id']!)).toBe('OfficeId');
+        expect(readMetaBrand(bodyOf('content.sites.uk.collections.events.get').shape['id']!)).toBe('EventId');
     });
 
     it("reads a site's own items and globals, and the shared ones, over HTTP", async () => {

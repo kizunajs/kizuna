@@ -602,6 +602,14 @@ describe('fetchIds', () => {
         expect(output).toContain("export const Revision = Kizuna.brand('Revision', z.number());");
     });
 
+    it('opens with no eslint-disable, since nothing in it needs one', () => {
+        const output = fetchIds({
+            output: './ids.ts',
+        }).render(api);
+
+        expect(output).not.toContain('eslint-disable');
+    });
+
     it('holds only the brands of the routes in its groups', () => {
         const output = fetchIds({
             output: './ids.ts',

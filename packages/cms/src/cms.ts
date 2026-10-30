@@ -1745,7 +1745,13 @@ export class CmsService {
      * `columns`.
      */
     listColumnsOf(listing: Listing): string[] {
-        return [...new Set([...listing.indexes, ...(listing.definition.columns ?? [])])];
+        return [
+            ...new Set([
+                ...listing.indexes,
+                ...(listing.definition.columns ?? []),
+                ...(choosesSites(listing.definition) ? [SHOWS_ON] : []),
+            ]),
+        ];
     }
 
     /**
@@ -2180,12 +2186,33 @@ export class CmsService {
         input: {
             query?: string;
             ids?: readonly string[];
+            /**
+             * The site the id is picked for, which a collection that chooses
+             * its sites lists only the items of.
+             */
+            site?: string;
             headers: Record<string, string>;
         }
     ): Promise<Array<RelationshipOption & { parent?: string | null; treeLabel?: string }>> {
         const owned = this.listingFor(brand);
         if (owned !== undefined) {
-            const items = await this.editorItems(owned.name, owned.site);
+            const site = input.site;
+            const items =
+                site === undefined || site === DEFAULT_SITE || owned.site !== DEFAULT_SITE || !choosesSites(owned.definition)
+                    ? await this.editorItems(owned.name, owned.site)
+                    : (
+                          await this.editorList(owned.name, {
+                              groups: [
+                                  [
+                                      {
+                                          field: SHOWS_ON,
+                                          operator: 'is',
+                                          value: site,
+                                      },
+                                  ],
+                              ],
+                          })
+                      ).items;
             const term = (input.query ?? '').toLowerCase();
             return items
                 .filter((item) =>
@@ -2393,7 +2420,8 @@ export class CmsService {
                     : {
                           sharedValue,
                       }),
-                ...(marksTranslated && own !== undefined && own.sites === undefined && isTranslated(own)
+                ...((marksTranslated && own !== undefined && own.sites === undefined && isTranslated(own)) ||
+                (target.source !== undefined && own !== undefined)
                     ? {
                           translated: true,
                       }
@@ -3176,6 +3204,23 @@ export class CmsService {
      */
     verifiesRefresh(signature: string, body: Record<string, unknown>): boolean {
         return verifyRefresh(previewSecret(this.options.previewSecret), signature, body);
+    }
+
+    /**
+     * The context an identity's guard answers for a request, or `undefined`
+     * when it denies, for a public route that reads a credential when one
+     * comes.
+     */
+    async signedInAs(identity: string, args: Record<string, unknown>): Promise<Record<string, unknown> | undefined> {
+        return authenticate(
+            this.api,
+            identity,
+            {
+                headers: args['headers'] as Record<string, string | string[] | undefined>,
+                query: args['query'],
+            },
+            adapterContextOf(args)
+        );
     }
 
     /**

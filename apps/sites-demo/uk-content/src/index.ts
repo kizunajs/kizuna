@@ -16,6 +16,16 @@ type KizunaBrand<Name extends string> = {
 
 export namespace API {
     /**
+     * A branded `string`. Responses hand one back, and `toEmployeeId` makes one from a plain value.
+     */
+    export type EmployeeId = string & KizunaBrand<"EmployeeId">;
+
+    /**
+     * A branded `string`. Responses hand one back, and `toEventId` makes one from a plain value.
+     */
+    export type EventId = string & KizunaBrand<"EventId">;
+
+    /**
      * A branded `string`. Responses hand one back, and `toOfficeId` makes one from a plain value.
      */
     export type OfficeId = string & KizunaBrand<"OfficeId">;
@@ -46,6 +56,13 @@ export namespace API {
     };
 
     export namespace ContentSitesUkPagesFrontPage {
+        export type Query = {
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
+        };
+
         export type Result =
             | { status: 200; body: {
                 version: number;
@@ -59,10 +76,18 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace ContentSitesUkPagesEventsPage {
+        export type Query = {
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
+        };
+
         export type Result =
             | { status: 200; body: {
                 version: number;
@@ -76,10 +101,18 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace ContentSitesUkGlobalsPrivacyPolicy {
+        export type Query = {
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
+        };
+
         export type Result =
             | { status: 200; body: {
                 version: number;
@@ -97,7 +130,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace ContentSitesUkCollectionsEmployeesList {
@@ -112,6 +146,10 @@ export namespace API {
              * The `next` of the previous page.
              */
             cursor?: string;
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
         };
 
         export type Result =
@@ -126,7 +164,7 @@ export namespace API {
                     email?: string;
                     office: OfficeId;
                     order: number;
-                    id: string;
+                    id: EmployeeId;
                 }>;
                 next: string | null;
             }; headers: Record<string, string> }
@@ -142,6 +180,13 @@ export namespace API {
             id: string;
         };
 
+        export type Query = {
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
+        };
+
         export type Result =
             | { status: 200; body: {
                 name: string;
@@ -153,13 +198,14 @@ export namespace API {
                 email?: string;
                 office: OfficeId;
                 order: number;
-                id: string;
+                id: EmployeeId;
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace ContentSitesUkCollectionsOfficesList {
@@ -173,6 +219,10 @@ export namespace API {
              * The `next` of the previous page.
              */
             cursor?: string;
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
         };
 
         export type Result =
@@ -191,7 +241,7 @@ export namespace API {
                         height: number;
                     };
                     order: number;
-                    id: string;
+                    id: OfficeId;
                 }>;
                 next: string | null;
             }; headers: Record<string, string> }
@@ -205,6 +255,13 @@ export namespace API {
     export namespace ContentSitesUkCollectionsOfficesGet {
         export type Params = {
             id: string;
+        };
+
+        export type Query = {
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
         };
 
         export type Result =
@@ -222,13 +279,14 @@ export namespace API {
                     height: number;
                 };
                 order: number;
-                id: string;
+                id: OfficeId;
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace ContentSitesUkCollectionsEventsList {
@@ -241,6 +299,10 @@ export namespace API {
              * The `next` of the previous page.
              */
             cursor?: string;
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
         };
 
         export type Result =
@@ -262,7 +324,7 @@ export namespace API {
                     };
                     office: OfficeId;
                     price?: string;
-                    id: string;
+                    id: EventId;
                 }>;
                 next: string | null;
             }; headers: Record<string, string> }
@@ -276,6 +338,13 @@ export namespace API {
     export namespace ContentSitesUkCollectionsEventsGet {
         export type Params = {
             id: string;
+        };
+
+        export type Query = {
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
         };
 
         export type Result =
@@ -296,13 +365,14 @@ export namespace API {
                 };
                 office: OfficeId;
                 price?: string;
-                id: string;
+                id: EventId;
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 }
 
@@ -318,6 +388,7 @@ export interface Client {
                      * const result = await client.content.sites.uk.pages.frontPage();
                      */
                     frontPage: ClientMethod<'GET', false, {
+                        query?: API.ContentSitesUkPagesFrontPage.Query;
                         headers?: Record<string, string>;
                         fetchOptions?: RequestInit;
                     }, API.ContentSitesUkPagesFrontPage.Result>;
@@ -328,6 +399,7 @@ export interface Client {
                      * const result = await client.content.sites.uk.pages.eventsPage();
                      */
                     eventsPage: ClientMethod<'GET', false, {
+                        query?: API.ContentSitesUkPagesEventsPage.Query;
                         headers?: Record<string, string>;
                         fetchOptions?: RequestInit;
                     }, API.ContentSitesUkPagesEventsPage.Result>;
@@ -340,6 +412,7 @@ export interface Client {
                      * const result = await client.content.sites.uk.globals.privacyPolicy();
                      */
                     privacyPolicy: ClientMethod<'GET', false, {
+                        query?: API.ContentSitesUkGlobalsPrivacyPolicy.Query;
                         headers?: Record<string, string>;
                         fetchOptions?: RequestInit;
                     }, API.ContentSitesUkGlobalsPrivacyPolicy.Result>;
@@ -369,6 +442,7 @@ export interface Client {
                          */
                         get: ClientMethod<'GET', false, {
                             params: API.ContentSitesUkCollectionsEmployeesGet.Params;
+                            query?: API.ContentSitesUkCollectionsEmployeesGet.Query;
                             headers?: Record<string, string>;
                             fetchOptions?: RequestInit;
                         }, API.ContentSitesUkCollectionsEmployeesGet.Result>;
@@ -397,6 +471,7 @@ export interface Client {
                          */
                         get: ClientMethod<'GET', false, {
                             params: API.ContentSitesUkCollectionsOfficesGet.Params;
+                            query?: API.ContentSitesUkCollectionsOfficesGet.Query;
                             headers?: Record<string, string>;
                             fetchOptions?: RequestInit;
                         }, API.ContentSitesUkCollectionsOfficesGet.Result>;
@@ -425,6 +500,7 @@ export interface Client {
                          */
                         get: ClientMethod<'GET', false, {
                             params: API.ContentSitesUkCollectionsEventsGet.Params;
+                            query?: API.ContentSitesUkCollectionsEventsGet.Query;
                             headers?: Record<string, string>;
                             fetchOptions?: RequestInit;
                         }, API.ContentSitesUkCollectionsEventsGet.Result>;
@@ -448,6 +524,7 @@ const routes: GeneratedRoutes = {
                             401: {},
                             403: {},
                             404: {},
+                            400: {},
                         },
                     },
                     eventsPage: {
@@ -458,6 +535,7 @@ const routes: GeneratedRoutes = {
                             401: {},
                             403: {},
                             404: {},
+                            400: {},
                         },
                     },
                 },
@@ -470,6 +548,7 @@ const routes: GeneratedRoutes = {
                             401: {},
                             403: {},
                             404: {},
+                            400: {},
                         },
                     },
                 },
@@ -493,6 +572,7 @@ const routes: GeneratedRoutes = {
                                 401: {},
                                 403: {},
                                 404: {},
+                                400: {},
                             },
                         },
                     },
@@ -515,6 +595,7 @@ const routes: GeneratedRoutes = {
                                 401: {},
                                 403: {},
                                 404: {},
+                                400: {},
                             },
                         },
                     },
@@ -537,6 +618,7 @@ const routes: GeneratedRoutes = {
                                 401: {},
                                 403: {},
                                 404: {},
+                                400: {},
                             },
                         },
                     },
@@ -553,6 +635,22 @@ const routes: GeneratedRoutes = {
  * const id = toOfficeId('1');
  */
 export const toOfficeId = (value: string): API.OfficeId => value as API.OfficeId;
+
+/**
+ * Brands a value from outside the API, like a URL segment, as `API.EmployeeId`. A value from a response is branded already.
+ *
+ * @example
+ * const id = toEmployeeId('1');
+ */
+export const toEmployeeId = (value: string): API.EmployeeId => value as API.EmployeeId;
+
+/**
+ * Brands a value from outside the API, like a URL segment, as `API.EventId`. A value from a response is branded already.
+ *
+ * @example
+ * const id = toEventId('1');
+ */
+export const toEventId = (value: string): API.EventId => value as API.EventId;
 
 /**
  * Whether a `400` body is the validation error kizuna sends, rather than a `400` the route declares itself.

@@ -268,14 +268,19 @@ describe('content routes with auth.read', () => {
     });
 
     it("serve a partner shared images and its sites' own, and no other site's", async () => {
-        const shared = await as('travel-token', `/content/media/${images.shared}/image`);
-        expect(shared.status).toBe(200);
-        expect(shared.headers['cache-control']).toBe('private, max-age=31536000, immutable');
+        expect((await as('travel-token', `/content/media/${images.shared}/image`)).status).toBe(200);
         expect((await as('travel-token', `/content/media/${images.uk}/image`)).status).toBe(200);
         const norway = await as('travel-token', `/content/media/${images.norway}/image`);
         expect(norway.status).toBe(403);
         expect(norway.body.detail).toContain('content.sites.norway:read');
-        expect((await request(guarded.app).get(`/content/media/${images.shared}/image`)).status).toBe(401);
+    });
+
+    it('serve every image without a token, publicly, since a browser loads it with none', async () => {
+        for (const id of Object.values(images)) {
+            const image = await request(guarded.app).get(`/content/media/${id}/image`);
+            expect(image.status).toBe(200);
+            expect(image.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+        }
     });
 });
 

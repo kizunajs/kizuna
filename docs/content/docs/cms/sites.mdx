@@ -301,7 +301,7 @@ Each publish records one row per site and partner, with its status and attempts:
 
 ### Running the refreshes
 
-A config with sites gets the CMS's own job, `content.refreshSite`, beside your [jobs](/docs/jobs), so it names a `jobRunner`. With `mode: 'in-process'`, the job runs on its own. With `mode: 'http'`, the job endpoints need an identity, and the CMS's job declares none, so your own jobs name it. A [transport](/docs/jobs#transports) retries a site or partner that does not answer, up to five attempts. Without one, a refresh that fails is not tried again.
+A config with sites gets the CMS's own job, `content.refreshSite`, beside your [jobs](/docs/jobs), so it names a `jobRunner`. With `mode: 'in-process'`, the job runs on its own. With `mode: 'http'`, the job endpoints need an identity. The job runs as the one your own jobs name, and with no jobs of your own, `jobs: { identity: 'scheduler' }` on `cms()` names it. A [transport](/docs/jobs#transports) retries a site or partner that does not answer, up to five attempts. Without one, a refresh that fails is not tried again.
 
 ## Partners
 
@@ -329,7 +329,7 @@ content: cms({
 
 `reads: ['uk']` is the UK's view and the shared content: the offices with the UK's phone numbers, and the UK's events.
 
-Content routes are public until `auth.read` names an identity. Then every content route, media included, requires that identity, and each partner's `reads` limits what its token may read. A read of Norway answers `403`, naming the permission it lacks, `content.sites.norway:read`. A token whose guard returns no `partner` reads every site, which suits your own apps.
+Content routes are public until `auth.read` names an identity. Then every content route requires that identity, and each partner's `reads` limits what its token may read. Image files stay public, since a browser loads them from a page with no token. A request that carries a partner's token is still held to that partner's `reads`. A read of Norway answers `403`, naming the permission it lacks, `content.sites.norway:read`. A token whose guard returns no `partner` reads every site, which suits your own apps.
 
 ### How it signs in
 

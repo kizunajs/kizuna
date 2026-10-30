@@ -11,7 +11,7 @@ The CMS routes come in three groups:
 | `editing`    | Editors and their agents                  | Drafts, publishing, versions, reviews, search     |
 | `invalidate` | Your app, and your other deployments      | Refreshing an id, a global or a page that changed |
 
-`GET /api/content/collections/employees` is the REST API, and every collection also serves `.../options`. Content routes are public, and `auth.read` on `cms()` makes every one of them, media included, require the identity it names.
+`GET /api/content/collections/employees` is the REST API, and every collection also serves `.../options`. Content routes are public, and `auth.read` on `cms()` makes every one of them require the identity it names. Image files at `/content/media/:id/image` stay public, since a browser loads them with no token.
 
 With [several sites](/docs/cms/sites), every content route sits under its site, at `/content/sites/<site>/...`, and media stays at `/content/media`. `GET /api/content/sites/uk/collections/offices` answers with the shared offices and the UK's values in place, and `GET /api/content/sites/uk/collections/events` with the UK's events.
 

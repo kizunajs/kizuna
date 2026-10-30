@@ -29,17 +29,15 @@ const partnerOf = (token: string): string | undefined => {
 };
 
 /**
- * A business outside Hagen that reads its content with a token. Images stay
- * public, since a visitor's browser loads them from a page without one.
+ * A business outside Hagen that reads its content with a token.
  */
 export const partner = k.identity
     .bearer({
         context: z.object({
-            partner: z.string().optional(),
+            partner: z.string(),
         }),
     })
-    .guard(({ bearer, request, deny }) => {
-        if (bearer === null && new URL(request.url).pathname.includes('/content/media/')) return {};
+    .guard(({ bearer, deny }) => {
         const found = bearer === null ? undefined : partnerOf(bearer.token);
         if (found === undefined) {
             return deny({

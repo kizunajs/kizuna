@@ -276,9 +276,14 @@ const forwardedHeaders = (args: Args): Record<string, string> => {
  * What the search route hands a collection or a relationship: the search
  * term, or the ids to name, and who is asking.
  */
-const searchInput = (args: Args): { query?: string; ids?: string[]; headers: Record<string, string> } => {
-    const { q, ids } = (args.query ?? {}) as { q?: string; ids?: string[] };
+const searchInput = (args: Args): { query?: string; ids?: string[]; site?: string; headers: Record<string, string> } => {
+    const { q, ids, site } = (args.query ?? {}) as { q?: string; ids?: string[]; site?: string };
     return {
+        ...(site === undefined
+            ? {}
+            : {
+                  site,
+              }),
         ...(q === undefined
             ? {}
             : {
@@ -965,7 +970,13 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
      */
     const assertReads = (args: Args, site: string | undefined): void => {
         if (reader === undefined) return;
-        const partner = args.auth?.[reader]?.['partner'];
+        assertPartnerReads(args.auth?.[reader]?.['partner'], site);
+    };
+
+    /**
+     * Refuses a partner a site its `reads` leaves out.
+     */
+    const assertPartnerReads = (partner: unknown, site: string | undefined): void => {
         if (partner === undefined) return;
         const reads = typeof partner === 'string' ? options.partners?.[partner]?.reads : undefined;
         if (reads === undefined) {
@@ -983,7 +994,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
      * The public list and get of a collection's items.
      */
     const listingReads = (input: {
-        definition: ContentDefinition;
+        definition: Collection;
         indexes: readonly string[];
         path: `/${string}`;
         collection: string;
@@ -1001,7 +1012,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         single: string;
     }) => {
         const item = (resolvedSchema(schemaOnSite(input.definition, input.readingSite)) as z.ZodObject).extend({
-            id: z.string(),
+            id: input.definition.id,
         });
         return {
             list: route({
@@ -2336,7 +2347,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     const getImage = route({
         method: 'GET',
         path: `${base}/content/media/:id/image`,
-        auth: readAuth,
+        // A browser loads an image with no token, so images stay public under auth.read.
+        auth: false,
         summary: 'The image as a page shows it, cropped and sized by sharp',
         pathParams: z.object({
             id: z.string(),
@@ -2347,18 +2359,22 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 body: BinarySchema,
                 contentType: 'image/webp',
                 cache: {
-                    scope: reader === undefined ? 'public' : 'private',
+                    scope: 'public',
                     maxAge: 31536000,
                     immutable: true,
                 },
             },
+            403: ProblemDetailsSchema,
             404: ProblemDetailsSchema,
         },
     }).handler(
         guarded(async (cms, args) => {
             const record = await cms.media.get(args.params['id']!);
             if (record === undefined) throw new CmsHttpError(404, { detail: `No media item '${args.params['id']}'.` });
-            assertReads(args, record.site);
+            if (reader !== undefined) {
+                const signedIn = await cms.signedInAs(reader, args as unknown as Record<string, unknown>);
+                assertPartnerReads(signedIn?.['partner'], record.site);
+            }
             const query = args.query as z.output<typeof ImageQuerySchema>;
             const rendered = await cms.media.render(record, {
                 crop: query.crop,
@@ -2470,6 +2486,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         query: z.object({
             q: z.string().optional(),
             ids: z.array(z.string()).optional().describe('Name these ids instead of searching.'),
+            site: z.string().optional().describe('The site the id is picked for, which lists only the items it shows.'),
         }),
         responses: {
             200: z.object({
@@ -2489,6 +2506,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     }).handler(
         guarded(async (cms, args) => {
             const owned = cms.listingFor(args.params['brand']!);
+            cms.access(args.auth).assertSees((args.query as { site?: string } | undefined)?.site);
             if (owned !== undefined && !cms.access(args.auth).sees(owned.site)) {
                 throw new CmsHttpError(404, {
                     detail: `No collection or relationship holds ids of the brand '${args.params['brand']}'. Define a relationship for it with defineRelationship().`,
