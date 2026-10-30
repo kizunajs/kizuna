@@ -41,6 +41,11 @@ import type { WaitingReview } from './dashboard.js';
 import type { PaletteAction } from './search.js';
 
 /**
+ * What `translating` holds while the whole translation is drafted.
+ */
+const TRANSLATING_ALL = '*';
+
+/**
  * How often the screen checks whether someone else, or a model, changed the
  * draft it shows.
  */
@@ -244,6 +249,8 @@ export function DocumentScreen({
     const [compared, setCompared] = useState<number | undefined>();
     const [restoring, setRestoring] = useState<number | undefined>();
     const [deciding, setDeciding] = useState(false);
+    // What Translate is drafting: the whole translation, or one field's path.
+    const [translating, setTranslating] = useState<string | undefined>();
     // The field whose review comments the person is replying to on the Edit tab.
     const [replyingOn, setReplyingOn] = useState<string | undefined>();
     const [draftChanges, setDraftChanges] = useState<{ changes: Changes; views: ViewedChange[] } | undefined>();
@@ -761,6 +768,32 @@ export function DocumentScreen({
     };
 
     /**
+     * Drafts the translation from the published source, or one field of it.
+     */
+    const translate = async (field?: string): Promise<void> => {
+        const tools = toolsFor(documentRef);
+        if (tools === undefined) return;
+        await form.current?.flush();
+        setTranslating(field ?? TRANSLATING_ALL);
+        setLinkProblem(undefined);
+        const answer = await connection.call(`${tools.prefix}_translate`, {
+            params: tools.params,
+            body:
+                field === undefined
+                    ? {}
+                    : {
+                          fields: [field],
+                      },
+        });
+        setTranslating(undefined);
+        if (answer.status !== 200) {
+            setLinkProblem(problemOf(answer, 'The translation failed'));
+            return;
+        }
+        await describe(documentRef);
+    };
+
+    /**
      * Makes an earlier version the draft, once the person confirmed. Undo
      * restores the draft it replaced, which is the latest version, until the
      * draft changes again.
@@ -1147,15 +1180,18 @@ export function DocumentScreen({
                                   label: 'Owner',
                                   value: owner,
                               },
-                        document.usedOn.everywhere || document.usedOn.partners.length > 0
+                        document.usedOn.everywhere
                             ? {
                                   label: 'Shows on',
-                                  value: [
-                                      ...(document.usedOn.everywhere ? ['every page'] : []),
-                                      ...document.usedOn.partners.map((partner) => partner.label),
-                                  ].join(', '),
+                                  value: 'every page',
                               }
                             : null,
+                        document.usedOn.partners.length === 0
+                            ? null
+                            : {
+                                  label: 'Partners',
+                                  value: document.usedOn.partners.map((partner) => partner.label).join(', '),
+                              },
                         siteFact === undefined
                             ? null
                             : {
@@ -1327,7 +1363,14 @@ export function DocumentScreen({
                 {siteTabs === undefined ? null : (
                     <SiteTabs documentRef={siteTabs.sharedRef} sites={siteTabs.sites} current={siteTabs.current} counts={siteCounts} />
                 )}
-                {document.locale === undefined ? null : <LocaleTabs documentRef={document.ref} locales={document.locale} />}
+                {document.locale === undefined ? null : (
+                    <LocaleTabs
+                        documentRef={document.ref}
+                        locales={document.locale}
+                        onTranslate={document.locale.translate === true ? () => void translate() : undefined}
+                        translating={translating === TRANSLATING_ALL}
+                    />
+                )}
                 {linkProblem === undefined ? null : (
                     <p className="k-error k-document__problem" role="alert">
                         <CircleAlert {...ICON} />
@@ -1351,6 +1394,8 @@ export function DocumentScreen({
                             pointed={pointed}
                             missing={document.complete ? [] : document.missing}
                             locales={document.locale}
+                            onTranslate={document.locale?.translate === true ? (field) => void translate(field.path) : undefined}
+                            translating={translating}
                             aside={reviewAside}
                             controlFor={(field, input) =>
                                 showsOn !== undefined && field.path === 'showsOn' ? <ShowsOn sites={showsOn} input={input} /> : undefined

@@ -550,7 +550,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                           auth: editor,
                           summary: `Draft a translation of ${scope.noun} from its published source`,
                           description:
-                              "The model translates the source's published text into the language given and saves it as that language's draft, which a person reviews and publishes. A translated slug is made from the translated title.",
+                              "The model translates the source's published text into the language `locale` names and saves it as that language's draft, which a person reviews and publishes. A translated slug is made from the translated title.",
                           tool:
                               scope.approveWrites === true
                                   ? {
@@ -577,7 +577,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                               const ref = refOf(cms, args);
                               const translated = await translateDraft(cms, {
                                   ref,
-                                  to: body.to,
                                   ...(body.fields === undefined
                                       ? {}
                                       : {
@@ -2008,7 +2007,14 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     ...(locale === undefined
                         ? {}
                         : {
-                              locale,
+                              locale: {
+                                  ...locale,
+                                  ...(options.translate === undefined
+                                      ? {}
+                                      : {
+                                            translate: true,
+                                        }),
+                              },
                           }),
                 },
                 headers: {

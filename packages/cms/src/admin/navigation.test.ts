@@ -503,17 +503,21 @@ describe('the admin navigation with several sites', () => {
         expect(sections.flatMap((section) => section.entries).map((entry) => [entry.label, hrefOf(entry.screen)])).toEqual([
             ['Pages', '/admin/pages'],
             ['Events', '/admin/collections/events'],
-            ['Media', '/admin/media'],
         ]);
     });
 
-    it("puts shared content in Shared, a site's own in that site, and keeps All sites while an admin opens a site", () => {
-        expect(placeOf(screenOf('/admin/collections/offices/k3j9x2'), ALL_PLACE, true)).toEqual(SHARED_PLACE);
-        expect(placeOf(screenOf('/admin/uk/collections/offices/k3j9x2'), sitePlace('uk'), true)).toEqual(SHARED_PLACE);
-        expect(placeOf(screenOf('/admin/uk/collections/events/e1'), ALL_PLACE, true)).toEqual(ALL_PLACE);
-        expect(placeOf(screenOf('/admin/uk/collections/events/e1'), SHARED_PLACE, true)).toEqual(sitePlace('uk'));
-        expect(placeOf(screenOf('/admin/pages'), sitePlace('uk'), true)).toEqual(ALL_PLACE);
-        expect(placeOf(screenOf('/admin'), sitePlace('norway'), false)).toEqual(sitePlace('norway'));
+    it('reads the place from the address alone: shared content is Shared, anything of one site that site', () => {
+        expect(placeOf(screenOf('/admin/collections/offices/k3j9x2'), true)).toEqual(SHARED_PLACE);
+        expect(placeOf(screenOf('/admin/uk/collections/offices/k3j9x2'), true)).toEqual(SHARED_PLACE);
+        expect(placeOf(screenOf('/admin/media'), true)).toEqual(SHARED_PLACE);
+        expect(placeOf(screenOf('/admin/norway/pages/frontPage'), true)).toEqual(sitePlace('norway'));
+        expect(placeOf(screenOf('/admin/uk/collections/events/e1'), true)).toEqual(sitePlace('uk'));
+        expect(placeOf(screenOf('/admin/group'), true)).toEqual(sitePlace('group'));
+        expect(placeOf(screenOf('/admin/uk/media'), true)).toEqual(sitePlace('uk'));
+        expect(placeOf(screenOf('/admin'), true)).toEqual(ALL_PLACE);
+        expect(placeOf(screenOf('/admin/pages'), true)).toEqual(ALL_PLACE);
+        expect(placeOf(screenOf('/admin/collections/events'), true)).toEqual(ALL_PLACE);
+        expect(placeOf(screenOf('/admin'), false)).toEqual(sitePlace('group'));
     });
 
     it('opens the same kind of screen in another place, where it has one', () => {

@@ -80,7 +80,6 @@ interface PlaceProps {
     allSites: boolean;
     screen: Screen;
     pinned: ReadonlySet<string>;
-    onChoose: (place: Place) => void;
     onPin: (site: string) => void;
 }
 
@@ -90,7 +89,7 @@ interface PlaceProps {
  * sites it lists the pinned ones and the site open, and All sites' count
  * opens the finder.
  */
-export function PlacesList({ sites, place, allSites, screen, pinned, onChoose, onPin }: PlaceProps) {
+export function PlacesList({ sites, place, allSites, screen, pinned, onPin }: PlaceProps) {
     const many = sites.length > MANY_SITES;
     const listed = many ? sites.filter((site) => pinned.has(site.key) || (place.kind === 'site' && place.site === site.key)) : sites;
     const link = (target: Place) => (
@@ -98,8 +97,7 @@ export function PlacesList({ sites, place, allSites, screen, pinned, onChoose, o
             key={target.kind === 'site' ? target.site : target.kind}
             className="k-sidebar__item k-place"
             href={hrefIn(target.kind === 'site' ? target.site : undefined, screenInPlace(screen, target))}
-            aria-current={samePlace(target, place) ? 'page' : undefined}
-            onClick={() => onChoose(target)}>
+            aria-current={samePlace(target, place) ? 'page' : undefined}>
             <PlaceIcon place={target} sites={sites} />
             <span className="k-sidebar__label k-ellipsis">{placeLabelOf(target, sites)}</span>
         </a>
@@ -115,7 +113,6 @@ export function PlacesList({ sites, place, allSites, screen, pinned, onChoose, o
                     allSites={allSites}
                     screen={screen}
                     pinned={pinned}
-                    onChoose={onChoose}
                     onPin={onPin}
                     className="k-sidebar__item k-place">
                     <span className="k-site-icon" aria-hidden="true">
@@ -139,14 +136,21 @@ export interface PathStep {
 
 /**
  * The bar across the top of a screen: the place, which opens the finder,
- * then the steps to the screen, and at its end who reads what it shows.
+ * its dashboard, then the steps to the screen, and at its end who reads
+ * what it shows.
  */
 export function PathBar({
+    dashboard,
     steps,
     reader,
     search,
     ...props
 }: PlaceProps & {
+    /**
+     * The place's dashboard, which follows the place, or `undefined` on the
+     * dashboard itself.
+     */
+    dashboard: string | undefined;
     steps: readonly PathStep[];
     reader: AdminSite | 'every site' | undefined;
     search: ReactNode;
@@ -159,6 +163,18 @@ export function PathBar({
                     <span className="k-ellipsis">{placeLabelOf(props.place, props.sites)}</span>
                     <ChevronsUpDown {...ICON} className="k-path-bar__chevron" />
                 </SiteFinder>
+                <span className="k-path-bar__separator" aria-hidden="true">
+                    /
+                </span>
+                {dashboard === undefined ? (
+                    <span className="k-path-bar__step" aria-current="page">
+                        Dashboard
+                    </span>
+                ) : (
+                    <a className="k-path-bar__step" href={dashboard}>
+                        Dashboard
+                    </a>
+                )}
                 {steps.map((step, index) => (
                     <span key={`${index}:${step.label}`} className="k-path-bar__step">
                         <span className="k-path-bar__separator" aria-hidden="true">

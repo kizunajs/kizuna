@@ -221,6 +221,7 @@ export const DocumentLocalesSchema = z
                 behind: z.int().describe('How many of its fields changed in the source since they were translated.'),
             })
         ),
+        translate: z.boolean().optional().describe("True when the translate tool drafts a language from the source's published text."),
     })
     .describe(
         "The languages the document is written in. Describe `<ref>@<code>` to work on one, and pass that `locale` to the editing tools. A translation's fields carry the source's text as `sourceValue`."

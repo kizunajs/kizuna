@@ -652,6 +652,24 @@
         color: var(--k-muted);
     }
 
+    .k-source__translate {
+        flex-shrink: 0;
+        margin-left: auto;
+        font-size: 12px;
+    }
+
+    .k-locale-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 16px;
+        margin: 12px var(--k-gutter, 16px) 0;
+    }
+
+    .k-locale-bar > .k-locale-tabs {
+        margin: 0;
+    }
+
     /* A document's languages under its header, each with where its copy stands. */
     .k-locale-tabs {
         display: flex;

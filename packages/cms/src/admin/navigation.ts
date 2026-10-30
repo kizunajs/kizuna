@@ -658,7 +658,6 @@ const siteNavigationOf = (options: Parameters<typeof navigationOf>[0], declared:
                             name,
                         },
                     })),
-                    media(undefined),
                 ],
             },
         ];
@@ -751,17 +750,15 @@ const showsShared = (screen: Screen): boolean => {
 };
 
 /**
- * The place a screen is in, from where the editor was: shared content is
- * Shared, a site's own content is that site, or All sites while an admin
- * looks at every site, and the screens every site shares an address for are
- * All sites.
+ * The place a screen is in, from its address alone: shared content is
+ * Shared, anything of one site is that site, and the screens every site
+ * shares an address for are All sites, or for an editor of some sites their
+ * first one.
  */
-export const placeOf = (screen: Screen, previous: Place, allSites: boolean): Place => {
-    if (showsShared(screen)) return SHARED_PLACE;
-    if (screen.kind === 'media' && screen.site === undefined) return previous.kind === 'site' ? SHARED_PLACE : previous;
-    if (screen.site !== undefined) return allSites && previous.kind === 'all' ? ALL_PLACE : sitePlace(screen.site);
-    if (allSites) return ALL_PLACE;
-    return previous.kind === 'site' ? previous : sitePlace(sites[0]?.key ?? '');
+export const placeOf = (screen: Screen, allSites: boolean): Place => {
+    if (showsShared(screen) || (screen.kind === 'media' && screen.site === undefined)) return SHARED_PLACE;
+    if (screen.site !== undefined) return sitePlace(screen.site);
+    return allSites ? ALL_PLACE : sitePlace(sites[0]?.key ?? '');
 };
 
 /**

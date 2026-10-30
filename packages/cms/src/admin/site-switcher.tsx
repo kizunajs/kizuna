@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Popover } from '@base-ui/react/popover';
-import { Check, Layers, Library, Pin, PinOff, Search } from 'lucide-react';
+import { Check, Layers, Library, Pin, Search } from 'lucide-react';
 import { ICON } from '../view/context.js';
 import type { AdminSite } from './config.js';
 import {
@@ -87,7 +87,6 @@ export function SiteFinder({
     allSites,
     screen,
     pinned,
-    onChoose,
     onPin,
     className,
     children,
@@ -101,7 +100,6 @@ export function SiteFinder({
      * it the finder offers no pins.
      */
     pinned?: ReadonlySet<string>;
-    onChoose: (place: Place) => void;
     onPin?: (site: string) => void;
     className: string;
     children: ReactNode;
@@ -118,10 +116,7 @@ export function SiteFinder({
                     className="k-menu__item k-site-menu__item"
                     href={hrefIn(site?.key, screenInPlace(screen, target))}
                     aria-current={chosen ? 'true' : undefined}
-                    onClick={() => {
-                        onChoose(target);
-                        setOpen(false);
-                    }}>
+                    onClick={() => setOpen(false)}>
                     {site === undefined ? <AllSitesIcon /> : <SiteIcon site={site} />}
                     <span className="k-ellipsis">{site?.label ?? ALL_SITES}</span>
                     {chosen ? (
@@ -137,7 +132,7 @@ export function SiteFinder({
                         aria-pressed={pinned.has(site.key)}
                         aria-label={pinned.has(site.key) ? `Unpin ${site.label}` : `Pin ${site.label}`}
                         onClick={() => onPin(site.key)}>
-                        {pinned.has(site.key) ? <PinOff {...ICON} /> : <Pin {...ICON} />}
+                        <Pin {...ICON} />
                     </button>
                 )}
             </div>

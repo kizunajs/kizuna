@@ -125,6 +125,10 @@ export interface DocumentLocales {
         status: DocumentStatus;
         behind: number;
     }>;
+    /**
+     * True when a model drafts translations.
+     */
+    translate?: boolean;
 }
 
 /**

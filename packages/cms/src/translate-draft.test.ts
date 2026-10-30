@@ -193,9 +193,7 @@ describe('POST /editing/.../translate', () => {
             caller: {},
             author: 'ada',
         });
-        const response = await asEditor(request(app).post('/editing/pages/aboutPage/translate')).send({
-            to: 'nb',
-        });
+        const response = await asEditor(request(app).post('/editing/pages/aboutPage/translate?locale=nb')).send({});
         expect(response.status).toBe(200);
         expect(response.body.fields).toEqual(['title', 'slug', 'intro']);
         expect(response.body.draft).toMatchObject({
@@ -222,8 +220,7 @@ describe('POST /editing/.../translate', () => {
             slug: 'about-us',
             intro: 'We sell plants.',
         });
-        const response = await asEditor(request(app).post('/editing/pages/aboutPage/translate')).send({
-            to: 'nb',
+        const response = await asEditor(request(app).post('/editing/pages/aboutPage/translate?locale=nb')).send({
             fields: ['intro'],
         });
         expect(response.status).toBe(200);
@@ -233,7 +230,34 @@ describe('POST /editing/.../translate', () => {
         });
     });
 
-    it('refuses a source that is not published, its own language, and a field that is not translated', async () => {
+    it('writes nothing when the translation already says the same', async () => {
+        await publishAbout({
+            title: 'About us',
+            slug: 'about-us',
+            intro: 'We sell plants.',
+        });
+        const nb: DocumentRef = {
+            ...about,
+            locale: 'nb',
+        };
+        await service.update({
+            ref: nb,
+            changes: {
+                title: 'Om oss',
+                slug: 'om-oss',
+                intro: 'Vi selger planter.',
+            },
+            caller: {},
+            author: 'ada',
+        });
+        await service.publish(nb, 'ada');
+        const response = await asEditor(request(app).post('/editing/pages/aboutPage/translate?locale=nb')).send({});
+        expect(response.status).toBe(200);
+        expect(response.body.fields).toEqual([]);
+        expect(response.body.draft.status).toBe('published');
+    });
+
+    it('refuses a source that is not published, no language or its own, and a field that is not translated', async () => {
         await service.update({
             ref: about,
             changes: {
@@ -243,24 +267,17 @@ describe('POST /editing/.../translate', () => {
             caller: {},
             author: 'ada',
         });
-        const unpublished = await asEditor(request(app).post('/editing/pages/aboutPage/translate')).send({
-            to: 'nb',
-        });
+        const unpublished = await asEditor(request(app).post('/editing/pages/aboutPage/translate?locale=nb')).send({});
         expect(unpublished.status).toBe(409);
         await service.publish(about, 'ada');
-        const own = await asEditor(request(app).post('/editing/pages/aboutPage/translate')).send({
-            to: 'en',
-        });
+        const own = await asEditor(request(app).post('/editing/pages/aboutPage/translate?locale=en')).send({});
         expect(own.status).toBe(400);
-        const shared = await asEditor(request(app).post('/editing/pages/aboutPage/translate')).send({
-            to: 'nb',
+        const shared = await asEditor(request(app).post('/editing/pages/aboutPage/translate?locale=nb')).send({
             fields: ['order'],
         });
         expect(shared.status).toBe(400);
-        const unknown = await asEditor(request(app).post('/editing/pages/aboutPage/translate')).send({
-            to: 'de',
-        });
-        expect(unknown.status).toBe(404);
+        const unnamed = await asEditor(request(app).post('/editing/pages/aboutPage/translate')).send({});
+        expect(unnamed.status).toBe(400);
     });
 
     it('answers 502 and writes nothing when the model answers with something the fields cannot hold', async () => {
@@ -269,9 +286,7 @@ describe('POST /editing/.../translate', () => {
             slug: 'about-us',
         });
         model.fails = true;
-        const response = await asEditor(request(app).post('/editing/pages/aboutPage/translate')).send({
-            to: 'nb',
-        });
+        const response = await asEditor(request(app).post('/editing/pages/aboutPage/translate?locale=nb')).send({});
         expect(response.status).toBe(502);
         expect(await service.store.get('page', 'aboutPage', 'default', 'nb')).toBeUndefined();
     });

@@ -89,6 +89,15 @@ export interface FieldFormProps {
         current: string;
         source: string;
     };
+    /**
+     * Drafts one translated field from the source, offered on its source
+     * line in a translation.
+     */
+    onTranslate?: (field: DescribedField) => void;
+    /**
+     * The path of the field being translated.
+     */
+    translating?: string | undefined;
     ref?: Ref<FieldFormHandle>;
 }
 
@@ -140,6 +149,8 @@ export function FieldForm({
     controlFor,
     readOnly,
     locales,
+    onTranslate,
+    translating,
     ref,
 }: FieldFormProps) {
     const [values, setValues] = useState<Record<string, unknown>>({});
@@ -414,6 +425,15 @@ export function FieldForm({
                     </span>
                 ) : (
                     <span className="k-source__text">{textOf(field.sourceValue)}</span>
+                )}
+                {onTranslate === undefined || !field.writable ? null : (
+                    <button
+                        type="button"
+                        className="k-text-button k-source__translate"
+                        disabled={translating !== undefined}
+                        onClick={() => onTranslate(field)}>
+                        {translating === field.path ? 'Translating…' : 'Translate'}
+                    </button>
                 )}
             </p>
         );

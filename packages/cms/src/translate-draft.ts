@@ -3,31 +3,31 @@ import { Kizuna } from 'kizunajs';
 import { CmsHttpError, type CmsService, type DraftState } from './cms.js';
 import { dataFields } from './field.js';
 import { sourceValueOf } from './locales.js';
-import { formatRef, sourceRefOf, type DocumentRef } from './refs.js';
+import { formatRef, type DocumentRef } from './refs.js';
+import { sameContent } from './same-content.js';
 import type { Caller } from './rules.js';
 import { translateFields, TranslationError } from './translate.js';
 import { DraftPageSchema } from './wire.js';
 
 /**
- * What the translate route answers: the draft, and the fields the model wrote.
+ * What the translate route answers: the draft, and the fields it changed.
  */
 export const TranslatedDraftSchema = Kizuna.model({
     title: 'CMS.TranslatedDraft',
     schema: z.object({
         draft: DraftPageSchema,
-        fields: z.array(z.string()).describe('The fields the model translated.'),
+        fields: z.array(z.string()).describe('The fields the translation changed. Empty when it already said the same.'),
     }),
 });
 
 export const TranslateBodySchema = z
     .object({
-        to: z.string().min(1).describe("The language to translate into, like 'nb'."),
         fields: z.array(z.string()).min(1).optional().describe('The fields to translate. Without it, every translated field.'),
     })
     .strict();
 
 /**
- * A translation drafted by the model, with the fields it wrote.
+ * A translation drafted by the model, with the fields it changed.
  */
 export interface TranslatedDraft {
     state: DraftState;
@@ -35,14 +35,13 @@ export interface TranslatedDraft {
 }
 
 /**
- * Drafts the translation of a document into `to` from its published source,
- * and records the source version it came from.
+ * Drafts a translation from its published source, and records the source
+ * version it came from.
  */
 export const translateDraft = async (
     cms: CmsService,
     input: {
         ref: DocumentRef;
-        to: string;
         fields?: readonly string[];
         caller: Caller;
         author: string;
@@ -50,14 +49,10 @@ export const translateDraft = async (
 ): Promise<TranslatedDraft> => {
     const model = cms.options.translate?.model;
     if (model === undefined) throw new CmsHttpError(404, { detail: 'cms() has no `translate` model.' });
-    const ref: DocumentRef = {
-        ...sourceRefOf(input.ref),
-        locale: input.to,
-    };
-    const target = cms.target(ref);
+    const target = cms.target(input.ref);
     if (target.source === undefined) {
         throw new CmsHttpError(400, {
-            detail: `'${input.to}' is the language '${formatRef(target.ref)}' is written in. Translate it into another.`,
+            detail: `Name the language to translate '${formatRef(target.ref)}' into with \`locale\`. It is written in ${cms.sourceLocaleOf(target.site)}.`,
         });
     }
     const source = await cms.document(target.source);
@@ -82,21 +77,28 @@ export const translateDraft = async (
             fields,
             values: Object.fromEntries(fields.map((field) => [field.name, sourceValueOf(source.target.definition, published, field.name)])),
             from: cms.sourceLocaleOf(target.site)!,
-            to: input.to,
+            to: target.locale,
         });
     } catch (error) {
         if (error instanceof TranslationError) throw new CmsHttpError(502, { detail: error.message });
         throw error;
     }
-    const written = fields.map((field) => field.name).filter((name) => name in translated);
-    if (written.length === 0) {
+    if (Object.keys(translated).length === 0) {
         throw new CmsHttpError(409, {
             detail: `'${formatRef(target.source)}' has no text to translate in the fields asked for.`,
         });
     }
+    const current = (await cms.document(target.ref)).row?.draft ?? {};
+    const written = fields.map((field) => field.name).filter((name) => name in translated && !sameContent(translated[name], current[name]));
+    if (written.length === 0) {
+        return {
+            state: await cms.draftState(target.ref),
+            fields: [],
+        };
+    }
     const state = await cms.update({
-        ref,
-        changes: translated,
+        ref: target.ref,
+        changes: Object.fromEntries(written.map((name) => [name, translated[name]])),
         caller: input.caller,
         author: input.author,
         summary: `Translated from ${cms.sourceLocaleOf(target.site)}`,

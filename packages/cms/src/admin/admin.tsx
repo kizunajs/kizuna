@@ -20,9 +20,6 @@ import {
     CONTENT_GROUP,
     placeOf,
     readerOf,
-    samePlace,
-    sitePlace,
-    type Place,
     hrefIn,
     hrefOf,
     inAppTargetOf,
@@ -199,12 +196,8 @@ export function Admin({ config }: { config: AdminConfig }) {
 
     const sites = useMemo(() => config.sites ?? [], [config.sites]);
     const allSites = sites.length > 0 && config.allSites !== false;
-    // Where the editor is: All sites, a site or Shared, which keeps All sites while an admin opens a site's document.
-    const [chosen, setChosen] = useState<Place>(() => placeOf(screen, allSites ? ALL_PLACE : sitePlace(sites[0]?.key ?? ''), allSites));
-    const place = sites.length === 0 ? ALL_PLACE : placeOf(screen, chosen, allSites);
-    useEffect(() => {
-        if (!samePlace(place, chosen)) setChosen(place);
-    }, [place, chosen]);
+    // Where the editor is, read from the address alone: All sites, a site or Shared.
+    const place = sites.length === 0 ? ALL_PLACE : placeOf(screen, allSites);
     // An editor of some sites opens their first site where an admin opens All sites.
     useEffect(() => {
         if (!allSites && place.kind === 'site' && screen.site === undefined && (screen.kind === 'dashboard' || screen.kind === 'pages')) {
@@ -230,13 +223,7 @@ export function Admin({ config }: { config: AdminConfig }) {
      * then the document or record open.
      */
     const pathSteps = (): PathStep[] => {
-        if (screen.kind === 'dashboard') {
-            return [
-                {
-                    label: 'Dashboard',
-                },
-            ];
-        }
+        if (screen.kind === 'dashboard') return [];
         const ref = screen.kind === 'document' ? parseRef(screen.ref) : undefined;
         const site = ref?.site ?? screen.site;
         const listOf = (label: string, list: Screen): PathStep => ({
@@ -525,46 +512,59 @@ export function Admin({ config }: { config: AdminConfig }) {
             <Logo />
         </a>
     );
-    const groups = (
-        <div className="k-sidebar__groups">
-            <div className="k-sidebar__group">
-                <a className="k-sidebar__item" href={dashboardHref} aria-current={screen.kind === 'dashboard' ? 'page' : undefined}>
-                    {sites.length === 0 ? null : <LayoutGrid {...ICON} className="k-sidebar__icon" />}
-                    <span className="k-sidebar__label k-ellipsis">Dashboard</span>
-                    {waiting !== undefined && waiting.length > 0 ? (
-                        <span className="k-sidebar__count" aria-label={`${waiting.length} waiting for your review`}>
-                            {waiting.length}
-                        </span>
-                    ) : null}
-                </a>
-            </div>
-            {sections.map((section) => (
-                <div key={section.label} className="k-sidebar__group">
-                    {sites.length > 0 ? null : <h2 className="k-heading k-sidebar__heading">{section.label}</h2>}
-                    {section.entries.map((entry) => {
-                        const Icon = sites.length === 0 ? undefined : entryIconOf(entry.screen);
-                        return (
-                            <a
-                                key={hrefOf(entry.screen)}
-                                className="k-sidebar__item"
-                                href={hrefOf(entry.screen)}
-                                aria-current={isCurrent(entry.screen, screen) ? 'page' : undefined}>
-                                {Icon === undefined ? null : <Icon {...ICON} className="k-sidebar__icon" />}
-                                <span className="k-sidebar__label k-ellipsis">{entry.label}</span>
-                            </a>
-                        );
-                    })}
-                </div>
-            ))}
-        </div>
+    const dashboardItem = (
+        <a className="k-sidebar__item" href={dashboardHref} aria-current={screen.kind === 'dashboard' ? 'page' : undefined}>
+            {sites.length === 0 ? null : <LayoutGrid {...ICON} className="k-sidebar__icon" />}
+            <span className="k-sidebar__label k-ellipsis">Dashboard</span>
+            {waiting !== undefined && waiting.length > 0 ? (
+                <span className="k-sidebar__count" aria-label={`${waiting.length} waiting for your review`}>
+                    {waiting.length}
+                </span>
+            ) : null}
+        </a>
     );
+    const entryLink = (entry: (typeof sections)[number]['entries'][number]) => {
+        const Icon = sites.length === 0 ? undefined : entryIconOf(entry.screen);
+        return (
+            <a
+                key={hrefOf(entry.screen)}
+                className="k-sidebar__item"
+                href={hrefOf(entry.screen)}
+                aria-current={isCurrent(entry.screen, screen) ? 'page' : undefined}>
+                {Icon === undefined ? null : <Icon {...ICON} className="k-sidebar__icon" />}
+                <span className="k-sidebar__label k-ellipsis">{entry.label}</span>
+            </a>
+        );
+    };
+    // With several sites the place's kinds are one list under its name, Dashboard first.
+    const groups =
+        sites.length > 0 ? (
+            <div className="k-sidebar__groups">
+                {sections.map((section) => (
+                    <div key={section.label} className="k-sidebar__group">
+                        <h2 className="k-heading k-sidebar__heading">{section.label}</h2>
+                        {place.kind === 'shared' ? null : dashboardItem}
+                        {section.entries.map(entryLink)}
+                    </div>
+                ))}
+            </div>
+        ) : (
+            <div className="k-sidebar__groups">
+                <div className="k-sidebar__group">{dashboardItem}</div>
+                {sections.map((section) => (
+                    <div key={section.label} className="k-sidebar__group">
+                        <h2 className="k-heading k-sidebar__heading">{section.label}</h2>
+                        {section.entries.map(entryLink)}
+                    </div>
+                ))}
+            </div>
+        );
     const placeProps = {
         sites,
         place,
         allSites,
         screen,
         pinned,
-        onChoose: setChosen,
         onPin: togglePin,
     };
     const places =
@@ -578,6 +578,7 @@ export function Admin({ config }: { config: AdminConfig }) {
         sites.length === 0 ? null : (
             <PathBar
                 {...placeProps}
+                dashboard={screen.kind === 'dashboard' ? undefined : dashboardHref}
                 steps={pathSteps()}
                 reader={readerOf(screen)}
                 search={phone ? null : <SearchButton onOpen={openSearch} />}
@@ -634,8 +635,8 @@ export function Admin({ config }: { config: AdminConfig }) {
                         <SearchButton onOpen={openSearch} compact />
                     </header>
                 ) : (
-                    <nav className="k-sidebar" aria-label="Admin">
-                        {brand}
+                    <nav className="k-sidebar" aria-label="Admin" data-sites={sites.length > 0 ? '' : undefined}>
+                        {sites.length > 0 ? <div className="k-sidebar__top">{brand}</div> : brand}
                         {places}
                         {sites.length === 0 ? <SearchButton onOpen={openSearch} /> : null}
                         {groups}
