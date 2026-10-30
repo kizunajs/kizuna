@@ -144,6 +144,7 @@ export default defineConfig({
     },
     routes,
     content: cms({
+        name: 'Hagen',
         db,
         pages,
         globals: [Settings],
@@ -153,7 +154,7 @@ export default defineConfig({
             roles: ['editor', 'admin'],
         },
         metadata: {
-            title: ({ title, settings }) => `${title} | ${settings.name}`,
+            title: ({ title, site }) => `${title} | ${site.label}`,
         },
         signInPath: '/login',
         preview: {

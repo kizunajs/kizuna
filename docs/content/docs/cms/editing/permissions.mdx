@@ -43,6 +43,7 @@ The shared content and their own site. Their site they edit by the rules above. 
 | `admin` over every site | Write and publish           | Write and publish       | Write and publish |
 | `admin` on a site       | Draft, and ask for a review | As `admin` on one site  | Not shown         |
 | `editor` on a site      | Draft, and ask for a review | As `editor` on one site | Not shown         |
+| `editor` with no site   | Draft, and ask for a review | None                    | Not shown         |
 
 A site's editor never sees another site, in the admin, the API or MCP. Roles and sites come from your identity, and [Sites](/docs/cms/sites#editors) shows the config.
 
@@ -54,7 +55,7 @@ Sam is Hagen UK's editor. Pick what Sam changes:
 
 <Tab value="The UK's phone number">
 
-Offices are shared, and the phone number is a [per-site field](/docs/cms/fields#per-site). The UK's number is the UK's, so Sam publishes it, and only the UK site refreshes.
+Offices are shared, and the phone number is a [per-site field](/docs/cms/fields#per-site). The UK's number is the UK's, so Sam publishes it, and only the UK site refreshes. Had Sam changed the shared address as well, the editor would show it as a second pending change, which goes to review.
 
 <EditorFigure kind="own-item" />
 

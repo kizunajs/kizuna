@@ -143,6 +143,8 @@ fields: [
 
 With `perSite: true`, a site's value shows in place of the shared one, and a site that leaves it empty shows the shared value. The editor shows the shared value as the placeholder and marks the field **Shared** or with the site's label. A field with `sites` exists on those sites alone. A site's values are its draft, its editors publish them, and only that site refreshes.
 
+`defineConfig` throws on `perSite` on the id, the slug, or a unique or indexed field, since those fields find a document and have to match on every site.
+
 ## Limits that keep the design
 
 A page keeps its design because its fields refuse what would break it. Designers say what they want, and the schema holds it for the editor, the agent and the API alike:

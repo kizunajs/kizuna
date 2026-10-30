@@ -138,15 +138,18 @@ Every screen opens with the same header: the trail back to the dashboard, the sc
 
 With [several sites](/docs/cms/sites), a switcher at the top of the sidebar lists each site the editor belongs to, with its label and icon. The sidebar below it shows that site's pages, globals and collections, and the shared content under a heading of its own, **Shared**.
 
-Every address carries the site's key, so a link opens the right site:
+Shared content keeps the addresses a project with one site has. A site's own content, and its view of shared content, carry the site's key:
 
-| Screen              | Address                         |
-| ------------------- | ------------------------------- |
-| The UK's events     | `/admin/uk/collections/events`  |
-| The UK's front page | `/admin/uk/pages/frontPage`     |
-| Norway's front page | `/admin/norway/pages/frontPage` |
+| Screen                            | Address                                |
+| --------------------------------- | -------------------------------------- |
+| A shared office                   | `/admin/collections/offices/k3j9x2`    |
+| The same office as the UK sees it | `/admin/uk/collections/offices/k3j9x2` |
+| The UK's events                   | `/admin/uk/collections/events`         |
+| The UK's front page               | `/admin/uk/pages/frontPage`            |
 
-The browser tab shows the current site's icon, so an editor with three sites open in three tabs tells them apart.
+The UK's [per-site values](/docs/cms/fields#per-site) on an office are edited at the UK's address, and the shared values at the shared one.
+
+The browser tab shows the current site's icon, and the tab titles and the sign-in screen use the current site's label in place of `name`, so an editor with three sites open in three tabs tells them apart.
 
 ## Lists
 

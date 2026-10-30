@@ -8,24 +8,29 @@ import views from './cms-views.module.css';
 const configCode = `content: cms({
     db,
     collections: [Employees, Offices],
-    sites: {
-        web: {
-            pages: webPages,
-            app: '../../apps/web/src/app',
+    sites: declareSites(Site, {
+        group: {
+            label: 'Hagen Group',
+            url: 'https://hagen.example.com',
+            icon: '/icons/group.svg',
+            pages: groupPages,
         },
         uk: {
-            pages: ukPages,
-            app: '../../apps/uk/src/app',
+            label: 'Hagen UK',
+            url: 'https://hagen.example.co.uk',
+            icon: '/icons/uk.svg',
+            pages: countryPages,
             collections: [Events],
         },
-    },
+    }),
+    site: () => process.env.KIZUNA_SITE,
 }),`;
 
-const readCode = `// every site
+const readCode = `// shared offices, with this site's own phone numbers
 kizuna.content.collections.offices
 
-// the UK alone
-kizuna.content.sites.uk.collections.events`;
+// the UK's own
+kizuna.content.of(['uk']).collections.events`;
 
 const points = [
     {
@@ -34,7 +39,7 @@ const points = [
     },
     {
         title: 'Each site’s own',
-        text: 'A site lists what only it has, and adds its own fields to what every site shows.',
+        text: 'A site lists what only it has, and sets its own values on shared fields.',
     },
 ];
 
@@ -52,7 +57,7 @@ export function CmsSites() {
             <div className={panel.panel}>
                 <div className={styles.split}>
                     <CodeWindow lang="ts" code={configCode} title="packages/content/kizuna.cms.config.ts" />
-                    <CodeWindow lang="ts" code={readCode} title="apps/uk/src/app/events/page.tsx" />
+                    <CodeWindow lang="ts" code={readCode} title="apps/countries/src/app/events/page.tsx" />
                 </div>
                 <div className={styles.points}>
                     {points.map((point) => (

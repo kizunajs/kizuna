@@ -24,8 +24,8 @@ A site's shape is `SiteSchema`, with the fields your pages need beside `label`, 
 import { z } from 'zod';
 import { declareSites } from '@kizunajs/cms';
 import { SiteSchema } from '@kizunajs/cms/schemas';
-import { pages as groupPages } from '../../../apps/group/src/cms.pages';
-import { pages as countryPages } from '../../../apps/countries/src/cms.pages';
+import { pages as groupPages } from './pages/group';
+import { pages as countryPages } from './pages/countries';
 import { Events } from './events';
 
 export const Site = SiteSchema.extend({
@@ -70,17 +70,17 @@ content: cms({
 }),
 ```
 
-`site` says which site a deployment is, and each deployment sets `KIZUNA_SITE`. The UK and Norway render the same countries app, deployed twice, so they share one pages module. Each still keeps its own page documents: the UK's `frontPage` and Norway's are edited and published apart. [Deployment](/docs/cms/deployment) shows the repository.
+`site` says which site a deployment is, and each deployment sets `KIZUNA_SITE`. The pages modules live in the content package too, at `src/pages/group.ts` and `src/pages/countries.ts`, and the apps import the content package, never the other way round. The UK and Norway render the same countries app, deployed twice, so they share one pages module. Each still keeps its own page documents: the UK's `frontPage` and Norway's are edited and published apart. [Deployment](/docs/cms/deployment) shows the repository.
 
 ## Reading
 
-A deployment reads its own site's view. On the UK's deployment, offices are the shared offices with the UK's values in place, and events are the UK's own:
+A deployment reads its own site's view. On the UK's deployment, offices are the shared offices with the UK's values in place, and events are the UK's own. Every site has offices, so they read straight from `kizuna.content`:
 
 ```tsx title="apps/countries/src/app/offices/page.tsx"
 const { items: offices } = await kizuna.content.collections.offices.list();
 ```
 
-The countries app serves two sites, and only one of them has events. `of` narrows the content to the sites an app serves, and checking `site` opens what that site has:
+`kizuna.content` is typed as any one of the declared sites' views, since the deployment decides which. The countries app serves two sites, and only one of them has events. `of` narrows the content to the sites an app serves, and checking `site` opens what that site has:
 
 ```tsx title="apps/countries/src/app/events/page.tsx"
 export default async function EventsPage() {
@@ -95,7 +95,7 @@ export default async function EventsPage() {
 }
 ```
 
-The declared site itself is typed, custom fields included:
+The group app narrows the same way, with `kizuna.content.of(['group'])`. The current site itself is typed, custom fields included:
 
 ```tsx title="apps/countries/src/app/layout.tsx"
 const site = await kizuna.content.site.get();
@@ -103,7 +103,9 @@ const site = await kizuna.content.site.get();
 <footer>{site.companyName}</footer>;
 ```
 
-Over HTTP, every content route sits under its site, at `/content/sites/uk/...`, and a client generated for one site has the same paths as `kizuna.content`. Caches are tagged per site, so a deployment refreshes only what it shows.
+`site.get()` returns the site's `key`, like `'uk'`, with its `label`, `url`, `icon`, `locales`, `status` and the fields `Site` adds.
+
+Over HTTP, every content route sits under its site, at `/content/sites/uk/...`, except media at `/content/media`, and a client generated for one site has the same paths as `kizuna.content`. Caches are tagged per site, so a deployment refreshes only what it shows.
 
 ## A site's own values on shared content
 
@@ -131,7 +133,9 @@ fields: [
 - **`perSite: true`** lets each site set its own value. A site that leaves it empty shows the shared one, and the editor shows the shared value as the placeholder, with the field marked **Shared** or with the site's label.
 - **`sites: ['uk']`** shows and stores the field on those sites alone. A page takes `sites` too, so the countries app's events page exists on the UK alone.
 
-A site's values are that site's draft. Its editors publish them, and only that site refreshes.
+A site's values are that site's draft. Its editors publish them, and only that site refreshes. When a site's editor changes a shared field of the same office too, the editor shows two pending changes: the site's values, which they publish, and the shared change, which goes to review for an admin over every site.
+
+`perSite` cannot go on the id, the slug, or a unique or indexed field, and `defineConfig` throws when it does, since those fields find a document and have to be the same on every site.
 
 ## Editors
 
@@ -145,13 +149,14 @@ auth: {
 },
 ```
 
-`sites` returns a role, or a list of roles, per site, as in `{ uk: 'editor' }`. An editor whose identity carries the role `admin` itself is an admin over every site and the shared content.
+`sites` returns a role, or a list of roles, per site, as in `{ uk: 'editor' }`. The role an editor's identity carries itself covers the shared content: `admin` there is an admin over the shared content and every site, and `editor` there drafts shared content and sees no site.
 
 | Editor                  | Shared content              | Their site              | Other sites       |
 | ----------------------- | --------------------------- | ----------------------- | ----------------- |
 | `admin` over every site | Write and publish           | Write and publish       | Write and publish |
 | `admin` on a site       | Draft, and ask for a review | As `admin` on one site  | Not shown         |
 | `editor` on a site      | Draft, and ask for a review | As `editor` on one site | Not shown         |
+| `editor` with no site   | Draft, and ask for a review | None                    | Not shown         |
 
 Inside a site, the [one-site rules](/docs/cms/editing/permissions#on-one-site) apply as they are. Shared content reaches every site, so an admin over every site publishes it. A site's editor never sees another site, in the admin, the API or MCP. [Who can do what](/docs/cms/editing/permissions#with-several-sites) shows each editor's screen.
 
@@ -159,7 +164,7 @@ Inside a site, the [one-site rules](/docs/cms/editing/permissions#on-one-site) a
 
 Before a shared document publishes, the editor shows where it appears on each site: the pages whose content holds it, and the pages that listed it when they last rendered.
 
-Publishing then refreshes every site and partner that shows the document. Each one gets a job of its own, calling its `invalidate` with `{ brand, id }`, and refreshes the pages that hold the id. The editor shows how it went:
+The list names partners under their label too. Publishing then refreshes every site and partner that shows the document. Each one gets a job of its own, calling its `invalidate` with `{ brand, id }`, and refreshes the pages that hold the id. A declared site's `invalidate` is at its `url` and `apiPath`, as in `https://hagen.example.co.uk/api/invalidate`, and the call carries a header signed with `KIZUNA_CMS_PREVIEW_SECRET`, which every app already shares. The editor shows how it went:
 
 <EditorFigure kind="fan-out" />
 
@@ -189,11 +194,24 @@ content: cms({
 
 ### What it reads
 
-`reads: ['uk']` is the UK's view and the shared content: the offices with the UK's phone numbers, and the UK's events. A read of Norway answers `403`, naming the permission it lacks, `content.sites.norway:read`.
+`reads: ['uk']` is the UK's view and the shared content: the offices with the UK's phone numbers, and the UK's events.
+
+Content routes are public until `auth.read` names an identity. Then every content route, media included, requires that identity, and each partner's `reads` limits what its token may read. A read of Norway answers `403`, naming the permission it lacks, `content.sites.norway:read`.
 
 ### How it signs in
 
-The travel agency signs in with OAuth client credentials. Your authorization server issues it a client, an `openIdConnect` identity verifies its tokens as on [OAuth](/docs/oauth), and the guard maps the token's client to the partner's name, `travelAgency`. The CMS verifies tokens and never issues them. A read that needs a token answers with `Cache-Control: private`, so no shared cache keeps it.
+The travel agency signs in with OAuth client credentials. Your authorization server issues it a client, and an `openIdConnect` identity verifies its tokens as on [OAuth](/docs/oauth). `auth.read` names that identity:
+
+```ts title="packages/content/kizuna.cms.config.ts"
+auth: {
+    identity: 'editor',
+    roles: ['editor', 'admin'],
+    sites: (editor) => editor.sites,
+    read: 'partner',
+},
+```
+
+The guard maps the token's client to the partner's name and returns it as `partner`, as in `{ partner: 'travelAgency' }`, and the CMS takes the sites that partner may read from its `reads`. The CMS verifies tokens and never issues them. A read with a token answers with `Cache-Control: private`, so no shared cache keeps it.
 
 ### What it installs
 
@@ -219,7 +237,7 @@ When a document it reads publishes, the CMS calls the partner's `invalidate` wit
 
 ## Sites created by admins
 
-Forty dealers, each with a site and a domain, on one app and one deployment. A developer never hears about a new site, since an admin creates it in the editor:
+Forty dealers, each with a site and its domains, on one app and one deployment. A developer never hears about a new site, since an admin creates it in the editor:
 
 ```ts title="src/cms/site.ts"
 export const Site = defineSite({
@@ -249,7 +267,7 @@ content: cms({
 }),
 ```
 
-The admin gives each dealer its label, address and the fields above, and the deployment picks the site from the address a request arrives at. A dealer's editors come from your identity's `sites`, under the dealer's key, and see their site alone. The rules below hold for these sites as for declared ones.
+The admin who creates a dealer's site picks its key, and gives it its label, its `domains` and the fields above. The deployment picks the site from the domain a request arrives at. A dealer's editors come from your identity's `sites`, under the dealer's key, and see their site alone. All forty sites share one deployment, so a publish refreshes that deployment once. The rules below hold for these sites as for declared ones.
 
 ## Starting with one site
 

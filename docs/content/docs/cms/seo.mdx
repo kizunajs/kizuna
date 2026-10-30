@@ -18,12 +18,12 @@ content: cms({
     db,
     pages,
     metadata: {
-        title: ({ title, settings }) => `${title} | ${settings.name}`,
+        title: ({ title, site }) => `${title} | ${site.label}`,
     },
 }),
 ```
 
-`settings` is the `Settings` global, so editors rename the site without a deploy. A title that already ends in the site's name, like the front page's "Acme Blog", gets nothing added.
+`site` is the current site, so with [several sites](/docs/cms/sites) each one's titles end in its own label. A project with one site takes its label from `name` on `cms()`. A title that already ends in the site's name, like the front page's "Acme Blog", gets nothing added.
 
 </Step>
 

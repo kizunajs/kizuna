@@ -9,7 +9,7 @@ defineSite({
 });
 ```
 
-When admins create sites in the editor, `defineSite` names the fields each one has beside the built-in `label`, `url`, `icon`, `locales` and `status`, with labels for the editor:
+When admins create sites in the editor, `defineSite` names the fields each one has beside the built-in `label`, `domains`, `icon`, `locales` and `status`, with labels for the editor. The admin who creates a site picks its key and its `domains`, and a request's domain picks the site:
 
 ```ts title="src/cms/site.ts"
 export const Site = defineSite({
@@ -43,6 +43,6 @@ content: cms({
 | -------- | --------- | ------------------------------------------------------------------- |
 | `fields` | `Field[]` | What an admin fills in for each site, as [fields](/docs/cms/fields) |
 
-`kizuna.content.site.get()` returns the current site, with these fields typed. Sites declared in code take [`declareSites()`](/docs/cms/reference/declare-sites) instead.
+`kizuna.content.site.get()` returns the current site, with its `key` and these fields typed. The sites share one deployment, so a publish refreshes it once. Sites declared in code take [`declareSites()`](/docs/cms/reference/declare-sites) instead.
 
 See [Sites created by admins](/docs/cms/sites#sites-created-by-admins).

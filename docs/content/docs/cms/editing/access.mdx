@@ -15,7 +15,7 @@ Editors sign in as an identity of your API, with the roles and permissions from 
 | Each person edits their own item        | [`item` on the collection](#their-own-item)                     |
 | A translator edits one language         | [`locales`](#one-language)                                      |
 | A field only some may change            | [`auth` on the field](#one-field)                               |
-| A country's editors edit their country  | [`sites`](/docs/cms/sites#editors)                              |
+| A site's editors edit their site        | [`sites`](/docs/cms/sites#editors)                              |
 | Someone looks before it goes live       | [`requireReview`](/docs/cms/editing/reviews#requiring-a-review) |
 
 `auth` on `cms()` covers every document. On a page, global or collection it replaces that, and on a field it narrows it. A list of rules passes when any one does, and nothing denies. The editor lists only what someone may write, and the model gets `403` for the rest.

@@ -5,15 +5,15 @@ description: 'The content routes, a client for readers, publishing one as a pack
 
 The CMS routes come in three groups:
 
-| Group        | Called by                | What it holds                                 |
-| ------------ | ------------------------ | --------------------------------------------- |
-| `content`    | Anyone                   | Published pages, globals, items and images    |
-| `editing`    | Editors and their agents | Drafts, publishing, versions, reviews, search |
-| `invalidate` | Your app                 | Refreshing pages that hold an id that changed |
+| Group        | Called by                                 | What it holds                                 |
+| ------------ | ----------------------------------------- | --------------------------------------------- |
+| `content`    | Anyone, or the identity `auth.read` names | Published pages, globals, items and images    |
+| `editing`    | Editors and their agents                  | Drafts, publishing, versions, reviews, search |
+| `invalidate` | Your app                                  | Refreshing pages that hold an id that changed |
 
-`GET /api/content/collections/employees` is the REST API, and every collection also serves `.../options`.
+`GET /api/content/collections/employees` is the REST API, and every collection also serves `.../options`. Content routes are public, and `auth.read` on `cms()` makes every one of them, media included, require the identity it names.
 
-With [several sites](/docs/cms/sites), every content route sits under its site, at `/content/sites/<site>/...`. `GET /api/content/sites/uk/collections/offices` answers with the shared offices and the UK's values in place, and `GET /api/content/sites/uk/collections/events` with the UK's events.
+With [several sites](/docs/cms/sites), every content route sits under its site, at `/content/sites/<site>/...`, and media stays at `/content/media`. `GET /api/content/sites/uk/collections/offices` answers with the shared offices and the UK's values in place, and `GET /api/content/sites/uk/collections/events` with the UK's events.
 
 ## A client for readers
 
@@ -34,18 +34,18 @@ Another repository, like a [partner's](/docs/cms/sites#partners), installs the c
 
 ```ts title="packages/content/kizuna.cms.config.ts"
 fetchClient({
-    output: './packages/uk-content/src/index.ts',
+    output: '../uk-content/src/index.ts',
     groups: ['content.sites.uk'],
 }),
 ```
 
-The package has two entries: the client, and `./ids` with the Zod brands, like `OfficeId`, so the other repository's own schemas hold your ids. Publish it where your packages go.
+The generator writes the Zod brands, like `OfficeId`, beside the client, so the package has two entries: the client, and `./ids` with the brands, for the other repository's own schemas to hold your ids. Publish it where your packages go.
 
 `kizuna diff` fails a change that would break a published client, judged by that client's `groups`, so a change to Norway never fails the UK's client. The snapshot records each brand's name, so renaming `EmployeeId` counts as breaking.
 
 ## Partners reading
 
-A partner reads with that client and a token from OAuth client credentials. It may read the sites its `reads` names and the shared content, and a read of another site answers `403`, naming the permission it lacks, like `content.sites.norway:read`. A read with a token answers with `Cache-Control: private`. [Partners](/docs/cms/sites#partners) shows the config, the sign-in and how a partner hears a publish.
+A partner reads with that client and a token from OAuth client credentials, signing in as the identity `auth.read` names. It may read the sites its `reads` names and the shared content, and a read of another site answers `403`, naming the permission it lacks, like `content.sites.norway:read`. A read with a token answers with `Cache-Control: private`. [Partners](/docs/cms/sites#partners) shows the config, the sign-in and how a partner hears a publish.
 
 ## Content in the app API
 
