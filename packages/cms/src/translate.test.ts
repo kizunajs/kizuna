@@ -5,7 +5,7 @@ import { Kizuna } from 'kizunajs';
 import { blocks, defineBlock } from './block.js';
 import { ImageSchema } from './image.js';
 import { RichTextSchema } from './rich-text.js';
-import { TranslationError, translateFields } from './translate.js';
+import { slugOf, TranslationError, translateFields } from './translate.js';
 import type { FieldList } from './field.js';
 
 const usage = {
@@ -83,7 +83,7 @@ const translate = (model: MockLanguageModelV4, fields: FieldList, values: Record
     });
 
 describe('translateFields', () => {
-    it('translates text and leaves numbers, enums, slugs and ids alone', async () => {
+    it('translates text and leaves numbers, enums, ids and strings with a pattern alone', async () => {
         const { model, calls } = translator();
         const fields: FieldList = [
             {
@@ -91,8 +91,8 @@ describe('translateFields', () => {
                 schema: z.string().max(60),
             },
             {
-                name: 'slug',
-                schema: z.string().regex(/^[a-z0-9-]+$/),
+                name: 'sku',
+                schema: z.string().regex(/^[A-Z0-9-]+$/),
             },
             {
                 name: 'price',
@@ -109,7 +109,7 @@ describe('translateFields', () => {
         ];
         const translated = await translate(model, fields, {
             heading: 'Plants for a dark office',
-            slug: 'plants-for-a-dark-office',
+            sku: 'PLANT-DARK-01',
             price: 120,
             category: 'plants',
             office: 'office-oslo',
@@ -122,6 +122,63 @@ describe('translateFields', () => {
                 t0: 'Plants for a dark office',
             },
         ]);
+    });
+
+    it('makes the slug from the translated title', async () => {
+        const { model, calls } = translator();
+        const translated = await translate(
+            model,
+            [
+                {
+                    name: 'title',
+                    schema: z.string(),
+                },
+                {
+                    name: 'slug',
+                    schema: z.string().regex(/^[a-z0-9-]+$/),
+                },
+            ],
+            {
+                title: 'Plants for a dark office',
+                slug: 'plants-for-a-dark-office',
+            }
+        );
+        expect(translated).toEqual({
+            title: 'Planter for et mørkt kontor',
+            slug: 'planter-for-et-morkt-kontor',
+        });
+        expect(calls).toEqual([
+            {
+                t0: 'Plants for a dark office',
+            },
+        ]);
+    });
+
+    it('keeps the source slug when the slug made from the title does not fit', async () => {
+        const { model } = translator();
+        const translated = await translate(
+            model,
+            [
+                {
+                    name: 'title',
+                    schema: z.string(),
+                },
+                {
+                    name: 'slug',
+                    schema: z
+                        .string()
+                        .regex(/^[a-z0-9-]+$/)
+                        .max(12),
+                },
+            ],
+            {
+                title: 'Plants for a dark office',
+                slug: 'dark-office',
+            }
+        );
+        expect(translated).toEqual({
+            title: 'Planter for et mørkt kontor',
+        });
     });
 
     it('keeps the structure of rich text and translates only its spans and image alt text', async () => {
@@ -352,5 +409,12 @@ describe('translateFields', () => {
                 }
             )
         ).rejects.toThrow("The model's translation from en to nb does not fit the fields.");
+    });
+});
+
+describe('slugOf', () => {
+    it('writes letters without their accents, and joins words with hyphens', () => {
+        expect(slugOf('Åpningstider på Grünerløkka')).toBe('apningstider-pa-grunerlokka');
+        expect(slugOf('  Café & Bar, 24/7 ')).toBe('cafe-bar-24-7');
     });
 });

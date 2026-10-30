@@ -129,6 +129,38 @@ const place = (target: Values, path: Path, text: string): void => {
     current[path.at(-1)!] = text;
 };
 
+const LETTERS: Readonly<Record<string, string>> = {
+    æ: 'ae',
+    ø: 'o',
+    œ: 'oe',
+    ß: 'ss',
+    đ: 'd',
+    ł: 'l',
+};
+
+/**
+ * A title as an address segment: `Planter for et mørkt kontor` is
+ * `planter-for-et-morkt-kontor`.
+ */
+export const slugOf = (title: string): string =>
+    title
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/\p{M}/gu, '')
+        .replace(/[æøœßđł]/g, (letter) => LETTERS[letter]!)
+        .replace(/[^\p{L}\p{N}]+/gu, '-')
+        .replace(/^-+|-+$/g, '');
+
+/**
+ * The field a slug is made from: `title`, or else the first text field the
+ * model translated.
+ */
+const titleOf = (fields: FieldList, found: readonly Text[]): string | undefined => {
+    const names = dataFields(fields).map((field) => field.name);
+    if (names.includes('title')) return 'title';
+    return found.find((text) => text.path.length === 1)?.path[0] as string | undefined;
+};
+
 const languageName = (code: string): string => {
     try {
         const name = new Intl.DisplayNames(['en'], {
@@ -149,8 +181,9 @@ const instructions = (from: string, to: string): string =>
 
 /**
  * The fields' values in another language, asked of the model: text, rich
- * text and an image's alt text, each in its place. Answers only the fields
- * that hold something to translate, and writes nothing.
+ * text and an image's alt text, each in its place, and a `slug` made from
+ * the translated title. Answers only the fields that hold something to
+ * translate, and writes nothing.
  *
  * @example
  * const translated = await translateFields({
@@ -191,6 +224,12 @@ export const translateFields = async (input: TranslateInput): Promise<Record<str
         Object.fromEntries(found.map((text) => [text.path[0]!, input.values[text.path[0] as string]]))
     );
     found.forEach((text, index) => place(translated, text.path, answer[`t${index}`]!));
+    const slug = dataFields(input.fields).find((field) => field.name === 'slug' && field.localized !== false);
+    const title = titleOf(input.fields, found);
+    if (slug !== undefined && title !== undefined && typeof translated[title] === 'string') {
+        const derived = slugOf(translated[title]);
+        if (derived !== '' && z.safeParse(slug.schema, derived).success) translated['slug'] = derived;
+    }
     for (const field of dataFields(input.fields)) {
         if (!(field.name in translated)) continue;
         const parsed = z.safeParse(field.schema, translated[field.name]);
