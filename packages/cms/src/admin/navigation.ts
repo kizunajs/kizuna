@@ -431,10 +431,6 @@ export interface NavigationEntry {
 
 export interface NavigationSection {
     label: string;
-    /**
-     * A line under the heading, like Shared's "Read by every site".
-     */
-    note?: string;
     entries: NavigationEntry[];
 }
 
@@ -448,11 +444,6 @@ export const CONTENT_GROUP = 'Content';
  * The heading the shared content sits under, with several sites.
  */
 export const SHARED_GROUP = 'Shared';
-
-/**
- * What the shared content's heading says of it.
- */
-export const SHARED_NOTE = 'Read by every site';
 
 /**
  * The sidebar's headings: Content first, with the pages and the media, then each `group`
@@ -573,7 +564,6 @@ const siteNavigationOf = (options: Parameters<typeof navigationOf>[0], declared:
               };
     const shared: NavigationSection = {
         label: SHARED_GROUP,
-        note: SHARED_NOTE,
         entries: [
             {
                 label: 'Media',

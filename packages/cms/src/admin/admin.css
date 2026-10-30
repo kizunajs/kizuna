@@ -155,13 +155,6 @@
         flex: 1;
     }
 
-    .k-sidebar__note {
-        margin: -2px 0 4px;
-        padding: 0 9px;
-        font-size: 12px;
-        color: var(--k-muted);
-    }
-
     .k-sidebar__count {
         flex-shrink: 0;
         padding: 0 7px;

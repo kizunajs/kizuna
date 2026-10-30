@@ -420,7 +420,6 @@ export function Admin({ config }: { config: AdminConfig }) {
                 return (
                     <div key={section.label} className="k-sidebar__group" data-shared={shared ? '' : undefined}>
                         <h2 className="k-heading k-sidebar__heading">{section.label}</h2>
-                        {section.note === undefined ? null : <p className="k-sidebar__note">{section.note}</p>}
                         {section.entries.map((entry) => {
                             const Icon = sites.length === 0 ? undefined : entryIconOf(entry.screen);
                             return (

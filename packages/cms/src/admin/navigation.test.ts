@@ -421,7 +421,7 @@ describe('the admin navigation with several sites', () => {
         for (const [screen, site, address] of moves) expect(hrefIn(site, screenInSite(screen, site))).toBe(address);
     });
 
-    it("lists the site's own content under its label, then the shared content under Shared, read by every site", () => {
+    it("lists the site's own content under its label, then the shared content under Shared", () => {
         const sections = navigationOf({
             globals: [
                 {
@@ -450,9 +450,9 @@ describe('the admin navigation with several sites', () => {
             sites: SITES,
             site: 'uk',
         });
-        expect(sections.map((section) => [section.label, section.note, section.entries.map((entry) => entry.label)])).toEqual([
-            ['Hagen UK', undefined, ['Pages', 'Settings', 'Events']],
-            ['Shared', 'Read by every site', ['Media', 'Privacy policy', 'Employees', 'Offices']],
+        expect(sections.map((section) => [section.label, section.entries.map((entry) => entry.label)])).toEqual([
+            ['Hagen UK', ['Pages', 'Settings', 'Events']],
+            ['Shared', ['Media', 'Privacy policy', 'Employees', 'Offices']],
         ]);
         expect(sections.flatMap((section) => section.entries).map((entry) => hrefOf(entry.screen))).toEqual([
             '/admin/uk/pages',
