@@ -1,5 +1,5 @@
 import { Fragment, isValidElement, type ReactNode } from 'react';
-import { hrefOf } from './navigation.js';
+import { trailStart } from './navigation.js';
 
 /**
  * One step of the trail back from a screen: its label, and where it leads.
@@ -8,13 +8,6 @@ export interface Crumb {
     label: string;
     href?: string;
 }
-
-const DASHBOARD_CRUMB: Crumb = {
-    label: 'Dashboard',
-    href: hrefOf({
-        kind: 'dashboard',
-    }),
-};
 
 /**
  * One fact in the header's line given as a label and its value, like
@@ -31,7 +24,8 @@ const isPair = (fact: unknown): fact is MetaPair =>
 /**
  * The header every screen opens with: the trail back to it, its title with
  * its actions on the right, a line of facts about it, and its tabs. The
- * trail starts at the dashboard and ends on the title, so a screen passes
+ * trail starts at the dashboard, or with several sites at the site open or
+ * Shared, and ends on the title, so a screen passes
  * only the steps between them. The dashboard passes no `crumbs` and shows no
  * trail.
  *
@@ -59,7 +53,7 @@ export function PageHeader({
     actions?: ReactNode;
     tabs?: ReactNode;
 }) {
-    const trail = crumbs === undefined ? undefined : [DASHBOARD_CRUMB, ...crumbs];
+    const trail = crumbs === undefined ? undefined : [trailStart(), ...crumbs];
     const facts = (meta ?? []).filter((fact) => fact !== null && fact !== undefined && fact !== false && fact !== '');
     const pairs = facts.length > 0 && facts.every(isPair);
     return (

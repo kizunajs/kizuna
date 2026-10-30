@@ -8,6 +8,7 @@ import { defineConfig, Kizuna } from 'kizunajs';
 import type { ContentRuntime } from 'kizunajs/plugin';
 import { expressAdapter } from '@kizunajs/express';
 import { cms } from '../provider.js';
+import { declareSites, SiteSchema } from '../site.js';
 import type { SignInAttempt, SignOutRequest } from '../options.js';
 import { PREVIEW_COOKIE } from '../preview-token.js';
 import type { AdminConfig } from './config.js';
@@ -325,6 +326,48 @@ describe('signing out', () => {
     it("gives the admin the site's name, for its tab titles", async () => {
         const response = await request(app).get('/admin').set('authorization', 'Bearer editor-token');
         expect(configIn<AdminConfig>(response.text).siteName).toBe('Hagen');
+    });
+});
+
+describe('the sign-in screen of a deployment with several sites', () => {
+    const withSites = defineConfig({
+        adapter: expressAdapter(),
+        auth: {
+            identities: {
+                editor,
+            },
+        },
+        content: cms({
+            name: 'Hagen',
+            db: drizzle(pglite),
+            sites: declareSites(SiteSchema, {
+                uk: {
+                    label: 'Hagen UK',
+                    url: 'https://hagen.example.co.uk',
+                    icon: '/icons/uk.svg',
+                },
+                norway: {
+                    label: 'Hagen Norge',
+                    url: 'https://hagen.example.no',
+                    icon: '/icons/norway.svg',
+                },
+            }),
+            site: () => 'uk',
+            auth: {
+                identity: 'editor',
+                signIn,
+                signOut,
+            },
+        }),
+    });
+    const sitesApp = express();
+    withSites.api.mount(sitesApp);
+
+    it("asks the editor to sign in to the site this deployment shows, under that site's icon", async () => {
+        const response = await request(sitesApp).get('/admin/login');
+        const served = configIn<SignInConfig>(response.text);
+        expect(served.siteName).toBe('Hagen UK');
+        expect(served.siteIcon).toBe('https://hagen.example.co.uk/icons/uk.svg');
     });
 });
 

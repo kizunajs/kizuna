@@ -4,6 +4,7 @@ import { Field } from '@base-ui/react/field';
 import { Form } from '@base-ui/react/form';
 import { Logo } from '../view/logo.js';
 import type { SignInConfig } from './sign-in-config.js';
+import { useTabIcon } from './tab-icon.js';
 import { useTheme } from './theme.js';
 
 const NO_ACCESS = 'This account cannot edit. Sign in as an editor.';
@@ -21,11 +22,13 @@ const messageFor = (status: number): string => {
 /**
  * The admin's sign-in screen: an email, a password and a Sign in button,
  * sent to the CMS's sign-in route. Once the editor is in, the page goes on
- * to `next`. With the site's name, it asks them to sign in to it.
+ * to `next`. With the site's name, it asks them to sign in to it, under the
+ * site's icon when it has one.
  */
 export function SignIn({ config }: { config: SignInConfig }) {
     // The screen shows the light or dark the editor chose in the admin.
     useTheme();
+    useTabIcon(config.siteIcon);
     const [error, setError] = useState<string | null>(config.noAccess ? NO_ACCESS : null);
     const [pending, setPending] = useState(false);
     const heading = config.siteName === undefined ? 'Sign in' : `Sign in to ${config.siteName}`;
@@ -75,7 +78,11 @@ export function SignIn({ config }: { config: SignInConfig }) {
                 className="k-sign-in__form"
                 aria-labelledby="k-sign-in__title"
                 onFormSubmit={(values: { email: string; password: string }) => void signIn(values)}>
-                <Logo />
+                {config.siteIcon === undefined ? (
+                    <Logo />
+                ) : (
+                    <img className="k-sign-in__icon" src={config.siteIcon} alt="" width={36} height={36} />
+                )}
                 <h1 id="k-sign-in__title" className="k-sign-in__title">
                     {heading}
                 </h1>

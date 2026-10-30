@@ -3,7 +3,7 @@ import { Toast } from '@base-ui/react/toast';
 import { Tooltip } from '@base-ui/react/tooltip';
 import { Admin } from './admin.js';
 import type { AdminConfig } from './config.js';
-import { addressOfHash, setAdminPath } from './navigation.js';
+import { addressOfHash, setAdminPath, setSites } from './navigation.js';
 import { Toasts } from './toasts.js';
 
 const readConfig = (): AdminConfig => {
@@ -25,6 +25,7 @@ const readConfig = (): AdminConfig => {
 
 const config = readConfig();
 setAdminPath(config.adminPath);
+setSites(config.sites ?? []);
 // A link from before screens had paths, like `/admin#/collections/employees`, moves to the path once.
 const moved = addressOfHash(window.location.hash);
 if (moved !== undefined) window.history.replaceState(null, '', moved);

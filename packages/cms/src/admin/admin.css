@@ -135,6 +135,48 @@
         color: var(--k-ink);
     }
 
+    /* With several sites, Shared sits a step apart, its heading carrying every site's icon. */
+    .k-sidebar__group[data-shared] {
+        margin-top: 8px;
+    }
+
+    .k-sidebar__heading {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .k-site-stack {
+        display: inline-flex;
+    }
+
+    .k-site-stack .k-site-icon {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+        box-shadow: 0 0 0 2px var(--k-canvas);
+    }
+
+    .k-site-stack .k-site-icon + .k-site-icon {
+        margin-left: -4px;
+    }
+
+    .k-sidebar__icon {
+        flex-shrink: 0;
+        color: var(--k-muted);
+    }
+
+    .k-sidebar__label {
+        flex: 1;
+    }
+
+    .k-sidebar__note {
+        margin: -2px 0 4px;
+        padding: 0 9px;
+        font-size: 12px;
+        color: var(--k-muted);
+    }
+
     .k-sidebar__count {
         flex-shrink: 0;
         padding: 0 7px;
@@ -154,6 +196,89 @@
         padding: 8px 9px;
         font-size: 12.5px;
         color: var(--k-muted);
+    }
+
+    /* The site switcher: the site shown, with its icon, opening a menu of the sites. It matches the search button under it. */
+    .k-site-switcher {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        min-height: 36px;
+        padding: 0 9px;
+        border: 0;
+        border-radius: var(--k-radius-control);
+        background: var(--k-control);
+        box-shadow: var(--k-control-elevation);
+        font: inherit;
+        font-size: 13.5px;
+        font-weight: 500;
+        text-align: left;
+        color: var(--k-ink);
+        cursor: pointer;
+    }
+
+    .k-site-switcher:hover,
+    .k-site-switcher[data-popup-open] {
+        background: var(--k-control-hover);
+    }
+
+    .k-site-switcher:focus-visible {
+        outline: 2px solid var(--k-ink);
+        outline-offset: 2px;
+    }
+
+    .k-site-switcher__label {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .k-site-switcher__chevron {
+        flex-shrink: 0;
+        color: var(--k-muted);
+    }
+
+    .k-site-icon {
+        display: inline-flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 5px;
+        object-fit: contain;
+        color: var(--k-muted);
+    }
+
+    .k-site-icon--letter {
+        background: var(--k-ink);
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--k-canvas);
+    }
+
+    /* A header's Site: the site's icon, or Shared's, before its label. */
+    .k-site-fact {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .k-site-fact .k-site-icon {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+    }
+
+    .k-site-menu {
+        width: var(--anchor-width);
+    }
+
+    .k-site-menu .k-menu__item {
+        font-size: 13.5px;
+    }
+
+    .k-site-menu .k-menu__item[aria-current] {
+        font-weight: 500;
     }
 
     /* Screens */
@@ -996,6 +1121,18 @@
 
     .k-document__problem {
         padding: 10px var(--k-gutter) 0;
+    }
+
+    /* A site's view of shared content says so under the header. */
+    .k-document__site-note {
+        margin: 0;
+        padding: 10px var(--k-gutter) 0;
+    }
+
+    .k-document__site-link {
+        color: var(--k-ink);
+        text-decoration: underline;
+        text-underline-offset: 2px;
     }
 
     /* A record of a view: what its action answered under the header, and its id in the header's line. */
@@ -2040,6 +2177,11 @@
 
     .k-nav-sheet .k-sidebar__search {
         height: 44px;
+        font-size: 14px;
+    }
+
+    .k-nav-sheet .k-site-switcher {
+        min-height: 44px;
         font-size: 14px;
     }
 

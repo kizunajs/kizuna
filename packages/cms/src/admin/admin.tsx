@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
 import { Toast } from '@base-ui/react/toast';
-import { Menu as MenuIcon, X } from 'lucide-react';
+import { FileText, Globe, Image, Library, Menu as MenuIcon, Table2, X, type LucideIcon } from 'lucide-react';
 import { EditorContext, ICON, type EditorContextValue } from '../view/context.js';
 import { singularOf } from '../view/array-rows.js';
+import { humanize } from '../view/schema.js';
 import { Logo } from '../view/logo.js';
 import { usePeople } from '../view/people.js';
 import { CommandPalette, SearchButton, usePaletteShortcut } from './command-palette.js';
@@ -16,6 +17,7 @@ import { CollectionList, PagesList, createItem } from './list.js';
 import { MediaLibrary } from './media.js';
 import {
     CONTENT_GROUP,
+    SHARED_GROUP,
     hrefOf,
     inAppTargetOf,
     isCurrent,
@@ -31,7 +33,9 @@ import {
 import { Loading } from './parts.js';
 import { PageHeader } from './page-header.js';
 import { SignedIn } from './signed-in.js';
+import { SiteFact, SiteStack, SiteSwitcher } from './site-switcher.js';
 import { NotFound, shownAddress } from './states.js';
+import { useTabIcon } from './tab-icon.js';
 import { useTheme } from './theme.js';
 import { useOfferUndo } from './toasts.js';
 import type { PaletteAction } from './search.js';
@@ -85,6 +89,19 @@ const usePhone = (): boolean => {
 };
 
 const open = (screen: Screen): void => navigate(hrefOf(screen));
+
+/**
+ * The icon a sidebar entry shows with several sites, so pages, collections
+ * and globals read apart under each heading.
+ */
+const entryIconOf = (screen: Screen): LucideIcon | undefined => {
+    if (screen.kind === 'pages') return FileText;
+    if (screen.kind === 'collection') return Library;
+    if (screen.kind === 'media') return Image;
+    if (screen.kind === 'view') return Table2;
+    if (screen.kind === 'document') return Globe;
+    return undefined;
+};
 
 /**
  * The admin: a sidebar of everything the editor may open, and the screen the
@@ -167,6 +184,8 @@ export function Admin({ config }: { config: AdminConfig }) {
         if (screen.kind !== 'document') void loadLists();
     }, [screen, loadLists]);
 
+    const sites = useMemo(() => config.sites ?? [], [config.sites]);
+    const site = sites.find((candidate) => candidate.key === screen.site);
     const sections = useMemo(
         () =>
             navigationOf({
@@ -174,8 +193,14 @@ export function Admin({ config }: { config: AdminConfig }) {
                 collections: collections ?? [],
                 views: views ?? [],
                 groups: config.groups,
+                sites,
+                ...(site === undefined
+                    ? {}
+                    : {
+                          site: site.key,
+                      }),
             }),
-        [globals, collections, views, config.groups]
+        [globals, collections, views, config.groups, sites, site]
     );
 
     // The tab is named after the screen: a document by its title, and anything else as the sidebar names it.
@@ -183,9 +208,11 @@ export function Admin({ config }: { config: AdminConfig }) {
         screen.kind === 'document'
             ? documentHeading
             : sections.flatMap((section) => section.entries).find((entry) => isCurrent(entry.screen, screen))?.label;
+    const siteName = site?.label ?? config.siteName;
     useEffect(() => {
-        window.document.title = tabTitleOf(screen.kind === 'dashboard' ? 'Dashboard' : screenTitle, config.siteName);
-    }, [screen.kind, screenTitle, config.siteName]);
+        window.document.title = tabTitleOf(screen.kind === 'dashboard' ? 'Dashboard' : screenTitle, siteName);
+    }, [screen.kind, screenTitle, siteName]);
+    useTabIcon(site?.icon ?? undefined);
 
     const groupOf = (name: string): string => config.groups[name] ?? CONTENT_GROUP;
     const collectionLabel = (name: string): string | undefined => collections?.find((collection) => collection.name === name)?.label;
@@ -266,12 +293,39 @@ export function Admin({ config }: { config: AdminConfig }) {
 
     const shown = (() => {
         if (screen.kind === 'missing') return missing('screen');
-        if (screen.kind === 'pages') return <PagesList connection={connection} routes={config.routes} />;
+        if (screen.kind === 'pages') {
+            return (
+                <PagesList
+                    connection={connection}
+                    routes={config.routes}
+                    site={screen.site}
+                    siteFact={sites.length === 0 ? undefined : <SiteFact site={site} />}
+                />
+            );
+        }
         if (screen.kind === 'media') {
-            return <MediaLibrary connection={connection} selectedId={screen.id} people={people} collectionLabel={collectionLabel} />;
+            return (
+                <MediaLibrary
+                    connection={connection}
+                    selectedId={screen.id}
+                    people={people}
+                    collectionLabel={collectionLabel}
+                    site={screen.site}
+                />
+            );
         }
         if (screen.kind === 'collection') {
-            const collection = collections?.find((candidate) => candidate.name === screen.name);
+            const own = site?.collections.find((candidate) => candidate.name === screen.name);
+            // TODO(sites): the collections route lists the shared collections alone, so a site's own lists from the config until it lists them too.
+            const collection =
+                collections?.find((candidate) => candidate.name === screen.name) ??
+                (own === undefined || collections === undefined
+                    ? undefined
+                    : {
+                          name: own.name,
+                          label: own.label ?? humanize(own.name),
+                          count: 0,
+                      });
             if (collection === undefined) {
                 if (collections !== undefined) return missing('list');
                 return (
@@ -282,20 +336,21 @@ export function Admin({ config }: { config: AdminConfig }) {
             }
             return (
                 <CollectionList
-                    key={collection.name}
+                    key={`${screen.site ?? ''}:${collection.name}`}
                     connection={connection}
                     collection={collection}
                     group={groupOf(collection.name)}
                     options={config.lists[collection.name]}
                     routes={config.routes}
                     onOpen={openDocument}
+                    siteFact={sites.length === 0 ? undefined : <SiteFact site={own === undefined ? undefined : site} />}
                 />
             );
         }
         if (screen.kind === 'document') {
             return (
                 <DocumentScreen
-                    key={screen.ref}
+                    key={`${screen.site ?? ''}:${screen.ref}`}
                     connection={connection}
                     documentRef={screen.ref}
                     siteUrl={config.siteUrl}
@@ -307,6 +362,7 @@ export function Admin({ config }: { config: AdminConfig }) {
                     onSearch={openSearch}
                     onTitle={setDocumentHeading}
                     paletteActions={documentActions}
+                    site={screen.site}
                 />
             );
         }
@@ -359,22 +415,34 @@ export function Admin({ config }: { config: AdminConfig }) {
                     ) : null}
                 </a>
             </div>
-            {sections.map((section) => (
-                <div key={section.label} className="k-sidebar__group">
-                    <h2 className="k-heading">{section.label}</h2>
-                    {section.entries.map((entry) => (
-                        <a
-                            key={hrefOf(entry.screen)}
-                            className="k-sidebar__item"
-                            href={hrefOf(entry.screen)}
-                            aria-current={isCurrent(entry.screen, screen) ? 'page' : undefined}>
-                            <span className="k-ellipsis">{entry.label}</span>
-                        </a>
-                    ))}
-                </div>
-            ))}
+            {sections.map((section) => {
+                const shared = sites.length > 0 && section.label === SHARED_GROUP;
+                return (
+                    <div key={section.label} className="k-sidebar__group" data-shared={shared ? '' : undefined}>
+                        <h2 className="k-heading k-sidebar__heading">
+                            {section.label}
+                            {shared ? <SiteStack sites={sites} /> : null}
+                        </h2>
+                        {section.note === undefined ? null : <p className="k-sidebar__note">{section.note}</p>}
+                        {section.entries.map((entry) => {
+                            const Icon = sites.length === 0 ? undefined : entryIconOf(entry.screen);
+                            return (
+                                <a
+                                    key={hrefOf(entry.screen)}
+                                    className="k-sidebar__item"
+                                    href={hrefOf(entry.screen)}
+                                    aria-current={isCurrent(entry.screen, screen) ? 'page' : undefined}>
+                                    {Icon === undefined ? null : <Icon {...ICON} className="k-sidebar__icon" />}
+                                    <span className="k-sidebar__label k-ellipsis">{entry.label}</span>
+                                </a>
+                            );
+                        })}
+                    </div>
+                );
+            })}
         </div>
     );
+    const switcher = sites.length === 0 ? null : <SiteSwitcher sites={sites} screen={screen} />;
     const signedIn = (
         <SignedIn
             person={me}
@@ -414,6 +482,7 @@ export function Admin({ config }: { config: AdminConfig }) {
                                                 <X {...ICON} />
                                             </Dialog.Close>
                                         </div>
+                                        {switcher}
                                         <SearchButton onOpen={openSearch} />
                                         {groups}
                                         {signedIn}
@@ -427,6 +496,7 @@ export function Admin({ config }: { config: AdminConfig }) {
                 ) : (
                     <nav className="k-sidebar" aria-label="Admin">
                         {brand}
+                        {switcher}
                         <SearchButton onOpen={openSearch} />
                         {groups}
                         {signedIn}

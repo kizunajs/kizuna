@@ -27,6 +27,7 @@ import {
     type MediaScope,
     type MediaUse,
 } from './media-library.js';
+import { withMediaSite } from './connection.js';
 import { hrefOf, navigate } from './navigation.js';
 import { PageHeader } from './page-header.js';
 import { Loading, problemOf } from './parts.js';
@@ -80,16 +81,23 @@ const openImage = (id: string | undefined): void => {
  * set, its uses listed, and it is deleted.
  */
 export function MediaLibrary({
-    connection,
+    connection: anyConnection,
     selectedId,
     people,
     collectionLabel,
+    site,
 }: {
     connection: Connection;
     selectedId: string | undefined;
     people: People | undefined;
     collectionLabel: (name: string) => string | undefined;
+    /**
+     * The site the library is shown in, which lists its own images beside the
+     * shared ones and keeps what is uploaded.
+     */
+    site?: string | undefined;
 }) {
+    const connection = useMemo(() => withMediaSite(anyConnection, site), [anyConnection, site]);
     const toasts = Toast.useToastManager();
     const [items, setItems] = useState<MediaItem[] | undefined>();
     const [maxBytes, setMaxBytes] = useState<number | undefined>();
@@ -419,9 +427,9 @@ export function MediaLibrary({
                     ) : (
                         <>
                             {layout === 'grid' ? (
-                                <MediaGrid items={shownPage.rows} selectedId={selectedId} />
+                                <MediaGrid items={shownPage.rows} selectedId={selectedId} sharedShown={site !== undefined} />
                             ) : (
-                                <MediaTable items={shownPage.rows} selectedId={selectedId} />
+                                <MediaTable items={shownPage.rows} selectedId={selectedId} sharedShown={site !== undefined} />
                             )}
                             <Pager
                                 page={shownPage.page}
@@ -465,7 +473,18 @@ export function MediaLibrary({
     );
 }
 
-function MediaGrid({ items, selectedId }: { items: readonly MediaItem[]; selectedId: string | undefined }) {
+function MediaGrid({
+    items,
+    selectedId,
+    sharedShown,
+}: {
+    items: readonly MediaItem[];
+    selectedId: string | undefined;
+    /**
+     * Marks each shared image, in a site's library.
+     */
+    sharedShown: boolean;
+}) {
     const { resolveUrl } = useEditorContext();
     return (
         <ul className="k-media-library__grid" aria-label="Images">
@@ -484,7 +503,9 @@ function MediaGrid({ items, selectedId }: { items: readonly MediaItem[]; selecte
                             <span className="k-media-tile__detail">
                                 {bytesOf(item.size)} · {item.width} × {item.height}
                             </span>
-                            <span className="k-media-tile__detail">{usageOf(item.uses)}</span>
+                            <span className="k-media-tile__detail">
+                                {sharedShown && item.site === undefined ? `${usageOf(item.uses)} · Shared` : usageOf(item.uses)}
+                            </span>
                         </span>
                     </a>
                 </li>
@@ -493,7 +514,15 @@ function MediaGrid({ items, selectedId }: { items: readonly MediaItem[]; selecte
     );
 }
 
-function MediaTable({ items, selectedId }: { items: readonly MediaItem[]; selectedId: string | undefined }) {
+function MediaTable({
+    items,
+    selectedId,
+    sharedShown,
+}: {
+    items: readonly MediaItem[];
+    selectedId: string | undefined;
+    sharedShown: boolean;
+}) {
     const { resolveUrl } = useEditorContext();
     return (
         <div className="k-table__scroll">
@@ -519,6 +548,7 @@ function MediaTable({ items, selectedId }: { items: readonly MediaItem[]; select
                                     aria-current={item.id === selectedId ? 'true' : undefined}>
                                     <img className="k-media-table__thumb" src={resolveUrl(`${item.url}?w=120`)} alt="" loading="lazy" />
                                     <span className="k-ellipsis">{item.filename}</span>
+                                    {sharedShown && item.site === undefined ? <span className="k-help">Shared</span> : null}
                                 </a>
                             </td>
                             <td>{bytesOf(item.size)}</td>

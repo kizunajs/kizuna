@@ -91,3 +91,35 @@ export const connectOverHttp = (options: { apiPath: string; routes: Record<strin
         },
     };
 };
+
+/**
+ * The media routes a site's screens list and upload through.
+ */
+const SITE_MEDIA_TOOLS = ['editing_media_list', 'editing_media_create_upload'];
+
+// TODO(sites): the `site` query the CMS's media routes are expected to take.
+/**
+ * A connection whose media calls name `site`, so a site's library lists its
+ * own images beside the shared ones and an upload belongs to it. Without a
+ * site, media calls list and upload shared images alone.
+ */
+export const withMediaSite = (connection: Connection, site: string | undefined): Connection =>
+    site === undefined
+        ? connection
+        : {
+              ...connection,
+              call: (name, input, options) =>
+                  connection.call(
+                      name,
+                      SITE_MEDIA_TOOLS.includes(name)
+                          ? {
+                                ...input,
+                                query: {
+                                    ...((input?.['query'] ?? {}) as Record<string, unknown>),
+                                    site,
+                                },
+                            }
+                          : input,
+                      options
+                  ),
+          };

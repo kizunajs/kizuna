@@ -61,6 +61,45 @@ export interface AdminConfig {
      * `null` when the API serves no MCP route.
      */
     chat?: ChatConnection | null;
+    /**
+     * The sites the editor may open, from `sites` on `cms()`, which the
+     * sidebar's switcher lists. Empty for a project with one site.
+     */
+    sites?: AdminSite[];
+}
+
+/**
+ * One of the sites `declareSites()` made, as the admin's switcher and
+ * addresses know it.
+ */
+export interface AdminSite {
+    key: string;
+    label: string;
+    /**
+     * The site's icon as a full URL, which the switcher and the browser tab
+     * show, or `null` without one.
+     */
+    icon: string | null;
+    /**
+     * The names of the site's pages.
+     */
+    pages: string[];
+    /**
+     * The globals only this site has.
+     */
+    globals: AdminSiteEntry[];
+    /**
+     * The collections only this site has.
+     */
+    collections: AdminSiteEntry[];
+}
+
+export interface AdminSiteEntry {
+    name: string;
+    /**
+     * The definition's `label`, or `null` to show its name.
+     */
+    label: string | null;
 }
 
 /**

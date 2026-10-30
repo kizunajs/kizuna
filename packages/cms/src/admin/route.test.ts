@@ -8,6 +8,9 @@ import { defineConfig, Kizuna } from 'kizunajs';
 import { expressAdapter } from '@kizunajs/express';
 import { mcpPlugin } from '@kizunajs/mcp';
 import { defineCollection } from '../definitions.js';
+import { definePages } from '../options.js';
+import { definePage } from '../page.js';
+import { declareSites, SiteSchema } from '../site.js';
 import { cms } from '../provider.js';
 import type { AdminConfig } from './config.js';
 
@@ -264,5 +267,113 @@ describe('adminCss', () => {
         const response = await request(app).get('/admin').set('authorization', 'Bearer editor-token');
         expect(response.text).not.toContain('<link rel="stylesheet"');
         expect(response.text).not.toContain('kizuna-cms-stylesheet');
+    });
+});
+
+const Events = defineCollection({
+    name: 'events',
+    id: Kizuna.brand('EventId', z.string()),
+    label: 'Events',
+    fields: [
+        {
+            name: 'title',
+            schema: z.string(),
+        },
+    ],
+});
+
+const FrontPage = definePage({
+    name: 'frontPage',
+    fields: [
+        {
+            name: 'heading',
+            schema: z.string(),
+        },
+    ],
+});
+
+const countryPages = definePages({
+    frontPage: {
+        path: '/',
+        page: FrontPage,
+    },
+});
+
+const withSites = defineConfig({
+    adapter: expressAdapter(),
+    auth: {
+        identities: {
+            editor,
+        },
+    },
+    content: cms({
+        db: drizzle(pglite),
+        collections: [Articles],
+        sites: declareSites(SiteSchema, {
+            uk: {
+                label: 'Hagen UK',
+                url: 'https://hagen.example.co.uk',
+                icon: '/icons/uk.svg',
+                pages: countryPages,
+                collections: [Events],
+            },
+            norway: {
+                label: 'Hagen Norge',
+                url: 'https://hagen.example.no',
+                icon: 'https://cdn.hagen.example.no/norway.svg',
+                pages: countryPages,
+            },
+        }),
+        site: () => 'uk',
+        auth: {
+            identity: 'editor',
+            roles: ['editor'],
+        },
+        signInPath: '/login',
+        apiPath: '/cms-api',
+    }),
+});
+const sitesApp = express();
+withSites.api.mount(sitesApp);
+
+describe('the admin with several sites', () => {
+    it('tells the admin each site, with its icon as a full URL and the content it has of its own', async () => {
+        const response = await request(sitesApp).get('/admin').set('authorization', 'Bearer editor-token');
+        expect(configOf(response.text).sites).toEqual([
+            {
+                key: 'uk',
+                label: 'Hagen UK',
+                icon: 'https://hagen.example.co.uk/icons/uk.svg',
+                pages: ['frontPage'],
+                globals: [],
+                collections: [
+                    {
+                        name: 'events',
+                        label: 'Events',
+                    },
+                ],
+            },
+            {
+                key: 'norway',
+                label: 'Hagen Norge',
+                icon: 'https://cdn.hagen.example.no/norway.svg',
+                pages: ['frontPage'],
+                globals: [],
+                collections: [],
+            },
+        ]);
+    });
+
+    it("serves a site's view of a shared item, a level deeper than the shared one", async () => {
+        const response = await request(sitesApp).get('/admin/uk/collections/articles/a1').set('authorization', 'Bearer editor-token');
+        expect(response.status).toBe(200);
+        expect(response.headers['content-type']).toMatch(/^text\/html/);
+        const unknown = await request(sitesApp).get('/admin/denmark/collections/articles/a1').set('authorization', 'Bearer editor-token');
+        expect(unknown.status).toBe(404);
+    });
+
+    it('tells a project with one site of no sites', async () => {
+        const response = await request(app).get('/admin').set('authorization', 'Bearer editor-token');
+        expect(configOf(response.text).sites).toEqual([]);
     });
 });

@@ -1,5 +1,18 @@
-import { describe, expect, it } from 'vitest';
-import { addressOfHash, hrefOf, isCurrent, navigationOf, screenOf, setAdminPath, tabTitleOf, type Screen } from './navigation.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AdminSite } from './config.js';
+import {
+    addressOfHash,
+    hrefIn,
+    hrefOf,
+    isCurrent,
+    navigationOf,
+    screenInSite,
+    screenOf,
+    setAdminPath,
+    setSites,
+    tabTitleOf,
+    type Screen,
+} from './navigation.js';
 
 describe('the admin navigation', () => {
     it('reads back every screen it writes into the address', () => {
@@ -43,13 +56,6 @@ describe('the admin navigation', () => {
                     ref: 'page:frontPage',
                 },
                 '/admin/pages/frontPage',
-            ],
-            [
-                {
-                    kind: 'document',
-                    ref: 'page:campaign:frontPage',
-                },
-                '/admin/pages/campaign/frontPage',
             ],
             [
                 {
@@ -170,5 +176,325 @@ describe('the admin navigation', () => {
         expect(tabTitleOf('Front page', 'Hagen')).toBe('Front page · Hagen');
         expect(tabTitleOf(undefined, 'Hagen')).toBe('Hagen');
         expect(tabTitleOf('Articles', undefined)).toBe('Articles · Kizuna CMS');
+    });
+});
+
+const SITES: AdminSite[] = [
+    {
+        key: 'group',
+        label: 'Hagen Group',
+        icon: 'https://hagen.example.com/icons/group.svg',
+        pages: ['frontPage', 'investorsPage'],
+        globals: [],
+        collections: [],
+    },
+    {
+        key: 'uk',
+        label: 'Hagen UK',
+        icon: 'https://hagen.example.co.uk/icons/uk.svg',
+        pages: ['frontPage', 'eventsPage'],
+        globals: [
+            {
+                name: 'settings',
+                label: null,
+            },
+        ],
+        collections: [
+            {
+                name: 'events',
+                label: 'Events',
+            },
+        ],
+    },
+    {
+        key: 'norway',
+        label: 'Hagen Norge',
+        icon: null,
+        pages: ['frontPage'],
+        globals: [],
+        collections: [],
+    },
+];
+
+describe('the admin navigation with several sites', () => {
+    beforeEach(() => setSites(SITES));
+    afterEach(() => {
+        setSites([]);
+        vi.unstubAllGlobals();
+    });
+
+    it("keeps shared content at the addresses of one site, and puts a site's own under its key", () => {
+        const addresses: Array<[Screen, string]> = [
+            [
+                {
+                    kind: 'document',
+                    ref: 'item:offices:k3j9x2',
+                },
+                '/admin/collections/offices/k3j9x2',
+            ],
+            [
+                {
+                    kind: 'document',
+                    ref: 'item:offices:k3j9x2',
+                    site: 'uk',
+                },
+                '/admin/uk/collections/offices/k3j9x2',
+            ],
+            [
+                {
+                    kind: 'collection',
+                    name: 'events',
+                    site: 'uk',
+                },
+                '/admin/uk/collections/events',
+            ],
+            [
+                {
+                    kind: 'document',
+                    ref: 'item:uk:events:e1',
+                    site: 'uk',
+                },
+                '/admin/uk/collections/events/e1',
+            ],
+            [
+                {
+                    kind: 'document',
+                    ref: 'global:uk:settings',
+                    site: 'uk',
+                },
+                '/admin/uk/globals/settings',
+            ],
+            [
+                {
+                    kind: 'document',
+                    ref: 'page:uk:frontPage',
+                    site: 'uk',
+                },
+                '/admin/uk/pages/frontPage',
+            ],
+            [
+                {
+                    kind: 'pages',
+                    site: 'norway',
+                },
+                '/admin/norway/pages',
+            ],
+            [
+                {
+                    kind: 'dashboard',
+                    site: 'uk',
+                },
+                '/admin/uk',
+            ],
+            [
+                {
+                    kind: 'media',
+                    site: 'uk',
+                },
+                '/admin/uk/media',
+            ],
+        ];
+        for (const [screen, address] of addresses) {
+            expect(hrefOf(screen)).toBe(address);
+            expect(screenOf(address)).toEqual(screen);
+        }
+    });
+
+    it("puts a site's own document under its site wherever it is linked from", () => {
+        expect(
+            hrefOf({
+                kind: 'document',
+                ref: 'item:uk:events:e1',
+            })
+        ).toBe('/admin/uk/collections/events/e1');
+        expect(
+            hrefIn(undefined, {
+                kind: 'document',
+                ref: 'page:norway:frontPage',
+            })
+        ).toBe('/admin/norway/pages/frontPage');
+    });
+
+    it('opens a link to shared content in the site open now', () => {
+        vi.stubGlobal('window', {
+            location: {
+                pathname: '/admin/uk/collections/events',
+            },
+        });
+        expect(
+            hrefOf({
+                kind: 'document',
+                ref: 'item:offices:k3j9x2',
+            })
+        ).toBe('/admin/uk/collections/offices/k3j9x2');
+        expect(
+            hrefIn(undefined, {
+                kind: 'document',
+                ref: 'item:offices:k3j9x2',
+            })
+        ).toBe('/admin/collections/offices/k3j9x2');
+    });
+
+    it('reads a first segment that names no site as a screen of the shared content', () => {
+        expect(screenOf('/admin/denmark/collections/offices')).toEqual({
+            kind: 'missing',
+        });
+        expect(screenOf('/admin/uk/collections/offices/k3j9x2/more')).toEqual({
+            kind: 'missing',
+        });
+        expect(screenOf('/admin/uk/elsewhere')).toEqual({
+            kind: 'missing',
+        });
+    });
+
+    it('keeps the same kind of screen when the switcher moves to another site', () => {
+        const moves: Array<[Screen, string | undefined, string]> = [
+            [
+                {
+                    kind: 'document',
+                    ref: 'page:uk:frontPage',
+                    site: 'uk',
+                },
+                'norway',
+                '/admin/norway/pages/frontPage',
+            ],
+            [
+                {
+                    kind: 'document',
+                    ref: 'page:uk:eventsPage',
+                    site: 'uk',
+                },
+                'norway',
+                '/admin/norway/pages',
+            ],
+            [
+                {
+                    kind: 'document',
+                    ref: 'item:offices:k3j9x2',
+                },
+                'uk',
+                '/admin/uk/collections/offices/k3j9x2',
+            ],
+            [
+                {
+                    kind: 'document',
+                    ref: 'item:offices:k3j9x2',
+                    site: 'uk',
+                },
+                undefined,
+                '/admin/collections/offices/k3j9x2',
+            ],
+            [
+                {
+                    kind: 'document',
+                    ref: 'item:uk:events:e1',
+                    site: 'uk',
+                },
+                'norway',
+                '/admin/norway',
+            ],
+            [
+                {
+                    kind: 'collection',
+                    name: 'offices',
+                    site: 'uk',
+                },
+                'group',
+                '/admin/group/collections/offices',
+            ],
+            [
+                {
+                    kind: 'pages',
+                    site: 'uk',
+                },
+                undefined,
+                '/admin',
+            ],
+            [
+                {
+                    kind: 'media',
+                },
+                'norway',
+                '/admin/norway/media',
+            ],
+        ];
+        for (const [screen, site, address] of moves) expect(hrefIn(site, screenInSite(screen, site))).toBe(address);
+    });
+
+    it("lists the shared content under Shared, read by every site, then the site's own under its label", () => {
+        const sections = navigationOf({
+            globals: [
+                {
+                    name: 'privacyPolicy',
+                    label: null,
+                    group: null,
+                    status: 'published',
+                    updatedAt: null,
+                },
+            ],
+            collections: [
+                {
+                    name: 'employees',
+                    label: 'Employees',
+                    count: 4,
+                },
+                {
+                    name: 'offices',
+                    label: 'Offices',
+                    count: 3,
+                },
+            ],
+            groups: {
+                employees: 'People',
+            },
+            sites: SITES,
+            site: 'uk',
+        });
+        expect(sections.map((section) => [section.label, section.note, section.entries.map((entry) => entry.label)])).toEqual([
+            ['Shared', 'Read by every site', ['Media', 'Privacy policy', 'Employees', 'Offices']],
+            ['Hagen UK', undefined, ['Pages', 'Settings', 'Events']],
+        ]);
+        expect(sections.flatMap((section) => section.entries).map((entry) => hrefOf(entry.screen))).toEqual([
+            '/admin/uk/media',
+            '/admin/uk/globals/privacyPolicy',
+            '/admin/uk/collections/employees',
+            '/admin/uk/collections/offices',
+            '/admin/uk/pages',
+            '/admin/uk/globals/settings',
+            '/admin/uk/collections/events',
+        ]);
+    });
+
+    it('lists the shared content alone outside every site, with no pages', () => {
+        const sections = navigationOf({
+            globals: [],
+            collections: [
+                {
+                    name: 'employees',
+                    label: 'Employees',
+                    count: 4,
+                },
+            ],
+            groups: {
+                employees: 'People',
+            },
+            sites: SITES,
+        });
+        expect(sections.map((section) => [section.label, section.entries.map((entry) => entry.label)])).toEqual([
+            ['Shared', ['Media', 'Employees']],
+        ]);
+    });
+
+    it("marks a site's own collection current while one of its items is open", () => {
+        expect(
+            isCurrent(
+                {
+                    kind: 'collection',
+                    name: 'events',
+                    site: 'uk',
+                },
+                screenOf('/admin/uk/collections/events/e1')
+            )
+        ).toBe(true);
     });
 });

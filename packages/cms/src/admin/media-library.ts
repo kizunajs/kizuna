@@ -19,6 +19,10 @@ export interface MediaItem {
     uploadedAt: string;
     uploadedBy: string;
     uses: number;
+    /**
+     * The site the image belongs to, or none for a shared image.
+     */
+    site?: string;
 }
 
 /**

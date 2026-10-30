@@ -5,6 +5,7 @@ import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
 import { Hint } from '../view/hint.js';
 import { usePeople } from '../view/people.js';
+import { parseRef } from '../refs.js';
 import { humanize } from '../view/schema.js';
 import { BulkFailures, SelectionActions, useBulkRun } from './bulk-bar.js';
 import { bulkSummaryOf, offeredActions, runBulk, type BulkAction, type BulkResult, type BulkTarget } from './bulk.js';
@@ -604,7 +605,33 @@ const useNames = (connection: Connection): ((id: string) => string) => {
 /**
  * Every page the CMS holds content for, by its path on the site.
  */
-export function PagesList({ connection, routes }: { connection: Connection; routes?: Readonly<Record<string, AdminRoute>> }) {
+const siteFactsOf = (siteFact: ReactNode): MetaPair[] =>
+    siteFact === undefined
+        ? []
+        : [
+              {
+                  label: 'Site',
+                  value: siteFact,
+              },
+          ];
+
+export function PagesList({
+    connection,
+    routes,
+    site,
+    siteFact,
+}: {
+    connection: Connection;
+    routes?: Readonly<Record<string, AdminRoute>>;
+    /**
+     * The site whose pages the list shows, with several.
+     */
+    site?: string | undefined;
+    /**
+     * Who the pages belong to, for the header's Site, with several sites.
+     */
+    siteFact?: ReactNode;
+}) {
     const [rows, setRows] = useState<TreeRow[] | undefined>();
     const [problem, setProblem] = useState<string | undefined>();
     const [loads, setLoads] = useState(0);
@@ -617,7 +644,10 @@ export function PagesList({ connection, routes }: { connection: Connection; rout
             }
             setRows(
                 answer.body.pages
-                    .filter((page) => page.ref.startsWith('page:'))
+                    .filter((page) => {
+                        const ref = parseRef(page.ref);
+                        return ref?.type === 'page' && (site === undefined || ref.site === site);
+                    })
                     .map((page) => ({
                         ref: page.ref,
                         href: hrefOf({
@@ -632,7 +662,7 @@ export function PagesList({ connection, routes }: { connection: Connection; rout
                     }))
             );
         });
-    }, [connection, loads]);
+    }, [connection, loads, site]);
     const actions = offeredActions(routes ?? {}, 'editing_pages');
     return (
         <ListScreen
@@ -640,6 +670,7 @@ export function PagesList({ connection, routes }: { connection: Connection; rout
             title="Pages"
             noun="pages"
             rows={rows}
+            facts={siteFactsOf(siteFact)}
             problem={problem}
             columns={DOCUMENT_COLUMNS}
             defaultSort={NEWEST_FIRST}
@@ -734,6 +765,7 @@ export function CollectionList({
     options,
     routes,
     onOpen,
+    siteFact,
 }: {
     connection: Connection;
     collection: CollectionSummary;
@@ -744,6 +776,11 @@ export function CollectionList({
     options: ListOptions | undefined;
     routes: Readonly<Record<string, AdminRoute>>;
     onOpen: (ref: string) => void;
+    /**
+     * Who the collection belongs to, for the header's Site, with several
+     * sites.
+     */
+    siteFact?: ReactNode;
 }) {
     const tree = options?.tree;
     const defaultSort = tree === undefined ? NEWEST_FIRST : undefined;
@@ -946,6 +983,7 @@ export function CollectionList({
             title={collection.label}
             noun={noun}
             rows={rows}
+            facts={siteFactsOf(siteFact)}
             total={counts?.total ?? items?.total}
             drafts={counts?.drafts ?? 0}
             problem={problem}

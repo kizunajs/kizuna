@@ -6,7 +6,7 @@ import type { CmsService } from '../cms.js';
 import { CONFIG_PLACEHOLDER, readBuilt, withStylesheet } from '../document-view.js';
 import type { ResolvedCmsOptions } from '../options.js';
 import { mcpRouteOf } from './chat.js';
-import type { AdminConfig, AdminRoute, ChatConnection } from './config.js';
+import type { AdminConfig, AdminRoute, AdminSite, ChatConnection } from './config.js';
 import { listOptionsOf } from './list-options.js';
 
 /**
@@ -117,13 +117,65 @@ export const adminConfigFor = (
     signOutMethod: options.auth.signOut === undefined ? 'GET' : 'POST',
     routes: editingRoutesOf(api),
     groups: Object.fromEntries(
-        [...(options.collections ?? []), ...(options.views ?? [])].flatMap((definition) =>
-            definition.group === undefined ? [] : [[definition.name, definition.group]]
-        )
+        [
+            ...(options.collections ?? []),
+            ...Object.values(options.sites?.entries ?? {}).flatMap((entry) => entry.collections ?? []),
+            ...(options.views ?? []),
+        ].flatMap((definition) => (definition.group === undefined ? [] : [[definition.name, definition.group]]))
     ),
     lists: listOptionsOf(options.collections ?? []),
     chat: chatOf(api, options.apiPath ?? '/api', chatToken),
+    sites: adminSitesOf(options),
 });
+
+/**
+ * A site's icon as a full URL: a path resolves against the site's own `url`.
+ */
+export const siteIconOf = (icon: string, url: string): string | null => {
+    try {
+        return new URL(icon, url).toString();
+    } catch {
+        return null;
+    }
+};
+
+/**
+ * Every declared site, as the admin's switcher lists them.
+ */
+const adminSitesOf = (options: ResolvedCmsOptions): AdminSite[] =>
+    // TODO(sites): list only the sites the signed-in editor may open, once `auth.sites` on cms() says which.
+    Object.entries(options.sites?.entries ?? {}).map(([key, entry]) => {
+        const values = options.sites!.values[key]!;
+        return {
+            key,
+            label: values.label,
+            icon: siteIconOf(values.icon, values.url),
+            pages: Object.keys(entry.pages ?? {}),
+            globals: (entry.globals ?? []).map((definition) => ({
+                name: definition.name,
+                label: definition.label ?? null,
+            })),
+            collections: (entry.collections ?? []).map((definition) => ({
+                name: definition.name,
+                label: definition.label ?? null,
+            })),
+        };
+    });
+
+/**
+ * The site this deployment shows, from `site` on `cms()`, when it names a
+ * declared one.
+ */
+export const deployedSiteOf = (options: ResolvedCmsOptions): { label: string; icon: string | null } | undefined => {
+    const key = options.site?.();
+    const values = key === undefined ? undefined : options.sites?.values[key];
+    return values === undefined
+        ? undefined
+        : {
+              label: values.label,
+              icon: siteIconOf(values.icon, values.url),
+          };
+};
 
 const chatOf = (api: PluginApi, apiPath: string, token: string | null): ChatConnection | null => {
     const route = mcpRouteOf(api, apiPath);
@@ -178,7 +230,8 @@ export const editorOf = async (
 
 /**
  * The paths under the admin's own that name a screen, like
- * `/collections/employees/k3j9x2`. The admin reads the screen from the
+ * `/collections/employees/k3j9x2`, or a site's, like
+ * `/uk/collections/events/k3j9x2`. The admin reads the screen from the
  * address, so the server answers each of them with the same page.
  */
 const SCREEN_PATHS = {
@@ -186,9 +239,10 @@ const SCREEN_PATHS = {
     adminSection: '/:section',
     adminEntry: '/:section/:name',
     adminEntryChild: '/:section/:name/:id',
+    adminSiteEntryChild: '/:site/:section/:name/:id',
 } satisfies Record<string, string>;
 
-const SCREEN_PARAMS = ['section', 'name', 'id'];
+const SCREEN_PARAMS = ['site', 'section', 'name', 'id'];
 
 /**
  * The query as the browser sent it, for the address an editor comes back to.
@@ -237,6 +291,14 @@ const adminRoute = (service: CmsService, options: ResolvedCmsOptions, api: Plugi
             200: z.unknown(),
         },
     }).handler(async (args) => {
+        const site = (args.params as Record<string, string> | undefined)?.['site'];
+        if (site !== undefined && options.sites?.entries[site] === undefined) {
+            return rawResponse(
+                new Response(null, {
+                    status: 404,
+                })
+            );
+        }
         const { signedIn, allowed } = await editorOf(service, options, api, args);
         if (!allowed) {
             const location = signInLocationOf(options, base, askedFor(adminPathOf(options, base), args.params, args.query));
@@ -279,9 +341,12 @@ const adminRoute = (service: CmsService, options: ResolvedCmsOptions, api: Plugi
 };
 
 /**
- * The admin's routes: its own path, and each depth of screen under it.
+ * The admin's routes: its own path, and each depth of screen under it. A
+ * site's screens go one deeper, so only a CMS with sites serves that depth.
  */
 export const adminRoutes = (service: CmsService, options: ResolvedCmsOptions, api: PluginApi, base: '' | `/${string}`) =>
     Object.fromEntries(
-        Object.entries(SCREEN_PATHS).map(([key, screenPath]) => [key, adminRoute(service, options, api, base, screenPath)])
-    ) as Record<keyof typeof SCREEN_PATHS, ReturnType<typeof adminRoute>>;
+        Object.entries(SCREEN_PATHS)
+            .filter(([, screenPath]) => options.sites !== undefined || !screenPath.includes(':site'))
+            .map(([key, screenPath]) => [key, adminRoute(service, options, api, base, screenPath)])
+    ) as Partial<Record<keyof typeof SCREEN_PATHS, ReturnType<typeof adminRoute>>>;

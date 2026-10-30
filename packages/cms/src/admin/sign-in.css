@@ -27,6 +27,12 @@
         align-self: flex-start;
     }
 
+    .k-sign-in__icon {
+        align-self: flex-start;
+        border-radius: 8px;
+        object-fit: contain;
+    }
+
     .k-sign-in__title {
         margin: 20px 0 8px;
         font-size: 22px;

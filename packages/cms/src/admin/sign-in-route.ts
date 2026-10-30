@@ -9,6 +9,7 @@ import { PREVIEW_COOKIE } from '../preview-token.js';
 import {
     adminPathOf,
     adminRoutePathOf,
+    deployedSiteOf,
     editorOf,
     embedded,
     headersOf,
@@ -109,11 +110,17 @@ export const signInScreenRoute = (service: CmsService, options: ResolvedCmsOptio
                 })
             );
         }
+        const deployed = deployedSiteOf(options);
         const config: SignInConfig = {
             signInPath: sessionPathOf(options, base, 'sign-in'),
             next,
             noAccess: signedIn !== undefined,
-            siteName: options.name,
+            siteName: deployed?.label ?? options.name,
+            ...(deployed?.icon === undefined || deployed.icon === null
+                ? {}
+                : {
+                      siteIcon: deployed.icon,
+                  }),
         };
         const page = withStylesheet(
             (await readBuilt('sign-in.html')).replace(CONFIG_PLACEHOLDER, () => embedded(config)),

@@ -11,11 +11,13 @@ import { PublishReview, changeViewsOf, type Changes, type PublishReviewHandle } 
 import { documentTitle, valueAt, type Description, type Draft, type ReviewState } from '../view/schema.js';
 import { sameContent } from '../same-content.js';
 import { parseRef } from '../refs.js';
+import { withMediaSite } from './connection.js';
 import { ConfirmDialog } from './confirm.js';
 import { blockerOf, documentDatesOf, menuEntriesOf } from './document-menu.js';
 import { DocumentMore, type DocumentMoreHandle } from './document-more.js';
 import { savedAtOf, type VersionSummary } from './history.js';
-import { hrefOf, navigate } from './navigation.js';
+import { hasSites, hrefIn, hrefOf, navigate, siteOf } from './navigation.js';
+import { SiteFact } from './site-switcher.js';
 import { PageHeader, type Crumb } from './page-header.js';
 import { Loading, SaveIndicator, Status, problemOf } from './parts.js';
 import { documentNounOf, documentStateOf, roleSubjectOf, titleOfRef } from './access.js';
@@ -28,6 +30,7 @@ import { CommentLinks, FieldComments } from './review-comments.js';
 import { DecisionCard, PeopleFact, RequestChanges, ReviewScreen, type ViewedChange } from './review-screen.js';
 import { askAgainLabelOf, askAgainOf, gateNoteOf, mayUndoApproval, mayWithdraw, reviewStatusPartsOf, waitsForMe } from './review-state.js';
 import { sectionLabelOf } from './sections.js';
+import { fieldsInSite, hasPerSiteFields, isShared } from './site-view.js';
 import { useOfferUndo } from './toasts.js';
 import { Versions } from './versions.js';
 import type { WaitingReview } from './dashboard.js';
@@ -161,6 +164,7 @@ export function DocumentScreen({
     onSearch,
     onTitle,
     paletteActions,
+    site,
 }: {
     connection: Connection;
     documentRef: string;
@@ -183,7 +187,15 @@ export function DocumentScreen({
      * header's buttons do as the document stands.
      */
     paletteActions?: RefObject<(() => PaletteAction[]) | undefined>;
+    /**
+     * The site the document is shown in, with several. A shared document
+     * shown in a site is that site's view of it.
+     */
+    site?: string | undefined;
 }) {
+    const shownSite = siteOf(site);
+    // A site's view of shared content asks for the site's own values beside the shared ones.
+    const viewSite = shownSite !== undefined && isShared(documentRef) ? shownSite.key : undefined;
     const [document, setDocument] = useState<Description | undefined>();
     const [loadProblem, setLoadProblem] = useState<string | undefined>();
     const [loadStatus, setLoadStatus] = useState<number | undefined>();
@@ -245,6 +257,11 @@ export function DocumentScreen({
             const answer = await connection.call<Description>('editing_describe', {
                 query: {
                     ref,
+                    ...(viewSite === undefined
+                        ? {}
+                        : {
+                              site: viewSite,
+                          }),
                 },
             });
             if (answer.status !== 200) {
@@ -259,7 +276,7 @@ export function DocumentScreen({
             seen.current = null;
             return answer.body;
         },
-        [connection]
+        [connection, viewSite]
     );
 
     useEffect(() => {
@@ -406,8 +423,17 @@ export function DocumentScreen({
             busy.current = true;
             saves.current += 1;
             try {
+                // TODO(sites): how the CMS takes a site's own values. A site's view sends its site beside the changes.
+                const siteValues = viewSite !== undefined && latest.current !== undefined && hasPerSiteFields(latest.current.fields);
                 const answer = await connection.call<Draft>(`${tools.prefix}_update_draft`, {
                     params: tools.params,
+                    ...(siteValues
+                        ? {
+                              query: {
+                                  site: viewSite,
+                              },
+                          }
+                        : {}),
                     body: {
                         changes,
                         autosave: true,
@@ -448,7 +474,7 @@ export function DocumentScreen({
                 busy.current = false;
             }
         },
-        [connection, describe]
+        [connection, describe, viewSite]
     );
 
     /**
@@ -488,12 +514,13 @@ export function DocumentScreen({
     const documentPath = document?.path ?? undefined;
     const editorContext = useMemo<EditorContextValue>(
         () => ({
-            connection,
+            // A site's own document picks among the site's images and the shared ones, and shared content among shared images alone.
+            connection: withMediaSite(connection, parseRef(documentRef)?.site),
             resolveUrl,
             pageUrl: siteUrl === null || documentPath === undefined ? undefined : new URL(documentPath, siteUrl).toString(),
             offerUndo,
         }),
-        [connection, resolveUrl, siteUrl, documentPath, offerUndo]
+        [connection, documentRef, resolveUrl, siteUrl, documentPath, offerUndo]
     );
 
     /**
@@ -940,6 +967,10 @@ export function DocumentScreen({
     };
 
     const fieldLabelOf = (path: string): string => sectionLabelOf(document.fields, document.layout, path, path);
+    // A site's view of a shared document edits the site's own values, and shows every other field as Shared.
+    const siteValuesOf = viewSite !== undefined && hasPerSiteFields(document.fields) ? shownSite : undefined;
+    const ownSite = parseRef(document.ref)?.site;
+    const siteFact = hasSites() ? <SiteFact site={ownSite === undefined ? siteValuesOf : siteOf(ownSite)} /> : undefined;
     // The note of whoever sent the draft back, and the open comments, at the top of the sidebar while the changes are made.
     const sentBackNote = document.review?.status === 'changes' && document.review.decisionNote !== null;
     const openComments = document.review?.comments.some((comment) => comment.resolvedAt === null) ?? false;
@@ -1010,6 +1041,12 @@ export function DocumentScreen({
                                   value: 'every page',
                               }
                             : null,
+                        siteFact === undefined
+                            ? null
+                            : {
+                                  label: 'Site',
+                                  value: siteFact,
+                              },
                     ]}
                     tabs={
                         <>
@@ -1163,6 +1200,20 @@ export function DocumentScreen({
                         )
                     }
                 />
+                {siteValuesOf === undefined ? null : (
+                    <p className="k-help k-document__site-note">
+                        {siteValuesOf.label}'s values on a shared {noun}. Shared fields are edited under{' '}
+                        <a
+                            className="k-document__site-link"
+                            href={hrefIn(undefined, {
+                                kind: 'document',
+                                ref: document.ref,
+                            })}>
+                            Shared
+                        </a>
+                        .
+                    </p>
+                )}
                 {linkProblem === undefined ? null : (
                     <p className="k-error k-document__problem" role="alert">
                         <CircleAlert {...ICON} />
@@ -1174,7 +1225,7 @@ export function DocumentScreen({
                         <FieldForm
                             key={`${document.ref}:${formKey}`}
                             ref={form}
-                            fields={document.fields}
+                            fields={fieldsInSite(document.fields, document.draft, siteValuesOf?.label)}
                             layout={document.layout}
                             draft={document.draft}
                             onSave={(changes) => save(document.ref, changes)}

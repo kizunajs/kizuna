@@ -16,8 +16,13 @@ export interface SignInConfig {
      */
     noAccess: boolean;
     /**
-     * What editors call the site, from `name` on `cms()`, which the screen
-     * asks them to sign in to.
+     * What editors call the site, which the screen asks them to sign in to:
+     * the label of the site this deployment shows, or `name` on `cms()`.
      */
     siteName?: string | undefined;
+    /**
+     * The icon of the site this deployment shows, as a full URL, which the
+     * screen and the browser tab show in place of the kanji.
+     */
+    siteIcon?: string | undefined;
 }
