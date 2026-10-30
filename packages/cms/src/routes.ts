@@ -80,6 +80,7 @@ import type { Person } from './options.js';
 import { collectionActionRoutes, itemActions } from './action-routes.js';
 import { listViewsRoute, viewRoutes } from './view-routes.js';
 import { dashboardRoute } from './dashboard-routes.js';
+import { TranslateBodySchema, TranslatedDraftSchema, translateDraft } from './translate-draft.js';
 import type { EditorAccess } from './site-access.js';
 
 interface Args {
@@ -316,7 +317,25 @@ const mediaSiteOf = (args: Args): string | undefined => {
     return typeof site === 'string' ? site : undefined;
 };
 
-const listQueryOf = (definition: ContentDefinition, indexes: readonly string[]) => {
+/**
+ * The `locale` a public read takes, among the languages the site serves.
+ */
+const localeShape = (locales: readonly string[]) =>
+    locales.length === 0
+        ? {}
+        : {
+              locale: z
+                  .enum(locales as [string, ...string[]])
+                  .optional()
+                  .describe(`The language to read, ${locales[0]} when left out.`),
+          };
+
+const localeOf = (args: Args): string | undefined => {
+    const locale = (args.query as { locale?: unknown } | undefined)?.locale;
+    return typeof locale === 'string' ? locale : undefined;
+};
+
+const listQueryOf = (definition: ContentDefinition, indexes: readonly string[], locales: readonly string[] = []) => {
     const shape: Record<string, z.ZodType> = {};
     for (const index of indexes) {
         const field = dataFields(definition.fields).find((candidate) => candidate.name === index)!;
@@ -333,6 +352,7 @@ const listQueryOf = (definition: ContentDefinition, indexes: readonly string[]) 
             direction: z.enum(['asc', 'desc']).optional(),
             limit: z.int().min(1).max(200).optional(),
             cursor: z.string().optional().describe('The `next` of the previous page.'),
+            ...localeShape(locales),
         })
         .strict();
 };
@@ -464,10 +484,12 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 guarded(async (cms, args) => {
                     const body = args.body as z.output<typeof UpdateDraftBodySchema>;
                     const ref = refOf(cms, args);
+                    const access = cms.access(args.auth);
                     const state = await cms.update({
                         ref,
                         changes: body.changes,
-                        caller: cms.access(args.auth).callerFor(ref),
+                        caller: access.callerFor(ref),
+                        access,
                         author: authorOf(cms, args),
                         summary: body.summary,
                         ifMatch: args.headers['if-match'],
@@ -482,6 +504,61 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     };
                 }) as never
             ),
+
+            ...(options.translate === undefined
+                ? {}
+                : {
+                      translate: route({
+                          method: 'POST',
+                          path: `${editingBase}${scope.prefix}/translate`,
+                          auth: editor,
+                          summary: `Draft a translation of ${scope.noun} from its published source`,
+                          description:
+                              "The model translates the source's published text into the language given and saves it as that language's draft, which a person reviews and publishes. A translated slug is made from the translated title.",
+                          tool:
+                              scope.approveWrites === true
+                                  ? {
+                                        needsApproval: true,
+                                    }
+                                  : true,
+                          pathParams: scope.params,
+                          body: TranslateBodySchema,
+                          responses: {
+                              200: {
+                                  body: TranslatedDraftSchema,
+                                  cache: 'no-store',
+                              },
+                              400: ProblemDetailsSchema,
+                              404: ProblemDetailsSchema,
+                              409: ProblemDetailsSchema,
+                              422: ValidationErrorSchema,
+                              502: ProblemDetailsSchema,
+                          },
+                      }).handler(
+                          guarded(async (cms, args) => {
+                              const body = args.body as z.output<typeof TranslateBodySchema>;
+                              const ref = refOf(cms, args);
+                              const translated = await translateDraft(cms, {
+                                  ref,
+                                  to: body.to,
+                                  ...(body.fields === undefined
+                                      ? {}
+                                      : {
+                                            fields: body.fields,
+                                        }),
+                                  caller: cms.access(args.auth).callerFor(ref),
+                                  author: authorOf(cms, args),
+                              });
+                              return {
+                                  status: 200,
+                                  body: {
+                                      draft: draftBody(translated.state),
+                                      fields: translated.fields,
+                                  },
+                              };
+                          }) as never
+                      ),
+                  }),
 
             missingFields: route({
                 method: 'GET',
@@ -653,10 +730,12 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     const paths = (args.body as z.output<typeof RevertBodySchema>).paths;
                     const published = (await cms.publishedAsStored(ref))?.content;
                     const changes = Object.fromEntries(paths.map((path) => [path, getAtPath(published, path)]));
+                    const access = cms.access(args.auth);
                     const state = await cms.update({
                         ref,
                         changes,
-                        caller: cms.access(args.auth).callerFor(ref),
+                        caller: access.callerFor(ref),
+                        access,
                         author: authorOf(cms, args),
                         summary: paths.length === 1 ? `Reverted ${paths[0]}` : `Reverted ${paths.length} changes`,
                     });
@@ -799,6 +878,25 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
 
     const reader = options.auth.read;
     const readAuth: RouteAuth = reader ?? false;
+
+    /**
+     * The languages a site serves: its own `locales`, or those on cms().
+     */
+    const localesOn = (site: string): readonly string[] =>
+        (site === DEFAULT_SITE ? undefined : (options.sites?.values[site] as { locales?: readonly string[] } | undefined)?.locales) ??
+        options.locales ??
+        [];
+
+    /**
+     * The query of a public read of one document: its `locale`, when the
+     * site serves languages.
+     */
+    const readQueryOf = (site: string) =>
+        localesOn(site).length === 0
+            ? {}
+            : {
+                  query: z.object(localeShape(localesOn(site))),
+              };
     // A read that needs a token answers that one caller, so no shared cache may keep it.
     const readCache = (
         reader === undefined
@@ -869,7 +967,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 path: input.path,
                 auth: readAuth,
                 summary: `List the published ${input.plural}`,
-                query: listQueryOf(input.definition, input.indexes),
+                query: listQueryOf(input.definition, input.indexes, localesOn(input.readingSite)),
                 responses: {
                     200: {
                         body: z.object({
@@ -883,7 +981,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             }).handler(
                 guarded(async (cms, args) => {
                     assertReads(args, input.readingSite);
-                    const { orderBy, direction, limit, cursor, ...where } = (args.query ?? {}) as Record<string, unknown>;
+                    const { orderBy, direction, limit, cursor, locale, ...where } = (args.query ?? {}) as Record<string, unknown>;
                     const result = await cms.listItems(
                         input.collection,
                         {
@@ -895,7 +993,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                             ...(typeof cursor === 'string' ? { cursor } : {}),
                         },
                         input.site,
-                        input.readingSite
+                        input.readingSite,
+                        typeof locale === 'string' ? locale : undefined
                     );
                     return {
                         status: 200,
@@ -914,6 +1013,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 pathParams: z.object({
                     id: z.string(),
                 }),
+                ...readQueryOf(input.readingSite),
                 responses: {
                     200: {
                         body: item,
@@ -924,7 +1024,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             }).handler(
                 guarded(async (cms, args) => {
                     assertReads(args, input.readingSite);
-                    const published = await cms.publishedOn(input.refOf(args.params['id']!), input.readingSite);
+                    const published = await cms.publishedOn(input.refOf(args.params['id']!), input.readingSite, localeOf(args));
                     if (published === undefined)
                         throw new CmsHttpError(404, { detail: `No published ${input.single} '${args.params['id']}'.` });
                     return {
@@ -953,6 +1053,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                             site === DEFAULT_SITE
                                 ? `Read the published content of ${entry.path}`
                                 : `Read the published content of ${entry.path} on the ${site} site`,
+                        ...readQueryOf(site),
                         responses: {
                             200: {
                                 body: z.object({
@@ -977,7 +1078,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                                               site,
                                           }),
                                 },
-                                site
+                                site,
+                                localeOf(args)
                             );
                             if (published === undefined) throw new CmsHttpError(404, { detail: `${entry.path} is not published.` });
                             return {
@@ -1008,6 +1110,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 site === DEFAULT_SITE
                     ? `Read the published ${words(definition.name)} global`
                     : `Read the published ${words(definition.name)} global on the ${site} site`,
+            ...readQueryOf(site),
             responses: {
                 200: {
                     body: z.object({
@@ -1022,7 +1125,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         }).handler(
             guarded(async (cms, args) => {
                 assertReads(args, site);
-                const published = await cms.publishedOn(ref, site);
+                const published = await cms.publishedOn(ref, site, localeOf(args));
                 if (published === undefined) throw new CmsHttpError(404, { detail: `The ${definition.name} global is not published.` });
                 return {
                     status: 200,
@@ -1384,7 +1487,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         (args.body as z.output<typeof CreateItemBodySchema>)?.values ?? {},
                         cms.access(args.auth).callerOn(siteOf(cms, args, at)),
                         authorOf(cms, args),
-                        siteOf(cms, args, at)
+                        siteOf(cms, args, at),
+                        cms.access(args.auth)
                     )
                 ),
             })) as never

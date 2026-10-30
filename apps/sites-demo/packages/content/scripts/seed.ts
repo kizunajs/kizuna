@@ -152,6 +152,44 @@ Write to privacy@hagen.example.com to see what we hold about you, or to ask us t
 };
 
 /**
+ * The privacy policy in Norwegian, which Hagen Norge shows at its root.
+ */
+const privacyPolicyInNorwegian = {
+    heading: 'Personvern',
+    body: `Hagen Group AS og butikkene i Storbritannia og Norge tar bare vare på det vi trenger for å svare deg, levere bestillingen din og holde kursene våre.
+
+Når du handler hos oss, tar vi vare på navn, adresse og bestilling så lenge loven krever at vi oppbevarer kvitteringer. Når du skriver til oss, tar vi vare på samtalen i ett år, så planteklinikken ser hva vi svarte sist.
+
+Vi selger aldri det vi vet om deg, og vi deler det bare med budene som bringer plantene og betalingstjenesten som tar imot kortet ditt.
+
+Skriv til privacy@hagen.example.com for å se hva vi har om deg, eller for å be oss slette det.`,
+};
+
+/**
+ * Each shop in Norwegian: its city, and the alt text of its photo.
+ */
+const officesInNorwegian: Record<string, Record<string, unknown>> = {
+    'Hagen London': {
+        city: 'London',
+    },
+    'Hagen Oslo': {
+        city: 'Oslo',
+        photo: 'Nærbilde av bregneblader som har foldet seg ut i skyggen',
+    },
+    'Hagen Bergen': {
+        city: 'Bergen',
+    },
+};
+
+/**
+ * Hagen Norge's front page in English, which it serves under `/en`.
+ */
+const norwayFrontPageInEnglish = {
+    heading: 'Plants that stay with you',
+    intro: 'Houseplants, ferns and trees from growers we know, in Oslo and Bergen. Delivered the next day in both cities.',
+};
+
+/**
  * Each site's pages, under the site they belong to.
  */
 const pages: Array<{ site: string; name: string; values: Record<string, unknown> }> = [
@@ -215,7 +253,7 @@ export const seedContent = async (service: CmsService): Promise<void> => {
     const publish = async (ref: DocumentRef): Promise<void> => {
         const state = await service.draftState(ref);
         if (!state.complete) throw new Error(`The seed for ${formatRef(ref)} is missing ${state.missing.join(', ')}.`);
-        await service.store.publish(state.target.kind, state.target.key, AUTHOR, state.target.site);
+        await service.store.publish(state.target.kind, state.target.key, AUTHOR, state.target.site, state.target.locale);
     };
 
     const fill = async (ref: DocumentRef, values: Record<string, unknown>): Promise<void> => {
@@ -373,4 +411,33 @@ export const seedContent = async (service: CmsService): Promise<void> => {
             page.values
         );
     }
+
+    await fill(
+        {
+            type: 'global',
+            name: 'privacyPolicy',
+            locale: 'nb',
+        },
+        privacyPolicyInNorwegian
+    );
+    for (const [name, values] of Object.entries(officesInNorwegian)) {
+        await fill(
+            {
+                type: 'item',
+                collection: 'offices',
+                id: officeId(name),
+                locale: 'nb',
+            },
+            values
+        );
+    }
+    await fill(
+        {
+            type: 'page',
+            name: 'frontPage',
+            site: 'norway',
+            locale: 'en',
+        },
+        norwayFrontPageInEnglish
+    );
 };

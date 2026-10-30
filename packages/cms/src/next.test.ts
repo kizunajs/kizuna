@@ -441,9 +441,13 @@ const createStory = async (title: string, slug: string, publish = true): Promise
 describe('the reader pages that show a collection', () => {
     it('reads the published item at an address, typed by the route params', async () => {
         const id = await createStory('Spring is here', 'spring');
-        expectTypeOf(reader.pages.storyPage.get).parameter(0).toEqualTypeOf<{
-            slug: string;
-        }>();
+        expectTypeOf(reader.pages.storyPage.get).parameter(0).toEqualTypeOf<
+            {
+                slug: string;
+            } & {
+                locale?: string;
+            }
+        >();
         const story = await reader.pages.storyPage.get({
             slug: 'spring',
         });

@@ -5,7 +5,8 @@ import { OfficeId } from './ids';
 
 /**
  * Hagen's shops. Every site shows them, and each site may answer the phones
- * with its own number. Only the UK lists opening hours.
+ * with its own number. Only the UK lists opening hours. A shop's name,
+ * address and number read the same in every language.
  */
 export const Offices = defineCollection({
     name: 'offices',
@@ -18,6 +19,7 @@ export const Offices = defineCollection({
                 {
                     name: 'name',
                     schema: z.string().min(1).max(60),
+                    localized: false,
                 },
                 {
                     name: 'city',
@@ -28,11 +30,13 @@ export const Offices = defineCollection({
         {
             name: 'address',
             schema: z.string().min(1).max(120),
+            localized: false,
         },
         {
             name: 'phone',
             schema: z.string().min(1).max(30),
             perSite: true,
+            localized: false,
         },
         {
             name: 'openingHours',

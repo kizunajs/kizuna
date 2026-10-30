@@ -2,7 +2,7 @@ import type { ContentRuntime } from 'kizunajs/plugin';
 import { DEFAULT_SITE, type PageMap } from './options.js';
 import type { DeclaredSites, SiteEntriesOf, SiteFieldsOf } from './site.js';
 import type { Output } from './output.js';
-import { CmsHttpError, collectionCacheTag, documentCacheTag, pageCacheTag, type CmsService, type Listing } from './cms.js';
+import { CmsHttpError, collectionCacheTag, documentCacheTag, localeCacheTag, pageCacheTag, type CmsService, type Listing } from './cms.js';
 import { servesCollection } from './page.js';
 import type { ParamsOf } from './dynamic.js';
 import type { Collection, ContentDefinition, Global } from './definitions.js';
@@ -41,9 +41,21 @@ export interface CmsPageReader<P> {
      * draft mode it is the published content, cached and tagged, and an
      * unpublished page answers not found. In draft mode it is the draft, and
      * an incomplete draft calls `notFound()` while the preview overlay shows
-     * the setup screen.
+     * the setup screen. With sites, `locale` is one the site serves, and
+     * without it the site's first.
+     *
+     * @example
+     * const page = await kizuna.content.pages.frontPage.get({ locale });
      */
-    get(): Promise<Output<P>>;
+    get(input?: LocaleInput): Promise<Output<P>>;
+}
+
+/**
+ * The language a read is in, like `nb`: one `locales` on `cms()` lists, or
+ * with sites, one the site serves. Without it, the first.
+ */
+export interface LocaleInput {
+    locale?: string;
 }
 
 /**
@@ -55,7 +67,7 @@ export interface CmsGlobalReader<G> {
      * in draft mode the draft where it passes the schema. A global with
      * neither calls `notFound()`.
      */
-    get(): Promise<Output<G>>;
+    get(input?: LocaleInput): Promise<Output<G>>;
 }
 
 type IndexOf<C> = C extends {
@@ -69,7 +81,7 @@ type IndexOf<C> = C extends {
  * and the cursor of the page before. A field a route reads from the address
  * is an index too.
  */
-export interface ListInput<C> {
+export interface ListInput<C> extends LocaleInput {
     where?: Partial<Record<IndexOf<C>, string | number | boolean>>;
     orderBy?: IndexOf<C> | 'publishedAt' | 'updatedAt';
     direction?: 'asc' | 'desc';
@@ -86,12 +98,13 @@ export interface CmsCollectionPageReader<C, Params> {
      * The item at an address, by the params the page component receives.
      * Outside draft mode the published item, cached and tagged with its
      * collection; in draft mode the draft whose address matches, then the
-     * published one. None calls `notFound()`.
+     * published one. None calls `notFound()`. A `locale` among the params,
+     * as a `[locale]` folder passes it, picks the language.
      *
      * @example
      * const article = await cms.pages.articlePage.get(await params);
      */
-    get(params: Params): Promise<Output<C>>;
+    get(params: Params & LocaleInput): Promise<Output<C>>;
 }
 
 /**
@@ -101,12 +114,12 @@ export interface CmsCollectionReader<C> {
     /**
      * One item by id. A missing or unpublished item calls `notFound()`.
      */
-    get(input: { id: string }): Promise<Output<C>>;
+    get(input: { id: string } & LocaleInput): Promise<Output<C>>;
     /**
      * Items in the order of the ids given, skipping the ones that are missing
      * or unpublished.
      */
-    getMany(input: { ids: readonly string[] }): Promise<Array<Output<C>>>;
+    getMany(input: { ids: readonly string[] } & LocaleInput): Promise<Array<Output<C>>>;
     /**
      * Items filtered and sorted by the collection's indexes, newest
      * `publishedAt` first unless `orderBy` says otherwise, a page at a time.
@@ -281,6 +294,41 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
     };
 
     /**
+     * The language a read asks for, checked against the ones the site
+     * serves. One it does not serve is not found.
+     */
+    const localeOf = async (locale: string | undefined): Promise<string | undefined> => {
+        try {
+            return service.readLocale(site, locale);
+        } catch (error) {
+            if (error instanceof CmsHttpError && runtime !== undefined) return runtime.notFound();
+            throw error;
+        }
+    };
+
+    /**
+     * One cached read per language, made on first use.
+     */
+    const perLocale = <Read>(make: (locale: string | undefined) => Read) => {
+        const made = new Map<string, Read>();
+        return (locale: string | undefined): Read => {
+            const key = locale ?? '';
+            let read = made.get(key);
+            if (read === undefined) {
+                read = make(locale);
+                made.set(key, read);
+            }
+            return read;
+        };
+    };
+
+    const inLocale = (parts: string[], locale: string | undefined): string[] =>
+        locale === undefined ? parts : [...parts, `locale:${locale}`];
+
+    const tagsIn = (tag: string, locale: string | undefined): string[] =>
+        locale === undefined ? [tag] : [tag, localeCacheTag(tag, locale)];
+
+    /**
      * Whether this request shows drafts: draft mode is on and the preview
      * cookie still verifies. The preview renews the cookie while the editor is
      * signed in, so a browser left in draft mode stops showing drafts soon
@@ -304,19 +352,30 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
      * content otherwise.
      */
     const reader = (ref: DocumentRef, fallBack: boolean) => {
-        const readPublished = cached(
-            async () => (await service.publishedOn(ref, site))?.content ?? null,
-            keyOf(service.target(ref).definition, 'published', site === DEFAULT_SITE ? formatRef(ref) : `${site}:${formatRef(ref)}`),
-            [ref.type === 'page' ? pageCacheTag(ref.name, ref.site) : documentCacheTag(ref, site)]
+        const readPublished = perLocale((locale) =>
+            cached(
+                async () => (await service.publishedOn(ref, site, locale))?.content ?? null,
+                keyOf(
+                    service.target(ref).definition,
+                    ...inLocale(['published', site === DEFAULT_SITE ? formatRef(ref) : `${site}:${formatRef(ref)}`], locale)
+                ),
+                tagsIn(ref.type === 'page' ? pageCacheTag(ref.name, ref.site) : documentCacheTag(ref, site), locale)
+            )
         );
-        return async (): Promise<Record<string, unknown> | undefined> => {
+        return async (asked?: string): Promise<Record<string, unknown> | undefined> => {
+            const locale = await localeOf(asked);
             if (await showsDrafts()) {
-                const draft = await service.draftOn(ref, site, fallBack);
+                const draft = await service.draftOn(ref, site, fallBack, locale);
                 return draft === undefined
                     ? undefined
-                    : encodeSourcePaths(service.target(ref).definition, draft, formatRef(ref), plainOf(ref));
+                    : encodeSourcePaths(
+                          service.target(ref).definition,
+                          draft,
+                          formatRef(service.shownRef(ref, site, locale)),
+                          plainOf(ref)
+                      );
             }
-            return (await readPublished()) ?? undefined;
+            return (await readPublished(locale)()) ?? undefined;
         };
     };
 
@@ -332,43 +391,69 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
                 false
             );
             pages[name] = {
-                get: async () => (await read()) ?? (await missing(entry.path)),
+                get: async (input?: LocaleInput) => (await read(input?.locale)) ?? (await missing(entry.path)),
             };
             continue;
         }
         const listing = service.servedListing(entry.page.collection.name, site);
-        const readPublished = cached(
-            async (params: string) => {
-                const id = await service.findItem(listing.name, JSON.parse(params) as Record<string, string>, 'published', listing.site);
-                return id === undefined ? null : ((await service.publishedOn(listing.refOf(id), site))?.content ?? null);
-            },
-            keyOf(
-                listing.definition,
-                'published',
-                formatRef({
-                    type: 'page',
-                    name,
-                    site,
-                })
-            ),
-            [collectionCacheTag(listing.name, site)]
+        const readPublished = perLocale((locale) =>
+            cached(
+                async (params: string) => {
+                    const id = await service.findItem(
+                        listing.name,
+                        JSON.parse(params) as Record<string, string>,
+                        'published',
+                        listing.site
+                    );
+                    return id === undefined ? null : ((await service.publishedOn(listing.refOf(id), site, locale))?.content ?? null);
+                },
+                keyOf(
+                    listing.definition,
+                    ...inLocale(
+                        [
+                            'published',
+                            formatRef({
+                                type: 'page',
+                                name,
+                                site,
+                            }),
+                        ],
+                        locale
+                    )
+                ),
+                tagsIn(collectionCacheTag(listing.name, site), locale)
+            )
         );
-        const readAt = async (params: Record<string, string>): Promise<Record<string, unknown> | undefined> => {
-            if (!(await showsDrafts())) return (await readPublished(JSON.stringify(params))) ?? undefined;
+        const readAt = async (params: Record<string, string>, asked: string | undefined): Promise<Record<string, unknown> | undefined> => {
+            const locale = await localeOf(asked);
+            if (!(await showsDrafts())) return (await readPublished(locale)(JSON.stringify(params))) ?? undefined;
             const drafted = await service.findItem(listing.name, params, 'draft', listing.site);
             if (drafted !== undefined) {
-                const draft = await service.draftOn(listing.refOf(drafted), site, false);
+                const draft = await service.draftOn(listing.refOf(drafted), site, false, locale);
                 if (draft !== undefined)
-                    return encodeSourcePaths(listing.definition, draft, formatRef(listing.refOf(drafted)), listing.pathFields);
+                    return encodeSourcePaths(
+                        listing.definition,
+                        draft,
+                        formatRef(service.shownRef(listing.refOf(drafted), site, locale)),
+                        listing.pathFields
+                    );
             }
             const live = await service.findItem(listing.name, params, 'published', listing.site);
-            const published = live === undefined ? undefined : await service.publishedOn(listing.refOf(live), site);
+            const published = live === undefined ? undefined : await service.publishedOn(listing.refOf(live), site, locale);
             return published === undefined || live === undefined
                 ? undefined
-                : encodeSourcePaths(listing.definition, published.content, formatRef(listing.refOf(live)), listing.pathFields);
+                : encodeSourcePaths(
+                      listing.definition,
+                      published.content,
+                      formatRef(service.shownRef(listing.refOf(live), site, locale)),
+                      listing.pathFields
+                  );
         };
         pages[name] = {
-            get: async (params: Record<string, string>) => (await readAt(decodeParams(params))) ?? (await missing(entry.path)),
+            get: async (input: Record<string, string>) => {
+                const { locale, ...params } = input;
+                return (await readAt(decodeParams(params), locale)) ?? (await missing(entry.path));
+            },
         };
     }
 
@@ -392,7 +477,7 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
         if (ref.type !== 'global') continue;
         const read = reader(ref, true);
         globals[ref.name] = {
-            get: async () => (await read()) ?? (await missing(`The ${ref.name} global`)),
+            get: async (input?: LocaleInput) => (await read(input?.locale)) ?? (await missing(`The ${ref.name} global`)),
         };
     }
 
@@ -401,22 +486,26 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
      * drafts included and marked in it.
      */
     const listOf = (listing: Listing) => {
-        const listPublished = cached(
-            async (input: string) =>
-                service.listItems(
-                    listing.name,
-                    {
-                        draft: false,
-                        ...(JSON.parse(input) as ListInput<unknown>),
-                    },
-                    listing.site,
-                    site
-                ),
-            keyOf(listing.definition, 'list', site === DEFAULT_SITE ? listing.name : `${site}:${listing.name}`),
-            [collectionCacheTag(listing.name, site)]
+        const listPublished = perLocale((locale) =>
+            cached(
+                async (input: string) =>
+                    service.listItems(
+                        listing.name,
+                        {
+                            draft: false,
+                            ...(JSON.parse(input) as ListInput<unknown>),
+                        },
+                        listing.site,
+                        site,
+                        locale
+                    ),
+                keyOf(listing.definition, ...inLocale(['list', site === DEFAULT_SITE ? listing.name : `${site}:${listing.name}`], locale)),
+                tagsIn(collectionCacheTag(listing.name, site), locale)
+            )
         );
-        return async (input: ListInput<unknown> = {}) => {
-            if (!(await showsDrafts())) return listPublished(JSON.stringify(input));
+        return async ({ locale: asked, ...input }: ListInput<unknown> = {}) => {
+            const locale = await localeOf(asked);
+            if (!(await showsDrafts())) return listPublished(locale)(JSON.stringify(input));
             const result = await service.listItems(
                 listing.name,
                 {
@@ -425,11 +514,17 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
                     where: input.where as Record<string, unknown> | undefined,
                 },
                 listing.site,
-                site
+                site,
+                locale
             );
             return {
                 items: result.items.map((content) =>
-                    encodeSourcePaths(listing.definition, content, formatRef(listing.refOf(String(content['id']))), listing.pathFields)
+                    encodeSourcePaths(
+                        listing.definition,
+                        content,
+                        formatRef(service.shownRef(listing.refOf(String(content['id'])), site, locale)),
+                        listing.pathFields
+                    )
                 ),
                 next: result.next,
             };
@@ -443,19 +538,20 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
     ];
     for (const listing of listings) {
         const name = listing.name;
-        const items = new Map<string, () => Promise<Record<string, unknown> | undefined>>();
-        const item = (id: string) => {
+        const items = new Map<string, (locale?: string) => Promise<Record<string, unknown> | undefined>>();
+        const item = (id: string, locale: string | undefined) => {
             let read = items.get(id);
             if (read === undefined) {
                 read = reader(listing.refOf(id), true);
                 items.set(id, read);
             }
-            return read();
+            return read(locale);
         };
         collections[name] = {
-            get: async (input: { id: string }) => (await item(input.id)) ?? (await missing(`The ${name} item '${input.id}'`)),
-            getMany: async (input: { ids: readonly string[] }) => {
-                const found = await Promise.all(input.ids.map((id) => item(id)));
+            get: async (input: { id: string } & LocaleInput) =>
+                (await item(input.id, input.locale)) ?? (await missing(`The ${name} item '${input.id}'`)),
+            getMany: async (input: { ids: readonly string[] } & LocaleInput) => {
+                const found = await Promise.all(input.ids.map((id) => item(id, input.locale)));
                 return found.filter((content) => content !== undefined);
             },
             list: listOf(listing),

@@ -344,3 +344,228 @@ describe('the locales on cms()', () => {
         expect(() => configOf({ locales: ['de', 'fr'], fallback: { fr: ['it'] } })).toThrow(/names 'it', which `locales` does not list/);
     });
 });
+
+describe('reading a language', () => {
+    it("reads a site's first language by default, and a translation with `locale`", async () => {
+        await publish(norwayFront(), {
+            heading: 'Velkommen',
+            intro: 'Hagen i Norge.',
+        });
+        expect((await config.content.pages.frontPage.get()).heading).toBe('Velkommen');
+        await expect(
+            config.content.pages.frontPage.get({
+                locale: 'en',
+            })
+        ).rejects.toMatchObject({
+            status: 404,
+        });
+        await write(norwayFront('en'), {
+            heading: 'Welcome',
+        });
+        await expect(
+            config.content.pages.frontPage.get({
+                locale: 'en',
+            })
+        ).rejects.toMatchObject({
+            status: 404,
+        });
+        await service.publish(norwayFront('en'), 'ada');
+        const english = await config.content.pages.frontPage.get({
+            locale: 'en',
+        });
+        expect(english.heading).toBe('Welcome');
+        expect(english.intro).toBeUndefined();
+    });
+
+    it('refuses a language the site does not serve', async () => {
+        showing.site = 'uk';
+        await expect(
+            config.content.pages.frontPage.get({
+                locale: 'nb',
+            })
+        ).rejects.toMatchObject({
+            status: 404,
+        });
+        expect((await request(app).get('/content/sites/uk/pages/frontPage?locale=nb')).status).toBe(400);
+    });
+
+    it('shows shared content in the language a site reads, with the shared fields from the source', async () => {
+        const id = await office();
+        await publish(officeRef(id), {
+            photo: {
+                id: 'missing',
+                alt: 'The shop front',
+            },
+        });
+        expect((await config.content.collections.offices.list()).items).toEqual([]);
+        await publish(officeRef(id, 'nb'), {
+            description: 'Vår største butikk.',
+            photo: 'Butikkfronten',
+        });
+        const [norwegian] = (await config.content.collections.offices.list()).items;
+        expect(norwegian).toMatchObject({
+            id,
+            name: 'Hagen Oslo',
+            description: 'Vår største butikk.',
+            phone: '+47 22 00 00 00',
+            order: 1,
+        });
+        expect(
+            (
+                await config.content.collections.offices.get({
+                    id,
+                })
+            ).photo?.alt
+        ).toBe('Butikkfronten');
+        showing.site = 'uk';
+        expect(
+            (
+                await config.content.collections.offices.get({
+                    id,
+                })
+            ).description
+        ).toBe('Our biggest shop.');
+    });
+
+    it('takes `locale` over HTTP', async () => {
+        const id = await office();
+        await publish(officeRef(id, 'nb'), {
+            description: 'Vår største butikk.',
+        });
+        await publish(norwayFront(), {
+            heading: 'Velkommen',
+        });
+        await publish(norwayFront('en'), {
+            heading: 'Welcome',
+        });
+        expect((await request(app).get('/content/sites/norway/pages/frontPage?locale=en')).body.content.heading).toBe('Welcome');
+        expect((await request(app).get('/content/sites/norway/pages/frontPage')).body.content.heading).toBe('Velkommen');
+        expect((await request(app).get(`/content/sites/norway/collections/offices/${id}`)).body.description).toBe('Vår største butikk.');
+        expect((await request(app).get(`/content/sites/norway/collections/offices?locale=en`)).body.items[0].description).toBe(
+            'Our biggest shop.'
+        );
+    });
+});
+
+const Products = defineCollection({
+    name: 'products',
+    id: Kizuna.brand('ProductId', z.string()),
+    fields: [
+        {
+            name: 'name',
+            schema: z.string(),
+        },
+        {
+            name: 'code',
+            schema: z.string(),
+            localized: false,
+        },
+    ],
+});
+
+describe('fallback', () => {
+    const shop = defineConfig({
+        jobRunner: heldJobs,
+        auth: {
+            identities: {
+                editor,
+            },
+        },
+        content: cms({
+            db,
+            locales: ['de', 'fr', 'it'],
+            fallback: {
+                fr: ['de'],
+                it: ['fr'],
+            },
+            collections: [Products],
+            auth: {
+                identity: 'editor',
+            },
+        }),
+    });
+    const shopService = (pluginExportsOf(shop.api)['cms'] as CmsExports).service;
+    const productRef = (id: string, locale?: string): DocumentRef => ({
+        type: 'item',
+        collection: 'products',
+        id,
+        ...(locale === undefined ? {} : { locale }),
+    });
+
+    it('shows the languages `fallback` names, a published translation only, and nothing without one', async () => {
+        const created = await shopService.createItem(
+            'products',
+            {
+                name: 'Warmwasserspeicher',
+                code: 'HWT-300',
+            },
+            {},
+            'ada'
+        );
+        const id = (created.target.ref as { id: string }).id;
+        await shopService.publish(productRef(id), 'ada');
+        const read = (locale: string) =>
+            shop.content.collections.products.get({
+                id,
+                locale,
+            });
+        expect((await read('fr')).name).toBe('Warmwasserspeicher');
+        await expect(read('it')).rejects.toMatchObject({
+            status: 404,
+        });
+        await shopService.update({
+            ref: productRef(id, 'fr'),
+            changes: {
+                name: 'Chauffe-eau',
+            },
+            caller: {},
+            author: 'ada',
+        });
+        await expect(read('it')).rejects.toMatchObject({
+            status: 404,
+        });
+        await shopService.publish(productRef(id, 'fr'), 'ada');
+        expect(await read('it')).toMatchObject({
+            name: 'Chauffe-eau',
+            code: 'HWT-300',
+        });
+    });
+});
+
+describe('sites', () => {
+    it('drops every language when the source publishes, and one language when its translation does', async () => {
+        await publish(norwayFront(), {
+            heading: 'Velkommen',
+        });
+        expect(revalidated).toContain('kizuna-cms:page:norway:frontPage');
+        revalidated.length = 0;
+        await publish(norwayFront('en'), {
+            heading: 'Welcome',
+        });
+        expect(revalidated).toEqual(['kizuna-cms:page:norway:frontPage@en']);
+        const id = await office();
+        revalidated.length = 0;
+        await publish(officeRef(id, 'nb'), {
+            description: 'Vår største butikk.',
+        });
+        expect(revalidated).toEqual(
+            expect.arrayContaining([
+                `kizuna-cms:item:norway:offices:${id}@nb`,
+                'kizuna-cms:collection:norway:offices@nb',
+                'kizuna-cms:collection:uk:offices@nb',
+            ])
+        );
+        expect(revalidated.every((tag) => tag.endsWith('@nb'))).toBe(true);
+    });
+
+    it("reads a site's other languages under their code, and its first at the root", async () => {
+        await publish(norwayFront(), {
+            heading: 'Velkommen',
+        });
+        expect(await service.pageAt('/', 'norway')).toEqual(norwayFront());
+        expect(await service.pageAt('/en', 'norway')).toEqual(norwayFront('en'));
+        expect(await service.pageAt('/en', 'uk')).toBeUndefined();
+        expect(service.localizedPath(service.target(norwayFront('en')), '/')).toBe('/en');
+        expect(service.localizedPath(service.target(norwayFront()), '/')).toBe('/');
+    });
+});

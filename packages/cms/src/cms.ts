@@ -30,12 +30,12 @@ import { blocksForWire, blocksHint, fieldChain, hiddenIn } from './content.js';
 import { conditionText } from './condition.js';
 import { dataFields, objectOf, type Field } from './field.js';
 import { randomBytes } from 'node:crypto';
-import type { ContentDefinition, Collection, Global } from './definitions.js';
+import { choosesSites, SHOWS_ON, type ContentDefinition, type Collection, type Global } from './definitions.js';
 import { servesCollection } from './page.js';
 import { fillPath, matchPath, routesOf, type ServedRoute } from './dynamic.js';
 import { DEFAULT_SITE, routePrefix, sitesOf, type PageEntry, type PageMap, type ResolvedCmsOptions } from './options.js';
 import { formatRef, parseRef, sourceRefOf, type DocumentRef } from './refs.js';
-import { translationOf } from './locales.js';
+import { translationOf, withTranslation } from './locales.js';
 import { CMS_MIGRATION_SQL, indexSql, type IndexType, type IndexedField } from './storage/migration.js';
 import { MediaService, type MediaRecord } from './media/media.js';
 import { memoryMediaStorage, type MediaStorage } from './media/storage.js';
@@ -145,6 +145,13 @@ export const documentCacheTag = (ref: DocumentRef, site?: string): string =>
  */
 export const collectionCacheTag = (name: string, site = DEFAULT_SITE): string =>
     site === DEFAULT_SITE ? `kizuna-cms:collection:${name}` : `kizuna-cms:collection:${site}:${name}`;
+
+/**
+ * A cache tag as one language reads it. A read carries its tag and its
+ * language's, so publishing a source drops every language and publishing a
+ * translation drops its own.
+ */
+export const localeCacheTag = (tag: string, locale: string): string => `${tag}@${locale}`;
 
 /**
  * The draft's entity tag: its version and when it was last saved, so a save
@@ -318,6 +325,14 @@ const isSet = (value: unknown): boolean =>
  */
 export const variesBySite = (definition: ContentDefinition): boolean =>
     dataFields(definition.fields).some((field) => field.perSite === true || field.sites !== undefined);
+
+/**
+ * The sites an item's `showsOn` holds.
+ */
+export const showsOnOf = (content: Record<string, unknown> | null | undefined): string[] => {
+    const held = content?.[SHOWS_ON];
+    return Array.isArray(held) ? held.filter((site): site is string => typeof site === 'string') : [];
+};
 
 /**
  * Whether a site shows and stores a field: every site, unless its `sites`
@@ -788,7 +803,51 @@ export class CmsService {
      * The document served at a path: a page, or the item a page that shows a
      * collection has at that address, by its draft address first.
      */
-    async pageAt(path: string, site = DEFAULT_SITE): Promise<DocumentRef | undefined> {
+    async pageAt(address: string, site = DEFAULT_SITE): Promise<DocumentRef | undefined> {
+        const { path, locale } = this.unprefixed(address, site);
+        const found = await this.sourceAt(path, site);
+        return found === undefined || locale === undefined
+            ? found
+            : this.canonical({
+                  ...found,
+                  locale,
+              });
+    }
+
+    /**
+     * A path with the language it is under taken off: a site's first language
+     * sits at the root, and each other under its code, like `/en/offices`.
+     */
+    unprefixed(path: string, site: string): { path: string; locale: string | undefined } {
+        const [, first, ...rest] = path.split('/');
+        if (first === undefined || !this.siteLocales(site).slice(1).includes(first)) {
+            return {
+                path,
+                locale: undefined,
+            };
+        }
+        return {
+            path: `/${rest.join('/')}`,
+            locale: first,
+        };
+    }
+
+    /**
+     * Where a document shows in a language on the site that serves it: under
+     * the language's code unless it is the site's first. Shared content
+     * shows on the first site serving the language.
+     */
+    localizedPath(target: Target, path: string | null): string | null {
+        if (path === null || target.source === undefined) return path;
+        const site =
+            target.site !== DEFAULT_SITE
+                ? target.site
+                : (this.siteNames().find((name) => this.siteLocales(name).includes(target.locale)) ?? DEFAULT_SITE);
+        if (this.siteLocales(site)[0] === target.locale) return path;
+        return `/${target.locale}${path === '/' ? '' : path}`;
+    }
+
+    private async sourceAt(path: string, site: string): Promise<DocumentRef | undefined> {
         const exact = this.entryAt(path, site);
         if (exact !== undefined) {
             return {
@@ -1109,14 +1168,69 @@ export class CmsService {
     }
 
     /**
-     * Published content as a site shows it.
+     * The language a site reads: the one asked for, or else its default.
+     * `undefined` when cms() lists no locales.
+     */
+    readLocale(site: string, locale: string | undefined): string | undefined {
+        const served = this.siteLocales(site);
+        if (served.length === 0) {
+            if (locale === undefined) return undefined;
+            throw new CmsHttpError(404, { detail: `cms() lists no locales, so nothing is in '${locale}'.` });
+        }
+        if (locale === undefined) return served[0];
+        if (served.includes(locale)) return locale;
+        throw new CmsHttpError(404, {
+            detail:
+                site === DEFAULT_SITE
+                    ? `Nothing is written in '${locale}'. cms() lists ${served.join(', ')}.`
+                    : `The ${site} site does not serve '${locale}'. It serves ${served.join(', ')}.`,
+        });
+    }
+
+    /**
+     * A source document in one language: the source in its own language, and
+     * in any other its translation over the source, trying the languages
+     * `fallback` names in turn. `read` reads one copy, the source or a
+     * translation.
+     */
+    private async inLocale<Read extends { content: Record<string, unknown> }>(
+        ref: DocumentRef,
+        locale: string | undefined,
+        read: (ref: DocumentRef) => Promise<Read | undefined>
+    ): Promise<Read | undefined> {
+        const target = this.target(ref);
+        if (locale === undefined || target.shared !== undefined) return read(ref);
+        const sourceLocale = this.sourceLocaleOf(target.site);
+        const translated = translationOf(target.definition) !== undefined;
+        for (const candidate of [locale, ...(this.options.fallback?.[locale] ?? [])]) {
+            if (candidate === sourceLocale || !translated) return read(ref);
+            if (!this.siteLocales(target.site).includes(candidate)) continue;
+            const translation = await read({
+                ...ref,
+                locale: candidate,
+            });
+            if (translation === undefined) continue;
+            const source = await read(ref);
+            if (source === undefined) return undefined;
+            return {
+                ...translation,
+                content: withTranslation(target.definition, source.content, translation.content),
+            };
+        }
+        return undefined;
+    }
+
+    /**
+     * Published content as a site shows it, in a language it serves.
      */
     async publishedOn(
         ref: DocumentRef,
-        site: string
+        site: string,
+        locale?: string
     ): Promise<{ content: Record<string, unknown>; version: number; updatedAt: Date } | undefined> {
-        const shared = await this.published(ref);
-        if (shared === undefined || !this.readsSiteValues(ref, site)) return shared;
+        const shared = await this.inLocale(ref, this.readLocale(site, locale), (copy) => this.published(copy));
+        if (shared === undefined || this.hidesOn(ref, site, shared.content)) return undefined;
+        if (!this.readsSiteValues(ref, site)) return shared;
         return {
             ...shared,
             content: this.withSiteValues(this.target(ref).definition, shared.content, await this.siteValues(ref, site, 'published'), site),
@@ -1126,12 +1240,66 @@ export class CmsService {
     /**
      * The draft as a site shows it in draft mode: the shared draft, or with
      * `fallBack` the published copy, with the site's draft values, or else
-     * its published ones, in place.
+     * its published ones, in place. A translation shows its draft, or else
+     * its published copy.
      */
-    async draftOn(ref: DocumentRef, site: string, fallBack: boolean): Promise<Record<string, unknown> | undefined> {
-        const content = (await this.draft(ref))?.content ?? (fallBack ? (await this.published(ref))?.content : undefined);
-        if (content === undefined || !this.readsSiteValues(ref, site)) return content;
-        return this.withSiteValues(this.target(ref).definition, content, await this.siteValues(ref, site, 'draft'), site);
+    async draftOn(ref: DocumentRef, site: string, fallBack: boolean, locale?: string): Promise<Record<string, unknown> | undefined> {
+        const shown = await this.inLocale(ref, this.readLocale(site, locale), async (copy) => {
+            const content =
+                (await this.draft(copy))?.content ??
+                (fallBack || copy.locale !== undefined ? (await this.published(copy))?.content : undefined);
+            return content === undefined
+                ? undefined
+                : {
+                      content,
+                  };
+        });
+        if (shown === undefined || this.hidesOn(ref, site, shown.content)) return undefined;
+        if (!this.readsSiteValues(ref, site)) return shown.content;
+        return this.withSiteValues(this.target(ref).definition, shown.content, await this.siteValues(ref, site, 'draft'), site);
+    }
+
+    /**
+     * Whether a shared collection that chooses its sites holds the item.
+     */
+    choosesSitesFor(ref: DocumentRef): boolean {
+        return (
+            ref.type === 'item' && (ref.site === undefined || ref.site === DEFAULT_SITE) && choosesSites(this.collections[ref.collection])
+        );
+    }
+
+    /**
+     * Whether a site leaves out an item whose `showsOn` does not hold it.
+     * Read on no site, every item shows.
+     */
+    private hidesOn(ref: DocumentRef, site: string, content: Record<string, unknown>): boolean {
+        return site !== DEFAULT_SITE && this.choosesSitesFor(sourceRefOf(ref)) && !showsOnOf(content).includes(site);
+    }
+
+    /**
+     * The sites a shared item that chooses its sites shows on in the copies
+     * given. `undefined` for anything else, which every site reads.
+     */
+    private async sitesShowing(ref: DocumentRef, copies: ReadonlyArray<'draft' | 'published'>): Promise<string[] | undefined> {
+        const source = sourceRefOf(ref);
+        if (!this.choosesSitesFor(source)) return undefined;
+        const row = await this.store.get('item', this.target(source).key, DEFAULT_SITE);
+        return [...new Set(copies.flatMap((copy) => showsOnOf(row?.[copy])))];
+    }
+
+    /**
+     * The ref the fields shown in a language were written under: the
+     * translation's when the language is one, else the source's.
+     */
+    shownRef(ref: DocumentRef, site: string, locale: string | undefined): DocumentRef {
+        const shown = this.readLocale(site, locale);
+        const target = this.target(ref);
+        if (shown === undefined || target.shared !== undefined || shown === this.sourceLocaleOf(target.site)) return ref;
+        if (translationOf(target.definition) === undefined || !this.siteLocales(target.site).includes(shown)) return ref;
+        return {
+            ...ref,
+            locale: shown,
+        };
     }
 
     /**
@@ -1383,9 +1551,11 @@ export class CmsService {
             cursor?: string;
         },
         site = DEFAULT_SITE,
-        readingSite = site
+        readingSite = site,
+        locale?: string
     ): Promise<{ items: Array<Record<string, unknown>>; next: string | undefined }> {
         const listing = this.listing(name, site);
+        const reading = this.readLocale(readingSite, locale);
         const result = await this.store.query({
             kind: 'item',
             keyPrefix: listing.keyPrefix,
@@ -1395,6 +1565,14 @@ export class CmsService {
                 ...this.indexOf(listing, field),
                 value,
             })),
+            ...(listing.site === DEFAULT_SITE && readingSite !== DEFAULT_SITE && choosesSites(listing.definition)
+                ? {
+                      holds: {
+                          field: SHOWS_ON,
+                          value: readingSite,
+                      },
+                  }
+                : {}),
             ...(query.orderBy === undefined
                 ? {}
                 : {
@@ -1424,7 +1602,24 @@ export class CmsService {
                 this.passes(target, migrated.published) ??
                 (migrated.published === null ? undefined : (await this.publishedAsStored(target.ref))?.content);
             if (content === undefined) continue;
-            const presented = await this.present(target, content);
+            const source = await this.present(target, content);
+            const presented = (
+                await this.inLocale(target.ref, reading, async (copy) => {
+                    if (copy.locale === undefined) {
+                        return {
+                            content: source,
+                        };
+                    }
+                    const translated =
+                        (query.draft ? (await this.draft(copy))?.content : undefined) ?? (await this.published(copy))?.content;
+                    return translated === undefined
+                        ? undefined
+                        : {
+                              content: translated,
+                          };
+                })
+            )?.content;
+            if (presented === undefined) continue;
             items.push(
                 this.readsSiteValues(target.ref, readingSite)
                     ? this.withSiteValues(
@@ -1444,9 +1639,10 @@ export class CmsService {
 
     /**
      * The shared collections, or with a site, its own, with what editors call
-     * each and how many items it holds.
+     * each and how many items it holds. With `shownOn`, a collection that
+     * chooses its sites counts the items that site shows.
      */
-    async collectionSummaries(site = DEFAULT_SITE): Promise<Array<{ name: string; label: string; count: number }>> {
+    async collectionSummaries(site = DEFAULT_SITE, shownOn?: string): Promise<Array<{ name: string; label: string; count: number }>> {
         const collections = site === DEFAULT_SITE ? this.collections : this.siteCollections[site];
         if (collections === undefined) throw new CmsHttpError(404, { detail: `There is no site named '${site}'.` });
         const rows = await this.store.list('item', site);
@@ -1460,7 +1656,11 @@ export class CmsService {
                         .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
                         .toLowerCase()
                         .replace(/^./, (first) => first.toUpperCase()),
-                count: rows.filter((row) => row.key.startsWith(listing.keyPrefix)).length,
+                count: rows.filter(
+                    (row) =>
+                        row.key.startsWith(listing.keyPrefix) &&
+                        (shownOn === undefined || !choosesSites(definition) || showsOnOf(row.draft ?? row.published).includes(shownOn))
+                ).length,
             };
         });
     }
@@ -1608,6 +1808,18 @@ export class CmsService {
             }
             return {
                 kind: 'status',
+                values: [condition.value],
+                negate,
+            };
+        }
+        if (condition.field === SHOWS_ON && choosesSites(listing.definition) && !nested) {
+            return {
+                kind: 'field',
+                field: {
+                    field: SHOWS_ON,
+                    type: 'text',
+                },
+                list: true,
                 values: [condition.value],
                 negate,
             };
@@ -1774,7 +1986,8 @@ export class CmsService {
         values: Record<string, unknown>,
         caller: Caller,
         author: string,
-        site = DEFAULT_SITE
+        site = DEFAULT_SITE,
+        access?: EditorAccess
     ): Promise<DraftState> {
         const listing = this.listing(name, site);
         const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -1800,6 +2013,11 @@ export class CmsService {
             ref,
             changes: values,
             caller,
+            ...(access === undefined
+                ? {}
+                : {
+                      access,
+                  }),
             author,
             summary: 'Created',
         });
@@ -1809,11 +2027,12 @@ export class CmsService {
         const listing = this.listing(name, site);
         const ref = listing.refOf(id);
         const target = this.target(ref);
+        const sites = await this.sitesShowing(ref, ['published']);
         if (!(await this.store.delete('item', target.key, target.site))) {
             throw new CmsHttpError(404, { detail: `There is no item '${id}' in '${listing.name}'.` });
         }
-        await this.revalidateDocument(ref);
-        await queueRefreshes(this, ref);
+        await this.revalidateDocument(ref, sites);
+        await queueRefreshes(this, ref, sites);
     }
 
     /**
@@ -1999,10 +2218,17 @@ export class CmsService {
                   ? 'Shared'
                   : String(this.siteInfo(target.site)['label']);
         const declared = dataFields(definition.fields);
+        const sites = this.siteNames();
+        const showsOn =
+            this.choosesSitesFor(ref) && sites.length > 0 ? z.array(z.enum(sites as [string, ...string[]])).default([]) : undefined;
         const described: z.output<typeof import('./wire.js').DescribedFieldSchema>[] = [];
         const push = (field: DescribedField, parent: string | undefined): void => {
             const own = parent === undefined ? declared.find((candidate) => candidate.name === field.path) : undefined;
             if (own !== undefined && own.sites !== undefined && !own.sites.includes(target.site)) return;
+            const sitesField = showsOn !== undefined && own?.name === SHOWS_ON;
+            const options = sitesField
+                ? Object.fromEntries(sites.map((site) => [site, String(this.siteInfo(site)['label'])]))
+                : field.options;
             const sharedValue =
                 target.shared !== undefined && own?.perSite === true ? getAtPath(shared ?? undefined, field.path) : undefined;
             const brand = this.referenceBrandOf(field.schema);
@@ -2038,7 +2264,7 @@ export class CmsService {
                 path: field.path,
                 name: field.name,
                 ...(field.label === undefined ? {} : { label: field.label }),
-                ...(field.options === undefined ? {} : { options: { ...field.options } }),
+                ...(options === undefined ? {} : { options: { ...options } }),
                 ...(description === '' ? {} : { description }),
                 ...(help === '' ? {} : { help }),
                 ...(field.block === undefined ? {} : { block: field.block }),
@@ -2079,7 +2305,7 @@ export class CmsService {
                 ...(roles === undefined ? {} : { roles }),
                 ...(brand === undefined ? {} : { brand }),
                 ...(brand === undefined ? {} : { searchTool: this.ownSearchTool() ?? `editing.searchItems` }),
-                schema: this.fieldJsonSchema(field.schema),
+                schema: this.fieldJsonSchema(sitesField ? showsOn : field.schema),
                 ...(draft === null ? {} : { value: getAtPath(draft, field.path) }),
                 ...(belongsTo === undefined
                     ? {}
@@ -2126,7 +2352,9 @@ export class CmsService {
         ref: DocumentRef,
         sees: (site: string) => boolean = () => true
     ): Promise<{ everywhere: boolean; pages: Array<{ name: string; path: string }>; partners: Array<{ key: string; label: string }> }> {
-        const partners = refreshTargets(this, ref)
+        const row = this.choosesSitesFor(ref) ? (await this.document(ref)).row : undefined;
+        const shownOn = this.choosesSitesFor(ref) ? showsOnOf(row?.draft ?? row?.published) : undefined;
+        const partners = refreshTargets(this, ref, shownOn)
             .filter((target) => target.kind === 'partner')
             .map((target) => ({
                 key: target.key,
@@ -2151,7 +2379,7 @@ export class CmsService {
             everywhere: false,
             partners,
             pages: (await this.whereUsed(brand, ref.id))
-                .filter((used) => sees(used.site))
+                .filter((used) => sees(used.site) && (shownOn === undefined || shownOn.includes(used.site)))
                 .map((used) => ({
                     name: used.name,
                     path: used.path,
@@ -2166,6 +2394,11 @@ export class CmsService {
         ref: DocumentRef;
         changes: Record<string, unknown>;
         caller: Caller;
+        /**
+         * Where the editor may go, which limits the sites they add to or take
+         * off an item's `showsOn`.
+         */
+        access?: EditorAccess;
         author: string;
         summary?: string;
         ifMatch?: string | string[];
@@ -2240,6 +2473,9 @@ export class CmsService {
             });
         }
         const stored = parsed.success ? (parsed.data as Record<string, unknown>) : draft;
+        if (this.choosesSitesFor(input.ref) && paths.some((path) => path.split('.')[0] === SHOWS_ON)) {
+            this.assertShowsOn(showsOnOf(row?.draft ?? row?.published), showsOnOf(stored), input.access);
+        }
         await this.assertMediaOnSite(target, stored);
         const listing = this.listingOf(input.ref);
         if (listing !== undefined && paths.some((path) => listing.pathFields.includes(path.split('.')[0]!))) {
@@ -2288,6 +2524,38 @@ export class CmsService {
             paths,
         });
         return this.draftState(input.ref);
+    }
+
+    /**
+     * Refuses a site `declareSites()` does not declare, and a site an editor
+     * who does not publish shared content may not open.
+     */
+    private assertShowsOn(before: readonly string[], after: readonly string[], access: EditorAccess | undefined): void {
+        const declared = this.siteNames();
+        const unknown = after.filter((site) => !declared.includes(site));
+        if (unknown.length > 0) {
+            throw new CmsHttpError(422, {
+                detail: `'${unknown[0]}' is not a site. ${SHOWS_ON} holds ${declared.join(', ')}.`,
+                errors: [
+                    {
+                        code: 'custom',
+                        path: [SHOWS_ON],
+                        message: 'Unknown site',
+                    },
+                ],
+            });
+        }
+        if (access === undefined || access.publishesShared) return;
+        const changed = [...after.filter((site) => !before.includes(site)), ...before.filter((site) => !after.includes(site))];
+        const own = Object.keys(access.sites);
+        if (changed.some((site) => !own.includes(site))) {
+            throw new CmsHttpError(403, {
+                detail:
+                    own.length === 0
+                        ? `Forbidden: ${SHOWS_ON} changes by an admin over every site.`
+                        : `Forbidden: you add or take off only ${own.join(', ')} in ${SHOWS_ON}.`,
+            });
+        }
     }
 
     /**
@@ -2391,9 +2659,10 @@ export class CmsService {
             });
         }
         await this.assertNoLoop(ref, state.row?.draft, 'published');
+        const sites = await this.sitesShowing(ref, ['published', 'draft']);
         await this.store.publish(state.target.kind, state.target.key, author, state.target.site, state.target.locale);
-        await this.revalidateDocument(ref);
-        await queueRefreshes(this, ref);
+        await this.revalidateDocument(ref, sites);
+        await queueRefreshes(this, ref, sites);
         return this.draftState(ref);
     }
 
@@ -2408,13 +2677,14 @@ export class CmsService {
                 detail: `There is no item '${ref.id}' in '${ref.collection}'.`,
             });
         }
+        const sites = await this.sitesShowing(ref, ['published']);
         if ((await this.store.unpublish(target.kind, target.key, author, target.site, target.locale)) === undefined) {
             throw new CmsHttpError(409, {
                 detail: `'${formatRef(ref)}' is not published.`,
             });
         }
-        await this.revalidateDocument(ref);
-        await queueRefreshes(this, ref);
+        await this.revalidateDocument(ref, sites);
+        await queueRefreshes(this, ref, sites);
         return this.draftState(ref);
     }
 
@@ -2738,10 +3008,12 @@ export class CmsService {
 
     /**
      * Drops every cached read a changed document reaches: its own, its
-     * collection's lists, and the pages that reference an item.
+     * collection's lists, and the pages that reference an item. `sites`
+     * narrows the sites, for an item that shows on some.
      */
-    async revalidateDocument(ref: DocumentRef): Promise<void> {
-        const readers = this.readersOf(ref);
+    async revalidateDocument(translated: DocumentRef, sites?: readonly string[]): Promise<void> {
+        const ref = sourceRefOf(translated);
+        const readers = this.readersOf(ref).filter((site) => sites === undefined || sites.includes(site));
         const tags = readers.flatMap((site) => [
             ref.type === 'page' ? pageCacheTag(ref.name, ref.site) : documentCacheTag(ref, site),
             ...(ref.type === 'item' ? [collectionCacheTag(ref.collection, site)] : []),
@@ -2754,7 +3026,14 @@ export class CmsService {
                     .map((used) => pageCacheTag(used.name, used.site))
             );
         }
-        await this.revalidateTags([...new Set(tags)]);
+        const locale = translated.locale;
+        if (locale === undefined) {
+            await this.revalidateTags([...new Set(tags)]);
+            return;
+        }
+        // A language that falls back to this one shows it too.
+        const shown = this.locales().filter((candidate) => candidate === locale || this.options.fallback?.[candidate]?.includes(locale));
+        await this.revalidateTags([...new Set(tags.flatMap((tag) => shown.map((each) => localeCacheTag(tag, each))))]);
     }
 
     /**
