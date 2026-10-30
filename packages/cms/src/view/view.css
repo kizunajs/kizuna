@@ -589,10 +589,11 @@
         white-space: nowrap;
     }
 
-    /* A field nobody may change: its value as text, on a quieter fill than an input. */
+    /* A field the editor cannot change: its input's shape on the fainter surface fill, muted text, and a lock on the right. */
     .k-read-only {
         display: flex;
         align-items: center;
+        gap: 8px;
         min-height: var(--k-control-height);
         margin: 0;
         padding: 9px 12px;
@@ -600,11 +601,28 @@
         background: var(--k-surface);
         font-size: 14px;
         line-height: 22px;
-        overflow-wrap: anywhere;
+        color: var(--k-muted);
+        cursor: default;
     }
 
-    .k-read-only[data-empty='true'] {
+    .k-read-only__text {
+        flex: 1;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        user-select: text;
+    }
+
+    .k-read-only__lock {
+        display: inline-flex;
+        flex: none;
         color: var(--k-muted);
+        border-radius: 4px;
+        outline: 2px solid transparent;
+        outline-offset: 2px;
+    }
+
+    .k-read-only__lock:focus-visible {
+        outline-color: var(--k-ink);
     }
 
     .k-required {

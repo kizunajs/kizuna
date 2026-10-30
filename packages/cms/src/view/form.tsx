@@ -11,11 +11,13 @@ import {
 } from 'react';
 import { Collapsible } from '@base-ui/react/collapsible';
 import { Tabs } from '@base-ui/react/tabs';
-import { ChevronDown, CircleAlert } from 'lucide-react';
+import { ChevronDown, CircleAlert, Lock } from 'lucide-react';
+import { conditionHolds } from '../condition.js';
 import { arrange, inSidebar, tabSets, type Arranged } from './arrange.js';
 import { ICON } from './context.js';
 import { Control, foldsItems, listsItems, Required } from './controls.js';
-import { readOnlyTextOf, readsAsText } from './read-only.js';
+import { Hint } from './hint.js';
+import { lockReasonOf, readOnlyTextOf, readsAsText } from './read-only.js';
 import { labelOf, valueAt, type DescribedField, type DescribedLayout } from './schema.js';
 
 /**
@@ -82,9 +84,6 @@ export interface FieldFormHandle {
      */
     flush: () => Promise<void>;
 }
-
-const refusalFor = (field: DescribedField, readOnly: boolean): string =>
-    field.readOnly || readOnly ? 'Read only' : `Only ${(field.roles ?? ['another role']).join(' or ')} can change this`;
 
 /**
  * The id of the element that holds a field, to scroll to it.
@@ -187,14 +186,37 @@ export function FieldForm({
         [flush]
     );
 
+    const valueOf = (path: string): unknown => (path in values ? values[path] : valueAt(draft, path));
+
+    /**
+     * Whether a field's condition holds on the values beside it as the person
+     * has them, a field with no value reading as its default.
+     */
+    const shows = (field: DescribedField): boolean => {
+        if (field.condition === undefined) return true;
+        const path = field.parent === undefined ? field.condition.field : `${field.parent}.${field.condition.field}`;
+        const value = valueOf(path);
+        return conditionHolds(
+            field.condition,
+            value === undefined ? fields.find((candidate) => candidate.path === path)?.schema.default : value
+        );
+    };
+    const hidden = fields
+        .filter((field) => !shows(field))
+        .map((field) => field.path)
+        .join(' ');
+
+    // A hidden field leaves the form, so a tab, row or collapsible holding only hidden fields goes with it.
     const arranged = useMemo(() => {
+        const hiddenPaths = new Set(hidden.split(' '));
+        const visible = fields.filter((field) => !hiddenPaths.has(field.path));
         const top = arrange(
-            fields.filter((field) => field.parent === undefined),
+            visible.filter((field) => field.parent === undefined),
             layout
         );
         const blocks = new Map<string, Arranged[]>();
-        for (const field of fields) {
-            const children = fields.filter((candidate) => candidate.parent === field.path);
+        for (const field of visible) {
+            const children = visible.filter((candidate) => candidate.parent === field.path);
             if (children.length > 0) blocks.set(field.path, arrange(children, layout));
         }
         const tabs = tabSets(top);
@@ -205,7 +227,7 @@ export function FieldForm({
             blocks,
             tabs,
         };
-    }, [fields, layout]);
+    }, [fields, layout, hidden]);
 
     // A field pointed at in the preview shows its tab and opens its collapsible before it scrolls into view.
     if (pointed !== revealed) {
@@ -240,7 +262,6 @@ export function FieldForm({
         });
     }, [pointed]);
 
-    const valueOf = (path: string): unknown => (path in values ? values[path] : valueAt(draft, path));
     const change = (path: string, value: unknown): void => {
         setValues((previous) => ({
             ...previous,
@@ -289,7 +310,7 @@ export function FieldForm({
                     />
                 </div>
                 {field.help !== undefined && !list ? <p className="k-help">{field.help}</p> : null}
-                {writable ? null : <p className="k-help">{refusalFor(field, readOnly === true)}</p>}
+                {writable ? null : <p className="k-help">{lockReasonOf(field, readOnly === true)}</p>}
             </>
         );
     };
@@ -304,6 +325,8 @@ export function FieldForm({
     const section = (field: DescribedField, headed = true): ReactNode => {
         const children = fields.filter((candidate) => candidate.parent === field.path);
         if (children.length > 0) {
+            const content = arranged.blocks.get(field.path);
+            if (content === undefined) return null;
             // A block's fields sit under its name as a heading, with no surface of their own. A tab that holds it alone already names it.
             return (
                 <section
@@ -323,9 +346,7 @@ export function FieldForm({
                     ) : field.help === undefined ? null : (
                         <p className="k-group__description">{field.help}</p>
                     )}
-                    <div className="k-fields">
-                        {shown(arranged.blocks.get(field.path) ?? [], 'k-fields', (child) => leaf(child, child.writable && field.writable))}
-                    </div>
+                    <div className="k-fields">{shown(content, 'k-fields', (child) => leaf(child, child.writable && field.writable))}</div>
                 </section>
             );
         }
@@ -334,10 +355,13 @@ export function FieldForm({
 
     /**
      * One field: its label, its input and its help. A list whose items fold
-     * draws its label itself, with Collapse all and Expand all beside it.
+     * draws its label itself, with Collapse all and Expand all beside it. A
+     * field the editor cannot change and whose value reads as text shows it
+     * in a locked box the shape of its input.
      */
     const leaf = (field: DescribedField, writable: boolean): ReactNode => {
         const folds = foldsItems(field.schema, field.schema);
+        const locked = readOnly === true || field.readOnly || !writable;
         const label = (
             <label className="k-field__label" htmlFor={folds ? undefined : fieldDomId(field.path) + '-input'}>
                 {labelOf(field)}
@@ -345,19 +369,27 @@ export function FieldForm({
             </label>
         );
         const needed = field.parent === undefined && missing?.includes(field.name) === true;
-        if ((readOnly === true || field.readOnly) && readsAsText(field.schema)) {
+        if (locked && readsAsText(field.schema)) {
             const text = readOnlyTextOf(field.schema, valueOf(field.path), field.options);
+            const reason = lockReasonOf(field, readOnly === true);
             return (
                 <section key={field.path} id={fieldDomId(field.path)} className="k-field">
                     <span className="k-field__label" id={fieldDomId(field.path) + '-label'}>
                         {labelOf(field)}
+                        {field.required ? <Required /> : null}
                     </span>
                     <div className="k-field__control" data-changed={isMarked(field.path, changed)}>
                         <p className="k-read-only" aria-labelledby={fieldDomId(field.path) + '-label'} data-empty={text === undefined}>
-                            {text ?? 'Not set'}
+                            <span className="k-read-only__text">{text ?? 'Not set'}</span>
+                            <Hint label={reason}>
+                                <span className="k-read-only__lock" role="img" aria-label={reason} tabIndex={0}>
+                                    <Lock size={13} strokeWidth={1.75} aria-hidden />
+                                </span>
+                            </Hint>
                         </p>
                         {field.help === undefined ? null : <p className="k-help">{field.help}</p>}
                     </div>
+                    {below?.(field)}
                 </section>
             );
         }

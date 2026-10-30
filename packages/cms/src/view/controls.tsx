@@ -21,6 +21,7 @@ import {
     Upload,
     X,
 } from 'lucide-react';
+import { conditionHolds } from '../condition.js';
 import { itemNounOf, movedIndex, remapOpen, rowLabelsOf, singularOf } from './array-rows.js';
 import { EditorContext, ICON, useEditorContext } from './context.js';
 import { Hint } from './hint.js';
@@ -1341,16 +1342,28 @@ function ObjectControl(props: ControlProps) {
 function BlockFields({ described, ...props }: ControlProps & { described: DescribedBlock | undefined }) {
     const base = useId();
     const required = props.schema.required ?? [];
+    const item = (props.value ?? {}) as Record<string, unknown>;
+    const properties = props.schema.properties ?? {};
+    // A condition reads a field beside it in the same item, one with no value reading as its default.
+    const shows = (name: string): boolean => {
+        const condition = described?.fields.find((candidate) => candidate.name === name)?.condition;
+        if (condition === undefined) return true;
+        const value = item[condition.field];
+        return conditionHolds(condition, value === undefined ? properties[condition.field]?.default : value);
+    };
     return (
         <div className="k-fields">
-            {Object.entries(props.schema.properties ?? {})
-                .filter(([name]) => name !== BLOCK_KEY)
+            {Object.entries(properties)
+                .filter(([name]) => name !== BLOCK_KEY && shows(name))
                 .map(([name, property]) => {
                     const field = described?.fields.find((candidate) => candidate.name === name);
                     const label = field?.label ?? humanize(name);
                     return (
                         <div key={name} className="k-block-field">
-                            <Row label={label} htmlFor={`${base}-${name}`} required={required.includes(name)}>
+                            <Row
+                                label={label}
+                                htmlFor={`${base}-${name}`}
+                                required={field?.condition === undefined ? required.includes(name) : field.required}>
                                 <PropertyControl
                                     props={props}
                                     name={name}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readOnlyTextOf, readsAsText } from './read-only.js';
+import { lockReasonOf, readOnlyTextOf, readsAsText } from './read-only.js';
 
 describe('readsAsText', () => {
     it('reads text, numbers, choices and lists of them as text', () => {
@@ -116,5 +116,70 @@ describe('readOnlyTextOf', () => {
                 'en-GB'
             )
         ).toBe('3 Mar 2026');
+    });
+
+    it('writes a date and time as a list cell does', () => {
+        expect(
+            readOnlyTextOf(
+                {
+                    type: 'string',
+                    format: 'date-time',
+                },
+                new Date(2026, 9, 30, 9, 41).toISOString(),
+                undefined
+            )
+        ).toBe('30 Oct 2026, 09:41');
+    });
+});
+
+describe('lockReasonOf', () => {
+    it('names the roles that may change a field', () => {
+        expect(
+            lockReasonOf(
+                {
+                    readOnly: false,
+                    roles: ['admin'],
+                },
+                false
+            )
+        ).toBe('Only admins can change this');
+        expect(
+            lockReasonOf(
+                {
+                    readOnly: false,
+                    roles: ['admin', 'editor'],
+                },
+                false
+            )
+        ).toBe('Only admins or editors can change this');
+    });
+
+    it('says read only when nobody may change it, or no role is known', () => {
+        expect(
+            lockReasonOf(
+                {
+                    readOnly: true,
+                    roles: ['admin'],
+                },
+                false
+            )
+        ).toBe('Read only');
+        expect(
+            lockReasonOf(
+                {
+                    readOnly: false,
+                    roles: ['admin'],
+                },
+                true
+            )
+        ).toBe('Read only');
+        expect(
+            lockReasonOf(
+                {
+                    readOnly: false,
+                },
+                false
+            )
+        ).toBe('Read only');
     });
 });

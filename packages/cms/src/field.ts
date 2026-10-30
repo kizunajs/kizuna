@@ -246,7 +246,9 @@ type ConditionIssue<Item, Siblings extends { name: string; schema: z.ZodType }> 
 }
     ? [Extract<Siblings, { name: Condition['field'] }>] extends [never]
         ? `the field "${Own}" shows by "${Condition['field']}", which is not a field beside it`
-        : [ListedValue<ConditionValues<Condition>>] extends [ListedValue<z.output<Extract<Siblings, { name: Condition['field'] }>['schema']>>]
+        : [ListedValue<ConditionValues<Condition>>] extends [
+                ListedValue<z.output<Extract<Siblings, { name: Condition['field'] }>['schema']>>,
+            ]
           ? never
           : `the field "${Own}" compares "${Condition['field']}" with a value it cannot hold`
     : never;
@@ -397,7 +399,9 @@ const assertCondition = (field: Field, siblings: readonly Field[], owner: string
         throw new Error(`${named} reading '${condition.field}', which is not a field beside it.`);
     }
     if (sibling.condition !== undefined) {
-        throw new Error(`${named} reading '${condition.field}', which shows by a condition of its own. A condition reads a field that always shows.`);
+        throw new Error(
+            `${named} reading '${condition.field}', which shows by a condition of its own. A condition reads a field that always shows.`
+        );
     }
     const choices = enumValuesOf(sibling.schema);
     const unknown = choices === undefined ? undefined : values.find((value) => !choices.includes(String(value)));
@@ -432,7 +436,8 @@ const enumValuesOf = (schema: z.ZodType): string[] | undefined => {
 export const shapeOf = <Fields extends FieldList>(fields: Fields): ShapeOf<Fields> => {
     const shape: Record<string, z.ZodType> = {};
     for (const field of dataFields(fields)) {
-        shape[field.name] = field.condition === undefined || unwrapOptionalWrappers(field.schema).optional ? field.schema : field.schema.optional();
+        shape[field.name] =
+            field.condition === undefined || unwrapOptionalWrappers(field.schema).optional ? field.schema : field.schema.optional();
     }
     return shape as ShapeOf<Fields>;
 };
@@ -475,15 +480,12 @@ export const objectOf = <Fields extends FieldList>(
     }) as z.ZodObject;
     for (const field of siblings) {
         if (field.condition === undefined || unwrapOptionalWrappers(field.schema).optional) continue;
-        schema = schema.refine(
-            (value: Record<string, unknown>) => value[field.name] !== undefined || !fieldShows(field, siblings, value),
-            {
-                path: [field.name],
-                message: 'Required while it shows',
-                // It runs beside other issues, so every field the draft is missing is listed at once.
-                when: (payload) => typeof payload.value === 'object' && payload.value !== null,
-            }
-        );
+        schema = schema.refine((value: Record<string, unknown>) => value[field.name] !== undefined || !fieldShows(field, siblings, value), {
+            path: [field.name],
+            message: 'Required while it shows',
+            // It runs beside other issues, so every field the draft is missing is listed at once.
+            when: (payload) => typeof payload.value === 'object' && payload.value !== null,
+        });
     }
     return schema as unknown as z.ZodObject<ShapeOf<Fields>, z.core.$strip>;
 };

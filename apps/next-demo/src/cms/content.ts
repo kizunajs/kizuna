@@ -124,11 +124,19 @@ export const Header = defineGlobal({
                                 .max(90)
                                 .optional()
                                 .describe('One line in a green band above the menu, like a delivery cut-off.'),
+                            condition: {
+                                field: 'showAnnouncement',
+                                is: true,
+                            },
                         },
                         {
                             name: 'announcementLink',
                             label: 'Link',
                             schema: LinkSchema.optional(),
+                            condition: {
+                                field: 'showAnnouncement',
+                                is: true,
+                            },
                         },
                     ],
                 },

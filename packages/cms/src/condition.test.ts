@@ -239,7 +239,9 @@ describe('a field with a condition', () => {
             field: 'showButton',
             is: true,
         });
-        expect(fields.find((field) => field.path === 'sections')?.blocks?.[0]?.fields.find((field) => field.name === 'buttonLabel')).toMatchObject({
+        expect(
+            fields.find((field) => field.path === 'sections')?.blocks?.[0]?.fields.find((field) => field.name === 'buttonLabel')
+        ).toMatchObject({
             condition: {
                 field: 'showButton',
                 is: true,

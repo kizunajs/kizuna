@@ -22,14 +22,14 @@ export const readsAsText = (schema: JsonSchema): boolean => {
 
 /**
  * A value as a read-only field shows it, or `undefined` when it holds none.
- * A choice reads as its label, yes or no as Yes and No, and a date in the
- * reader's own words.
+ * A choice reads as its label, yes or no as Yes and No, and a date as a list
+ * cell writes it, "30 Oct 2026, 09:41".
  */
 export const readOnlyTextOf = (
     schema: JsonSchema,
     value: unknown,
     labels: Record<string, string> | undefined,
-    locale?: string
+    locale = 'en-GB'
 ): string | undefined => {
     if (value === undefined || value === null || value === '') return undefined;
     const resolved = resolveRef(schema, schema);
@@ -46,15 +46,37 @@ export const readOnlyTextOf = (
     const date = new Date(text);
     if (resolved.format === 'date-time' && !Number.isNaN(date.getTime())) {
         return date.toLocaleString(locale, {
-            dateStyle: 'medium',
-            timeStyle: 'short',
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
         });
     }
     if (resolved.format === 'date' && !Number.isNaN(date.getTime())) {
         return date.toLocaleDateString(locale, {
-            dateStyle: 'medium',
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
             timeZone: 'UTC',
         });
     }
     return text;
+};
+
+/**
+ * Why a field takes no changes, as its lock's tooltip says it: "Only admins
+ * can change this" when the editor's role is what stops them, and "Read
+ * only" otherwise.
+ */
+export const lockReasonOf = (
+    field: {
+        readOnly: boolean;
+        roles?: readonly string[];
+    },
+    formReadOnly: boolean
+): string => {
+    if (field.readOnly || formReadOnly || field.roles === undefined || field.roles.length === 0) return 'Read only';
+    const plural = field.roles.map((role) => (role.endsWith('s') ? role : `${role}s`));
+    return `Only ${plural.join(' or ')} can change this`;
 };

@@ -181,8 +181,9 @@ export function RecordScreen({
     ];
     const status = record.readOnly ? 'Read only' : changed && !gone ? 'Unsaved changes' : undefined;
 
+    // The record takes a document's layout: the fields in the main column, and the sidebar beside it.
     return (
-        <>
+        <div className="k-document">
             <PageHeader
                 crumbs={[crumb]}
                 title={record.title}
@@ -201,8 +202,8 @@ export function RecordScreen({
                 actions={buttons.length === 0 ? undefined : <ActionBar buttons={buttons} onRun={run} onProblem={setProblem} />}
             />
             <ActionProblem problem={problem} />
-            <div className="k-admin__body">
-                {gone ? (
+            {gone ? (
+                <div className="k-admin__body">
                     <p className="k-note">
                         This record is gone.{' '}
                         <a
@@ -214,34 +215,38 @@ export function RecordScreen({
                             Back to {viewLabel}
                         </a>
                     </p>
-                ) : (
-                    <FieldForm
-                        key={`${record.id}:${formKey}`}
-                        fields={record.fields}
-                        layout={record.layout}
-                        draft={draft}
-                        onSave={async (changes) => {
-                            latestEdits.current = {
-                                ...latestEdits.current,
-                                ...changes,
-                            };
-                            setEdits(latestEdits.current);
-                            return undefined;
-                        }}
-                        onState={(state) => {
-                            formState.current = state;
-                            setTyping(state === 'pending' || state === 'saving');
-                            if (state !== 'pending' && state !== 'saving') {
-                                settled.current?.();
-                                settled.current = undefined;
-                            }
-                        }}
-                        changed={NOTHING_CHANGED}
-                        pointed={undefined}
-                        readOnly={record.readOnly}
-                    />
-                )}
-            </div>
-        </>
+                </div>
+            ) : (
+                <div className="k-document__body">
+                    <div className="k-document__fields">
+                        <FieldForm
+                            key={`${record.id}:${formKey}`}
+                            fields={record.fields}
+                            layout={record.layout}
+                            draft={draft}
+                            onSave={async (changes) => {
+                                latestEdits.current = {
+                                    ...latestEdits.current,
+                                    ...changes,
+                                };
+                                setEdits(latestEdits.current);
+                                return undefined;
+                            }}
+                            onState={(state) => {
+                                formState.current = state;
+                                setTyping(state === 'pending' || state === 'saving');
+                                if (state !== 'pending' && state !== 'saving') {
+                                    settled.current?.();
+                                    settled.current = undefined;
+                                }
+                            }}
+                            changed={NOTHING_CHANGED}
+                            pointed={undefined}
+                            readOnly={record.readOnly}
+                        />
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }
