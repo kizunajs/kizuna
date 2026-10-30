@@ -43,6 +43,11 @@ test('an editor names an owner and asks her to review, and she approves it so it
     });
     await expect(contact).toBeVisible();
     await expect(editor.locator('.k-review__blocker')).toContainText('Needs an approval before it goes live.');
+    // Drafts other tests left are listed too. Leave them out, so the request is about this page alone.
+    const others = editor.locator('.k-review__group').filter({
+        hasNotText: 'Button label',
+    });
+    for (const other of await others.all()) await other.getByRole('checkbox').click();
     await editor
         .getByRole('button', {
             name: 'Ask for review',

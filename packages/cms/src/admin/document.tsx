@@ -918,7 +918,15 @@ export function DocumentScreen({
     );
 
     const normalHeader = !comparing && !answering;
-    const publishShown = normalHeader && !(sentBackBy !== undefined && document.requireReview && !canPublishPast);
+    const publishShown = normalHeader && document.canPublish && !(sentBackBy !== undefined && document.requireReview && !canPublishPast);
+    // Shared content the editor drafts goes to an admin over every site, so asking takes Publish's place.
+    const askShown =
+        normalHeader &&
+        !document.canPublish &&
+        askable &&
+        sentBackBy === undefined &&
+        document.review?.status !== 'open' &&
+        (document.status === 'draft' || document.status === 'changed');
     const publishDisabled = !online || unsaved || saveState === 'failed' || (blocker !== undefined && waiting.length === 0);
     const saveDraftOffered = normalHeader && shownView !== 'review' && saveProblem === undefined && saveState === 'pending';
     offered.current = () => {
@@ -1177,6 +1185,15 @@ export function DocumentScreen({
                                         Review
                                     </button>
                                 ) : null}
+                                {!askShown ? null : (
+                                    <button
+                                        type="button"
+                                        className="k-button k-button--primary"
+                                        disabled={!online || saveState === 'failed'}
+                                        onClick={() => void form.current?.flush().then(() => setAskOpen(true))}>
+                                        Ask for review
+                                    </button>
+                                )}
                                 {!publishShown ? null : (
                                     <PublishReview
                                         ref={publishButton}

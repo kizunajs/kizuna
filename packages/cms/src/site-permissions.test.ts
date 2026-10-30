@@ -24,6 +24,13 @@ const k = new Kizuna();
 const roles = Kizuna.roles(['editor', 'admin']);
 
 const EDITORS: Record<string, { userId: string; role: 'editor' | 'admin'; sites?: Record<string, 'editor' | 'admin'> }> = {
+    'nils-token': {
+        userId: 'nils',
+        role: 'editor',
+        sites: {
+            norway: 'editor',
+        },
+    },
     'grace-token': {
         userId: 'grace',
         role: 'admin',
@@ -180,6 +187,12 @@ const config = defineConfig({
                     Object.values(EDITORS).map((person) => ({
                         id: person.userId,
                         name: person.userId,
+                        roles: [person.role],
+                        ...(person.sites === undefined
+                            ? {}
+                            : {
+                                  sites: person.sites,
+                              }),
                     })),
             },
         },
@@ -403,11 +416,33 @@ describe("a site's editor", () => {
         expect((await grace.get('/editing/pages')).body.pages.map((page: { site: string }) => page.site).sort()).toEqual(['norway', 'uk']);
     });
 
+    it('names only the people who hold their site, and the admins over every site', async () => {
+        const ids = async (who: Editor) => (await who.get('/editing/people')).body.people.map((person: { id: string }) => person.id).sort();
+        expect(await ids(sam)).toEqual(['grace', 'sam', 'uma']);
+        expect(await ids(grace)).toEqual(['ada', 'grace', 'nils', 'sam', 'uma']);
+        await save(sam, '/sites/uk/pages/frontPage', {
+            heading: 'Welcome',
+        });
+        const outside = await askReview(sam, 'page:uk:frontPage', 'nils');
+        expect(outside.status).toBe(422);
+        expect((await askReview(sam, 'page:uk:frontPage', 'uma')).status).toBe(201);
+    });
+
+    it('is offered a review in place of Publish on shared content', async () => {
+        const id = await office();
+        expect((await describeRef(sam, `item:offices:${id}`)).body.canPublish).toBe(false);
+        expect((await describeRef(sam, `item:uk:offices:${id}`)).body.canPublish).toBe(true);
+        expect((await describeRef(grace, `item:offices:${id}`)).body.canPublish).toBe(true);
+        const changes = await sam.get(`/editing/collections/offices/items/${id}/changes`);
+        expect(changes.body.canPublish).toBe(false);
+        expect(changes.body.canPublishPastReview).toBe(false);
+    });
+
     it("never sees another site's reviews", async () => {
         await save(grace, '/sites/norway/pages/frontPage', {
             heading: 'Velkommen',
         });
-        const asked = await askReview(grace, 'page:norway:frontPage', 'sam');
+        const asked = await askReview(grace, 'page:norway:frontPage', 'nils');
         expect(asked.status).toBe(201);
         const waiting = await sam.get('/editing/reviews').query({
             for: 'anyone',
@@ -544,7 +579,37 @@ describe('the admin', () => {
         expect(configOf((await grace.get('/admin')).text).sites?.map((site) => site.key)).toEqual(['uk', 'norway']);
         expect(configOf((await sam.get('/admin')).text).sites?.map((site) => site.key)).toEqual(['uk']);
         expect(configOf((await ada.get('/admin')).text).sites).toEqual([]);
-        expect((await sam.get('/admin/norway/collections/shops/bergen')).status).toBe(404);
+    });
+
+    it("answers 404 for another site's screens at every depth", async () => {
+        for (const path of [
+            '/admin/norway',
+            '/admin/norway/pages',
+            '/admin/norway/pages/frontPage',
+            '/admin/norway/collections/shops',
+            '/admin/norway/collections/shops/bergen',
+        ]) {
+            expect((await sam.get(path)).status, path).toBe(404);
+            expect((await grace.get(path)).status, path).toBe(200);
+        }
+        expect((await sam.get('/admin/uk/collections/events')).status).toBe(200);
+        expect((await sam.get('/admin/collections/offices')).status).toBe(200);
+    });
+});
+
+describe('declareSites()', () => {
+    it("refuses a site named like one of the admin's screens", () => {
+        for (const name of ['pages', 'media', 'collections', 'globals', 'views', 'login']) {
+            expect(() =>
+                declareSites(SiteSchema, {
+                    [name]: {
+                        label: 'Hagen',
+                        url: 'https://hagen.example.com',
+                        icon: '/icons/group.svg',
+                    },
+                })
+            ).toThrow(`declareSites() has a site named '${name}', which the admin's addresses use`);
+        }
     });
 });
 

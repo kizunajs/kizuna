@@ -913,6 +913,14 @@ export class CmsService {
         return new EditorAccess(shared, sites, false);
     }
 
+    /**
+     * Whether an editor may publish, unpublish or delete a document. Shared
+     * content reaches every site, so it takes an admin over every site.
+     */
+    mayPublish(access: EditorAccess, ref: DocumentRef): boolean {
+        return access.publishesShared || this.target(ref).site !== DEFAULT_SITE;
+    }
+
     statusOf(row: DocumentRow | undefined, version: number): PageStatus {
         if (row === undefined || (row.draft === null && row.published === null)) return 'empty';
         if (row.published === null) return 'draft';

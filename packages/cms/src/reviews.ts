@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { CmsHttpError, type CmsService, type DraftState } from './cms.js';
 import { dataFields } from './field.js';
-import type { Person } from './options.js';
+import { DEFAULT_SITE, type Person } from './options.js';
+import type { EditorAccess } from './site-access.js';
 import { formatRef, parseRef, type DocumentRef } from './refs.js';
 import type { DocumentRow, ReviewCommentRow, ReviewRow } from './storage/store.js';
 
@@ -72,6 +73,27 @@ export const documentLabel = (state: DraftState): string => {
 };
 
 export const peopleOf = async (cms: CmsService): Promise<readonly Person[]> => (await cms.options.auth.people?.list()) ?? [];
+
+const holdsSite = (person: Person, site: string): boolean => {
+    const role = person.sites?.[site];
+    return role !== undefined && role.length > 0;
+};
+
+/**
+ * Who an editor may name as an owner or a reviewer: on a site, the people
+ * who hold it and the admins over every site; on shared content, the people
+ * who share a site with them and those admins. Everyone, without
+ * `auth.sites` or for an admin over every site.
+ */
+export const peopleFor = async (cms: CmsService, access: EditorAccess, site = DEFAULT_SITE): Promise<readonly Person[]> => {
+    const everyone = await peopleOf(cms);
+    if (cms.options.auth.sites === undefined) return everyone;
+    const admin = (person: Person): boolean => person.roles?.includes('admin') === true;
+    if (site !== DEFAULT_SITE) return everyone.filter((person) => admin(person) || holdsSite(person, site));
+    if (access.publishesShared) return everyone;
+    const held = Object.keys(access.sites);
+    return everyone.filter((person) => admin(person) || held.some((name) => holdsSite(person, name)));
+};
 
 const viewOf = (people: readonly Person[], id: string): PersonView => {
     const person = people.find((candidate) => candidate.id === id);
@@ -174,13 +196,13 @@ const refOrThrow = (value: string): DocumentRef => {
     return ref;
 };
 
-export const setOwner = async (cms: CmsService, ref: DocumentRef, owner: string | null): Promise<void> => {
+export const setOwner = async (cms: CmsService, ref: DocumentRef, owner: string | null, access: EditorAccess): Promise<void> => {
     const state = await cms.draftState(ref);
     if (state.row === undefined) {
         throw new CmsHttpError(409, { detail: `'${formatRef(ref)}' has no content yet. Save a draft before naming its owner.` });
     }
     if (owner !== null) {
-        const people = await peopleOf(cms);
+        const people = await peopleFor(cms, access, state.target.site);
         if (!people.some((person) => person.id === owner)) {
             throw new CmsHttpError(422, { detail: `Nobody called '${owner}' edits here. Pick someone from the people list.` });
         }
@@ -194,7 +216,7 @@ export const setOwner = async (cms: CmsService, ref: DocumentRef, owner: string 
  */
 export const requestReviews = async (
     cms: CmsService,
-    input: { refs: readonly string[]; reviewers: readonly string[]; note: string | null; by: string }
+    input: { refs: readonly string[]; reviewers: readonly string[]; note: string | null; by: string; access?: EditorAccess }
 ): Promise<ReviewState[]> => {
     const people = await peopleOf(cms);
     const reviewers = [...new Set(input.reviewers)];
@@ -209,6 +231,13 @@ export const requestReviews = async (
         const state = await cms.draftState(refOrThrow(value));
         if (state.row === undefined || (state.status !== 'draft' && state.status !== 'changed')) {
             throw new CmsHttpError(409, { detail: `'${value}' has no unpublished changes to review.` });
+        }
+        if (input.access !== undefined) {
+            const named = await peopleFor(cms, input.access, state.target.site);
+            const outside = reviewers.find((reviewer) => !named.some((person) => person.id === reviewer));
+            if (outside !== undefined) {
+                throw new CmsHttpError(422, { detail: `'${outside}' does not edit '${value}'. Pick reviewers from the people list.` });
+            }
         }
         states.push(state);
     }

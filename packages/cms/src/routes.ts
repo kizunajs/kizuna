@@ -62,6 +62,7 @@ import {
     decideReviews,
     documentLabel,
     mayPublishPastReview,
+    peopleFor,
     peopleOf,
     recordPublishedPast,
     reopenReviews,
@@ -170,7 +171,9 @@ const sharedContentOf = async (cms: CmsService, state: DraftState): Promise<Reco
  * What a draft changes from what is published: one entry per field shown in
  * the editor, the fields of a block counted one by one.
  */
-const draftChanges = async (cms: CmsService, ref: DocumentRef, caller: ReturnType<CmsService['caller']>) => {
+const draftChanges = async (cms: CmsService, ref: DocumentRef, access: EditorAccess) => {
+    const caller = access.callerFor(ref);
+    const canPublish = cms.mayPublish(access, ref);
     const state = await cms.draftState(ref);
     const draft = state.row?.draft ?? state.row?.published ?? null;
     const published = (await cms.publishedAsStored(ref))?.content;
@@ -206,7 +209,8 @@ const draftChanges = async (cms: CmsService, ref: DocumentRef, caller: ReturnTyp
         published: published !== undefined,
         changes,
         ...(await reviewFields(cms, state)),
-        canPublishPastReview: mayPublishPastReview(cms, caller.role),
+        canPublish,
+        canPublishPastReview: canPublish && mayPublishPastReview(cms, caller.role),
     };
 };
 
@@ -215,7 +219,7 @@ const draftChanges = async (cms: CmsService, ref: DocumentRef, caller: ReturnTyp
  * is no admin over every site, since every site shows it.
  */
 const assertPublishes = (cms: CmsService, access: EditorAccess, ref: DocumentRef): void => {
-    if (access.publishesShared || cms.target(ref).site !== DEFAULT_SITE) return;
+    if (cms.mayPublish(access, ref)) return;
     throw new CmsHttpError(403, {
         detail: `'${formatRef(ref)}' is shared, and every site shows it, so an admin over every site publishes it. Ask one to review it.`,
     });
@@ -617,7 +621,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     const ref = refOf(cms, args);
                     return {
                         status: 200,
-                        body: await draftChanges(cms, ref, cms.access(args.auth).callerFor(ref)),
+                        body: await draftChanges(cms, ref, cms.access(args.auth)),
                     };
                 }) as never
             ),
@@ -747,7 +751,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 },
             }).handler(
                 guarded(async (cms, args) => {
-                    await setOwner(cms, refOf(cms, args), (args.body as z.output<typeof OwnerBodySchema>).owner);
+                    await setOwner(cms, refOf(cms, args), (args.body as z.output<typeof OwnerBodySchema>).owner, cms.access(args.auth));
                     return {
                         status: 204,
                     };
@@ -791,14 +795,47 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         };
     };
 
-    const publicCache = {
-        etag: true,
-        cache: {
-            scope: 'public',
-            maxAge: 0,
-            staleWhileRevalidate: 60,
-        },
-    } as never;
+    const reader = options.auth.read;
+    const readAuth: RouteAuth = reader ?? false;
+    // A read that needs a token answers that one caller, so no shared cache may keep it.
+    const readCache = (
+        reader === undefined
+            ? {
+                  etag: true,
+                  cache: {
+                      scope: 'public',
+                      maxAge: 0,
+                      staleWhileRevalidate: 60,
+                  },
+              }
+            : {
+                  etag: true,
+                  cache: {
+                      scope: 'private',
+                      maxAge: 0,
+                  },
+              }
+    ) as never;
+
+    /**
+     * Refuses a partner's token a site outside its `reads`. A reader whose
+     * guard names no partner reads every site.
+     */
+    const assertReads = (args: Args, site: string | undefined): void => {
+        if (reader === undefined) return;
+        const partner = args.auth?.[reader]?.['partner'];
+        if (partner === undefined) return;
+        const reads = typeof partner === 'string' ? options.partners?.[partner]?.reads : undefined;
+        if (reads === undefined) {
+            throw new CmsHttpError(403, {
+                detail: `Forbidden: the token names the partner '${String(partner)}', which cms() does not declare.`,
+            });
+        }
+        if (site === undefined || site === DEFAULT_SITE || reads.includes(site)) return;
+        throw new CmsHttpError(403, {
+            detail: `Forbidden: this route requires content.sites.${site}:read, and the ${partner} partner reads ${reads.length === 0 ? 'no site' : reads.join(', ')}.`,
+        });
+    };
 
     /**
      * The public list and get of a collection's items.
@@ -828,7 +865,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             list: route({
                 method: 'GET',
                 path: input.path,
-                auth: false,
+                auth: readAuth,
                 summary: `List the published ${input.plural}`,
                 query: listQueryOf(input.definition, input.indexes),
                 responses: {
@@ -837,12 +874,13 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                             items: z.array(item),
                             next: z.string().nullable(),
                         }),
-                        ...(publicCache as object),
+                        ...(readCache as object),
                     },
                     400: ProblemDetailsSchema,
                 },
             }).handler(
                 guarded(async (cms, args) => {
+                    assertReads(args, input.readingSite);
                     const { orderBy, direction, limit, cursor, ...where } = (args.query ?? {}) as Record<string, unknown>;
                     const result = await cms.listItems(
                         input.collection,
@@ -869,7 +907,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             get: route({
                 method: 'GET',
                 path: `${input.path}/:id`,
-                auth: false,
+                auth: readAuth,
                 summary: `Read one published ${input.single}`,
                 pathParams: z.object({
                     id: z.string(),
@@ -877,12 +915,13 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 responses: {
                     200: {
                         body: item,
-                        ...(publicCache as object),
+                        ...(readCache as object),
                     },
                     404: ProblemDetailsSchema,
                 },
             }).handler(
                 guarded(async (cms, args) => {
+                    assertReads(args, input.readingSite);
                     const published = await cms.publishedOn(input.refOf(args.params['id']!), input.readingSite);
                     if (published === undefined)
                         throw new CmsHttpError(404, { detail: `No published ${input.single} '${args.params['id']}'.` });
@@ -907,7 +946,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     route({
                         method: 'GET',
                         path: site === DEFAULT_SITE ? `${base}/content/pages/${name}` : `${base}/content/sites/${site}/pages/${name}`,
-                        auth: false,
+                        auth: readAuth,
                         summary:
                             site === DEFAULT_SITE
                                 ? `Read the published content of ${entry.path}`
@@ -919,12 +958,13 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                                     updatedAt: z.string(),
                                     content: resolvedSchema(entry.page.schema),
                                 }),
-                                ...(publicCache as object),
+                                ...(readCache as object),
                             },
                             404: ProblemDetailsSchema,
                         },
                     }).handler(
-                        guarded(async (cms) => {
+                        guarded(async (cms, args) => {
+                            assertReads(args, site);
                             const published = await cms.publishedOn(
                                 {
                                     type: 'page',
@@ -961,7 +1001,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         route({
             method: 'GET',
             path,
-            auth: false,
+            auth: readAuth,
             summary:
                 site === DEFAULT_SITE
                     ? `Read the published ${words(definition.name)} global`
@@ -973,12 +1013,13 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         updatedAt: z.string(),
                         content: resolvedSchema(schemaOnSite(definition, site)),
                     }),
-                    ...(publicCache as object),
+                    ...(readCache as object),
                 },
                 404: ProblemDetailsSchema,
             },
         }).handler(
-            guarded(async (cms) => {
+            guarded(async (cms, args) => {
+                assertReads(args, site);
                 const published = await cms.publishedOn(ref, site);
                 if (published === undefined) throw new CmsHttpError(404, { detail: `The ${definition.name} global is not published.` });
                 return {
@@ -1425,6 +1466,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         path: `${editingBase}/people`,
         auth: editor,
         summary: 'List the people who edit, to name an owner or ask someone for a review',
+        description: 'With sites, the people who share a site with you, and the admins over every site.',
         tool: true,
         responses: {
             200: {
@@ -1437,7 +1479,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             status: 200,
             body: {
                 me: authorOf(cms, args),
-                people: (await peopleOf(cms)).map((person) => ({
+                people: (await peopleFor(cms, cms.access(args.auth))).map((person) => ({
                     id: person.id,
                     name: person.name,
                     ...(person.email === undefined
@@ -1531,6 +1573,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 status: 201,
                 body: {
                     reviews: await requestReviews(cms, {
+                        access,
                         refs: body.refs,
                         reviewers: body.reviewers,
                         note: body.note ?? null,
@@ -1782,6 +1825,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     layout: cms.describeLayout(ref),
                     draft,
                     ...(await reviewFields(cms, state)),
+                    canPublish: cms.mayPublish(access, ref),
                     ...(ref.type === 'item' && state.target.shared === undefined
                         ? {
                               actions: await itemActions(cms, cms.collection(ref.collection, ref.site), ref, caller),
@@ -2075,7 +2119,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     const getImage = route({
         method: 'GET',
         path: `${base}/content/media/:id/image`,
-        auth: false,
+        auth: readAuth,
         summary: 'The image as a page shows it, cropped and sized by sharp',
         pathParams: z.object({
             id: z.string(),
@@ -2086,7 +2130,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 body: BinarySchema,
                 contentType: 'image/webp',
                 cache: {
-                    scope: 'public',
+                    scope: reader === undefined ? 'public' : 'private',
                     maxAge: 31536000,
                     immutable: true,
                 },
@@ -2097,6 +2141,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         guarded(async (cms, args) => {
             const record = await cms.media.get(args.params['id']!);
             if (record === undefined) throw new CmsHttpError(404, { detail: `No media item '${args.params['id']}'.` });
+            assertReads(args, record.site);
             const query = args.query as z.output<typeof ImageQuerySchema>;
             const rendered = await cms.media.render(record, {
                 crop: query.crop,

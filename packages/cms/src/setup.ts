@@ -219,7 +219,7 @@ const validate = (service: CmsService, options: ResolvedCmsOptions, api: PluginA
         assertTree(definition);
     }
     assertViews(options.views ?? [], [...names.keys()], identityRoles, label);
-    assertDashboard(options.dashboard ?? [], identityRoles, label);
+    assertDashboard(options, identityRoles, label);
     for (const [site, declared] of Object.entries(sitesOf(options))) {
         const reachable = [...(options.collections ?? []), ...(options.sites?.entries[site]?.collections ?? [])];
         for (const entry of Object.values(declared.pages)) {

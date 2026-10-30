@@ -140,6 +140,10 @@ export interface Description {
     review: ReviewState | null;
     requireReview: boolean;
     /**
+     * Whether the editor may publish it, or asks for a review instead.
+     */
+    canPublish: boolean;
+    /**
      * For an item, the buttons its collection's actions show the editor.
      */
     actions?: Array<{

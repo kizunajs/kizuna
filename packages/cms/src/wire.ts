@@ -282,6 +282,9 @@ const ReviewFields = {
     owner: PersonSchema.nullable().describe('The person who looks after it, if anyone does.'),
     review: ReviewStateSchema.nullable().describe('Its latest review since it was last published.'),
     requireReview: z.boolean().describe('Whether publishing waits for an approval.'),
+    canPublish: z
+        .boolean()
+        .describe('Whether the caller may publish it. Shared content, on a CMS with sites, takes an admin over every site.'),
 };
 
 export const DescribedPageSchema = Kizuna.model({

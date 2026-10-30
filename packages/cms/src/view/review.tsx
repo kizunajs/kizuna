@@ -31,6 +31,7 @@ export interface Changes {
     owner: PersonView | null;
     review: ReviewState | null;
     requireReview: boolean;
+    canPublish: boolean;
     canPublishPastReview: boolean;
 }
 
@@ -180,6 +181,10 @@ interface Pending {
     review: ReviewState | null;
     requireReview: boolean;
     /**
+     * Whether the person may publish it at all, or asks for a review.
+     */
+    canPublish: boolean;
+    /**
      * Whether the person may publish it before its review is approved.
      */
     canPublishPastReview: boolean;
@@ -196,6 +201,7 @@ const eitherOf = (names: readonly string[]): string =>
  * Why a document cannot go live yet, or undefined when it can.
  */
 const heldBack = (document: Pending): string | undefined => {
+    if (!document.canPublish) return 'Every site shows this, so an admin over every site publishes it. Ask for a review.';
     if (!document.requireReview || document.review?.status === 'approved') return undefined;
     const review = document.review;
     if (review === null) return 'Needs an approval before it goes live.';
@@ -413,6 +419,7 @@ export function PublishReview({
                     owner: answer.body.owner,
                     review: answer.body.review,
                     requireReview: answer.body.requireReview,
+                    canPublish: answer.body.canPublish,
                     canPublishPastReview: answer.body.canPublishPastReview,
                 };
             })
@@ -459,6 +466,8 @@ export function PublishReview({
 
     const selected = (pending ?? []).filter((document) => !skipped.has(document.ref));
     const publishable = selected.filter((document) => heldBack(document) === undefined);
+    // Nothing chosen here is the person's to publish, so asking is what they do.
+    const reviewOnly = selected.length > 0 && selected.every((document) => !document.canPublish);
     const me = people?.me;
     const mine = selected.filter(
         (document) => document.review?.status === 'open' && document.review.reviewers.some((reviewer) => reviewer.id === me)
@@ -862,24 +871,26 @@ export function PublishReview({
                                         {people !== undefined && people.people.some((person) => person.id !== me) ? (
                                             <button
                                                 type="button"
-                                                className="k-button k-button--secondary"
+                                                className={`k-button ${reviewOnly ? 'k-button--primary' : 'k-button--secondary'}`}
                                                 disabled={busy !== undefined || selected.length === 0}
                                                 onClick={startAsking}>
                                                 Ask for review
                                             </button>
                                         ) : null}
-                                        <button
-                                            type="button"
-                                            className="k-button k-button--primary"
-                                            disabled={busy !== undefined || publishable.length === 0}
-                                            aria-describedby={blockers.length > 0 ? blockerId : undefined}
-                                            onClick={() => void publish(publishable, false)}>
-                                            {busy === 'publish'
-                                                ? 'Publishing'
-                                                : publishable.length > 1
-                                                  ? `Publish ${publishable.length}`
-                                                  : 'Publish'}
-                                        </button>
+                                        {reviewOnly ? null : (
+                                            <button
+                                                type="button"
+                                                className="k-button k-button--primary"
+                                                disabled={busy !== undefined || publishable.length === 0}
+                                                aria-describedby={blockers.length > 0 ? blockerId : undefined}
+                                                onClick={() => void publish(publishable, false)}>
+                                                {busy === 'publish'
+                                                    ? 'Publishing'
+                                                    : publishable.length > 1
+                                                      ? `Publish ${publishable.length}`
+                                                      : 'Publish'}
+                                            </button>
+                                        )}
                                     </>
                                 )}
                             </>

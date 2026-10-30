@@ -291,7 +291,10 @@ const adminRoute = (service: CmsService, options: ResolvedCmsOptions, api: Plugi
             200: z.unknown(),
         },
     }).handler(async (args) => {
-        const site = (args.params as Record<string, string> | undefined)?.['site'];
+        const params = args.params as Record<string, string> | undefined;
+        // A site's screens one level shallower match the shared patterns, with the site's key read as the section.
+        const site =
+            params?.['site'] ?? (options.sites?.entries[params?.['section'] ?? ''] === undefined ? undefined : params?.['section']);
         if (site !== undefined && options.sites?.entries[site] === undefined) {
             return rawResponse(
                 new Response(null, {

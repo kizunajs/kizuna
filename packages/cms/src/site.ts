@@ -96,6 +96,12 @@ export type SiteFieldsOf<Sites> = Sites extends { readonly values: Readonly<Reco
 const CONTENT_KEYS = ['pages', 'globals', 'collections'];
 
 /**
+ * The first segments of the admin's own addresses, which a site's key would
+ * be read as.
+ */
+const ADMIN_SECTIONS = ['pages', 'globals', 'collections', 'views', 'media', 'edit', 'login', 'sign-in', 'sign-out'];
+
+/**
  * A site's name: lowercase, like `uk` or `norway`.
  */
 export const SITE_NAME = /^[a-z][a-z0-9-]*$/;
@@ -129,6 +135,11 @@ export const declareSites = <
     for (const [name, entry] of Object.entries(entries as Record<string, SiteContent>)) {
         if (!SITE_NAME.test(name)) {
             throw new Error(`declareSites() has a site named '${name}'. A site name is lowercase, like uk or norway.`);
+        }
+        if (ADMIN_SECTIONS.includes(name)) {
+            throw new Error(
+                `declareSites() has a site named '${name}', which the admin's addresses use for its own screens. Name it after the site.`
+            );
         }
         if (name === 'default') {
             throw new Error("declareSites() has a site named 'default', which the CMS keeps for shared content. Name it after the site.");

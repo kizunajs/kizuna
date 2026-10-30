@@ -7,7 +7,7 @@ import type { CmsDatabase } from './storage/store.js';
 import type { MediaStorage } from './media/storage.js';
 import { isRelationship, type CmsRelationship } from './relationships.js';
 import { isView, type View } from './view-definition.js';
-import { DashboardWidgetSchema, type DashboardWidget } from './dashboard.js';
+import { DashboardWidgetSchema, OverviewWidgetSchema, type DashboardWidget, type OverviewWidget } from './dashboard.js';
 import { isDeclaredSites, type DeclaredSites } from './site.js';
 
 /**
@@ -114,6 +114,16 @@ export interface CmsAuthOptions {
      * sites: (editor) => editor.sites,
      */
     sites?: (editor: Record<string, any>) => Partial<Record<string, string | readonly string[]>> | undefined;
+    /**
+     * The identity every content route requires, which partners sign in
+     * with. Its guard returns the partner's name as `partner`, and that
+     * partner then reads the shared content and the sites in its `reads`.
+     * Content routes are public without it.
+     *
+     * @example
+     * read: 'partner',
+     */
+    read?: string;
     /**
      * How a version names its author, from the identity's context. Without
      * it, the context's `userId`, `id`, `email` or `name`.
@@ -232,6 +242,11 @@ export interface Person {
      */
     image?: string;
     roles?: readonly string[];
+    /**
+     * The role, or roles, they hold on each site, as `auth.sites` gives them,
+     * so a site's documents suggest only its own people.
+     */
+    sites?: Partial<Record<string, string | readonly string[]>>;
 }
 
 export interface PeopleOptions {
@@ -271,6 +286,33 @@ export interface ReviewOptions {
      * in a chat.
      */
     onReviewRequested?: (request: ReviewRequest) => void | Promise<void>;
+}
+
+/**
+ * A business outside your sites that reads some of them and hears their
+ * publishes.
+ */
+export interface PartnerOptions {
+    /**
+     * What editors call the partner, like `'Travel agency'`.
+     */
+    label: string;
+    /**
+     * The sites it reads, beside the shared content.
+     */
+    reads: readonly string[];
+    /**
+     * Where the CMS sends `{ brand, id }` when a document it reads
+     * publishes, unpublishes or is deleted.
+     */
+    invalidate: {
+        url: string;
+        /**
+         * What the partner's route expects, like the bearer token it gave
+         * you.
+         */
+        headers?: () => Record<string, string> | Promise<Record<string, string>>;
+    };
 }
 
 /**
@@ -328,6 +370,21 @@ export interface CmsPluginOptions<
      */
     site?: () => string | undefined;
     /**
+     * Businesses outside your sites that read them, by name.
+     *
+     * @example
+     * partners: {
+     *     travelAgency: {
+     *         label: 'Travel agency',
+     *         reads: ['uk'],
+     *         invalidate: {
+     *             url: 'https://travel.example.com/api/invalidate',
+     *         },
+     *     },
+     * },
+     */
+    partners?: Record<string, PartnerOptions>;
+    /**
      * Content with one instance and no route, made with `defineGlobal()`.
      */
     globals?: readonly Global[];
@@ -348,9 +405,14 @@ export interface CmsPluginOptions<
     views?: readonly View<string, any, any>[];
     /**
      * The admin's first page, as widgets in the order shown. Without it,
-     * `reviews` and `collections`.
+     * `reviews` and `collections`. With sites, it runs for the site open.
      */
-    dashboard?: readonly DashboardWidget[];
+    dashboard?: readonly DashboardWidget<NoInfer<Sites>>[];
+    /**
+     * The sites compared, which an admin over every site opens. Without it,
+     * `reviews`, `refreshes` and `reach`.
+     */
+    overview?: readonly OverviewWidget<NoInfer<Sites>>[];
     media?: MediaOptions;
     /**
      * Who may approve a review, and how reviewers hear of one.
@@ -523,10 +585,24 @@ export const CmsPluginOptionsSchema = z
             })
             .optional(),
         site: z.custom<() => string | undefined>(isFunction).optional(),
+        partners: z
+            .record(
+                z.string().min(1),
+                z.object({
+                    label: z.string().min(1),
+                    reads: z.array(z.string().min(1)),
+                    invalidate: z.object({
+                        url: z.url(),
+                        headers: z.custom<PartnerOptions['invalidate']['headers']>(isFunction).optional(),
+                    }),
+                })
+            )
+            .optional(),
         auth: z.object({
             identity: z.string().min(1),
             roles: z.union([z.string(), z.array(z.string())]).optional(),
             sites: z.custom<CmsAuthOptions['sites']>(isFunction).optional(),
+            read: z.string().min(1).optional(),
             author: z.custom<CmsAuthOptions['author']>(isFunction).optional(),
             people: z
                 .object({
@@ -560,6 +636,7 @@ export const CmsPluginOptionsSchema = z
             )
             .optional(),
         dashboard: z.array(DashboardWidgetSchema).optional(),
+        overview: z.array(OverviewWidgetSchema).optional(),
         media: z
             .object({
                 bucket: z.string().optional(),
@@ -613,6 +690,22 @@ export const CmsPluginOptionsSchema = z
     .refine((options) => options.pages === undefined || options.sites === undefined, {
         error: 'takes `pages` for one app, or `sites` for several, not both',
         path: ['sites'],
+    })
+    .superRefine((options, context) => {
+        const declared = Object.keys(options.sites?.entries ?? {});
+        for (const [name, partner] of Object.entries(options.partners ?? {})) {
+            for (const site of partner.reads) {
+                if (declared.includes(site)) continue;
+                context.addIssue({
+                    code: 'custom',
+                    message:
+                        declared.length === 0
+                            ? `reads the site '${site}', but cms() declares no sites. Declare them with declareSites()`
+                            : `reads the site '${site}', which declareSites() does not declare. It declares ${declared.join(', ')}`,
+                    path: ['partners', name, 'reads'],
+                });
+            }
+        }
     })
     .refine((options) => options.auth.sites === undefined || options.sites !== undefined, {
         error: 'gives editors roles on sites, but cms() declares no sites. Declare them with declareSites()',
