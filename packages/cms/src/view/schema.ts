@@ -95,6 +95,36 @@ export interface DescribedField {
      * The shared value, which the site shows while it sets none of its own.
      */
     sharedValue?: unknown;
+    /**
+     * True for a field each language holds its own value of.
+     */
+    translated?: boolean;
+    /**
+     * In a translation, the source's value of the field.
+     */
+    sourceValue?: unknown;
+    /**
+     * In a translation, true when the source changed since the field was
+     * translated.
+     */
+    behind?: boolean;
+    /**
+     * For a field that is behind, the source value it was translated from.
+     */
+    sourceBefore?: unknown;
+}
+
+/**
+ * The languages a document is written in, and where each copy stands.
+ */
+export interface DocumentLocales {
+    current: string;
+    source: string;
+    locales: Array<{
+        code: string;
+        status: DocumentStatus;
+        behind: number;
+    }>;
 }
 
 /**
@@ -159,6 +189,7 @@ export interface Description {
         confirm?: string;
         available: boolean;
     }>;
+    locale?: DocumentLocales;
 }
 
 /**

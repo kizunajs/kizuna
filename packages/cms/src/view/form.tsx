@@ -72,10 +72,33 @@ export interface FieldFormProps {
      */
     below?: (field: DescribedField) => ReactNode;
     /**
+     * The input a field gets in place of the one its schema picks, or
+     * `undefined` to keep that one.
+     */
+    controlFor?: (field: DescribedField, input: FieldInput) => ReactNode | undefined;
+    /**
      * Shows every field as it stands, for a record nobody may save.
      */
     readOnly?: boolean;
+    /**
+     * The language the form is in and the source's, for a document in
+     * several. A translated field is marked with its language, and in a
+     * translation shows the source's value under it.
+     */
+    locales?: {
+        current: string;
+        source: string;
+    };
     ref?: Ref<FieldFormHandle>;
+}
+
+/**
+ * A field's value as the form holds it, and how a change reaches it.
+ */
+export interface FieldInput {
+    value: unknown;
+    onChange: (value: unknown) => void;
+    disabled: boolean;
 }
 
 export interface FieldFormHandle {
@@ -114,7 +137,9 @@ export function FieldForm({
     missing,
     aside,
     below,
+    controlFor,
     readOnly,
+    locales,
     ref,
 }: FieldFormProps) {
     const [values, setValues] = useState<Record<string, unknown>>({});
@@ -282,6 +307,11 @@ export function FieldForm({
         const error = errorFor(field.path);
         // A list shows its help beside its Add button.
         const list = listsItems(field.schema);
+        const custom = controlFor?.(field, {
+            value: valueOf(field.path),
+            onChange: (value) => change(field.path, value),
+            disabled: !writable,
+        });
         return (
             <>
                 <div className="k-field__input" data-invalid={error !== undefined}>
@@ -291,25 +321,28 @@ export function FieldForm({
                             {error}
                         </p>
                     )}
-                    <Control
-                        id={fieldDomId(field.path) + '-input'}
-                        name={field.name}
-                        label={labelOf(field)}
-                        heading={heading}
-                        schema={field.schema}
-                        root={field.schema}
-                        value={valueOf(field.path)}
-                        onChange={(value) => change(field.path, value)}
-                        disabled={!writable}
-                        brand={field.brand}
-                        searchTool={field.searchTool}
-                        labels={field.options}
-                        blocks={field.blocks}
-                        help={list ? field.help : undefined}
-                        placeholder={typeof field.sharedValue === 'string' ? field.sharedValue : undefined}
-                        required
-                    />
+                    {custom ?? (
+                        <Control
+                            id={fieldDomId(field.path) + '-input'}
+                            name={field.name}
+                            label={labelOf(field)}
+                            heading={heading}
+                            schema={field.schema}
+                            root={field.schema}
+                            value={valueOf(field.path)}
+                            onChange={(value) => change(field.path, value)}
+                            disabled={!writable}
+                            brand={field.brand}
+                            searchTool={field.searchTool}
+                            labels={field.options}
+                            blocks={field.blocks}
+                            help={list ? field.help : undefined}
+                            placeholder={typeof field.sharedValue === 'string' ? field.sharedValue : undefined}
+                            required
+                        />
+                    )}
                 </div>
+                {sourceLine(field)}
                 {field.help !== undefined && !list ? <p className="k-help">{field.help}</p> : null}
                 {writable ? null : <p className="k-help">{lockReasonOf(field, readOnly === true)}</p>}
             </>
@@ -355,6 +388,38 @@ export function FieldForm({
     };
 
     /**
+     * The language a translated field holds, beside its label.
+     */
+    const marker = (field: DescribedField): ReactNode =>
+        locales === undefined || field.translated !== true || field.parent !== undefined ? null : (
+            <span className="k-field__locale">{locales.current.toUpperCase()}</span>
+        );
+
+    /**
+     * In a translation, the source's value under a translated field, with
+     * what it was translated from struck out when the source changed since.
+     */
+    const sourceLine = (field: DescribedField): ReactNode => {
+        if (locales === undefined || locales.current === locales.source || field.translated !== true || field.parent !== undefined) {
+            return null;
+        }
+        const textOf = (value: unknown): string =>
+            typeof value === 'string' ? value : (readOnlyTextOf(field.schema, value, field.options) ?? '');
+        return (
+            <p className="k-source" data-behind={field.behind === true}>
+                <span className="k-source__code">{locales.source.toUpperCase()}</span>
+                {field.behind === true ? (
+                    <span className="k-source__text">
+                        <del>{textOf(field.sourceBefore)}</del> {textOf(field.sourceValue)}
+                    </span>
+                ) : (
+                    <span className="k-source__text">{textOf(field.sourceValue)}</span>
+                )}
+            </p>
+        );
+    };
+
+    /**
      * One field: its label, its input and its help. A list whose items fold
      * draws its label itself, with Collapse all and Expand all beside it. A
      * field the editor cannot change and whose value reads as text shows it
@@ -368,6 +433,7 @@ export function FieldForm({
                 {labelOf(field)}
                 {field.required ? <Required /> : null}
                 {field.belongsTo === undefined ? null : <span className="k-field__owner">{field.belongsTo}</span>}
+                {marker(field)}
             </label>
         );
         const needed = field.parent === undefined && missing?.includes(field.name) === true;
@@ -380,6 +446,7 @@ export function FieldForm({
                         {labelOf(field)}
                         {field.required ? <Required /> : null}
                         {field.belongsTo === undefined ? null : <span className="k-field__owner">{field.belongsTo}</span>}
+                        {marker(field)}
                     </span>
                     <div className="k-field__control" data-changed={isMarked(field.path, changed)}>
                         <p className="k-read-only" aria-labelledby={fieldDomId(field.path) + '-label'} data-empty={text === undefined}>

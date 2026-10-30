@@ -146,33 +146,134 @@
         gap: 8px;
     }
 
-    /* In All sites a site's heading folds its group. */
-    .k-sidebar__fold {
-        display: flex;
-        flex: 1;
-        align-items: center;
-        justify-content: space-between;
-        gap: 6px;
-        min-width: 0;
-        margin: -2px -4px;
-        padding: 2px 4px;
+    /* With several sites the sidebar leads with the places, a rule under them. */
+    .k-places .k-site-icon {
+        width: 18px;
+        height: 18px;
+        border-radius: 5px;
+    }
+
+    .k-place {
+        width: 100%;
         border: 0;
-        border-radius: 6px;
         background: none;
         font: inherit;
-        letter-spacing: inherit;
-        text-transform: inherit;
-        color: inherit;
+        font-size: 13.5px;
+        text-align: left;
         cursor: pointer;
     }
 
-    .k-sidebar__fold:hover {
+    .k-sidebar__rule {
+        height: 1px;
+        margin: 0 9px;
+        background: var(--k-line);
+    }
+
+    /* The path bar: the place, which opens the finder, the steps to the screen, and who reads it. */
+    .k-path-bar {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        min-height: 52px;
+        padding: 8px var(--k-gutter);
+        background: var(--k-canvas);
+        box-shadow: inset 0 -1px 0 var(--k-line);
+        font-size: 13.5px;
+    }
+
+    .k-path-bar__trail {
+        display: flex;
+        flex: 1;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        color: var(--k-muted);
+    }
+
+    .k-path-bar__place {
+        display: inline-flex;
+        flex-shrink: 0;
+        align-items: center;
+        gap: 8px;
+        margin-left: -8px;
+        padding: 4px 8px;
+        border: 0;
+        border-radius: 8px;
+        background: none;
+        font: inherit;
+        font-weight: 500;
+        color: var(--k-ink);
+        cursor: pointer;
+    }
+
+    .k-path-bar__place:hover,
+    .k-path-bar__place[data-popup-open] {
+        background: var(--k-tint);
+    }
+
+    .k-path-bar__place .k-site-icon {
+        width: 18px;
+        height: 18px;
+    }
+
+    .k-path-bar__chevron {
+        color: var(--k-muted);
+    }
+
+    .k-path-bar__step {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .k-path-bar__step a:hover {
         color: var(--k-ink);
     }
 
-    .k-sidebar__fold:focus-visible {
-        outline: 2px solid var(--k-ink);
-        outline-offset: 1px;
+    .k-path-bar__step [aria-current] {
+        color: var(--k-ink);
+    }
+
+    .k-path-bar__separator {
+        color: var(--k-line-strong);
+    }
+
+    .k-path-bar__reader {
+        display: inline-flex;
+        flex-shrink: 0;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+        font-size: 12.5px;
+        color: var(--k-ink);
+    }
+
+    .k-path-bar__reader-label {
+        color: var(--k-muted);
+    }
+
+    .k-path-bar__reader .k-site-icon {
+        width: 16px;
+        height: 16px;
+    }
+
+    .k-path-bar .k-sidebar__search {
+        width: 240px;
+    }
+
+    .k-site-menu__row {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+    }
+
+    .k-site-menu__pin {
+        flex-shrink: 0;
+        color: var(--k-muted);
     }
 
     .k-sidebar__icon {
@@ -278,6 +379,53 @@
         width: 16px;
         height: 16px;
         border-radius: 4px;
+    }
+
+    /* An item's Shows on: each site the editor opens, dimmed while it is off. */
+    .k-shows-on {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 16px;
+    }
+
+    .k-shows-on__site {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 28px;
+        padding: 0;
+        border: 0;
+        background: none;
+        font: inherit;
+        font-size: 13px;
+        color: var(--k-muted);
+        cursor: pointer;
+    }
+
+    .k-shows-on__site .k-site-icon {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+        opacity: 0.45;
+        filter: grayscale(1);
+    }
+
+    .k-shows-on__site[aria-pressed='true'] {
+        font-weight: 500;
+        color: var(--k-ink);
+    }
+
+    .k-shows-on__site[aria-pressed='true'] .k-site-icon {
+        opacity: 1;
+        filter: none;
+    }
+
+    .k-shows-on__site:hover:not(:disabled) {
+        color: var(--k-ink);
+    }
+
+    .k-shows-on__site:disabled {
+        cursor: default;
     }
 
     .k-site-menu {

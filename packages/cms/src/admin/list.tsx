@@ -19,6 +19,7 @@ import {
     pageOf,
     pagesAround,
     collectionColumnsOf,
+    choiceLabelsOf,
     fieldValuesOf,
     orderOf,
     readChosenColumns,
@@ -1004,8 +1005,8 @@ export function CollectionList({
         const ordered = nested
             ? [...items.items].sort((left, right) => (left.treeLabel ?? left.label).localeCompare(right.treeLabel ?? right.label))
             : items.items;
-        return ordered.map((item) => rowOf(item, tree));
-    }, [items, nested, tree]);
+        return ordered.map((item) => rowOf(item, options));
+    }, [items, nested, options]);
 
     const create = async (): Promise<void> => {
         setCreating(true);
@@ -1141,7 +1142,7 @@ export function CollectionList({
  * One item as a row of its collection's list, its field columns showing the
  * labels the server gives.
  */
-const rowOf = (item: ItemEntry, tree: string | undefined): TreeRow => ({
+const rowOf = (item: ItemEntry, options: ListOptions | undefined): TreeRow => ({
     ref: item.ref,
     href: hrefOf({
         kind: 'document',
@@ -1152,9 +1153,12 @@ const rowOf = (item: ItemEntry, tree: string | undefined): TreeRow => ({
     status: item.status,
     updatedAt: item.updatedAt,
     updatedBy: item.updatedBy,
-    values: fieldValuesOf(item.values, item.labels),
+    values: fieldValuesOf(item.values, {
+        ...item.labels,
+        ...choiceLabelsOf(item.values, options?.columns ?? []),
+    }),
     tree:
-        tree === undefined
+        options?.tree === undefined
             ? undefined
             : {
                   id: item.id,

@@ -1,35 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
 import { Toast } from '@base-ui/react/toast';
-import {
-    ChevronDown,
-    ChevronRight,
-    File,
-    FileText,
-    Image,
-    LayoutGrid,
-    List,
-    Menu as MenuIcon,
-    Table2,
-    X,
-    type LucideIcon,
-} from 'lucide-react';
+import { File, FileText, Image, LayoutGrid, List, Menu as MenuIcon, Table2, X, type LucideIcon } from 'lucide-react';
 import { EditorContext, ICON, type EditorContextValue } from '../view/context.js';
 import { singularOf } from '../view/array-rows.js';
 import { humanize } from '../view/schema.js';
 import { Logo } from '../view/logo.js';
 import { usePeople } from '../view/people.js';
 import { CommandPalette, SearchButton, usePaletteShortcut } from './command-palette.js';
-import type { AdminConfig, AdminSite } from './config.js';
-import { connectOverHttp, withSiteCollections } from './connection.js';
+import type { AdminConfig } from './config.js';
+import { connectOverHttp, withSearchOn, withSiteCollections } from './connection.js';
 import { Dashboard, type WaitingReview } from './dashboard.js';
 import { DocumentScreen } from './document.js';
 import { EditInChat } from './edit-in-chat.js';
 import { CollectionList, PagesList, createItem } from './list.js';
 import { MediaLibrary } from './media.js';
 import {
+    ALL_PLACE,
     CONTENT_GROUP,
-    MANY_SITES,
+    placeOf,
+    readerOf,
+    samePlace,
+    sitePlace,
+    type Place,
     hrefIn,
     hrefOf,
     inAppTargetOf,
@@ -48,7 +41,8 @@ import {
 import { Loading } from './parts.js';
 import { PageHeader } from './page-header.js';
 import { SignedIn } from './signed-in.js';
-import { SiteFact, SiteSwitcher } from './site-switcher.js';
+import { SiteFact } from './site-switcher.js';
+import { PathBar, PlacesList, usePins, type PathStep } from './places.js';
 import { sharedNameOf, siteValuesRefOf } from './site-view.js';
 import { NotFound, shownAddress } from './states.js';
 import { useTabIcon } from './tab-icon.js';
@@ -56,6 +50,8 @@ import { useTheme } from './theme.js';
 import { useOfferUndo } from './toasts.js';
 import type { PaletteAction } from './search.js';
 import { RecordScreen, ViewList } from './view-screen.js';
+import { translationConnection } from './translation.js';
+import { parseRef } from '../refs.js';
 import type { ViewSummary } from './views.js';
 
 /**
@@ -119,35 +115,6 @@ const entryIconOf = (screen: Screen): LucideIcon | undefined => {
     if (screen.kind === 'document') return FileText;
     return undefined;
 };
-
-const FOLDED_KEY = 'kizuna-cms:folded-sites';
-
-/**
- * The sites whose group the editor folded in All sites, kept for the next
- * visit. With many sites every group starts folded.
- */
-const readFolded = (sites: readonly AdminSite[]): Set<string> => {
-    try {
-        const stored = window.localStorage.getItem(FOLDED_KEY);
-        if (stored !== null) return new Set(JSON.parse(stored) as string[]);
-    } catch {
-        // Storage may be blocked, which leaves the default.
-    }
-    return new Set(sites.length > MANY_SITES ? sites.map((site) => site.key) : []);
-};
-
-const saveFolded = (folded: ReadonlySet<string>): void => {
-    try {
-        window.localStorage.setItem(FOLDED_KEY, JSON.stringify([...folded]));
-    } catch {
-        // Storage may be blocked, so folding lasts the visit.
-    }
-};
-
-/**
- * The screens every site shares an address for, which All sites shows.
- */
-const showsEverySite = (screen: Screen): boolean => screen.site === undefined && (screen.kind === 'dashboard' || screen.kind === 'pages');
 
 /**
  * The admin: a sidebar of everything the editor may open, and the screen the
@@ -232,51 +199,106 @@ export function Admin({ config }: { config: AdminConfig }) {
 
     const sites = useMemo(() => config.sites ?? [], [config.sites]);
     const allSites = sites.length > 0 && config.allSites !== false;
-    // The site the admin is shown in, or `undefined` for All sites, which keeps its place while an admin opens a site's document.
-    const [chosen, setChosen] = useState<string | undefined>(() => (allSites ? screen.site : (screen.site ?? sites[0]?.key)));
-    const view =
-        screen.site !== undefined
-            ? allSites && chosen === undefined
-                ? undefined
-                : screen.site
-            : showsEverySite(screen) && allSites
-              ? undefined
-              : chosen;
+    // Where the editor is: All sites, a site or Shared, which keeps All sites while an admin opens a site's document.
+    const [chosen, setChosen] = useState<Place>(() => placeOf(screen, allSites ? ALL_PLACE : sitePlace(sites[0]?.key ?? ''), allSites));
+    const place = sites.length === 0 ? ALL_PLACE : placeOf(screen, chosen, allSites);
     useEffect(() => {
-        if (view !== chosen) setChosen(view);
-    }, [view, chosen]);
+        if (!samePlace(place, chosen)) setChosen(place);
+    }, [place, chosen]);
     // An editor of some sites opens their first site where an admin opens All sites.
     useEffect(() => {
-        if (!allSites && view !== undefined && showsEverySite(screen)) replaceAddress(hrefIn(view, screen));
-    }, [allSites, view, screen]);
-    showSite(view);
-    const site = sites.find((candidate) => candidate.key === view);
+        if (!allSites && place.kind === 'site' && screen.site === undefined && (screen.kind === 'dashboard' || screen.kind === 'pages')) {
+            replaceAddress(hrefIn(place.site, screen));
+        }
+    }, [allSites, place, screen]);
+    showSite(place.kind === 'site' ? place.site : undefined);
+    const [pinned, togglePin] = usePins(sites);
+    const site = place.kind === 'site' ? sites.find((candidate) => candidate.key === place.site) : undefined;
     const siteOfScreen = sites.find((candidate) => candidate.key === screen.site);
     const titleSite = site ?? siteOfScreen;
-    const [folded, setFolded] = useState<Set<string>>(() => readFolded(sites));
-    const toggleFolded = (key: string): void =>
-        setFolded((current) => {
-            const next = new Set(current);
-            if (!next.delete(key)) next.add(key);
-            saveFolded(next);
-            return next;
-        });
-    const sections = useMemo(
-        () =>
-            navigationOf({
-                globals: globals ?? [],
-                collections: collections ?? [],
-                views: views ?? [],
-                groups: config.groups,
-                sites,
-                ...(site === undefined
-                    ? {}
+    const sections = navigationOf({
+        globals: globals ?? [],
+        collections: collections ?? [],
+        views: views ?? [],
+        groups: config.groups,
+        sites,
+        place,
+    });
+
+    /**
+     * The path bar's steps after the place: the list a screen belongs to,
+     * then the document or record open.
+     */
+    const pathSteps = (): PathStep[] => {
+        if (screen.kind === 'dashboard') {
+            return [
+                {
+                    label: 'Dashboard',
+                },
+            ];
+        }
+        const ref = screen.kind === 'document' ? parseRef(screen.ref) : undefined;
+        const site = ref?.site ?? screen.site;
+        const listOf = (label: string, list: Screen): PathStep => ({
+            label,
+            href: hrefOf(
+                site === undefined
+                    ? list
                     : {
-                          site: site.key,
+                          ...list,
+                          site,
+                      }
+            ),
+        });
+        const title = (label: string | undefined): PathStep[] =>
+            label === undefined || label === ''
+                ? []
+                : [
+                      {
+                          label,
+                      },
+                  ];
+        if (screen.kind === 'pages' || ref?.type === 'page') {
+            return [
+                listOf('Pages', {
+                    kind: 'pages',
+                }),
+                ...(ref === undefined ? [] : title(documentHeading)),
+            ];
+        }
+        if (screen.kind === 'collection' || ref?.type === 'item') {
+            const name = screen.kind === 'collection' ? screen.name : ref?.type === 'item' ? ref.collection : '';
+            return [
+                listOf(collectionLabel(name) ?? humanize(name), {
+                    kind: 'collection',
+                    name,
+                }),
+                ...(ref === undefined ? [] : title(documentHeading)),
+            ];
+        }
+        if (ref?.type === 'global') return title(documentHeading);
+        if (screen.kind === 'media') {
+            return [
+                {
+                    label: 'Media',
+                },
+            ];
+        }
+        if (screen.kind === 'view' || screen.kind === 'record') {
+            const name = screen.kind === 'view' ? screen.name : screen.view;
+            const label = views?.find((candidate) => candidate.name === name)?.label ?? humanize(name);
+            return screen.kind === 'view'
+                ? title(label)
+                : [
+                      listOf(label, {
+                          kind: 'view',
+                          name,
                       }),
-            }),
-        [globals, collections, views, config.groups, sites, site]
-    );
+                      ...title(screen.id),
+                  ];
+        }
+        return [];
+    };
 
     // The tab is named after the screen: a document by its title, and anything else as the sidebar names it.
     const screenTitle =
@@ -426,17 +448,19 @@ export function Admin({ config }: { config: AdminConfig }) {
             );
         }
         if (screen.kind === 'document') {
-            // A shared document that sites set values on has a tab for each, and a site's tab edits that site's values.
-            const sharedName = sharedNameOf(screen.ref);
+            // A shared document that sites set values on has a tab for each, and a site's tab edits that site's values. A translation has none, since a site's values are the same in every language.
+            const translation = parseRef(screen.ref)?.locale !== undefined;
+            const sharedName = translation ? undefined : sharedNameOf(screen.ref);
             const tabSites = sites.filter(
                 (candidate) => sharedName !== undefined && config.siteValues?.[sharedName]?.includes(candidate.key)
             );
             const onSiteTab = screen.site !== undefined && tabSites.some((candidate) => candidate.key === screen.site);
             const documentRef = onSiteTab ? siteValuesRefOf(screen.ref, screen.site!) : screen.ref;
+            const ownSite = parseRef(documentRef)?.site;
             return (
                 <DocumentScreen
                     key={documentRef}
-                    connection={connection}
+                    connection={translationConnection(ownSite === undefined ? connection : withSearchOn(connection, ownSite), documentRef)}
                     documentRef={documentRef}
                     siteTabs={
                         tabSites.length === 0
@@ -456,6 +480,11 @@ export function Admin({ config }: { config: AdminConfig }) {
                     onSearch={openSearch}
                     onTitle={setDocumentHeading}
                     paletteActions={documentActions}
+                    showsOn={
+                        !onSiteTab && screen.ref.startsWith('item:') && config.lists[sharedName ?? '']?.chooseSites === true
+                            ? sites
+                            : undefined
+                    }
                 />
             );
         }
@@ -509,48 +538,51 @@ export function Admin({ config }: { config: AdminConfig }) {
                     ) : null}
                 </a>
             </div>
-            {sections.map((section) => {
-                const foldable = view === undefined && section.site !== undefined;
-                const isFolded = foldable && folded.has(section.site!);
-                return (
-                    <div
-                        key={section.label}
-                        className="k-sidebar__group"
-                        data-shared={sites.length > 0 && section.site === undefined ? '' : undefined}>
-                        {foldable ? (
-                            <h2 className="k-heading k-sidebar__heading">
-                                <button
-                                    type="button"
-                                    className="k-sidebar__fold"
-                                    aria-expanded={!isFolded}
-                                    onClick={() => toggleFolded(section.site!)}>
-                                    <span className="k-ellipsis">{section.label}</span>
-                                    {isFolded ? <ChevronRight {...ICON} /> : <ChevronDown {...ICON} />}
-                                </button>
-                            </h2>
-                        ) : (
-                            <h2 className="k-heading k-sidebar__heading">{section.label}</h2>
-                        )}
-                        {(isFolded ? [] : section.entries).map((entry) => {
-                            const Icon = sites.length === 0 ? undefined : entryIconOf(entry.screen);
-                            return (
-                                <a
-                                    key={hrefOf(entry.screen)}
-                                    className="k-sidebar__item"
-                                    href={hrefOf(entry.screen)}
-                                    aria-current={isCurrent(entry.screen, screen) ? 'page' : undefined}>
-                                    {Icon === undefined ? null : <Icon {...ICON} className="k-sidebar__icon" />}
-                                    <span className="k-sidebar__label k-ellipsis">{entry.label}</span>
-                                </a>
-                            );
-                        })}
-                    </div>
-                );
-            })}
+            {sections.map((section) => (
+                <div key={section.label} className="k-sidebar__group">
+                    {sites.length > 0 ? null : <h2 className="k-heading k-sidebar__heading">{section.label}</h2>}
+                    {section.entries.map((entry) => {
+                        const Icon = sites.length === 0 ? undefined : entryIconOf(entry.screen);
+                        return (
+                            <a
+                                key={hrefOf(entry.screen)}
+                                className="k-sidebar__item"
+                                href={hrefOf(entry.screen)}
+                                aria-current={isCurrent(entry.screen, screen) ? 'page' : undefined}>
+                                {Icon === undefined ? null : <Icon {...ICON} className="k-sidebar__icon" />}
+                                <span className="k-sidebar__label k-ellipsis">{entry.label}</span>
+                            </a>
+                        );
+                    })}
+                </div>
+            ))}
         </div>
     );
-    const switcher =
-        sites.length === 0 ? null : <SiteSwitcher sites={sites} shown={view} allSites={allSites} screen={screen} onChoose={setChosen} />;
+    const placeProps = {
+        sites,
+        place,
+        allSites,
+        screen,
+        pinned,
+        onChoose: setChosen,
+        onPin: togglePin,
+    };
+    const places =
+        sites.length === 0 ? null : (
+            <>
+                <PlacesList {...placeProps} />
+                <div className="k-sidebar__rule" role="separator" />
+            </>
+        );
+    const pathBar =
+        sites.length === 0 ? null : (
+            <PathBar
+                {...placeProps}
+                steps={pathSteps()}
+                reader={readerOf(screen)}
+                search={phone ? null : <SearchButton onOpen={openSearch} />}
+            />
+        );
     const signedIn = (
         <SignedIn
             person={me}
@@ -590,8 +622,8 @@ export function Admin({ config }: { config: AdminConfig }) {
                                                 <X {...ICON} />
                                             </Dialog.Close>
                                         </div>
-                                        {switcher}
-                                        <SearchButton onOpen={openSearch} />
+                                        {places}
+                                        {sites.length === 0 ? <SearchButton onOpen={openSearch} /> : null}
                                         {groups}
                                         {signedIn}
                                     </nav>
@@ -604,13 +636,16 @@ export function Admin({ config }: { config: AdminConfig }) {
                 ) : (
                     <nav className="k-sidebar" aria-label="Admin">
                         {brand}
-                        {switcher}
-                        <SearchButton onOpen={openSearch} />
+                        {places}
+                        {sites.length === 0 ? <SearchButton onOpen={openSearch} /> : null}
                         {groups}
                         {signedIn}
                     </nav>
                 )}
-                <main className="k-admin__main">{shown}</main>
+                <main className="k-admin__main">
+                    {pathBar}
+                    {shown}
+                </main>
             </div>
             {config.chat === undefined || config.chat === null ? null : (
                 <EditInChat open={chatOpen} onOpenChange={setChatOpen} chat={config.chat} editorName={me?.name} />

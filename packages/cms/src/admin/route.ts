@@ -126,7 +126,10 @@ export const adminConfigFor = (
             ...(options.views ?? []),
         ].flatMap((definition) => (definition.group === undefined ? [] : [[definition.name, definition.group]]))
     ),
-    lists: listOptionsOf(options.collections ?? []),
+    lists: listOptionsOf(
+        options.collections ?? [],
+        adminSitesOf(options).filter((site) => sees(site.key))
+    ),
     chat: chatOf(api, options.apiPath ?? '/api', chatToken),
     sites: adminSitesOf(options).filter((site) => sees(site.key)),
     allSites,

@@ -145,3 +145,40 @@ export const withSiteCollections = (connection: Connection, site: string): Conne
         );
     },
 });
+
+/**
+ * A connection whose searches for ids pick them for a site, so a collection
+ * that chooses its sites offers only the items that site shows.
+ */
+export const withSearchOn = (connection: Connection, site: string): Connection => {
+    const bySite = searchConnections.get(connection) ?? new Map<string, Connection>();
+    searchConnections.set(connection, bySite);
+    const known = bySite.get(site);
+    if (known !== undefined) return known;
+    const searching = searchOn(connection, site);
+    bySite.set(site, searching);
+    return searching;
+};
+
+/**
+ * Each connection's site-searching copies, kept so a document's connection stays the same object between renders.
+ */
+const searchConnections = new WeakMap<Connection, Map<string, Connection>>();
+
+const searchOn = (connection: Connection, site: string): Connection => ({
+    ...connection,
+    call: (name, input, options) =>
+        name !== 'editing_search_items'
+            ? connection.call(name, input, options)
+            : connection.call(
+                  name,
+                  {
+                      ...input,
+                      query: {
+                          ...((input?.['query'] ?? {}) as Record<string, unknown>),
+                          site,
+                      },
+                  },
+                  options
+              ),
+});

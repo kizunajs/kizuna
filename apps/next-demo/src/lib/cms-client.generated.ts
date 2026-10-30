@@ -3012,6 +3012,10 @@ export namespace API {
              * Name these ids instead of searching.
              */
             ids?: Array<string>;
+            /**
+             * The site the id is picked for, which lists only the items it shows.
+             */
+            site?: string;
         };
 
         export type Result =

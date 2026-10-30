@@ -112,7 +112,7 @@ export function cms(options: CmsPluginOptions): ContentProvider<unknown, CmsRout
         ...(options.sites === undefined
             ? {}
             : {
-                  jobs: refreshJobs(plugin.slug),
+                  jobs: refreshJobs(plugin.slug, options.jobs?.identity),
               }),
     });
 }

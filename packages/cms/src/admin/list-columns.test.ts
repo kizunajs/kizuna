@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    choiceLabelsOf,
     DOCUMENT_COLUMNS,
     NEWEST_FIRST,
     collectionColumnsOf,
@@ -231,6 +232,32 @@ describe('the columns of a list', () => {
         ).toEqual({
             'field:topic': 'Plant care',
             'field:order': 2,
+        });
+    });
+
+    it('names the values of a column that names them, and leaves out the rest', () => {
+        expect(
+            choiceLabelsOf(
+                {
+                    showsOn: ['norway', 'uk'],
+                },
+                [
+                    {
+                        field: 'showsOn',
+                        label: 'Shows on',
+                        sortable: false,
+                        shown: true,
+                        choices: [
+                            {
+                                value: 'uk',
+                                label: 'Hagen UK',
+                            },
+                        ],
+                    },
+                ]
+            )
+        ).toEqual({
+            showsOn: 'Hagen UK',
         });
     });
 });

@@ -1,5 +1,5 @@
 import { humanize } from '../view/schema.js';
-import type { ListOptions } from './config.js';
+import type { ListColumnOption, ListOptions } from './config.js';
 import { cellText } from './views.js';
 
 /**
@@ -127,6 +127,31 @@ export const collectionColumnsOf = (options: ListOptions | undefined): ListColum
  */
 export const fieldOfColumn = (key: string): string | undefined =>
     key.startsWith(FIELD_COLUMN) ? key.slice(FIELD_COLUMN.length) : undefined;
+
+/**
+ * The labels of the columns that name their values, each value's label
+ * joined, leaving out a value the column does not name.
+ */
+export const choiceLabelsOf = (
+    values: Readonly<Record<string, unknown>> | undefined,
+    columns: readonly ListColumnOption[]
+): Record<string, string> =>
+    Object.fromEntries(
+        columns.flatMap((column) => {
+            if (column.choices === undefined) return [];
+            const held = values?.[column.field];
+            const entries = Array.isArray(held) ? held : held === undefined || held === null ? [] : [held];
+            return [
+                [
+                    column.field,
+                    column.choices
+                        .filter((choice) => entries.includes(choice.value))
+                        .map((choice) => choice.label)
+                        .join(', '),
+                ],
+            ];
+        })
+    );
 
 /**
  * The cells of a collection's field columns: the label of a choice or an id

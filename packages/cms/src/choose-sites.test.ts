@@ -324,6 +324,19 @@ describe('reading an article on a site', () => {
         expect(await listed('showsOn:isNot:norway')).toEqual(['Columbia Road flower market', 'Unplaced draft']);
     });
 
+    it('offers a site only the articles it shows, when picking one for it', async () => {
+        await article('Columbia Road flower market', ['uk']);
+        await article('Juletrær i Oslo', ['norway']);
+
+        const offered = async (site?: string) =>
+            (await grace.get('/editing/items/ArticleId').query(site === undefined ? {} : { site })).body.items
+                .map((item: { label: string }) => item.label)
+                .sort();
+        expect(await offered()).toEqual(['Columbia Road flower market', 'Juletrær i Oslo']);
+        expect(await offered('norway')).toEqual(['Juletrær i Oslo']);
+        expect((await sam.get('/editing/items/ArticleId').query({ site: 'norway' })).status).toBe(404);
+    });
+
     it("counts the articles a site shows on that site's dashboard", async () => {
         await article('Winter care for houseplants', ['uk', 'norway']);
         await article('Columbia Road flower market', ['uk']);

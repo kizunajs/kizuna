@@ -1,5 +1,5 @@
 import { Fragment, isValidElement, type ReactNode } from 'react';
-import { trailStart } from './navigation.js';
+import { hasSites, trailStart } from './navigation.js';
 
 /**
  * One step of the trail back from a screen: its label, and where it leads.
@@ -53,7 +53,8 @@ export function PageHeader({
     actions?: ReactNode;
     tabs?: ReactNode;
 }) {
-    const trail = crumbs === undefined ? undefined : [trailStart(), ...crumbs];
+    // With several sites the path bar above the screen holds the trail.
+    const trail = crumbs === undefined || hasSites() ? undefined : [trailStart(), ...crumbs];
     const facts = (meta ?? []).filter((fact) => fact !== null && fact !== undefined && fact !== false && fact !== '');
     const pairs = facts.length > 0 && facts.every(isPair);
     return (

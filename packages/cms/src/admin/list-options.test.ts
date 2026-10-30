@@ -140,4 +140,49 @@ describe('how the admin lists each collection', () => {
             ],
         });
     });
+
+    it('filters and shows an item of a collection that chooses its sites by the sites given', () => {
+        const Journal = defineCollection({
+            name: 'journal',
+            id: Kizuna.brand('JournalId', z.string()),
+            chooseSites: true,
+            fields: [
+                {
+                    name: 'title',
+                    schema: z.string(),
+                },
+            ],
+        });
+        const sites = [
+            {
+                key: 'uk',
+                label: 'Hagen UK',
+            },
+        ];
+        const choices = [
+            {
+                value: 'uk',
+                label: 'Hagen UK',
+            },
+        ];
+        expect(listOptionsOf([Journal], sites)['journal']).toEqual({
+            chooseSites: true,
+            filters: [
+                {
+                    field: 'showsOn',
+                    label: 'Shows on',
+                    choices,
+                },
+            ],
+            columns: [
+                {
+                    field: 'showsOn',
+                    label: 'Shows on',
+                    sortable: false,
+                    shown: true,
+                    choices,
+                },
+            ],
+        });
+    });
 });

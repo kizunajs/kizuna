@@ -19,7 +19,9 @@ import { savedAtOf, type VersionSummary } from './history.js';
 import { hasSites, hrefOf, navigate, siteOf } from './navigation.js';
 import { SiteFact, SiteTabs } from './site-switcher.js';
 import type { AdminSite } from './config.js';
+import { ShowsOn } from './shows-on.js';
 import { PageHeader, type Crumb } from './page-header.js';
+import { LocaleTabs } from './locale-tabs.js';
 import { Loading, SaveIndicator, Status, problemOf } from './parts.js';
 import { documentNounOf, documentStateOf, roleSubjectOf, titleOfRef } from './access.js';
 import { OfflineBadge, SaveFailedNotice, retriesSave, useOnline, useRetry, type SaveProblem } from './save-failed.js';
@@ -177,6 +179,7 @@ export function DocumentScreen({
     onTitle,
     paletteActions,
     siteTabs,
+    showsOn,
 }: {
     connection: Connection;
     documentRef: string;
@@ -214,6 +217,11 @@ export function DocumentScreen({
               current: string | undefined;
           }
         | undefined;
+    /**
+     * The sites an item of a collection that chooses its sites offers under
+     * Shows on.
+     */
+    showsOn?: readonly AdminSite[] | undefined;
 }) {
     const [document, setDocument] = useState<Description | undefined>();
     const [loadProblem, setLoadProblem] = useState<string | undefined>();
@@ -393,7 +401,26 @@ export function DocumentScreen({
         return () => window.clearTimeout(timer);
     }, [changed]);
 
-    const loadedTitle = document === undefined ? undefined : documentTitle(document);
+    // A site's values carry only its own fields, so its tab takes the shared document's title.
+    const [sharedTitle, setSharedTitle] = useState<string | undefined>();
+    const titleRef = siteTabs?.current === undefined ? undefined : siteTabs.sharedRef;
+    useEffect(() => {
+        if (titleRef === undefined) return;
+        let current = true;
+        void connection
+            .call<Description>('editing_describe', {
+                query: {
+                    ref: titleRef,
+                },
+            })
+            .then((answer) => {
+                if (current && answer.status === 200) setSharedTitle(documentTitle(answer.body));
+            });
+        return () => {
+            current = false;
+        };
+    }, [connection, titleRef]);
+    const loadedTitle = document === undefined ? undefined : titleRef === undefined ? documentTitle(document) : sharedTitle;
     useEffect(() => {
         onTitle?.(loadedTitle);
     }, [onTitle, loadedTitle]);
@@ -809,7 +836,9 @@ export function DocumentScreen({
               ? 'no-access'
               : document === undefined
                 ? undefined
-                : documentStateOf(document);
+                : siteTabs?.current !== undefined
+                  ? 'open'
+                  : documentStateOf(document);
     if (state === 'not-found') {
         const capitalised = `${noun.charAt(0).toUpperCase()}${noun.slice(1)}`;
         return (
@@ -862,7 +891,7 @@ export function DocumentScreen({
         );
     }
 
-    const title = documentTitle(document);
+    const title = loadedTitle ?? '';
     const me = people?.me;
     // A review that went away, once its draft was published, takes its tab with it.
     const shownView: DocumentView = view === 'review' && document.review === null ? 'edit' : view;
@@ -1298,6 +1327,7 @@ export function DocumentScreen({
                 {siteTabs === undefined ? null : (
                     <SiteTabs documentRef={siteTabs.sharedRef} sites={siteTabs.sites} current={siteTabs.current} counts={siteCounts} />
                 )}
+                {document.locale === undefined ? null : <LocaleTabs documentRef={document.ref} locales={document.locale} />}
                 {linkProblem === undefined ? null : (
                     <p className="k-error k-document__problem" role="alert">
                         <CircleAlert {...ICON} />
@@ -1320,7 +1350,11 @@ export function DocumentScreen({
                             changed={changed}
                             pointed={pointed}
                             missing={document.complete ? [] : document.missing}
+                            locales={document.locale}
                             aside={reviewAside}
+                            controlFor={(field, input) =>
+                                showsOn !== undefined && field.path === 'showsOn' ? <ShowsOn sites={showsOn} input={input} /> : undefined
+                            }
                             below={(field) => (
                                 <>
                                     {onSiteTab &&

@@ -181,6 +181,13 @@ export interface ListColumnOption {
     label: string | null;
     sortable: boolean;
     shown: boolean;
+    /**
+     * The label of each value the column shows, where the server gives none.
+     */
+    choices?: Array<{
+        value: string;
+        label: string;
+    }>;
 }
 
 export interface ListOptions {
@@ -188,6 +195,10 @@ export interface ListOptions {
      * The field naming each item's parent, for a collection with a `tree`.
      */
     tree?: string;
+    /**
+     * Each item picks the sites that show it, under Shows on.
+     */
+    chooseSites?: boolean;
     filters: ListFilter[];
     columns: ListColumnOption[];
 }

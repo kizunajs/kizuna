@@ -12,6 +12,12 @@ import {
     setSites,
     showSite,
     siteGroupsOf,
+    ALL_PLACE,
+    SHARED_PLACE,
+    placeOf,
+    readerOf,
+    screenInPlace,
+    sitePlace,
     tabTitleOf,
     type Screen,
 } from './navigation.js';
@@ -435,72 +441,93 @@ describe('the admin navigation with several sites', () => {
         for (const [screen, site, address] of moves) expect(hrefIn(site, screenInSite(screen, site))).toBe(address);
     });
 
-    it("lists the site's own content under its label, then the shared content under Shared", () => {
-        const sections = navigationOf({
-            globals: [
-                {
-                    name: 'privacyPolicy',
-                    label: null,
-                    group: null,
-                    status: 'published',
-                    updatedAt: null,
-                },
-            ],
-            collections: [
-                {
-                    name: 'employees',
-                    label: 'Employees',
-                    count: 4,
-                },
-                {
-                    name: 'offices',
-                    label: 'Offices',
-                    count: 3,
-                },
-            ],
-            groups: {
-                employees: 'People',
+    const LISTED = {
+        globals: [
+            {
+                name: 'privacyPolicy',
+                label: null,
+                group: null,
+                status: 'published',
+                updatedAt: null,
             },
-            sites: SITES,
-            site: 'uk',
+        ],
+        collections: [
+            {
+                name: 'employees',
+                label: 'Employees',
+                count: 4,
+            },
+            {
+                name: 'offices',
+                label: 'Offices',
+                count: 3,
+            },
+        ],
+        groups: {
+            employees: 'People',
+        },
+        sites: SITES,
+    };
+
+    it("lists a site's own kinds, flat, under it", () => {
+        const sections = navigationOf({
+            ...LISTED,
+            place: sitePlace('uk'),
         });
-        expect(sections.map((section) => [section.label, section.entries.map((entry) => entry.label)])).toEqual([
-            ['Hagen UK', ['Pages', 'Events', 'Settings', 'Media']],
-            ['Shared', ['Employees', 'Offices', 'Privacy policy']],
-        ]);
-        expect(sections.flatMap((section) => section.entries).map((entry) => hrefOf(entry.screen))).toEqual([
-            '/admin/uk/pages',
-            '/admin/uk/collections/events',
-            '/admin/uk/globals/settings',
-            '/admin/uk/media',
-            '/admin/uk/collections/employees',
-            '/admin/uk/collections/offices',
-            '/admin/uk/globals/privacyPolicy',
+        expect(sections.flatMap((section) => section.entries).map((entry) => [entry.label, hrefOf(entry.screen)])).toEqual([
+            ['Pages', '/admin/uk/pages'],
+            ['Events', '/admin/uk/collections/events'],
+            ['Settings', '/admin/uk/globals/settings'],
+            ['Media', '/admin/uk/media'],
         ]);
     });
 
-    it("lists each site's own content in All sites, then Shared with the shared media", () => {
+    it('lists the shared collections, globals and media under Shared', () => {
         const sections = navigationOf({
-            globals: [],
-            collections: [
-                {
-                    name: 'employees',
-                    label: 'Employees',
-                    count: 4,
-                },
-            ],
-            groups: {
-                employees: 'People',
-            },
-            sites: SITES,
+            ...LISTED,
+            place: SHARED_PLACE,
         });
-        expect(sections.map((section) => [section.label, section.site, section.entries.map((entry) => entry.label)])).toEqual([
-            ['Hagen Group', 'group', ['Pages', 'Media']],
-            ['Hagen UK', 'uk', ['Pages', 'Events', 'Settings', 'Media']],
-            ['Hagen Norge', 'norway', ['Pages', 'Media']],
-            ['Shared', undefined, ['Employees', 'Media']],
+        expect(sections.flatMap((section) => section.entries).map((entry) => [entry.label, hrefOf(entry.screen)])).toEqual([
+            ['Employees', '/admin/collections/employees'],
+            ['Offices', '/admin/collections/offices'],
+            ['Privacy policy', '/admin/globals/privacyPolicy'],
+            ['Media', '/admin/media'],
         ]);
-        expect(sections.at(-1)!.entries.map((entry) => hrefOf(entry.screen))).toEqual(['/admin/collections/employees', '/admin/media']);
+    });
+
+    it("lists every site's pages and own collections as one list each in All sites", () => {
+        const sections = navigationOf({
+            ...LISTED,
+            place: ALL_PLACE,
+        });
+        expect(sections.flatMap((section) => section.entries).map((entry) => [entry.label, hrefOf(entry.screen)])).toEqual([
+            ['Pages', '/admin/pages'],
+            ['Events', '/admin/collections/events'],
+            ['Media', '/admin/media'],
+        ]);
+    });
+
+    it("puts shared content in Shared, a site's own in that site, and keeps All sites while an admin opens a site", () => {
+        expect(placeOf(screenOf('/admin/collections/offices/k3j9x2'), ALL_PLACE, true)).toEqual(SHARED_PLACE);
+        expect(placeOf(screenOf('/admin/uk/collections/offices/k3j9x2'), sitePlace('uk'), true)).toEqual(SHARED_PLACE);
+        expect(placeOf(screenOf('/admin/uk/collections/events/e1'), ALL_PLACE, true)).toEqual(ALL_PLACE);
+        expect(placeOf(screenOf('/admin/uk/collections/events/e1'), SHARED_PLACE, true)).toEqual(sitePlace('uk'));
+        expect(placeOf(screenOf('/admin/pages'), sitePlace('uk'), true)).toEqual(ALL_PLACE);
+        expect(placeOf(screenOf('/admin'), sitePlace('norway'), false)).toEqual(sitePlace('norway'));
+    });
+
+    it('opens the same kind of screen in another place, where it has one', () => {
+        expect(hrefOf(screenInPlace(screenOf('/admin/uk/pages'), ALL_PLACE))).toBe('/admin/pages');
+        expect(hrefOf(screenInPlace(screenOf('/admin/uk/pages/frontPage'), sitePlace('norway')))).toBe('/admin/norway/pages/frontPage');
+        expect(hrefOf(screenInPlace(screenOf('/admin/collections/offices'), sitePlace('uk')))).toBe('/admin/uk');
+        expect(hrefOf(screenInPlace(screenOf('/admin/uk/collections/events'), SHARED_PLACE))).toBe('/admin/media');
+    });
+
+    it('says who reads a screen: one site, every site, or nobody in particular', () => {
+        expect(readerOf(screenOf('/admin/uk/collections/events/e1'))).toBe(SITES[1]);
+        expect(readerOf(screenOf('/admin/collections/offices/k3j9x2'))).toBe('every site');
+        expect(readerOf(screenOf('/admin/uk/collections/offices/k3j9x2'))).toBe(SITES[1]);
+        expect(readerOf(screenOf('/admin/pages'))).toBeUndefined();
     });
 
     it("marks a site's pages current on its own pages alone", () => {

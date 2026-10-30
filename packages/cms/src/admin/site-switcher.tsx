@@ -1,9 +1,21 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Popover } from '@base-ui/react/popover';
-import { Check, ChevronsUpDown, Layers, Library, Search } from 'lucide-react';
+import { Check, Layers, Library, Pin, PinOff, Search } from 'lucide-react';
 import { ICON } from '../view/context.js';
 import type { AdminSite } from './config.js';
-import { ALL_SITES, hrefIn, MANY_SITES, screenInSite, SHARED_GROUP, siteGroupsOf, type Screen } from './navigation.js';
+import {
+    ALL_PLACE,
+    ALL_SITES,
+    hrefIn,
+    MANY_SITES,
+    samePlace,
+    screenInPlace,
+    SHARED_GROUP,
+    siteGroupsOf,
+    sitePlace,
+    type Place,
+    type Screen,
+} from './navigation.js';
 
 /**
  * A site's icon, its label's first letter without one, or the shared
@@ -43,7 +55,7 @@ export function SiteFact({ site }: { site: AdminSite | undefined }) {
 /**
  * All sites' mark in the switcher.
  */
-function AllSitesIcon() {
+export function AllSitesIcon() {
     return (
         <span className="k-site-icon" aria-hidden="true">
             <Layers {...ICON} />
@@ -64,63 +76,73 @@ const countryName = (country: string): string => {
 };
 
 /**
- * The switcher at the top of the sidebar: the site shown, or All sites,
- * opening a list of every site the editor may open. An admin over every site
- * finds All sites first. With many sites the list takes a search and groups
- * them by country. Choosing one keeps the same kind of screen when that site
- * has one.
+ * The finder of every site the editor may open: a search with many sites,
+ * the sites grouped by country, and a pin beside each, which keeps it in the
+ * sidebar's places. Choosing one keeps the same kind of screen when that site
+ * has one. An admin over every site finds All sites first.
  */
-export function SiteSwitcher({
+export function SiteFinder({
     sites,
-    shown,
+    place,
     allSites,
     screen,
+    pinned,
     onChoose,
+    onPin,
+    className,
+    children,
 }: {
     sites: readonly AdminSite[];
-    /**
-     * The site shown, or `undefined` for All sites.
-     */
-    shown: string | undefined;
+    place: Place;
     allSites: boolean;
     screen: Screen;
-    onChoose: (site: string | undefined) => void;
+    /**
+     * The sites the editor pinned, which a pin beside each toggles. Without
+     * it the finder offers no pins.
+     */
+    pinned?: ReadonlySet<string>;
+    onChoose: (place: Place) => void;
+    onPin?: (site: string) => void;
+    className: string;
+    children: ReactNode;
 }) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
-    const current = sites.find((site) => site.key === shown);
     const groups = siteGroupsOf(sites, search);
     const choice = (site: AdminSite | undefined) => {
-        const chosen = site?.key === current?.key;
+        const target = site === undefined ? ALL_PLACE : sitePlace(site.key);
+        const chosen = samePlace(target, place);
         return (
-            <a
-                key={site?.key ?? ''}
-                className="k-menu__item k-site-menu__item"
-                href={hrefIn(site?.key, screenInSite(screen, site?.key))}
-                aria-current={chosen ? 'true' : undefined}
-                onClick={() => {
-                    onChoose(site?.key);
-                    setOpen(false);
-                }}>
-                {site === undefined ? <AllSitesIcon /> : <SiteIcon site={site} />}
-                <span className="k-ellipsis">{site?.label ?? ALL_SITES}</span>
-                {chosen ? (
-                    <span className="k-menu__check">
-                        <Check {...ICON} />
-                    </span>
-                ) : null}
-            </a>
-        );
-    };
-    // An editor of one site has nothing to switch to, so the site is a heading.
-    if (sites.length === 1 && !allSites) {
-        return (
-            <div className="k-site-switcher" data-static="">
-                <SiteIcon site={sites[0]} />
-                <span className="k-site-switcher__label k-ellipsis">{sites[0]!.label}</span>
+            <div key={site?.key ?? ''} className="k-site-menu__row">
+                <a
+                    className="k-menu__item k-site-menu__item"
+                    href={hrefIn(site?.key, screenInPlace(screen, target))}
+                    aria-current={chosen ? 'true' : undefined}
+                    onClick={() => {
+                        onChoose(target);
+                        setOpen(false);
+                    }}>
+                    {site === undefined ? <AllSitesIcon /> : <SiteIcon site={site} />}
+                    <span className="k-ellipsis">{site?.label ?? ALL_SITES}</span>
+                    {chosen ? (
+                        <span className="k-menu__check">
+                            <Check {...ICON} />
+                        </span>
+                    ) : null}
+                </a>
+                {site === undefined || pinned === undefined || onPin === undefined ? null : (
+                    <button
+                        type="button"
+                        className="k-icon-button k-site-menu__pin"
+                        aria-pressed={pinned.has(site.key)}
+                        aria-label={pinned.has(site.key) ? `Unpin ${site.label}` : `Pin ${site.label}`}
+                        onClick={() => onPin(site.key)}>
+                        {pinned.has(site.key) ? <PinOff {...ICON} /> : <Pin {...ICON} />}
+                    </button>
+                )}
             </div>
         );
-    }
+    };
     return (
         <Popover.Root
             open={open}
@@ -128,11 +150,7 @@ export function SiteSwitcher({
                 setOpen(next);
                 if (!next) setSearch('');
             }}>
-            <Popover.Trigger className="k-site-switcher">
-                {current === undefined ? <AllSitesIcon /> : <SiteIcon site={current} />}
-                <span className="k-site-switcher__label k-ellipsis">{current?.label ?? ALL_SITES}</span>
-                <ChevronsUpDown {...ICON} className="k-site-switcher__chevron" />
-            </Popover.Trigger>
+            <Popover.Trigger className={className}>{children}</Popover.Trigger>
             <Popover.Portal>
                 <Popover.Positioner side="bottom" align="start" sideOffset={6} className="k-positioner">
                     <Popover.Popup className="k-popup k-menu k-site-menu" aria-label="Sites">

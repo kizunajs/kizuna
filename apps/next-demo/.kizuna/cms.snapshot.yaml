@@ -12409,6 +12409,10 @@ routes:
             kind: array
             element:
               kind: string
+        site:
+          optional: true
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
