@@ -11443,6 +11443,86 @@ routes:
                                 optional: true
                                 schema:
                                   kind: number
+                  list:
+                    kind: object
+                    fields:
+                      type:
+                        optional: false
+                        schema:
+                          kind: enum
+                          values:
+                            - list
+                      label:
+                        optional: false
+                        schema:
+                          kind: string
+                      description:
+                        optional: true
+                        schema:
+                          kind: string
+                      rows:
+                        optional: false
+                        schema:
+                          kind: array
+                          element:
+                            kind: object
+                            fields:
+                              label:
+                                optional: false
+                                schema:
+                                  kind: string
+                              detail:
+                                optional: true
+                                schema:
+                                  kind: string
+                              value:
+                                optional: false
+                                schema:
+                                  kind: number
+                              formatted:
+                                optional: false
+                                schema:
+                                  kind: string
+                              of:
+                                optional: true
+                                schema:
+                                  kind: number
+                              change:
+                                optional: true
+                                schema:
+                                  kind: number
+                  funnel:
+                    kind: object
+                    fields:
+                      type:
+                        optional: false
+                        schema:
+                          kind: enum
+                          values:
+                            - funnel
+                      label:
+                        optional: false
+                        schema:
+                          kind: string
+                      description:
+                        optional: true
+                        schema:
+                          kind: string
+                      steps:
+                        optional: false
+                        schema:
+                          kind: array
+                          element:
+                            kind: object
+                            fields:
+                              label:
+                                optional: false
+                                schema:
+                                  kind: string
+                              value:
+                                optional: false
+                                schema:
+                                  kind: number
                   reviews:
                     kind: object
                     fields:
@@ -11711,23 +11791,24 @@ routes:
                           kind: enum
                           values:
                             - sites
-                      chart:
+                      charts:
                         optional: false
                         schema:
-                          kind: object
-                          nullable: true
-                          fields:
-                            label:
-                              optional: false
-                              schema:
-                                kind: string
-                            style:
-                              optional: false
-                              schema:
-                                kind: enum
-                                values:
-                                  - bar
-                                  - line
+                          kind: array
+                          element:
+                            kind: object
+                            fields:
+                              label:
+                                optional: false
+                                schema:
+                                  kind: string
+                              style:
+                                optional: false
+                                schema:
+                                  kind: enum
+                                  values:
+                                    - bar
+                                    - line
                       sites:
                         optional: false
                         schema:
@@ -11775,26 +11856,28 @@ routes:
                                         optional: false
                                         schema:
                                           kind: string
-                              chart:
+                              charts:
                                 optional: false
                                 schema:
                                   kind: array
-                                  nullable: true
                                   element:
-                                    kind: object
-                                    fields:
-                                      label:
-                                        optional: false
-                                        schema:
-                                          kind: string
-                                      value:
-                                        optional: false
-                                        schema:
-                                          kind: number
-                                      previous:
-                                        optional: true
-                                        schema:
-                                          kind: number
+                                    kind: array
+                                    nullable: true
+                                    element:
+                                      kind: object
+                                      fields:
+                                        label:
+                                          optional: false
+                                          schema:
+                                            kind: string
+                                        value:
+                                          optional: false
+                                          schema:
+                                            kind: number
+                                        previous:
+                                          optional: true
+                                          schema:
+                                            kind: number
                               waiting:
                                 optional: false
                                 schema:

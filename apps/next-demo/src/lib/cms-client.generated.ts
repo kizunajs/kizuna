@@ -157,7 +157,7 @@ export namespace API {
             /**
              * The widgets the person may see, in the order listed.
              */
-            widgets: Array<CMS.StatWidget | CMS.ChartWidget | CMS.ReviewsWidget | CMS.CollectionsWidget | CMS.SitesWidget | CMS.RefreshesWidget | CMS.ReachWidget | CMS.EditorsWidget>;
+            widgets: Array<CMS.StatWidget | CMS.ChartWidget | CMS.ListWidget | CMS.FunnelWidget | CMS.ReviewsWidget | CMS.CollectionsWidget | CMS.SitesWidget | CMS.RefreshesWidget | CMS.ReachWidget | CMS.EditorsWidget>;
         };
 
         export type DecideReview = {
@@ -474,6 +474,19 @@ export namespace API {
             isNot?: string | number | boolean | Array<string | number | boolean>;
         };
 
+        export type FunnelWidget = {
+            type: "funnel";
+            label: string;
+            description?: string;
+            /**
+             * The steps, the first one every visitor takes.
+             */
+            steps: Array<{
+                label: string;
+                value: number;
+            }>;
+        };
+
         export type Layout = {
             /**
              * What the fields inside it name in their layout.
@@ -488,6 +501,41 @@ export namespace API {
              * Where the editor shows a collapsible, when beside the main column.
              */
             position?: "sidebar";
+        };
+
+        export type ListWidget = {
+            type: "list";
+            label: string;
+            /**
+             * What the numbers count, like "Views".
+             */
+            description?: string;
+            /**
+             * The rows, in the order your function ranked them.
+             */
+            rows: Array<{
+                label: string;
+                /**
+                 * A line under the label.
+                 */
+                detail?: string;
+                /**
+                 * The number the row's bar is drawn from.
+                 */
+                value: number;
+                /**
+                 * The value as the row shows it.
+                 */
+                formatted: string;
+                /**
+                 * The most the value can reach, which the bar fills to.
+                 */
+                of?: number;
+                /**
+                 * How far the value moved since the period before, as a signed fraction.
+                 */
+                change?: number;
+            }>;
         };
 
         export type Media = {
@@ -845,12 +893,12 @@ export namespace API {
         export type SitesWidget = {
             type: "sites";
             /**
-             * The chart each site draws, on one scale for every site's.
+             * The charts each site draws, each on one scale for every site.
              */
-            chart: {
+            charts: Array<{
                 label: string;
                 style: "bar" | "line";
-            } | null;
+            }>;
             sites: Array<{
                 key: string;
                 label: string;
@@ -875,16 +923,16 @@ export namespace API {
                     label: string;
                 }>;
                 /**
-                 * Null on a site the chart leaves out.
+                 * The points of each chart, in the order of `charts`. Null on a site the chart leaves out.
                  */
-                chart: Array<{
+                charts: Array<Array<{
                     label: string;
                     value: number;
                     /**
                      * The same point in the period before.
                      */
                     previous?: number;
-                }> | null;
+                }> | null>;
                 /**
                  * How many reviews wait on the site.
                  */
