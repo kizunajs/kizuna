@@ -123,7 +123,7 @@ export interface CollectionDefinition<Name extends string, Fields extends FieldL
      */
     actions?: Readonly<Record<string, Action<CollectionItem<Fields, Id>>>>;
     /**
-     * The page of your app the admin's Live preview shows an item on. `url`
+     * The page of your app the admin's Live Preview shows an item on. `url`
      * returns its path on the site, which opens in draft mode.
      *
      * @example
@@ -135,7 +135,7 @@ export interface CollectionDefinition<Name extends string, Fields extends FieldL
 }
 
 /**
- * Where the admin's Live preview shows an item.
+ * Where the admin's Live Preview shows an item.
  */
 export interface CollectionPreview<Item> {
     /**

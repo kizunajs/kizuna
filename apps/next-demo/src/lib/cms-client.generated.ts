@@ -171,7 +171,7 @@ export namespace API {
             label?: string;
             path: string | null;
             /**
-             * The page the Live preview opens on: an item's `preview.url`, where the document is served, or the first page that shows it. Null when no page shows it.
+             * The page the Live Preview opens on: an item's `preview.url`, where the document is served, or the first page that shows it. Null when no page shows it.
              */
             previewPath: string | null;
             /**

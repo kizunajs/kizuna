@@ -294,7 +294,7 @@ export const collectionPreviewPath = (target: Target, content: Record<string, un
 };
 
 /**
- * The page the admin's Live preview opens a document on: its collection's
+ * The page the admin's Live Preview opens a document on: its collection's
  * `preview.url`, where it is served, or the first page that shows it. A
  * global shows on every page, so it opens on the front page. `null` for an
  * item no page shows.

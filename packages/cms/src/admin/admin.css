@@ -882,7 +882,7 @@
         color: var(--k-ink);
     }
 
-    /* Editing: the fields and the sidebar column beside them, the site beside both in Live preview, and the versions */
+    /* Editing: the fields and the sidebar column beside them, the site beside both in Live Preview, and the versions */
 
     .k-document {
         display: flex;
@@ -938,7 +938,7 @@
         color: var(--k-muted);
     }
 
-    /* Live preview and Info sit at the row's far end. */
+    /* Live Preview and Info sit at the row's far end. */
     .k-document__spacer {
         flex: 1;
     }
@@ -1332,7 +1332,7 @@
         background: var(--k-line);
     }
 
-    /* Live preview: the fields take two fifths, the sidebar's fields under the main ones, and the site the rest. */
+    /* Live Preview: the fields take two fifths, the sidebar's fields under the main ones, and the site the rest. */
     .k-document[data-preview='true'] .k-document__body {
         flex-wrap: nowrap;
     }

@@ -176,9 +176,9 @@ export const Newsletters = defineCollection({
 
 Editors write the newsletter as a draft, ask for a review, and an admin picks Send. `item` is the published item. Actions take the same options as a [view's](/docs/cms/views#actions).
 
-## Live preview
+## Live Preview
 
-An article has a page of its own, so the admin's **Live preview** opens it there. An employee only appears on other pages, so its collection names the page to show it on:
+An article has a page of its own, so the admin's **Live Preview** opens it there. An employee only appears on other pages, so its collection names the page to show it on:
 
 ```ts title="src/cms/content.ts"
 export const Employees = defineCollection({
@@ -225,7 +225,7 @@ The page renders through your own components, so the preview matches the site. I
 
 `item` is the draft as it stands: the id, and the fields saved so far. A new item may not have them all yet, so `url` should work from the id alone. `url` returns a path on the site, which opens in [draft mode](/docs/cms/next#draft-mode).
 
-A collection without `preview` opens its items on their own page when one [shows the collection](/docs/cms/pages#pages-that-show-a-collection), and otherwise on the first page that holds them. An item no page shows opens without a Live preview.
+A collection without `preview` opens its items on their own page when one [shows the collection](/docs/cms/pages#pages-that-show-a-collection), and otherwise on the first page that holds them. An item no page shows opens without a Live Preview.
 
 ## Collection or your own table
 

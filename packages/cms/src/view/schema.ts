@@ -103,7 +103,7 @@ export interface Description {
     label?: string;
     path: string | null;
     /**
-     * The page Live preview opens on, or `null` when no page shows it.
+     * The page Live Preview opens on, or `null` when no page shows it.
      */
     previewPath: string | null;
     usedOn: {

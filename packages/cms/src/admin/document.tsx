@@ -1034,7 +1034,7 @@ export function DocumentScreen({
                                         setView('edit');
                                     }}>
                                     <PanelRight {...ICON} />
-                                    <span className="k-document__long">Live preview</span>
+                                    <span className="k-document__long">Live Preview</span>
                                     <span className="k-document__short">Preview</span>
                                 </button>
                             )}
