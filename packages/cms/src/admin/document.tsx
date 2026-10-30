@@ -33,7 +33,7 @@ import {
     type Outcome,
     type Pending,
 } from './translation-ui.js';
-import { Loading, SaveIndicator, Status, problemOf } from './parts.js';
+import { Loading, SaveIndicator, problemOf } from './parts.js';
 import { documentNounOf, documentStateOf, roleSubjectOf, titleOfRef } from './access.js';
 import { OfflineBadge, SaveFailedNotice, retriesSave, useOnline, useRetry, type SaveProblem } from './save-failed.js';
 import { NoAccess, NotFound, shownAddress, type Way } from './states.js';
@@ -1159,10 +1159,6 @@ export function DocumentScreen({
                 <Popover.Positioner sideOffset={6} align="end" className="k-positioner">
                     <Popover.Popup className="k-popup k-document-info" aria-label="Document info">
                         <dl className="k-document-info__list">
-                            <dt>Status</dt>
-                            <dd>
-                                <Status status={document.status} />
-                            </dd>
                             {owner === null ? null : (
                                 <>
                                     <dt>Owner</dt>
