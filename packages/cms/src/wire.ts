@@ -203,8 +203,28 @@ export const DescribedFieldSchema = Kizuna.model({
             .optional()
             .describe("Whose value this is, when the CMS serves several sites: 'Shared', or the label of the site that sets it."),
         sharedValue: z.unknown().optional().describe('The shared value, which the site shows while it sets none of its own.'),
+        translated: z.boolean().optional().describe('True for a field each language holds its own value of.'),
+        sourceValue: z.unknown().optional().describe("In a translation, the source's value, which the field says in its own language."),
+        behind: z.boolean().optional().describe('In a translation, true when the source changed since the field was translated.'),
+        sourceBefore: z.unknown().optional().describe('For a field that is behind, the source value it was translated from.'),
     }),
 });
+
+export const DocumentLocalesSchema = z
+    .object({
+        current: z.string().describe('The language this copy is in.'),
+        source: z.string().describe('The language of the source, which every other language translates.'),
+        locales: z.array(
+            z.object({
+                code: z.string(),
+                status: PageStatusSchema,
+                behind: z.int().describe('How many of its fields changed in the source since they were translated.'),
+            })
+        ),
+    })
+    .describe(
+        "The languages the document is written in. Describe `<ref>@<code>` to work on one, and pass that `locale` to the editing tools. A translation's fields carry the source's text as `sourceValue`."
+    );
 
 export const DescribedLayoutSchema = Kizuna.model({
     title: 'CMS.Layout',
@@ -322,6 +342,7 @@ export const DescribedPageSchema = Kizuna.model({
             ),
         draft: z.record(z.string(), z.unknown()).nullable(),
         actions: z.array(AvailableActionSchema).optional().describe("For an item, the buttons its collection's actions show the caller."),
+        locale: DocumentLocalesSchema.optional(),
         ...ReviewFields,
     }),
 });

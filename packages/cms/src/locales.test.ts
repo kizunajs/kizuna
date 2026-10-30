@@ -569,3 +569,123 @@ describe('sites', () => {
         expect(service.localizedPath(service.target(norwayFront()), '/')).toBe('/');
     });
 });
+
+describe('a translation behind its source', () => {
+    it('shows the fields the source changed since, and keeps showing the translation until someone updates it', async () => {
+        await publish(norwayFront(), {
+            heading: 'Velkommen',
+            intro: 'Hagen i Norge.',
+        });
+        await publish(norwayFront('en'), {
+            heading: 'Welcome',
+            intro: 'Hagen in Norway.',
+        });
+        expect((await service.documentLocales(norwayFront()))?.locales).toEqual([
+            {
+                code: 'nb',
+                status: 'published',
+                behind: 0,
+            },
+            {
+                code: 'en',
+                status: 'published',
+                behind: 0,
+            },
+        ]);
+        await publish(norwayFront(), {
+            heading: 'Velkommen til Hagen',
+        });
+        const english = await service.draftState(norwayFront('en'));
+        expect([...(await service.behindOf(english.target, english.row))]).toEqual([
+            [
+                'heading',
+                {
+                    before: 'Velkommen',
+                },
+            ],
+        ]);
+        expect(
+            (
+                await config.content.pages.frontPage.get({
+                    locale: 'en',
+                })
+            ).heading
+        ).toBe('Welcome');
+        await write(norwayFront('en'), {
+            heading: 'Welcome to Hagen',
+        });
+        const updated = await service.draftState(norwayFront('en'));
+        expect((await service.behindOf(updated.target, updated.row)).size).toBe(0);
+    });
+
+    it('lets a model translate through the editing tools: describe, write with `locale`, publish', async () => {
+        await publish(norwayFront(), {
+            heading: 'Velkommen',
+            intro: 'Hagen i Norge.',
+        });
+        const described = await request(app)
+            .get('/editing/describe')
+            .query({
+                url: '/',
+                site: 'norway',
+            })
+            .set('authorization', 'Bearer token');
+        expect(described.body.locale).toEqual({
+            current: 'nb',
+            source: 'nb',
+            locales: [
+                {
+                    code: 'nb',
+                    status: 'published',
+                    behind: 0,
+                },
+                {
+                    code: 'en',
+                    status: 'empty',
+                    behind: 0,
+                },
+            ],
+        });
+        expect(described.body.fields[0]).toMatchObject({
+            path: 'heading',
+            translated: true,
+        });
+        const translation = await request(app)
+            .get('/editing/describe')
+            .query({
+                ref: 'page:norway:frontPage@en',
+            })
+            .set('authorization', 'Bearer token');
+        expect(translation.body.previewPath).toBe('/en');
+        expect(translation.body.fields.map((field: { path: string; sourceValue: unknown }) => [field.path, field.sourceValue])).toEqual([
+            ['heading', 'Velkommen'],
+            ['intro', 'Hagen i Norge.'],
+        ]);
+        const saved = await request(app)
+            .patch('/editing/sites/norway/pages/frontPage/draft')
+            .query({
+                locale: 'en',
+            })
+            .set('authorization', 'Bearer token')
+            .send({
+                changes: {
+                    heading: 'Welcome',
+                    intro: 'Hagen in Norway.',
+                },
+            });
+        expect(saved.status).toBe(200);
+        expect(saved.body.ref).toBe('page:norway:frontPage@en');
+        const published = await request(app)
+            .post('/editing/sites/norway/pages/frontPage/publish')
+            .query({
+                locale: 'en',
+            })
+            .set('authorization', 'Bearer token')
+            .send({});
+        expect(published.body.status).toBe('published');
+        expect((await request(app).get('/content/sites/norway/pages/frontPage?locale=en')).body.content.heading).toBe('Welcome');
+        expect((await request(app).get('/editing/describe?url=/en&site=norway').set('authorization', 'Bearer token')).body.ref).toBe(
+            'page:norway:frontPage@en'
+        );
+    });
+});
