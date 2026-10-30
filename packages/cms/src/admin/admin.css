@@ -1830,11 +1830,13 @@
     }
 
     /* The row opens the account menu: the name and the role a line each, and a chevron. */
+    /* The account sits on its own quiet surface, apart from the links above it. */
     .k-sidebar__account {
         width: 100%;
         border: 0;
-        border-radius: 8px;
-        background: none;
+        border-radius: var(--k-radius-control);
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
         font: inherit;
         font-size: 12.5px;
         text-align: left;
@@ -1843,7 +1845,7 @@
 
     .k-sidebar__account:hover,
     .k-sidebar__account[data-popup-open] {
-        background: var(--k-tint);
+        background: var(--k-control);
     }
 
     .k-sidebar__account:focus-visible {
