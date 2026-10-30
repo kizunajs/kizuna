@@ -1,27 +1,53 @@
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
+import { useMemo } from 'react';
 import {
-    areaPath,
-    chartSummary,
-    labelledBars,
-    linePath,
-    linePointsOf,
-    placeBars,
-    positionOf,
-    scaleOf,
-    type ChartBar,
-} from './chart-geometry.js';
+    areaY,
+    barY,
+    crosshair,
+    defineChart,
+    dot,
+    group,
+    lineY,
+    ruleY,
+    whenFocused,
+    type ChartCurve,
+    type ChartPoint,
+} from '@tanstack/charts';
+import { Chart as TanStackChart } from '@tanstack/charts/react/tooltip';
+import { scaleBand } from '@tanstack/charts/scales/band';
+import { scaleLinear } from '@tanstack/charts/scales/linear';
+import { tooltip } from '@tanstack/charts/tooltip';
+import { portal } from '@tanstack/charts/tooltip/portal';
+import type { ChartBar } from './dashboard-widgets.js';
 
 const HEIGHT = 168;
 const TOP = 10;
 const AXIS_SPACE = 24;
 const TICK_GAP = 8;
 const TICK_CHARACTER = 6.2;
+const TICK_SIZE = 10.5;
 
 /**
  * The room the axis labels get, enough for a compact number like "48.2k",
  * so charts side by side start their plots at the same place.
  */
 const AXIS_WIDTH = 48;
+
+/**
+ * How much of its slot a bar fills, the rest the gap to its neighbour, so a
+ * chart of thirty points spaces its bars as one of fourteen does.
+ */
+const BAR_SHARE = 0.7;
+
+/**
+ * How wide a bar, or a bar and the one for the period before, grows when
+ * there are few of them.
+ */
+const WIDEST_BAR = 40;
+
+/**
+ * The most labels under the axis, however wide the chart is.
+ */
+const MOST_LABELS = 6;
 
 const WHOLE = new Intl.NumberFormat();
 const COMPACT = new Intl.NumberFormat(undefined, {
@@ -30,21 +56,119 @@ const COMPACT = new Intl.NumberFormat(undefined, {
 });
 
 /**
- * The width the element is drawn at, following it as it changes.
+ * One value of a chart as its marks read it: the point it belongs to, and
+ * whether it is this period's or the one before.
  */
-const useWidth = (element: RefObject<HTMLElement | null>, fallback: number): number => {
-    const [width, setWidth] = useState(fallback);
-    useLayoutEffect(() => {
-        const current = element.current;
-        if (current === null) return;
-        setWidth(current.clientWidth || fallback);
-        const observer = new ResizeObserver(([entry]) => {
-            if (entry !== undefined && entry.contentRect.width > 0) setWidth(entry.contentRect.width);
-        });
-        observer.observe(current);
-        return () => observer.disconnect();
-    }, [element, fallback]);
-    return width;
+interface ChartRow {
+    index: number;
+    value: number | undefined;
+    period: 'current' | 'previous';
+}
+
+/**
+ * The axis for a chart's values: it always includes zero, and its round
+ * ticks keep the grid to three or four lines.
+ */
+const valueScaleOf = (values: readonly number[]) => {
+    const low = Math.min(0, ...values);
+    const high = Math.max(0, ...values);
+    const domain = low === high ? [0, 1] : [low, high];
+    const coarse = scaleLinear().domain(domain).nice(2);
+    const fine = scaleLinear().domain(domain).nice(3);
+    return fine.ticks(3).length <= 4
+        ? {
+              scale: fine,
+              ticks: fine.ticks(3),
+          }
+        : {
+              scale: coarse,
+              ticks: coarse.ticks(2),
+          };
+};
+
+/**
+ * The slope a smooth line leaves each point at, kept monotone so it never
+ * overshoots a peak or dips below a valley it passes through.
+ */
+const tangentsOf = (points: ReadonlyArray<readonly [number, number]>): number[] => {
+    const secants = points.slice(1).map(([x, y], index) => (y - points[index]![1]) / (x - points[index]![0]));
+    const tangents = points.map((_, index) => {
+        if (index === 0) return secants[0] ?? 0;
+        if (index === points.length - 1) return secants.at(-1) ?? 0;
+        const before = secants[index - 1]!;
+        const after = secants[index]!;
+        return before * after <= 0 ? 0 : (before + after) / 2;
+    });
+    secants.forEach((secant, index) => {
+        if (secant === 0) {
+            tangents[index] = 0;
+            tangents[index + 1] = 0;
+            return;
+        }
+        const start = tangents[index]! / secant;
+        const end = tangents[index + 1]! / secant;
+        const length = start * start + end * end;
+        if (length > 9) {
+            const shrink = 3 / Math.sqrt(length);
+            tangents[index] = shrink * start * secant;
+            tangents[index + 1] = shrink * end * secant;
+        }
+    });
+    return tangents;
+};
+
+const smoothThrough = (points: ReadonlyArray<readonly [number, number]>): string => {
+    const first = points[0];
+    if (first === undefined) return '';
+    if (points.length === 1) return `M${first[0]},${first[1]}h0`;
+    const tangents = tangentsOf(points);
+    const curves = points.slice(1).map(([x, y], index) => {
+        const [fromX, fromY] = points[index]!;
+        const third = (x - fromX) / 3;
+        return `C${fromX + third},${fromY + tangents[index]! * third} ${x - third},${y - tangents[index + 1]! * third} ${x},${y}`;
+    });
+    return `M${first[0]},${first[1]}${curves.join('')}`;
+};
+
+/**
+ * A smooth line through the points that keeps to their peaks and valleys,
+ * and the area under it down to the baseline.
+ */
+const monotone: ChartCurve = {
+    line: smoothThrough,
+    area: (top, bottom) =>
+        `${smoothThrough(top)}${[...bottom]
+            .reverse()
+            .map(([x, y]) => `L${x},${y}`)
+            .join('')}Z`,
+};
+
+/**
+ * What a screen reader hears for a chart: its range, its extremes and its
+ * latest bar or point.
+ */
+export const chartSummary = (label: string, data: readonly ChartBar[], unit: 'bar' | 'point' = 'bar'): string => {
+    const first = data[0];
+    const last = data.at(-1);
+    if (first === undefined || last === undefined) return `${label}: no numbers yet.`;
+    const highest = data.reduce((best, bar) => (bar.value > best.value ? bar : best), first);
+    const lowest = data.reduce((best, bar) => (bar.value < best.value ? bar : best), first);
+    const range = data.length === 1 ? `1 ${unit}, ${first.label}` : `${data.length} ${unit}s, ${first.label} to ${last.label}`;
+    return [
+        `${label}: ${range}.`,
+        `Highest ${WHOLE.format(highest.value)} (${highest.label}).`,
+        `Lowest ${WHOLE.format(lowest.value)} (${lowest.label}).`,
+        `Latest ${WHOLE.format(last.value)} (${last.label}).`,
+    ].join(' ');
+};
+
+/**
+ * What the tooltip says to a screen reader as it moves to a point.
+ */
+const spokenOf = (point: ChartBar | undefined): string => {
+    if (point === undefined) return '';
+    const value = `${point.label}: ${WHOLE.format(point.value)}`;
+    return point.previous === undefined ? value : `${value}, previous period ${WHOLE.format(point.previous)}`;
 };
 
 /**
@@ -82,6 +206,30 @@ export function Legend({ style }: { style: 'bar' | 'line' }) {
 }
 
 /**
+ * One point's label, value and the value before, shown while it is hovered
+ * or focused.
+ */
+function Tooltip({ point, style, compares }: { point: ChartBar; style: 'bar' | 'line'; compares: boolean }) {
+    return (
+        <span className="k-popup k-chart__tooltip-body">
+            <span className="k-chart__tooltip-label">{point.label}</span>
+            <span className="k-chart__tooltip-row">
+                {compares ? <Swatch style={style} previous={false} /> : null}
+                {compares ? <span>This period</span> : null}
+                <strong>{WHOLE.format(point.value)}</strong>
+            </span>
+            {point.previous === undefined ? null : (
+                <span className="k-chart__tooltip-row">
+                    <Swatch style={style} previous />
+                    <span>Previous period</span>
+                    <strong>{WHOLE.format(point.previous)}</strong>
+                </span>
+            )}
+        </span>
+    );
+}
+
+/**
  * One series from a zero baseline, as bars or a line, with the period before
  * beside it when the points carry one. Hovering or arrowing to a point shows
  * its label, value and the value before, and a screen reader gets the summary
@@ -104,172 +252,235 @@ export function Chart({
     domain?: readonly number[];
     height?: number;
 }) {
-    const frame = useRef<HTMLDivElement>(null);
-    const width = useWidth(frame, 560);
-    const [active, setActive] = useState<number | undefined>();
-
     const compares = data.some((point) => point.previous !== undefined);
-    const scale = scaleOf([
+    const values = [
         ...domain,
         ...data.map((point) => point.value),
         ...data.flatMap((point) => (point.previous === undefined ? [] : [point.previous])),
-    ]);
-    const tickLabels = scale.ticks.map((tick) => COMPACT.format(tick));
-    const left = Math.max(AXIS_WIDTH, Math.max(...tickLabels.map((tickLabel) => tickLabel.length)) * TICK_CHARACTER + TICK_GAP * 2);
-    const bottom = height - AXIS_SPACE;
-    const plot = {
-        left,
-        right: width,
-        top: TOP,
-        bottom,
-        scale,
-    };
-    const bars = placeBars(data, plot);
-    const points = linePointsOf(
-        data.map((point) => point.value),
-        plot
-    );
-    const previousPoints = linePointsOf(
-        data.map((point) => point.previous),
-        plot
-    );
-    const slotWidth = bars[0]?.slotWidth ?? 0;
-    const labelled = labelledBars(data, slotWidth);
-    const baseline = positionOf(scale, 0, TOP, bottom);
-    const shown = active === undefined ? undefined : bars[active];
-    const shownPoint = active === undefined ? undefined : data[active];
-    const shownValue = active === undefined ? undefined : points[active];
-    const shownPrevious = active === undefined ? undefined : previousPoints[active];
-    // The tip sits over the highest mark of the point, this period's or the one before.
-    const shownTop = Math.min(
-        style === 'line' ? (shownValue?.y ?? baseline) : (shown?.end ?? baseline),
-        baseline,
-        shownPrevious?.y ?? baseline
-    );
+    ];
+    const low = Math.min(0, ...values);
+    const high = Math.max(0, ...values);
 
-    const move = (event: KeyboardEvent<SVGSVGElement>): void => {
+    const definition = useMemo(() => {
+        const { scale, ticks } = valueScaleOf([low, high]);
+        const left = Math.max(AXIS_WIDTH, Math.max(...ticks.map((tick) => COMPACT.format(tick).length)) * TICK_CHARACTER + TICK_GAP * 2);
+        const indexes = data.map((_, index) => index);
         const last = data.length - 1;
-        const next = (() => {
-            if (event.key === 'ArrowLeft') return Math.max(0, (active ?? last) - 1);
-            if (event.key === 'ArrowRight') return Math.min(last, (active ?? last) + 1);
-            if (event.key === 'Home') return 0;
-            if (event.key === 'End') return last;
-            return undefined;
-        })();
-        if (next === undefined) return;
-        event.preventDefault();
-        setActive(next);
-    };
+        const every = Math.max(1, Math.ceil(last / (MOST_LABELS - 1)));
+        const current: ChartRow[] = data.map((point, index) => ({
+            index,
+            value: point.value,
+            period: 'current',
+        }));
+        const previous: ChartRow[] = data.map((point, index) => ({
+            index,
+            value: point.previous,
+            period: 'previous',
+        }));
+
+        return defineChart({
+            chart: ({ width }) => {
+                const slot = Math.max(1, width - left) / Math.max(1, data.length);
+                // The bars fill BAR_SHARE of their slot until they reach WIDEST_BAR, centred in it.
+                const gap = style === 'bar' ? 1 - Math.min(BAR_SHARE, WIDEST_BAR / slot) : 0;
+                return {
+                    marks: [
+                        crosshair({
+                            x:
+                                style === 'line'
+                                    ? {
+                                          stroke: 'var(--k-line-strong)',
+                                          strokeWidth: 1,
+                                      }
+                                    : false,
+                            y: false,
+                        }),
+                        ruleY([0], {
+                            stroke: 'var(--k-line-strong)',
+                            strokeOpacity: 0.7,
+                        }),
+                        ...(style === 'bar'
+                            ? [
+                                  barY(compares ? [...previous, ...current].filter((row) => row.value !== undefined) : current, {
+                                      x: 'index',
+                                      y1: 0,
+                                      y2: 'value',
+                                      z: 'period',
+                                      ...(compares
+                                          ? {
+                                                layout: group({
+                                                    scale: scaleBand<string>().domain(['previous', 'current']),
+                                                }),
+                                                inset: 0.5,
+                                            }
+                                          : {}),
+                                      radius: {
+                                          end: 4,
+                                      },
+                                      fill: (row) => (row.period === 'previous' ? 'var(--k-chart-previous)' : 'var(--k-chart-bar)'),
+                                      states: [
+                                          {
+                                              when: {
+                                                  focus: 'x',
+                                              },
+                                              style: {
+                                                  fill: ({ datum }) =>
+                                                      datum.period === 'previous'
+                                                          ? 'var(--k-chart-previous-active)'
+                                                          : 'var(--k-chart-bar-active)',
+                                              },
+                                          },
+                                      ],
+                                  }),
+                              ]
+                            : [
+                                  areaY(current, {
+                                      x: 'index',
+                                      y1: 0,
+                                      y2: 'value',
+                                      fill: 'var(--k-chart-area)',
+                                      fillOpacity: 1,
+                                      curve: monotone,
+                                  }),
+                                  ...(compares
+                                      ? [
+                                            lineY(previous, {
+                                                x: 'index',
+                                                y: 'value',
+                                                stroke: 'var(--k-muted)',
+                                                strokeOpacity: 0.8,
+                                                strokeWidth: 1,
+                                                strokeDasharray: '0 3.5',
+                                                curve: monotone,
+                                            }),
+                                        ]
+                                      : []),
+                                  lineY(current, {
+                                      x: 'index',
+                                      y: 'value',
+                                      stroke: 'var(--k-ink)',
+                                      strokeWidth: 2,
+                                      curve: monotone,
+                                  }),
+                                  ...(compares
+                                      ? [
+                                            whenFocused(
+                                                dot(previous, {
+                                                    x: 'index',
+                                                    y: 'value',
+                                                    r: 2.5,
+                                                    fill: 'var(--k-canvas)',
+                                                    stroke: 'var(--k-muted)',
+                                                    strokeWidth: 1.5,
+                                                }),
+                                                {
+                                                    match: 'x',
+                                                }
+                                            ),
+                                        ]
+                                      : []),
+                                  whenFocused(
+                                      dot(current, {
+                                          x: 'index',
+                                          y: 'value',
+                                          r: 3.5,
+                                          fill: 'var(--k-ink)',
+                                          stroke: 'var(--k-canvas)',
+                                          strokeWidth: 2,
+                                      }),
+                                      {
+                                          match: 'x',
+                                      }
+                                  ),
+                              ]),
+                    ],
+                    scales: {
+                        x: {
+                            scale: scaleBand<number>()
+                                .domain(indexes)
+                                .paddingInner(gap)
+                                .paddingOuter(gap / 2),
+                            axis: {
+                                line: false,
+                                ticks: {
+                                    values: indexes.filter((index) => (last - index) % every === 0),
+                                    size: 0,
+                                    padding: 7,
+                                    format: (index: number) => data[index]?.label ?? '',
+                                },
+                                tickLabels: {
+                                    fontSize: TICK_SIZE,
+                                    opacity: 1,
+                                    thin: {
+                                        minGap: 10,
+                                        keep: [last],
+                                    },
+                                },
+                            },
+                        },
+                        y: {
+                            scale,
+                            grid: {
+                                stroke: 'var(--k-line)',
+                                strokeOpacity: 0.6,
+                            },
+                            axis: {
+                                line: false,
+                                ticks: {
+                                    values: ticks,
+                                    size: 0,
+                                    padding: TICK_GAP,
+                                    format: (value: number) => COMPACT.format(value),
+                                },
+                                tickLabels: {
+                                    fontSize: TICK_SIZE,
+                                    opacity: 1,
+                                },
+                            },
+                        },
+                    },
+                    margin: {
+                        top: TOP,
+                        right: 0,
+                        bottom: AXIS_SPACE,
+                        left,
+                    },
+                };
+            },
+            focus: 'group-x',
+            maxFocusDistance: Number.POSITIVE_INFINITY,
+            focusRing: false,
+            tooltip: {
+                use: tooltip,
+                portal,
+                className: 'k-chart__tooltip',
+                format: (point: ChartPoint<ChartRow>) => spokenOf(data[point.datum.index]),
+                formatGroup: (points: readonly ChartPoint<ChartRow>[]) => spokenOf(data[points[0]?.datum.index ?? -1]),
+                anchor: (points: readonly ChartPoint[]) => ({
+                    x: points.reduce((sum, point) => sum + point.x, 0) / Math.max(1, points.length),
+                    y: Math.min(...points.map((point) => point.y)),
+                }),
+                placement: ['top', 'top-right', 'top-left'],
+                offset: 10,
+                sticky: false,
+                motion: false,
+            },
+        });
+    }, [data, style, compares, low, high]);
 
     return (
-        <div ref={frame} className="k-chart__frame">
-            <div className="k-chart__stage">
-                <svg
-                    className="k-chart__plot"
-                    width={width}
-                    height={height}
-                    role="img"
-                    aria-label={chartSummary(label, data, (value) => WHOLE.format(value), style === 'line' ? 'point' : 'bar')}
-                    tabIndex={0}
-                    onKeyDown={move}
-                    onFocus={() => setActive((current) => current ?? data.length - 1)}
-                    onBlur={() => setActive(undefined)}
-                    onPointerLeave={() => setActive(undefined)}>
-                    {scale.ticks.map((tick, index) => {
-                        const y = positionOf(scale, tick, TOP, bottom);
-                        return (
-                            <g key={tick}>
-                                <line className={tick === 0 ? 'k-chart__baseline' : 'k-chart__grid'} x1={left} x2={width} y1={y} y2={y} />
-                                <text className="k-chart__axis" x={left - TICK_GAP} y={y + 3.5} textAnchor="end">
-                                    {tickLabels[index]}
-                                </text>
-                            </g>
-                        );
-                    })}
-                    {style === 'line' ? (
-                        <>
-                            {shown === undefined ? null : (
-                                <line
-                                    className="k-chart__crosshair"
-                                    x1={shown.slotX + shown.slotWidth / 2}
-                                    x2={shown.slotX + shown.slotWidth / 2}
-                                    y1={TOP}
-                                    y2={bottom}
-                                />
-                            )}
-                            <path className="k-chart__area" d={areaPath(points, baseline)} />
-                            {compares ? <path className="k-chart__line k-chart__line--previous" d={linePath(previousPoints)} /> : null}
-                            <path className="k-chart__line" d={linePath(points)} />
-                            {shownPrevious === undefined ? null : (
-                                <circle className="k-chart__dot k-chart__dot--previous" cx={shownPrevious.x} cy={shownPrevious.y} r={2.5} />
-                            )}
-                            {shownValue === undefined ? null : (
-                                <circle className="k-chart__dot" cx={shownValue.x} cy={shownValue.y} r={3.5} />
-                            )}
-                        </>
-                    ) : (
-                        bars.map((bar, index) => (
-                            <g key={index}>
-                                {bar.previous === undefined ? null : (
-                                    <path
-                                        className="k-chart__bar k-chart__bar--previous"
-                                        data-active={index === active}
-                                        d={bar.previous.path}
-                                    />
-                                )}
-                                <path className="k-chart__bar" data-active={index === active} d={bar.path} />
-                            </g>
-                        ))
-                    )}
-                    {bars.map((bar, index) => (
-                        <g key={index}>
-                            {labelled.has(index) ? (
-                                <text className="k-chart__axis" x={bar.slotX + bar.slotWidth / 2} y={bottom + 16} textAnchor="middle">
-                                    {data[index]?.label}
-                                </text>
-                            ) : null}
-                            <rect
-                                x={bar.slotX}
-                                y={TOP}
-                                width={bar.slotWidth}
-                                height={bottom - TOP}
-                                fill="transparent"
-                                onPointerEnter={() => setActive(index)}
-                            />
-                        </g>
-                    ))}
-                    {scale.minimum < 0 ? <line className="k-chart__baseline" x1={left} x2={width} y1={baseline} y2={baseline} /> : null}
-                </svg>
-                {shown === undefined || shownPoint === undefined || active === undefined ? null : (
-                    <div
-                        className="k-popup k-chart__tooltip"
-                        data-align={active === 0 ? 'start' : active === data.length - 1 ? 'end' : 'middle'}
-                        style={{
-                            left:
-                                active === 0
-                                    ? shown.slotX
-                                    : active === data.length - 1
-                                      ? shown.slotX + shown.slotWidth
-                                      : shown.slotX + shown.slotWidth / 2,
-                            top: shownTop,
-                        }}
-                        aria-hidden="true">
-                        <span className="k-chart__tooltip-label">{shownPoint.label}</span>
-                        <span className="k-chart__tooltip-row">
-                            {compares ? <Swatch style={style} previous={false} /> : null}
-                            {compares ? <span>This period</span> : null}
-                            <strong>{WHOLE.format(shownPoint.value)}</strong>
-                        </span>
-                        {shownPoint.previous === undefined ? null : (
-                            <span className="k-chart__tooltip-row">
-                                <Swatch style={style} previous />
-                                <span>Previous period</span>
-                                <strong>{WHOLE.format(shownPoint.previous)}</strong>
-                            </span>
-                        )}
-                    </div>
-                )}
-            </div>
+        <div className="k-chart__frame">
+            <TanStackChart
+                definition={definition}
+                className="k-chart__plot"
+                ariaLabel={chartSummary(label, data, style === 'line' ? 'point' : 'bar')}
+                height={height}
+                initialWidth={560}
+                renderTooltipBody={({ points }) => {
+                    const point = data[points[0]?.datum.index ?? -1];
+                    return point === undefined ? null : <Tooltip point={point} style={style} compares={compares} />;
+                }}
+            />
             <table className="k-visually-hidden">
                 <caption>{label}</caption>
                 <thead>

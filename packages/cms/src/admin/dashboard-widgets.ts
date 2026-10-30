@@ -1,4 +1,3 @@
-import type { ChartBar } from './chart-geometry.js';
 import { parseRef } from '../refs.js';
 import { CONTENT_GROUP } from './navigation.js';
 import { relativeTimeOf } from './time.js';
@@ -134,6 +133,18 @@ export interface StatWidgetBody {
      * Values for a small line beside the number, oldest first.
      */
     trend?: number[];
+}
+
+/**
+ * One bar or point of a dashboard chart, as the dashboard route sends it.
+ */
+export interface ChartBar {
+    label: string;
+    value: number;
+    /**
+     * The same point in the period before, drawn beside it.
+     */
+    previous?: number;
 }
 
 export interface ChartWidgetBody {
