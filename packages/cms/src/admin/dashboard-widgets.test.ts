@@ -4,7 +4,7 @@ import {
     changeOf,
     groupsOf,
     isNewOf,
-    periodOfHash,
+    periodOfSearch,
     rangeOf,
     runsOf,
     tileColumnsOf,
@@ -139,14 +139,14 @@ describe('tileColumnsOf', () => {
 
 describe('the dashboard period', () => {
     it('reads the period the address names', () => {
-        expect(periodOfHash('#period=30d')).toBe('30d');
-        expect(periodOfHash('#period=24h')).toBe('24h');
+        expect(periodOfSearch('?period=30d')).toBe('30d');
+        expect(periodOfSearch('?period=24h')).toBe('24h');
     });
 
     it('opens on the last 7 days without one, or with one it does not know', () => {
-        expect(periodOfHash('')).toBe('7d');
-        expect(periodOfHash('#/')).toBe('7d');
-        expect(periodOfHash('#period=1y')).toBe('7d');
+        expect(periodOfSearch('')).toBe('7d');
+        expect(periodOfSearch('?page=2')).toBe('7d');
+        expect(periodOfSearch('?period=1y')).toBe('7d');
     });
 
     it('names a week by its first and last day', () => {

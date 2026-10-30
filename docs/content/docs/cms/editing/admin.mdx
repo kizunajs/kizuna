@@ -91,7 +91,25 @@ import kizuna from '@kizuna-config';
 export const { GET, HEAD } = kizuna.api.mount();
 ```
 
-With no `basePath`, the route matches the path as the browser sent it, so this file serves `/admin` and `/admin/login`. The admin calls the CMS's routes at `apiPath` wherever it is served, signing in and out among them, and an editor who signs in comes back to `adminPath`.
+With no `basePath`, the route matches the path as the browser sent it, so this file serves `/admin`, `/admin/login` and every screen under them. The admin calls the CMS's routes at `apiPath` wherever it is served, signing in and out among them.
+
+Every screen has an address of its own, so a link to one opens it, and reloading stays on it:
+
+| Screen                   | Address                               |
+| ------------------------ | ------------------------------------- |
+| The dashboard            | `/admin`, or `/admin?period=30d`      |
+| Pages                    | `/admin/pages`                        |
+| A page                   | `/admin/pages/frontPage`              |
+| A page of another site   | `/admin/pages/campaign/frontPage`     |
+| A global                 | `/admin/globals/header`               |
+| A collection             | `/admin/collections/employees`        |
+| An item                  | `/admin/collections/employees/k3j9x2` |
+| A view                   | `/admin/views/appUsers`               |
+| A record of a view       | `/admin/views/appUsers/42`            |
+| Media                    | `/admin/media`                        |
+| An image beside the grid | `/admin/media/med_3f2a9c1e`           |
+
+A collection's list keeps its state in the query, as in `/admin/collections/articles?page=2&sort=-updatedAt`: `page`, `limit` for the rows a page holds, `sort` with a `-` before a field sorted newest or last first, `search`, and a `filter` for each condition, like `filter=status:is:draft`. A signed-out editor who opens any of these signs in and comes back to that address, query included.
 
 ## The sidebar
 

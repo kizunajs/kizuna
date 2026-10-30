@@ -1033,6 +1033,24 @@ const probePlugin = definePlugin({
     }),
     setup: ({ options }) => ({
         routes: {
+            // Declared before the static paths beside it, which still win the paths they name.
+            named: route({
+                method: 'GET',
+                path: '/probe/:name',
+                pathParams: z.object({
+                    name: z.string(),
+                }),
+                responses: {
+                    200: z.object({
+                        name: z.string(),
+                    }),
+                },
+            }).handler(({ params }) => ({
+                status: 200,
+                body: {
+                    name: params.name,
+                },
+            })),
             ping: route({
                 method: 'GET',
                 path: '/probe/ping',

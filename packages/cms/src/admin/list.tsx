@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Select } from '@base-ui/react/select';
 import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, LoaderCircle, Plus } from 'lucide-react';
 import type { Connection } from '../view/connection.js';
@@ -23,15 +23,17 @@ import {
     readChosenColumns,
     saveChosenColumns,
     shownColumnsOf,
+    sortOfParam,
+    sortParamOf,
     sortRows,
     type ListColumn,
     type Sort,
 } from './list-columns.js';
-import { NO_FILTERS, activeConditions, filterEntriesOf, isFiltering, type Filters } from './list-filters.js';
+import { NO_FILTERS, activeConditions, conditionsOf, filterEntriesOf, isFiltering, type Filters } from './list-filters.js';
 import { EmptyTable, FlatRows, TreeRows, type TableOptions, type TreeRow } from './list-rows.js';
 import { ColumnsPanel, ListToolbar, SortMenu, type ListPanel } from './list-toolbar.js';
 import { parentAfterDrop, parentChange, type TreePlace } from './list-tree.js';
-import { hrefOf, type CollectionSummary } from './navigation.js';
+import { hrefOf, replaceQuery, useAddress, type CollectionSummary } from './navigation.js';
 import { PageHeader, type MetaPair } from './page-header.js';
 import { Loading, problemOf } from './parts.js';
 
@@ -366,8 +368,17 @@ export function ListScreen({
     };
     const bulkRun = useBulkRun(runOnSelected);
 
-    // A filter or a search changes which rows the ticks stand for.
+    // A filter or a search changes which rows the ticks stand for. The page the list opened on stays.
+    const searchedFor = useRef({
+        filterValue,
+        query,
+    });
     useEffect(() => {
+        if (searchedFor.current.filterValue === filterValue && searchedFor.current.query === query) return;
+        searchedFor.current = {
+            filterValue,
+            query,
+        };
         setSelected(new Set());
         setPage(0);
     }, [filterValue, query]);
@@ -692,6 +703,27 @@ export const createItem = async (connection: Connection, name: string): Promise<
 };
 
 /**
+ * A collection list's search, filters, sort and page, as its address's query
+ * holds them, like `?page=2&sort=-updatedAt&filter=status:is:draft`.
+ */
+const listAddressOf = (
+    search: string,
+    defaultSort: Sort | undefined
+): { query: string; filter: string[]; sort: Sort | undefined; page: number; perPage: number } => {
+    const params = new URLSearchParams(search);
+    const sort = params.get('sort');
+    const page = Number(params.get('page'));
+    const perPage = Number(params.get('limit'));
+    return {
+        query: params.get('search') ?? '',
+        filter: params.getAll('filter'),
+        sort: sort === null || sort === '' ? defaultSort : sortOfParam(sort),
+        page: Number.isInteger(page) && page > 1 ? page - 1 : 0,
+        perPage: PER_PAGE_CHOICES.includes(perPage) ? perPage : PAGE_SIZE,
+    };
+};
+
+/**
  * One collection's items, newest change first, or nested under their
  * parents for a collection with a `tree`. The list route searches, filters,
  * sorts and pages them, and ticked rows get the selection's actions.
@@ -714,15 +746,44 @@ export function CollectionList({
     onOpen: (ref: string) => void;
 }) {
     const tree = options?.tree;
+    const defaultSort = tree === undefined ? NEWEST_FIRST : undefined;
     const [items, setItems] = useState<{ items: ItemEntry[]; total: number } | undefined>();
     const [counts, setCounts] = useState<{ total: number; drafts: number } | undefined>();
     const [problem, setProblem] = useState<string | undefined>();
     const [creating, setCreating] = useState(false);
-    const [filters, setFilters] = useState<Filters>(NO_FILTERS);
-    const [query, setQuery] = useState('');
-    const [sort, setSort] = useState<Sort | undefined>(tree === undefined ? NEWEST_FIRST : undefined);
-    const [page, setPage] = useState(0);
-    const [perPage, setPerPage] = useState(PAGE_SIZE);
+    const addressQuery = useAddress().search;
+    const listed = useMemo(() => listAddressOf(addressQuery, defaultSort), [addressQuery, defaultSort]);
+    const { query, sort, page, perPage } = listed;
+    // The address holds only the conditions that filter, so a row still being filled in lives here until it does.
+    const [filters, setOwnFilters] = useState<Filters>(() => conditionsOf(listed.filter));
+    const addressFilter = JSON.stringify(listed.filter);
+    useEffect(() => {
+        setOwnFilters((current) =>
+            JSON.stringify(filterEntriesOf(current)) === addressFilter ? current : conditionsOf(JSON.parse(addressFilter) as string[])
+        );
+    }, [addressFilter]);
+    const setFilters = (next: Filters): void => {
+        setOwnFilters(next);
+        replaceQuery({
+            filter: filterEntriesOf(next),
+        });
+    };
+    const setQuery = (next: string): void =>
+        replaceQuery({
+            search: next === '' ? undefined : next,
+        });
+    const setSort = (next: Sort | undefined): void =>
+        replaceQuery({
+            sort: sortParamOf(next) === sortParamOf(defaultSort) ? undefined : sortParamOf(next),
+        });
+    const setPage = (next: number): void =>
+        replaceQuery({
+            page: next === 0 ? undefined : String(next + 1),
+        });
+    const setPerPage = (next: number): void =>
+        replaceQuery({
+            limit: next === PAGE_SIZE ? undefined : String(next),
+        });
     const [moveProblem, setMoveProblem] = useState<string | undefined>();
     const [loads, setLoads] = useState(0);
     const nameOf = useNames(connection);
@@ -889,7 +950,7 @@ export function CollectionList({
             drafts={counts?.drafts ?? 0}
             problem={problem}
             columns={columns}
-            defaultSort={tree === undefined ? NEWEST_FIRST : undefined}
+            defaultSort={defaultSort}
             defaultSortLabel="Tree order"
             nameOf={nameOf}
             server={{

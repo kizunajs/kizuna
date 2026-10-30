@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hrefOf, isCurrent, navigationOf, screenOf, tabTitleOf, type Screen } from './navigation.js';
+import { addressOfHash, hrefOf, isCurrent, navigationOf, screenOf, setAdminPath, tabTitleOf, type Screen } from './navigation.js';
 
 describe('the admin navigation', () => {
     it('reads back every screen it writes into the address', () => {
@@ -27,9 +27,91 @@ describe('the admin navigation', () => {
             },
         ];
         for (const screen of screens) expect(screenOf(hrefOf(screen))).toEqual(screen);
-        expect(screenOf('')).toEqual({
-            kind: 'dashboard',
-        });
+    });
+
+    it('gives each screen a path under the admin', () => {
+        const addresses: Array<[Screen, string]> = [
+            [
+                {
+                    kind: 'dashboard',
+                },
+                '/admin',
+            ],
+            [
+                {
+                    kind: 'document',
+                    ref: 'page:frontPage',
+                },
+                '/admin/pages/frontPage',
+            ],
+            [
+                {
+                    kind: 'document',
+                    ref: 'page:campaign:frontPage',
+                },
+                '/admin/pages/campaign/frontPage',
+            ],
+            [
+                {
+                    kind: 'document',
+                    ref: 'global:header',
+                },
+                '/admin/globals/header',
+            ],
+            [
+                {
+                    kind: 'document',
+                    ref: 'item:employees:k3j9x2',
+                },
+                '/admin/collections/employees/k3j9x2',
+            ],
+            [
+                {
+                    kind: 'record',
+                    view: 'appUsers',
+                    id: '42',
+                },
+                '/admin/views/appUsers/42',
+            ],
+        ];
+        for (const [screen, address] of addresses) {
+            expect(hrefOf(screen)).toBe(address);
+            expect(screenOf(address)).toEqual(screen);
+        }
+    });
+
+    it('serves its screens under any adminPath', () => {
+        setAdminPath('/cms-api/editor');
+        try {
+            expect(
+                hrefOf({
+                    kind: 'collection',
+                    name: 'employees',
+                })
+            ).toBe('/cms-api/editor/collections/employees');
+            expect(screenOf('/cms-api/editor')).toEqual({
+                kind: 'dashboard',
+            });
+        } finally {
+            setAdminPath('/admin');
+        }
+    });
+
+    it('names no screen for an address it does not know', () => {
+        for (const address of ['/admin/login', '/admin/collections', '/admin/collections/employees/k3j9x2/more', '/elsewhere']) {
+            expect(screenOf(address)).toEqual({
+                kind: 'missing',
+            });
+        }
+    });
+
+    it('moves an address of the old hash form to its path', () => {
+        expect(addressOfHash('#/collections/employees')).toBe('/admin/collections/employees');
+        expect(addressOfHash(`#/edit/${encodeURIComponent('item:articles:a/1')}`)).toBe('/admin/collections/articles/a%2F1');
+        expect(addressOfHash('#/views/appUsers/42')).toBe('/admin/views/appUsers/42');
+        expect(addressOfHash('#/')).toBe('/admin');
+        expect(addressOfHash('#field-title')).toBeUndefined();
+        expect(addressOfHash('')).toBeUndefined();
     });
 
     it('puts pages and everything without a group under Content, then each group', () => {

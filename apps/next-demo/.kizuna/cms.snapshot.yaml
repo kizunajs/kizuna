@@ -13555,6 +13555,36 @@ routes:
     responses:
       "200":
         kind: unknown
+  cms.adminSection:
+    method: GET
+    path: /admin/:section
+    statuses:
+      - 200
+    deprecated: false
+    hidden: true
+    responses:
+      "200":
+        kind: unknown
+  cms.adminEntry:
+    method: GET
+    path: /admin/:section/:name
+    statuses:
+      - 200
+    deprecated: false
+    hidden: true
+    responses:
+      "200":
+        kind: unknown
+  cms.adminEntryChild:
+    method: GET
+    path: /admin/:section/:name/:id
+    statuses:
+      - 200
+    deprecated: false
+    hidden: true
+    responses:
+      "200":
+        kind: unknown
   cms.signInScreen:
     method: GET
     path: /admin/login

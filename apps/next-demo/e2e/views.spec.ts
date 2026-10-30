@@ -27,7 +27,7 @@ test.describe('a view that filters and sorts on the server', () => {
     });
 
     test("heads App users' columns with their labels and shows when each signed up as a date", async ({ page }) => {
-        await page.goto('/admin#/views/appUsers');
+        await page.goto('/admin/views/appUsers');
         await expect(
             page.getByRole('link', {
                 name: 'Edda Editor',
@@ -61,7 +61,7 @@ test.describe('a view that filters and sorts on the server', () => {
     });
 
     test('filters App users by role and sorts them by name or sign-up date', async ({ page }) => {
-        await page.goto('/admin#/views/appUsers');
+        await page.goto('/admin/views/appUsers');
         await expect(
             page.getByRole('link', {
                 name: 'Edda Editor',
@@ -110,7 +110,8 @@ test.describe('a view that filters and sorts on the server', () => {
             })
             .click();
         await expect.poll(() => titles(page)).toEqual(['Ada Admin', 'Kizuna Dev']);
-        expect(asked.some((url) => url.searchParams.get('orderBy') === 'name')).toBe(true);
+        // The rows may already sit in this order, so wait for the request rather than the rows.
+        await expect.poll(() => asked.some((url) => url.searchParams.get('orderBy') === 'name')).toBe(true);
 
         await page
             .getByRole('button', {
@@ -123,6 +124,6 @@ test.describe('a view that filters and sorts on the server', () => {
             })
             .click();
         await expect.poll(() => titles(page)).toEqual(['Kizuna Dev', 'Ada Admin']);
-        expect(asked.some((url) => url.searchParams.get('orderBy') === 'signedUpAt')).toBe(true);
+        await expect.poll(() => asked.some((url) => url.searchParams.get('orderBy') === 'signedUpAt')).toBe(true);
     });
 });

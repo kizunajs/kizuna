@@ -9,7 +9,7 @@ import { parseRef } from '../refs.js';
 import { itemActionCall, outcomeOf } from './actions.js';
 import { ConfirmDialog, type Confirmation } from './confirm.js';
 import { duplicateValuesOf, menuEntriesOf, type MenuEntry } from './document-menu.js';
-import { hrefOf } from './navigation.js';
+import { hrefOf, navigate } from './navigation.js';
 import { problemOf } from './parts.js';
 import { useOfferUndo } from './toasts.js';
 
@@ -151,10 +151,12 @@ export function DocumentMore({
                 onProblem(problemOf(answer, 'It was not duplicated'));
                 return;
             }
-            window.location.hash = hrefOf({
-                kind: 'document',
-                ref: answer.body.ref,
-            });
+            navigate(
+                hrefOf({
+                    kind: 'document',
+                    ref: answer.body.ref,
+                })
+            );
             return;
         }
         if (entry.kind === 'delete') {
@@ -171,10 +173,12 @@ export function DocumentMore({
             toasts.add({
                 description: `Deleted ${title}.`,
             });
-            window.location.hash = hrefOf({
-                kind: 'collection',
-                name: item.collection,
-            });
+            navigate(
+                hrefOf({
+                    kind: 'collection',
+                    name: item.collection,
+                })
+            );
             return;
         }
         if (entry.kind === 'action') {

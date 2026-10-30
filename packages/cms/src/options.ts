@@ -390,7 +390,8 @@ export interface CmsPluginOptions<
     /**
      * Where the admin is served, from the site's root. A path under `apiPath`
      * is served by the API's own mount. Anywhere else, mount the API a second
-     * time at the root, from a route file at this path.
+     * time at the root, from a route file that matches this path and every
+     * path under it.
      *
      * @default `/admin` under `apiPath` and `path`, so '/api/admin'
      *

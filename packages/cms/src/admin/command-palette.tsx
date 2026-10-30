@@ -4,7 +4,7 @@ import { Dialog } from '@base-ui/react/dialog';
 import { Search } from 'lucide-react';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
-import { hrefOf, type CollectionSummary, type NavigationSection, type Screen } from './navigation.js';
+import { hrefOf, navigate, type CollectionSummary, type NavigationSection } from './navigation.js';
 import {
     actionResultsOf,
     groupsOfResults,
@@ -58,11 +58,6 @@ export function SearchButton({ onOpen, compact = false }: { onOpen: () => void; 
         </button>
     );
 }
-
-/**
- * The address a screen opens at, for a tab of its own.
- */
-const addressOf = (screen: Screen): string => `${window.location.pathname}${window.location.search}${hrefOf(screen)}`;
 
 /**
  * The palette the search buttons and ⌘K open: every screen in the sidebar,
@@ -140,10 +135,10 @@ export function CommandPalette({
             return;
         }
         if (inNewTab) {
-            window.open(addressOf(result.screen), '_blank', 'noopener');
+            window.open(hrefOf(result.screen), '_blank', 'noopener');
             return;
         }
-        window.location.hash = hrefOf(result.screen);
+        navigate(hrefOf(result.screen));
         change(false);
     };
 

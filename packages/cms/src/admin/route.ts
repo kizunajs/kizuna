@@ -111,6 +111,7 @@ export const adminConfigFor = (
     siteName: options.name,
     siteUrl: originOf(options.preview?.url),
     apiPath: options.apiPath ?? '/api',
+    adminPath: adminPathOf(options, base),
     role,
     signOutPath: options.auth.signOut === undefined ? (options.signOutPath ?? null) : sessionPathOf(options, base, 'sign-out'),
     signOutMethod: options.auth.signOut === undefined ? 'GET' : 'POST',
@@ -176,23 +177,69 @@ export const editorOf = async (
 };
 
 /**
- * `GET /admin`, or `adminPath`: the CMS in a browser tab, for an editor signed
- * in as the editor identity. Anyone else goes to sign in, and comes back
- * after.
+ * The paths under the admin's own that name a screen, like
+ * `/collections/employees/k3j9x2`. The admin reads the screen from the
+ * address, so the server answers each of them with the same page.
  */
-export const adminRoute = (service: CmsService, options: ResolvedCmsOptions, api: PluginApi, base: '' | `/${string}`) =>
-    route({
+const SCREEN_PATHS = {
+    admin: '',
+    adminSection: '/:section',
+    adminEntry: '/:section/:name',
+    adminEntryChild: '/:section/:name/:id',
+} satisfies Record<string, string>;
+
+const SCREEN_PARAMS = ['section', 'name', 'id'];
+
+/**
+ * The query as the browser sent it, for the address an editor comes back to.
+ */
+const searchOf = (query: unknown): string => {
+    const search = new URLSearchParams();
+    for (const [name, value] of Object.entries((query ?? {}) as Record<string, unknown>)) {
+        for (const each of Array.isArray(value) ? value : [value]) {
+            if (typeof each === 'string') search.append(name, each);
+        }
+    }
+    const text = search.toString();
+    return text === '' ? '' : `?${text}`;
+};
+
+/**
+ * The address the editor asked for: the admin's path, the screen under it
+ * and the query.
+ */
+const askedFor = (adminPath: string, params: unknown, query: unknown): string => {
+    const held = (params ?? {}) as Record<string, unknown>;
+    const screen = SCREEN_PARAMS.flatMap((name) => (typeof held[name] === 'string' ? [`/${encodeURIComponent(held[name])}`] : [])).join('');
+    return `${screen === '' ? adminPath : `${adminPath.replace(/\/+$/, '')}${screen}`}${searchOf(query)}`;
+};
+
+/**
+ * `GET /admin`, or `adminPath`, and every screen under it: the CMS in a
+ * browser tab, for an editor signed in as the editor identity. Anyone else
+ * goes to sign in, and comes back to the screen they asked for after.
+ */
+const adminRoute = (service: CmsService, options: ResolvedCmsOptions, api: PluginApi, base: '' | `/${string}`, screenPath: string) => {
+    const adminPath = adminRoutePathOf(options, base);
+    const path = (screenPath === '' ? adminPath : `${adminPath.replace(/\/+$/, '')}${screenPath}`) as `/${string}`;
+    const params = SCREEN_PARAMS.filter((name) => screenPath.includes(`:${name}`));
+    return route({
         method: 'GET',
-        path: adminRoutePathOf(options, base),
+        path,
         auth: false,
         summary: 'The admin, for a signed-in editor',
+        ...(params.length === 0
+            ? {}
+            : {
+                  pathParams: z.object(Object.fromEntries(params.map((name) => [name, z.string()]))),
+              }),
         responses: {
             200: z.unknown(),
         },
     }).handler(async (args) => {
         const { signedIn, allowed } = await editorOf(service, options, api, args);
         if (!allowed) {
-            const location = signInLocationOf(options, base, adminPathOf(options, base));
+            const location = signInLocationOf(options, base, askedFor(adminPathOf(options, base), args.params, args.query));
             if (location === undefined) {
                 return rawResponse(
                     new Response('Sign in as an editor first.', {
@@ -229,3 +276,12 @@ export const adminRoute = (service: CmsService, options: ResolvedCmsOptions, api
             })
         );
     });
+};
+
+/**
+ * The admin's routes: its own path, and each depth of screen under it.
+ */
+export const adminRoutes = (service: CmsService, options: ResolvedCmsOptions, api: PluginApi, base: '' | `/${string}`) =>
+    Object.fromEntries(
+        Object.entries(SCREEN_PATHS).map(([key, screenPath]) => [key, adminRoute(service, options, api, base, screenPath)])
+    ) as Record<keyof typeof SCREEN_PATHS, ReturnType<typeof adminRoute>>;

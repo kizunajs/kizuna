@@ -37,11 +37,11 @@ export type PeriodKey = (typeof PERIODS)[number]['key'];
 export const DEFAULT_PERIOD: PeriodKey = '7d';
 
 /**
- * The period the address names after `#period=`, or the default for none or
- * one the dashboard does not know.
+ * The period the address's query names, as in `?period=30d`, or the default
+ * for none or one the dashboard does not know.
  */
-export const periodOfHash = (hash: string): PeriodKey => {
-    const named = /^#?period=([^&]*)/.exec(hash)?.[1];
+export const periodOfSearch = (search: string): PeriodKey => {
+    const named = new URLSearchParams(search).get('period');
     return PERIODS.find((period) => period.key === named)?.key ?? DEFAULT_PERIOD;
 };
 

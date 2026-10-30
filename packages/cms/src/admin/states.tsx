@@ -72,4 +72,4 @@ export function NotFound({ noun, back, onSearch }: { noun: string; back: Way; on
  * The address the browser shows, for the header's line of a screen that
  * found nothing there.
  */
-export const shownAddress = (): string => decodeURIComponent(`${window.location.pathname}${window.location.hash}`);
+export const shownAddress = (): string => decodeURIComponent(`${window.location.pathname}${window.location.search}`);

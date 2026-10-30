@@ -140,6 +140,33 @@ describe('the admin route', () => {
         expect(served.routes['content_pages_get_page']).toBeUndefined();
     });
 
+    it('serves the same page at every screen under the admin, and tells it where the admin is', async () => {
+        for (const path of [
+            '/admin/pages',
+            '/admin/pages/frontPage',
+            '/admin/collections/articles?page=2',
+            '/admin/collections/articles/a%2F1',
+            '/admin/views/appUsers/42',
+        ]) {
+            const response = await request(app).get(path).set('authorization', 'Bearer editor-token');
+            expect(response.status).toBe(200);
+            expect(response.headers['content-type']).toMatch(/^text\/html/);
+            expect(configOf(response.text).adminPath).toBe('/cms-api/admin');
+        }
+        const deeper = await request(app).get('/admin/collections/articles/a1/more').set('authorization', 'Bearer editor-token');
+        expect(deeper.status).toBe(404);
+    });
+
+    it('sends a signed-out visitor to sign in, and back to the screen and query they asked for', async () => {
+        const response = await request(app).get('/admin/collections/articles?filter=status:is:draft&filter=or&page=2');
+        expect(response.status).toBe(307);
+        expect(response.headers['location']).toBe(
+            `/login?next=${encodeURIComponent('/cms-api/admin/collections/articles?filter=status%3Ais%3Adraft&filter=or&page=2')}`
+        );
+        const item = await request(app).get('/admin/collections/articles/a%2F1');
+        expect(item.headers['location']).toBe(`/login?next=${encodeURIComponent('/cms-api/admin/collections/articles/a%2F1')}`);
+    });
+
     it('tells the admin the role the editor signed in with, and where Sign out goes', async () => {
         const response = await request(app).get('/admin').set('authorization', 'Bearer editor-token');
         const served = configOf(response.text);
@@ -156,6 +183,9 @@ describe('adminPath', () => {
         expect(configOf(signedIn.text).apiPath).toBe('/cms-api');
         const signedOut = await request(served).get('/cms-api/editor');
         expect(signedOut.headers['location']).toBe(`/login?next=${encodeURIComponent('/cms-api/editor')}`);
+        const screen = await request(served).get('/cms-api/editor/collections/articles').set('authorization', 'Bearer editor-token');
+        expect(screen.status).toBe(200);
+        expect(configOf(screen.text).adminPath).toBe('/cms-api/editor');
     });
 
     it('serves the admin outside apiPath from a second mount at the root', async () => {
@@ -166,13 +196,16 @@ describe('adminPath', () => {
         moved.api.mount(cmsApi);
         moved.api.mount(atRoot);
         served.use('/cms-api', cmsApi);
-        served.get('/editor', atRoot);
+        served.get(['/editor', '/editor/*screen'], atRoot);
         const signedIn = await request(served).get('/editor').set('authorization', 'Bearer editor-token');
         expect(signedIn.status).toBe(200);
         expect(configOf(signedIn.text).apiPath).toBe('/cms-api');
         const signedOut = await request(served).get('/editor');
         expect(signedOut.status).toBe(307);
         expect(signedOut.headers['location']).toBe(`/login?next=${encodeURIComponent('/editor')}`);
+        const screen = await request(served).get('/editor/globals/header').set('authorization', 'Bearer editor-token');
+        expect(screen.status).toBe(200);
+        expect(configOf(screen.text).adminPath).toBe('/editor');
     });
 });
 

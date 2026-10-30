@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { NO_FILTERS, STATUS_FIELD, filterEntriesOf, groupsOf, isFiltering, withCondition, type Condition } from './list-filters.js';
+import {
+    NO_FILTERS,
+    STATUS_FIELD,
+    conditionsOf,
+    filterEntriesOf,
+    groupsOf,
+    isFiltering,
+    withCondition,
+    type Condition,
+} from './list-filters.js';
 
 const topicIs = (value: string, join: Condition['join'] = 'and'): Condition => ({
     join,
@@ -52,6 +61,13 @@ describe('the filters above a list', () => {
 
     it('groups the rows joined by and, and starts a group at each or', () => {
         expect(groupsOf([statusIs('draft'), topicIs('care'), statusIs('published', 'or')]).map((group) => group.length)).toEqual([2, 1]);
+    });
+
+    it('reads the conditions back from the address', () => {
+        const filters = [statusIs('draft'), topicIs('care'), topicIs('season', 'or')];
+        expect(conditionsOf(filterEntriesOf(filters))).toEqual(filters);
+        expect(conditionsOf(['author:is:item:people:ingrid'])[0]?.value).toBe('item:people:ingrid');
+        expect(conditionsOf(['topic', 'topic:near:care', 'or'])).toEqual([]);
     });
 
     it('changes one row, or removes it', () => {

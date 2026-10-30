@@ -76,6 +76,33 @@ export const filterEntriesOf = (filters: Filters): string[] =>
         ),
     ]);
 
+const OPERATORS: readonly string[] = ['is', 'isNot', 'within', 'outside'] satisfies Operator[];
+
+/**
+ * The conditions a `filter` names, the way round from
+ * {@link filterEntriesOf}, leaving out any entry it could not have written.
+ */
+export const conditionsOf = (entries: readonly string[]): Condition[] => {
+    const conditions: Condition[] = [];
+    let join: Condition['join'] = 'and';
+    for (const entry of entries) {
+        if (entry === 'or') {
+            join = 'or';
+            continue;
+        }
+        const [field = '', operator = '', ...value] = entry.split(':');
+        if (field === '' || !OPERATORS.includes(operator) || value.length === 0) continue;
+        conditions.push({
+            join: conditions.length === 0 ? 'and' : join,
+            field: field === 'status' ? STATUS_FIELD : field,
+            operator: operator as Operator,
+            value: value.join(':'),
+        });
+        join = 'and';
+    }
+    return conditions;
+};
+
 /**
  * The filters with one condition changed, or removed with `undefined`.
  */

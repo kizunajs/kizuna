@@ -27,7 +27,7 @@ import {
     type MediaScope,
     type MediaUse,
 } from './media-library.js';
-import { hrefOf } from './navigation.js';
+import { hrefOf, navigate } from './navigation.js';
 import { PageHeader } from './page-header.js';
 import { Loading, problemOf } from './parts.js';
 import { dayOf } from './time.js';
@@ -59,15 +59,17 @@ const saveLayout = (layout: Layout): void => {
 };
 
 const openImage = (id: string | undefined): void => {
-    window.location.hash = hrefOf(
-        id === undefined
-            ? {
-                  kind: 'media',
-              }
-            : {
-                  kind: 'media',
-                  id,
-              }
+    navigate(
+        hrefOf(
+            id === undefined
+                ? {
+                      kind: 'media',
+                  }
+                : {
+                      kind: 'media',
+                      id,
+                  }
+        )
     );
 };
 

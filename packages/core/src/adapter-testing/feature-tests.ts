@@ -978,6 +978,25 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 });
             });
         },
+        'plugins.staticBeforeParam': async () => {
+            await usingPlugins(async (mounted) => {
+                const ping = await mounted.request({
+                    method: 'GET',
+                    path: '/probe/ping',
+                });
+                expect(ping.body).toEqual({
+                    pong: true,
+                });
+                const named = await mounted.request({
+                    method: 'GET',
+                    path: '/probe/fern',
+                });
+                expect(named.status).toBe(200);
+                expect(named.body).toEqual({
+                    name: 'fern',
+                });
+            });
+        },
         'plugins.rawResponse': async () => {
             await usingPlugins(async (mounted) => {
                 const response = await mounted.request({

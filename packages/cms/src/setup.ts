@@ -20,7 +20,7 @@ import { defaultPagesOutput, discoverPages, findAppDir, renderPagesModule } from
 import { PREVIEW_COOKIE, PREVIEW_TTL_SECONDS } from './preview-token.js';
 import { PREVIEW_PROXY_PATH, PROXY_CORS, previewProxyUrl, proxyToSite } from './preview-proxy.js';
 import { draftEventsRoute } from './draft-events.js';
-import { adminRoute, signInLocationOf } from './admin/route.js';
+import { adminRoutes, signInLocationOf } from './admin/route.js';
 import { signInRoute, signInScreenRoute, signOutRoute } from './admin/sign-in-route.js';
 import { routePrefix } from './options.js';
 import { assertActionAccess, resolveActions } from './action.js';
@@ -272,7 +272,7 @@ const definition = definePlugin({
                 draftEvents: draftEventsRoute(service, options, api, base),
                 previewProxy: previewProxyRoute(service, options, base),
                 previewProxyPreflight: previewProxyPreflightRoute(base),
-                admin: adminRoute(service, options, api, base),
+                ...adminRoutes(service, options, api, base),
                 ...(options.auth.signIn === undefined
                     ? {}
                     : {

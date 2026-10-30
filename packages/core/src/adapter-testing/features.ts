@@ -150,6 +150,9 @@ export const ADAPTER_FEATURES = {
     'plugins.contractWinsOverlap': {
         summary: 'A contract route wins a path a plugin route also matches, such as a static path against the plugin’s param.',
     },
+    'plugins.staticBeforeParam': {
+        summary: 'Among a plugin’s own routes, a static path wins over a param route that also matches it, whichever is declared first.',
+    },
     'plugins.rawResponse': {
         summary: 'A plugin route answering with `rawResponse` sends its response untouched by validation or rendering.',
     },

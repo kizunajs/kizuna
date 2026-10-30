@@ -17,9 +17,12 @@ import { MediaLibrary } from './media.js';
 import {
     CONTENT_GROUP,
     hrefOf,
+    inAppTargetOf,
     isCurrent,
+    navigate,
     navigationOf,
     screenOf,
+    useAddress,
     tabTitleOf,
     type CollectionSummary,
     type GlobalSummary,
@@ -39,13 +42,26 @@ import type { ViewSummary } from './views.js';
  * The screen the address names, following it as it changes.
  */
 const useScreen = (): Screen => {
-    const [screen, setScreen] = useState<Screen>(() => screenOf(window.location.hash));
+    const { pathname } = useAddress();
+    return useMemo(() => screenOf(pathname), [pathname]);
+};
+
+/**
+ * Opens the admin's own links in place, so moving between screens keeps the
+ * page loaded. Each is still a real link, which a middle click or ⌘-click
+ * opens in a tab of its own.
+ */
+const useLinksInPlace = (): void => {
     useEffect(() => {
-        const follow = (): void => setScreen(screenOf(window.location.hash));
-        window.addEventListener('hashchange', follow);
-        return () => window.removeEventListener('hashchange', follow);
+        const follow = (event: MouseEvent): void => {
+            const target = inAppTargetOf(event);
+            if (target === undefined) return;
+            event.preventDefault();
+            navigate(target);
+        };
+        window.document.addEventListener('click', follow);
+        return () => window.document.removeEventListener('click', follow);
     }, []);
-    return screen;
 };
 
 /**
@@ -68,9 +84,7 @@ const usePhone = (): boolean => {
     return phone;
 };
 
-const open = (screen: Screen): void => {
-    window.location.hash = hrefOf(screen);
-};
+const open = (screen: Screen): void => navigate(hrefOf(screen));
 
 /**
  * The admin: a sidebar of everything the editor may open, and the screen the
@@ -82,6 +96,7 @@ export function Admin({ config }: { config: AdminConfig }) {
     const connection = useMemo(() => connectOverHttp(config), [config]);
     const people = usePeople(connection);
     const screen = useScreen();
+    useLinksInPlace();
     const phone = usePhone();
     const [searching, setSearching] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
@@ -223,8 +238,8 @@ export function Admin({ config }: { config: AdminConfig }) {
         });
     };
 
-    // A list the address names that the editor has none of, or may not open.
-    const missingList = (
+    // A list the address names that the editor has none of, or may not open, or an address that names no screen.
+    const missing = (noun: string) => (
         <>
             <PageHeader
                 crumbs={[]}
@@ -237,7 +252,7 @@ export function Admin({ config }: { config: AdminConfig }) {
                 ]}
             />
             <NotFound
-                noun="list"
+                noun={noun}
                 back={{
                     label: 'Go to the dashboard',
                     href: hrefOf({
@@ -250,6 +265,7 @@ export function Admin({ config }: { config: AdminConfig }) {
     );
 
     const shown = (() => {
+        if (screen.kind === 'missing') return missing('screen');
         if (screen.kind === 'pages') return <PagesList connection={connection} routes={config.routes} />;
         if (screen.kind === 'media') {
             return <MediaLibrary connection={connection} selectedId={screen.id} people={people} collectionLabel={collectionLabel} />;
@@ -257,7 +273,7 @@ export function Admin({ config }: { config: AdminConfig }) {
         if (screen.kind === 'collection') {
             const collection = collections?.find((candidate) => candidate.name === screen.name);
             if (collection === undefined) {
-                if (collections !== undefined) return missingList;
+                if (collections !== undefined) return missing('list');
                 return (
                     <div className="k-admin__body">
                         <Loading problem={problem} />
@@ -298,7 +314,7 @@ export function Admin({ config }: { config: AdminConfig }) {
             const name = screen.kind === 'view' ? screen.name : screen.view;
             const view = views?.find((candidate) => candidate.name === name);
             if (view === undefined) {
-                if (views !== undefined) return missingList;
+                if (views !== undefined) return missing('list');
                 return (
                     <div className="k-admin__body">
                         <Loading />

@@ -25,6 +25,10 @@ export interface AdminConfig {
      */
     apiPath: string;
     /**
+     * Where the admin is served, which every screen's address starts under.
+     */
+    adminPath: string;
+    /**
      * The role the editor signed in with, shown under their name.
      */
     role: string | null;

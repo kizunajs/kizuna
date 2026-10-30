@@ -10,6 +10,8 @@ import {
     nextSort,
     orderOf,
     pageOf,
+    sortOfParam,
+    sortParamOf,
     pagesAround,
     shownColumnsOf,
     sortRows,
@@ -196,6 +198,23 @@ describe('the columns of a list', () => {
             direction: 'asc',
         });
         expect(orderOf(undefined)).toEqual({});
+    });
+
+    it('writes a sort into the address, and reads it back', () => {
+        expect(sortParamOf(NEWEST_FIRST)).toBe('-updatedAt');
+        expect(sortParamOf(undefined)).toBeUndefined();
+        const sorts = [
+            NEWEST_FIRST,
+            {
+                column: 'title',
+                direction: 'ascending',
+            },
+            {
+                column: 'field:publishedOn',
+                direction: 'descending',
+            },
+        ] satisfies Parameters<typeof sortParamOf>[0][];
+        for (const sort of sorts) expect(sortOfParam(sortParamOf(sort)!)).toEqual(sort);
     });
 
     it('shows a field by the label the server gives it', () => {

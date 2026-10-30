@@ -15,7 +15,7 @@ import { ConfirmDialog } from './confirm.js';
 import { blockerOf, documentDatesOf, menuEntriesOf } from './document-menu.js';
 import { DocumentMore, type DocumentMoreHandle } from './document-more.js';
 import { savedAtOf, type VersionSummary } from './history.js';
-import { hrefOf } from './navigation.js';
+import { hrefOf, navigate } from './navigation.js';
 import { PageHeader, type Crumb } from './page-header.js';
 import { Loading, SaveIndicator, Status, problemOf } from './parts.js';
 import { documentNounOf, documentStateOf, roleSubjectOf, titleOfRef } from './access.js';
@@ -386,10 +386,12 @@ export function DocumentScreen({
             return;
         }
         if (ref !== null) {
-            window.location.hash = hrefOf({
-                kind: 'document',
-                ref,
-            });
+            navigate(
+                hrefOf({
+                    kind: 'document',
+                    ref,
+                })
+            );
         }
     }, []);
 

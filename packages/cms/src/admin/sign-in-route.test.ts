@@ -168,6 +168,25 @@ describe("the admin's sign-in screen", () => {
         expect(response.headers['location']).toBe(`/cms-api/admin/login?next=${encodeURIComponent('/cms-api/admin')}`);
     });
 
+    it('keeps the screen and query a signed-out editor asked for, and still serves itself under the admin', async () => {
+        const response = await request(app).get('/admin/collections/articles?page=2&sort=-updatedAt');
+        expect(response.status).toBe(307);
+        const next = '/cms-api/admin/collections/articles?page=2&sort=-updatedAt';
+        expect(response.headers['location']).toBe(`/cms-api/admin/login?next=${encodeURIComponent(next)}`);
+        const screen = await request(app).get('/admin/login').query({
+            next,
+        });
+        expect(screen.status).toBe(200);
+        expect(configIn<SignInConfig>(screen.text).next).toBe(next);
+        const signedIn = await request(app)
+            .get('/admin/login')
+            .query({
+                next,
+            })
+            .set('authorization', 'Bearer editor-token');
+        expect(signedIn.headers['location']).toBe(next);
+    });
+
     it('is where a signed-out editor opening draft mode goes', async () => {
         const response = await request(app).get('/draft').query({
             redirect: '/blog/welcome',

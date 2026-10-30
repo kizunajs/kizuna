@@ -49,7 +49,8 @@ export function SignIn({ config }: { config: SignInConfig }) {
                 }),
             });
             if (response.ok) {
-                window.location.assign(config.next);
+                // A redirect here keeps the hash of the address asked for, which an old admin link holds its screen in.
+                window.location.assign(`${config.next}${window.location.hash}`);
                 return;
             }
             setError(messageFor(response.status));

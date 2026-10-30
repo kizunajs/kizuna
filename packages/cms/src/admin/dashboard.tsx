@@ -12,7 +12,7 @@ import {
     groupsOf,
     isNewOf,
     PERIODS,
-    periodOfHash,
+    periodOfSearch,
     rangeOf,
     runsOf,
     tileColumnsOf,
@@ -25,7 +25,7 @@ import {
     type StatWidgetBody,
 } from './dashboard-widgets.js';
 import { createItem } from './list.js';
-import { hrefOf, type CollectionSummary } from './navigation.js';
+import { hrefOf, replaceQuery, useAddress, type CollectionSummary } from './navigation.js';
 import { PageHeader } from './page-header.js';
 import { Loading, problemOf } from './parts.js';
 import { SelectMenu } from '../view/select-menu.js';
@@ -207,14 +207,15 @@ export function Dashboard({
     const [failure, setFailure] = useState<string | undefined>();
     const [creating, setCreating] = useState<string | undefined>();
     const [problem, setProblem] = useState<string | undefined>();
-    const [period, setPeriod] = useState<PeriodKey>(() => periodOfHash(window.location.hash));
+    const period = periodOfSearch(useAddress().search);
     const [counted, setCounted] = useState<DashboardPeriod | undefined>();
     const [loading, setLoading] = useState(false);
     const requests = useRef(0);
 
     const choosePeriod = useCallback((key: PeriodKey): void => {
-        window.history.replaceState(window.history.state, '', `#period=${key}`);
-        setPeriod(key);
+        replaceQuery({
+            period: key === DEFAULT_PERIOD ? undefined : key,
+        });
     }, []);
 
     // The widgets shown stay while the next period loads, and only the latest request lands.

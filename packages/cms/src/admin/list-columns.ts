@@ -175,6 +175,28 @@ export const orderOf = (sort: Sort | undefined): { orderBy?: string; direction?:
           };
 };
 
+/**
+ * A sort as the address's `sort` holds it: what the list route orders by,
+ * after a `-` when it runs descending, as in `-updatedAt`.
+ */
+export const sortParamOf = (sort: Sort | undefined): string | undefined => {
+    const { orderBy, direction } = orderOf(sort);
+    if (orderBy === undefined) return undefined;
+    return direction === 'desc' ? `-${orderBy}` : orderBy;
+};
+
+/**
+ * The sort an address's `sort` names, the way round from {@link sortParamOf}.
+ */
+export const sortOfParam = (value: string): Sort => {
+    const descending = value.startsWith('-');
+    const orderBy = descending ? value.slice(1) : value;
+    return {
+        column: orderBy === 'title' || orderBy === 'status' ? orderBy : orderBy === 'updatedAt' ? 'updated' : `${FIELD_COLUMN}${orderBy}`,
+        direction: descending ? 'descending' : 'ascending',
+    };
+};
+
 const STATUS_ORDER = ['published', 'changed', 'draft', 'empty'];
 
 /**
