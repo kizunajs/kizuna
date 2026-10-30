@@ -621,7 +621,7 @@ const useNames = (connection: Connection): ((id: string) => string) => {
 const SITE_COLUMN = 'site';
 
 /**
- * The pages' columns in All sites: the title, then the site, then the rest.
+ * The pages' columns in Overview: the title, then the site, then the rest.
  */
 const SITE_COLUMNS: readonly ListColumn[] = [
     DOCUMENT_COLUMNS[0]!,
@@ -663,7 +663,7 @@ export function PagesList({
      */
     siteFact?: ReactNode;
     /**
-     * Every site the editor may open, for the pages of All sites, which
+     * Every site the editor may open, for the pages of Overview, which
      * shows each page's site and filters by it.
      */
     sites?: readonly AdminSite[] | undefined;
@@ -704,7 +704,7 @@ export function PagesList({
         });
     }, [connection, loads, site]);
     const actions = offeredActions(routes ?? {}, 'editing_pages');
-    // All sites lists every site's pages, each with its site, and filters them by it.
+    // Overview lists every site's pages, each with its site, and filters them by it.
     const everySite = sites !== undefined && sites.length > 0;
     const shownRows = useMemo(
         () =>

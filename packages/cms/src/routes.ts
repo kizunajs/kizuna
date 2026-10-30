@@ -42,6 +42,9 @@ import {
     VersionContentSchema,
     PageStatusSchema,
     PeopleSchema,
+    InvitePersonBodySchema,
+    InvitedPersonSchema,
+    ChangePersonBodySchema,
     OwnerBodySchema,
     RequestReviewBodySchema,
     DecideReviewBodySchema,
@@ -49,6 +52,7 @@ import {
     CommentBodySchema,
     ReviewStateSchema,
     WaitingReviewsSchema,
+    WaitingTranslationsSchema,
     ReviewListSchema,
     WhereUsedSchema,
 } from './wire.js';
@@ -64,7 +68,6 @@ import {
     decideReviews,
     documentLabel,
     mayPublishPastReview,
-    peopleFor,
     peopleOf,
     recordPublishedPast,
     reopenReviews,
@@ -76,6 +79,8 @@ import {
     waitingReviews,
     withdrawReviews,
 } from './reviews.js';
+import { waitingTranslations } from './waiting-translations.js';
+import { changePerson, invitePerson, managedSites, peopleWithSites, siteRoles } from './people.js';
 import type { Person } from './options.js';
 import { collectionActionRoutes, itemActions } from './action-routes.js';
 import { listViewsRoute, viewRoutes } from './view-routes.js';
@@ -627,6 +632,11 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                                       : {
                                             fields: body.fields,
                                         }),
+                                  ...(body.save === undefined
+                                      ? {}
+                                      : {
+                                            save: body.save,
+                                        }),
                                   caller: cms.access(args.auth).callerFor(ref),
                                   author: authorOf(cms, args),
                               });
@@ -635,6 +645,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                                   body: {
                                       draft: draftBody(translated.state),
                                       fields: translated.fields,
+                                      values: translated.values,
                                   },
                               };
                           }) as never
@@ -1678,31 +1689,117 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             },
         },
     }).handler(
-        guarded(async (cms, args) => ({
-            status: 200,
-            body: {
-                me: authorOf(cms, args),
-                people: (await peopleFor(cms, cms.access(args.auth))).map((person) => ({
-                    id: person.id,
-                    name: person.name,
-                    ...(person.email === undefined
+        guarded(async (cms, args) => {
+            const access = cms.access(args.auth);
+            return {
+                status: 200,
+                body: {
+                    me: authorOf(cms, args),
+                    people: (await peopleWithSites(cms, access)).map((person) => ({
+                        id: person.id,
+                        name: person.name,
+                        ...(person.email === undefined
+                            ? {}
+                            : {
+                                  email: person.email,
+                              }),
+                        ...(person.image === undefined
+                            ? {}
+                            : {
+                                  image: person.image,
+                              }),
+                        ...(person.roles === undefined
+                            ? {}
+                            : {
+                                  roles: [...person.roles],
+                              }),
+                        ...(person.siteRoles === undefined
+                            ? {}
+                            : {
+                                  sites: person.siteRoles,
+                              }),
+                    })),
+                    ...(cms.options.auth.sites === undefined
                         ? {}
                         : {
-                              email: person.email,
+                              manage: {
+                                  sites: managedSites(cms, access),
+                                  roles: siteRoles(cms),
+                                  invite: cms.options.auth.people?.invite !== undefined,
+                                  change: cms.options.auth.people?.setSites !== undefined,
+                              },
                           }),
-                    ...(person.image === undefined
-                        ? {}
-                        : {
-                              image: person.image,
-                          }),
-                    ...(person.roles === undefined
-                        ? {}
-                        : {
-                              roles: [...person.roles],
-                          }),
-                })),
-            },
-        })) as never
+                },
+            };
+        }) as never
+    );
+
+    const invitePersonRoute = route({
+        method: 'POST',
+        path: `${editingBase}/people`,
+        auth: editor,
+        summary: 'Invite someone to edit, with their role on each site',
+        description:
+            'Only an admin may invite: an admin over every site to any site, and an admin of a site to that site. The answer may carry a link that signs them in, to send them.',
+        tool: {
+            needsApproval: true,
+        },
+        body: InvitePersonBodySchema,
+        responses: {
+            201: InvitedPersonSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+            422: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const body = args.body as z.output<typeof InvitePersonBodySchema>;
+            return {
+                status: 201,
+                body: await invitePerson(cms, cms.access(args.auth), {
+                    email: body.email,
+                    sites: body.sites,
+                    invitedBy: authorOf(cms, args),
+                }),
+            };
+        }) as never
+    );
+
+    const changePersonRoute = route({
+        method: 'PATCH',
+        path: `${editingBase}/people/:id`,
+        auth: editor,
+        summary: "Change someone's role on some sites, or take a site away from them",
+        description:
+            'Only an admin may change roles: an admin over every site on any site, and an admin of a site on that site. Sites left out keep their role.',
+        tool: {
+            needsApproval: true,
+        },
+        pathParams: z.object({
+            id: z.string().describe('Their id, from the people list.'),
+        }),
+        body: ChangePersonBodySchema,
+        responses: {
+            204: z.void(),
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+            422: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const body = args.body as z.output<typeof ChangePersonBodySchema>;
+            await changePerson(cms, cms.access(args.auth), {
+                id: args.params['id']!,
+                sites: body.sites,
+                changedBy: authorOf(cms, args),
+            });
+            return {
+                status: 204,
+                body: undefined,
+            };
+        }) as never
     );
 
     /**
@@ -1743,6 +1840,32 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     reviews: await waitingReviews(cms, query.for === 'anyone' ? undefined : authorOf(cms, args), (ref) =>
                         cms.access(args.auth).seesRef(ref)
                     ),
+                },
+            };
+        }) as never
+    );
+
+    const listTranslations = route({
+        method: 'GET',
+        path: `${editingBase}/translations`,
+        auth: editor,
+        summary: 'List the translations that wait on someone: fields whose source changed, and fields not translated yet',
+        tool: {
+            readOnlyHint: true,
+        },
+        responses: {
+            200: {
+                body: WaitingTranslationsSchema,
+                cache: 'no-store',
+            },
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const access = cms.access(args.auth);
+            return {
+                status: 200,
+                body: {
+                    translations: await waitingTranslations(cms, (site) => access.sees(site)),
                 },
             };
         }) as never
@@ -2752,6 +2875,15 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             createPreview,
             people: {
                 list: listPeople,
+                ...(siteEntries.length === 0
+                    ? {}
+                    : {
+                          invite: invitePersonRoute,
+                          change: changePersonRoute,
+                      }),
+            },
+            translations: {
+                list: listTranslations,
             },
             reviews: {
                 list: listReviews,

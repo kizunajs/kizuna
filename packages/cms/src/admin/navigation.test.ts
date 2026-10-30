@@ -12,10 +12,10 @@ import {
     setSites,
     showSite,
     siteGroupsOf,
+    siteMarksOf,
     ALL_PLACE,
     SHARED_PLACE,
     placeOf,
-    readerOf,
     screenInPlace,
     sitePlace,
     tabTitleOf,
@@ -478,6 +478,7 @@ describe('the admin navigation with several sites', () => {
             ['Pages', '/admin/uk/pages'],
             ['Events', '/admin/uk/collections/events'],
             ['Settings', '/admin/uk/globals/settings'],
+            ['Waiting', '/admin/uk/waiting'],
             ['Media', '/admin/uk/media'],
         ]);
     });
@@ -492,17 +493,6 @@ describe('the admin navigation with several sites', () => {
             ['Offices', '/admin/collections/offices'],
             ['Privacy policy', '/admin/globals/privacyPolicy'],
             ['Media', '/admin/media'],
-        ]);
-    });
-
-    it("lists every site's pages and own collections as one list each in All sites", () => {
-        const sections = navigationOf({
-            ...LISTED,
-            place: ALL_PLACE,
-        });
-        expect(sections.flatMap((section) => section.entries).map((entry) => [entry.label, hrefOf(entry.screen)])).toEqual([
-            ['Pages', '/admin/pages'],
-            ['Events', '/admin/collections/events'],
         ]);
     });
 
@@ -521,17 +511,10 @@ describe('the admin navigation with several sites', () => {
     });
 
     it('opens the same kind of screen in another place, where it has one', () => {
-        expect(hrefOf(screenInPlace(screenOf('/admin/uk/pages'), ALL_PLACE))).toBe('/admin/pages');
+        expect(hrefOf(screenInPlace(screenOf('/admin/uk/pages'), ALL_PLACE))).toBe('/admin');
         expect(hrefOf(screenInPlace(screenOf('/admin/uk/pages/frontPage'), sitePlace('norway')))).toBe('/admin/norway/pages/frontPage');
         expect(hrefOf(screenInPlace(screenOf('/admin/collections/offices'), sitePlace('uk')))).toBe('/admin/uk');
         expect(hrefOf(screenInPlace(screenOf('/admin/uk/collections/events'), SHARED_PLACE))).toBe('/admin/media');
-    });
-
-    it('says who reads a screen: one site, every site, or nobody in particular', () => {
-        expect(readerOf(screenOf('/admin/uk/collections/events/e1'))).toBe(SITES[1]);
-        expect(readerOf(screenOf('/admin/collections/offices/k3j9x2'))).toBe('every site');
-        expect(readerOf(screenOf('/admin/uk/collections/offices/k3j9x2'))).toBe(SITES[1]);
-        expect(readerOf(screenOf('/admin/pages'))).toBeUndefined();
     });
 
     it("marks a site's pages current on its own pages alone", () => {
@@ -583,5 +566,121 @@ describe('the admin navigation with several sites', () => {
         expect(siteGroupsOf(many, 'hagen o').map((group) => [group.country, group.sites.map((site) => site.key)])).toEqual([
             ['NO', ['oslo']],
         ]);
+    });
+
+    it('marks a site with its own icon, or with a code when another site shares the icon', () => {
+        const dealer = (key: string, label: string, code?: string): AdminSite => ({
+            key,
+            label,
+            icon: 'https://hagen.example.no/icon.svg',
+            pages: [],
+            globals: [],
+            collections: [],
+            ...(code === undefined
+                ? {}
+                : {
+                      code,
+                  }),
+        });
+        const marks = siteMarksOf([
+            {
+                ...dealer('uk', 'Hagen UK'),
+                icon: 'https://hagen.example.co.uk/icon.svg',
+            },
+            dealer('bergen-sentrum', 'Hagen Bergen Sentrum'),
+            dealer('bergen-asane', 'Hagen Bergen Åsane'),
+            dealer('trondheim', 'Hagen Trondheim'),
+            dealer('tromso', 'Hagen Tromsø'),
+            dealer('malmo', 'Hagen Malmö', 'MLM'),
+        ]);
+        expect(Object.fromEntries(marks)).toEqual({
+            uk: {
+                icon: 'https://hagen.example.co.uk/icon.svg',
+            },
+            'bergen-sentrum': {
+                code: 'BS',
+            },
+            'bergen-asane': {
+                code: 'BÅ',
+            },
+            trondheim: {
+                code: 'TRO',
+            },
+            tromso: {
+                code: 'TRØ',
+            },
+            malmo: {
+                code: 'MLM',
+            },
+        });
+    });
+
+    it("gives Overview's Waiting, Sites and People addresses of their own, and a site its Waiting", () => {
+        const addresses: Array<[Screen, string]> = [
+            [
+                {
+                    kind: 'waiting',
+                },
+                '/admin/waiting',
+            ],
+            [
+                {
+                    kind: 'waiting',
+                    site: 'uk',
+                },
+                '/admin/uk/waiting',
+            ],
+            [
+                {
+                    kind: 'sites',
+                },
+                '/admin/sites',
+            ],
+            [
+                {
+                    kind: 'sites',
+                    key: 'norway',
+                },
+                '/admin/sites/norway',
+            ],
+            [
+                {
+                    kind: 'people',
+                },
+                '/admin/people',
+            ],
+        ];
+        for (const [screen, address] of addresses) {
+            expect(hrefOf(screen)).toBe(address);
+            expect(screenOf(address)).toEqual(screen);
+        }
+        expect(placeOf(screenOf('/admin/waiting'), true)).toEqual(ALL_PLACE);
+        expect(placeOf(screenOf('/admin/sites/norway'), true)).toEqual(ALL_PLACE);
+        expect(placeOf(screenOf('/admin/uk/waiting'), true)).toEqual(sitePlace('uk'));
+    });
+
+    it('lists Waiting, Sites and People in Overview, and Waiting in a site', () => {
+        expect(
+            navigationOf({
+                ...LISTED,
+                place: ALL_PLACE,
+            })
+                .flatMap((section) => section.entries)
+                .map((entry) => entry.label)
+        ).toEqual(['Waiting', 'Sites', 'People']);
+        expect(
+            navigationOf({
+                ...LISTED,
+                place: sitePlace('uk'),
+            })
+                .flatMap((section) => section.entries)
+                .map((entry) => [entry.label, hrefOf(entry.screen)])
+        ).toContainEqual(['Waiting', '/admin/uk/waiting']);
+    });
+
+    it('keeps Waiting when the switcher moves between Overview and a site', () => {
+        expect(hrefOf(screenInPlace(screenOf('/admin/waiting'), sitePlace('uk')))).toBe('/admin/uk/waiting');
+        expect(hrefOf(screenInPlace(screenOf('/admin/uk/waiting'), ALL_PLACE))).toBe('/admin/waiting');
+        expect(hrefOf(screenInPlace(screenOf('/admin/sites/norway'), sitePlace('uk')))).toBe('/admin/uk');
     });
 });

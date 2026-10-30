@@ -146,6 +146,288 @@
         gap: 8px;
     }
 
+    /* With several sites the sidebar is headed by the place shown, its mark and name larger. The sidebar's gap spaces it from the logo row above and the kinds below alike, and its padding lines the tile up with the logo and the icons. */
+    .k-place-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+        padding: 0 9px;
+    }
+
+    .k-place-head .k-site-icon {
+        flex-shrink: 0;
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+    }
+
+    .k-place-head span.k-site-icon {
+        background: var(--k-control-hover);
+        color: var(--k-ink);
+    }
+
+    .k-place-head .k-site-icon svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .k-place-head .k-site-icon--code {
+        font-size: 11px;
+    }
+
+    .k-place-head__name {
+        min-width: 0;
+        font-size: 17px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+    }
+
+    .k-sidebar__waiting {
+        flex-shrink: 0;
+        font-size: 12px;
+        color: var(--k-muted);
+    }
+
+    /* Waiting: what waits on someone, as one table. */
+    .k-waiting-table__kind {
+        width: 44px;
+        color: var(--k-muted);
+    }
+
+    .k-waiting-table__item {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .k-waiting-table__detail {
+        font-size: 12.5px;
+        font-weight: 400;
+        color: var(--k-muted);
+    }
+
+    .k-waiting-table__change {
+        max-width: 320px;
+    }
+
+    .k-waiting-table__answer {
+        text-align: right;
+    }
+
+    .k-waiting-table__group th {
+        height: 40px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        text-align: left;
+        color: var(--k-muted);
+    }
+
+    .k-waiting__kinds {
+        gap: 2px;
+    }
+
+    .k-waiting__count {
+        color: var(--k-muted);
+    }
+
+    /* Sites: every site in a list, and the one chosen beside it. */
+    .k-admin__body.k-sites {
+        display: grid;
+        grid-template-columns: 290px minmax(0, 1fr);
+        align-items: start;
+        gap: 32px;
+    }
+
+    .k-sites__list {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        padding: 8px;
+        border-radius: var(--k-radius-card);
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
+    }
+
+    .k-sites__list .k-list-toolbar__search {
+        flex: none;
+        max-width: none;
+        margin-bottom: 8px;
+    }
+
+    .k-sites__group {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        margin-top: 8px;
+    }
+
+    .k-sites__count {
+        font-size: 12px;
+        color: var(--k-muted);
+    }
+
+    .k-sites__chosen {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        min-width: 0;
+    }
+
+    .k-sites__head {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .k-sites__head .k-site-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+    }
+
+    .k-sites__head span.k-site-icon {
+        background: var(--k-control-hover);
+        color: var(--k-ink);
+    }
+
+    .k-sites__name {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+
+    .k-sites__title .k-page-header__meta {
+        margin-top: 4px;
+    }
+
+    .k-sites__heading {
+        margin-top: 10px;
+        padding-left: 0;
+    }
+
+    .k-sites__heading-count {
+        margin-left: 6px;
+        letter-spacing: 0;
+    }
+
+    /* People: everyone who edits beside Sites' list, with each one's sites and the invite form. */
+    .k-people__entry {
+        width: 100%;
+        border: 0;
+        background: none;
+        font: inherit;
+        font-size: 13.5px;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .k-people__entry .k-sidebar__label {
+        flex: 1;
+    }
+
+    .k-people__sites td {
+        vertical-align: middle;
+    }
+
+    .k-people__role {
+        width: 180px;
+    }
+
+    .k-people__role .k-select {
+        width: 160px;
+    }
+
+    .k-people__remove {
+        width: 44px;
+        text-align: right;
+    }
+
+    .k-people__add,
+    .k-people__link,
+    .k-people__actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .k-people__add .k-select {
+        width: 240px;
+    }
+
+    .k-people__link {
+        max-width: 620px;
+    }
+
+    .k-people__link .k-input {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .k-people__form {
+        max-width: 620px;
+    }
+
+    .k-people__sites-field {
+        margin: 0;
+        padding: 0;
+        border: 0;
+    }
+
+    .k-people__sites-field legend {
+        padding: 0;
+        margin-bottom: var(--k-label-gap);
+    }
+
+    .k-people__choices {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .k-people__choice {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 32px;
+        font-size: 14px;
+        color: var(--k-ink);
+        cursor: pointer;
+    }
+
+    .k-people__choice .k-site-icon {
+        width: 18px;
+        height: 18px;
+    }
+
+    .k-people__actions {
+        margin-top: 8px;
+    }
+
+    /* A site with no icon of its own shows a code in a grey tile. */
+    .k-site-icon--code {
+        background: var(--k-control-hover);
+        font-size: 8px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        color: var(--k-ink);
+    }
+
+    .k-site-icon--code[data-length='3'] {
+        font-size: 7px;
+    }
+
+    .k-site-menu__detail {
+        margin-left: auto;
+        font-size: 12px;
+        color: var(--k-muted);
+    }
+
     /* With several sites the sidebar leads with the places, a rule under them. */
     .k-places .k-site-icon {
         width: 18px;
@@ -247,25 +529,6 @@
 
     .k-path-bar__separator {
         color: var(--k-line-strong);
-    }
-
-    .k-path-bar__reader {
-        display: inline-flex;
-        flex-shrink: 0;
-        align-items: center;
-        gap: 6px;
-        margin: 0;
-        font-size: 12.5px;
-        color: var(--k-ink);
-    }
-
-    .k-path-bar__reader-label {
-        color: var(--k-muted);
-    }
-
-    .k-path-bar__reader .k-site-icon {
-        width: 16px;
-        height: 16px;
     }
 
     .k-path-bar .k-sidebar__search {

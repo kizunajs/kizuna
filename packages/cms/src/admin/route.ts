@@ -186,6 +186,17 @@ const adminSitesOf = (options: ResolvedCmsOptions): AdminSite[] =>
             label: values.label,
             icon: siteIconOf(values.icon, values.url),
             country: countryOf(values.locales?.[0]),
+            url: values.url,
+            ...(values.locales === undefined
+                ? {}
+                : {
+                      locales: [...values.locales],
+                  }),
+            ...(typeof (values as Record<string, unknown>)['code'] === 'string'
+                ? {
+                      code: (values as Record<string, unknown>)['code'] as string,
+                  }
+                : {}),
             pages: Object.keys(entry.pages ?? {}),
             globals: (entry.globals ?? []).map((definition) => ({
                 name: definition.name,

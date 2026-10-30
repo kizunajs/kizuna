@@ -43,6 +43,22 @@ export type Screen = (
       }
     | {
           /**
+           * The reviews and translations that wait on someone.
+           */
+          kind: 'waiting';
+      }
+    | {
+          /**
+           * Every site, with the one chosen beside the list.
+           */
+          kind: 'sites';
+          key?: string;
+      }
+    | {
+          kind: 'people';
+      }
+    | {
+          /**
            * An address under the admin's that names no screen.
            */
           kind: 'missing';
@@ -69,6 +85,103 @@ let sites: readonly AdminSite[] = [];
  */
 export const setSites = (declared: readonly AdminSite[]): void => {
     sites = declared;
+    marks = undefined;
+};
+
+/**
+ * How a site shows beside its name: its own icon, or a code in a tile.
+ */
+export type SiteMark =
+    | {
+          icon: string;
+      }
+    | {
+          code: string;
+      };
+
+let marks: ReadonlyMap<string, SiteMark> | undefined;
+
+const lettersOf = (word: string): string => word.replace(/[^\p{L}\p{N}]/gu, '');
+
+/**
+ * The codes a site's tile could carry, best first: its initials, or for one
+ * word its first letters, then other letters of it.
+ */
+const codeCandidatesOf = (words: readonly string[]): string[] => {
+    const [first = '', ...rest] = words;
+    if (rest.length > 0) {
+        return [
+            words
+                .slice(0, 3)
+                .map((word) => word.charAt(0))
+                .join(''),
+            `${first.charAt(0)}${rest[0]!.slice(0, 2)}`,
+            `${first.slice(0, 2)}${rest[0]!.charAt(0)}`,
+        ];
+    }
+    return [
+        first.slice(0, 3),
+        `${first.charAt(0)}${first.charAt(1)}${first.charAt(first.length - 1)}`,
+        `${first.charAt(0)}${first.slice(2, 4)}`,
+        first.slice(0, 2),
+    ];
+};
+
+/**
+ * Each site's mark: its own icon when no other site uses the same one, and
+ * otherwise a code of two or three letters, its declared `code` or one made
+ * from the words of its name that set it apart from the others, like `BS`
+ * for Hagen Bergen Sentrum among the Hagen sites.
+ */
+export const siteMarksOf = (all: readonly AdminSite[]): ReadonlyMap<string, SiteMark> => {
+    const iconUses = new Map<string, number>();
+    for (const site of all) if (site.icon !== null) iconUses.set(site.icon, (iconUses.get(site.icon) ?? 0) + 1);
+    const wordsOf = (site: AdminSite): string[] =>
+        site.label
+            .split(/\s+/)
+            .map(lettersOf)
+            .filter((word) => word !== '');
+    const shared =
+        all.length < 2
+            ? []
+            : wordsOf(all[0]!).filter((word) =>
+                  all.every((site) => wordsOf(site).some((other) => other.toLowerCase() === word.toLowerCase()))
+              );
+    const taken = new Set<string>();
+    const result = new Map<string, SiteMark>();
+    for (const site of all) {
+        if (site.icon !== null && iconUses.get(site.icon) === 1) {
+            result.set(site.key, {
+                icon: site.icon,
+            });
+            continue;
+        }
+        const own = wordsOf(site).filter((word) => !shared.some((common) => common.toLowerCase() === word.toLowerCase()));
+        const words = own.length === 0 ? wordsOf(site) : own;
+        const candidates = [...(site.code === undefined ? [] : [site.code]), ...codeCandidatesOf(words), lettersOf(site.key).slice(0, 3)]
+            .map((code) => code.toUpperCase())
+            .filter((code) => code.length >= 2);
+        let code = candidates.find((candidate) => !taken.has(candidate)) ?? candidates[0] ?? site.key.slice(0, 2).toUpperCase();
+        for (let suffix = 2; taken.has(code); suffix += 1) code = `${code.slice(0, 2)}${suffix}`;
+        taken.add(code);
+        result.set(site.key, {
+            code,
+        });
+    }
+    return result;
+};
+
+/**
+ * A declared site's mark, among the sites the admin knows.
+ */
+export const siteMarkOf = (site: AdminSite): SiteMark => {
+    marks ??= siteMarksOf(sites);
+    return (
+        marks.get(site.key) ??
+        siteMarksOf([site]).get(site.key) ?? {
+            code: site.key.slice(0, 2).toUpperCase(),
+        }
+    );
 };
 
 const siteNamed = (key: string | undefined): AdminSite | undefined => sites.find((site) => site.key === key);
@@ -85,7 +198,7 @@ const root = (): string => (adminPath === '' ? '/' : adminPath);
 let viewSite: string | undefined;
 
 /**
- * The site the admin is shown in, or `undefined` for All sites, which a
+ * The site the admin is shown in, or `undefined` for Overview, which a
  * screen naming no site of its own opens in. The admin sets it as it renders.
  */
 export const showSite = (site: string | undefined): void => {
@@ -95,7 +208,7 @@ export const showSite = (site: string | undefined): void => {
 /**
  * The site of the address open now.
  */
-const addressSite = (): string | undefined => (typeof window === 'undefined' ? undefined : screenOf(window.location.pathname).site);
+export const addressSite = (): string | undefined => (typeof window === 'undefined' ? undefined : screenOf(window.location.pathname).site);
 
 /**
  * A screen's address in one site, or in the shared content for `undefined`.
@@ -106,6 +219,9 @@ export const hrefIn = (site: string | undefined, screen: Screen): string => {
     const prefix = (ref?.type === 'page' ? ref.site : (ref?.site ?? site)) ?? '';
     const at = (...segments: string[]): string => under(...(prefix === '' ? segments : [prefix, ...segments]));
     if (screen.kind === 'pages') return at('pages');
+    if (screen.kind === 'waiting') return at('waiting');
+    if (screen.kind === 'sites') return screen.key === undefined ? at('sites') : at('sites', screen.key);
+    if (screen.kind === 'people') return at('people');
     if (screen.kind === 'media') return screen.id === undefined ? at('media') : at('media', screen.id);
     if (screen.kind === 'collection') return at('collections', screen.name);
     if (screen.kind === 'view') return at('views', screen.name);
@@ -231,6 +347,27 @@ const screenAt = (segments: readonly string[], site: AdminSite | undefined): Scr
                   id,
               };
     }
+    if (section === 'waiting' && name === undefined) {
+        return {
+            kind: 'waiting',
+        };
+    }
+    // Every site and the people who edit them are Overview's alone.
+    if (site === undefined && section === 'sites' && id === undefined) {
+        return name === undefined
+            ? {
+                  kind: 'sites',
+              }
+            : {
+                  kind: 'sites',
+                  key: name,
+              };
+    }
+    if (site === undefined && section === 'people' && name === undefined) {
+        return {
+            kind: 'people',
+        };
+    }
     if (section === 'media' && id === undefined) {
         return name === undefined
             ? {
@@ -269,7 +406,7 @@ export const screenOf = (pathname: string): Screen => {
 };
 
 /**
- * The screen of the same kind in another site, or in All sites for
+ * The screen of the same kind in another site, or in Overview for
  * `undefined`, which the switcher opens: the same page when that site has
  * one by its name, the same shared document, or the dashboard when the site
  * has nothing like it.
@@ -307,7 +444,7 @@ export const screenInSite = (screen: Screen, key: string | undefined): Screen =>
     if (screen.kind !== 'document') return dashboard;
     const ref = parseRef(screen.ref);
     if (ref === undefined) return dashboard;
-    // All sites shows every site's documents where they are.
+    // Overview shows every site's documents where they are.
     if (site === undefined) {
         return {
             kind: 'document',
@@ -393,7 +530,7 @@ export const navigate = (href: string): void => {
 
 /**
  * Open `href` in place of the address shown, for an address that leads on
- * to another, like All sites for an editor of one site.
+ * to another, like Overview for an editor of one site.
  */
 export const replaceAddress = (href: string): void => {
     if (href === currentAddress()) return;
@@ -492,7 +629,7 @@ export const SHARED_GROUP = 'Shared';
 /**
  * The view of every site at once, which an admin over every site opens.
  */
-export const ALL_SITES = 'All sites';
+export const ALL_SITES = 'Overview';
 
 /**
  * The sidebar's headings: Content first, with the pages and the media, then each `group`
@@ -500,7 +637,7 @@ export const ALL_SITES = 'All sites';
  *
  * With several sites, the sidebar has the site shown under its label, with
  * its pages, its own collections and globals and its media, and then Shared,
- * with every shared collection, global and view. All sites lists every site
+ * with every shared collection, global and view. Overview lists every site
  * the editor may open that way, then Shared with the shared media.
  */
 export const navigationOf = (options: {
@@ -638,26 +775,28 @@ const siteNavigationOf = (options: Parameters<typeof navigationOf>[0], declared:
     const labelOf = (collection: { name: string; label: string | null }): string =>
         options.collections.find((candidate) => candidate.name === collection.name)?.label ?? collection.label ?? humanize(collection.name);
     if (place.kind === 'all') {
-        const owned = new Map<string, string>();
-        for (const site of declared)
-            for (const collection of site.collections) if (!owned.has(collection.name)) owned.set(collection.name, labelOf(collection));
         return [
             {
                 label: ALL_SITES,
                 entries: [
                     {
-                        label: 'Pages',
+                        label: 'Waiting',
                         screen: {
-                            kind: 'pages',
+                            kind: 'waiting',
                         },
                     },
-                    ...[...owned].map(([name, label]) => ({
-                        label,
+                    {
+                        label: 'Sites',
                         screen: {
-                            kind: 'collection' as const,
-                            name,
+                            kind: 'sites',
                         },
-                    })),
+                    },
+                    {
+                        label: 'People',
+                        screen: {
+                            kind: 'people',
+                        },
+                    },
                 ],
             },
         ];
@@ -697,6 +836,13 @@ const siteNavigationOf = (options: Parameters<typeof navigationOf>[0], declared:
                         site: shown.key,
                     },
                 })),
+                {
+                    label: 'Waiting',
+                    screen: {
+                        kind: 'waiting',
+                        site: shown.key,
+                    },
+                },
                 media(shown.key),
             ],
         },
@@ -704,7 +850,7 @@ const siteNavigationOf = (options: Parameters<typeof navigationOf>[0], declared:
 };
 
 /**
- * Where the editor is: All sites, one site, or the shared content, which the
+ * Where the editor is: Overview, one site, or the shared content, which the
  * sidebar's places list and its kinds below follow.
  */
 export type Place =
@@ -752,7 +898,7 @@ const showsShared = (screen: Screen): boolean => {
 /**
  * The place a screen is in, from its address alone: shared content is
  * Shared, anything of one site is that site, and the screens every site
- * shares an address for are All sites, or for an editor of some sites their
+ * shares an address for are Overview, or for an editor of some sites their
  * first one.
  */
 export const placeOf = (screen: Screen, allSites: boolean): Place => {
@@ -767,7 +913,13 @@ export const placeOf = (screen: Screen, allSites: boolean): Place => {
  */
 export const screenInPlace = (screen: Screen, place: Place): Screen => {
     if (place.kind === 'site') {
-        return showsShared(screen)
+        if (screen.kind === 'waiting') {
+            return {
+                kind: 'waiting',
+                site: place.site,
+            };
+        }
+        return showsShared(screen) || screen.kind === 'sites' || screen.kind === 'people'
             ? {
                   kind: 'dashboard',
                   site: place.site,
@@ -783,37 +935,20 @@ export const screenInPlace = (screen: Screen, place: Place): Screen => {
             kind: 'media',
         };
     }
-    if (screen.kind === 'pages') {
+    if (screen.kind === 'waiting') {
         return {
-            kind: 'pages',
+            kind: 'waiting',
         };
     }
-    if (screen.kind === 'collection' && ownedBySomeSite(screen.name)) {
-        return {
-            kind: 'collection',
-            name: screen.name,
-        };
-    }
-    if (screen.kind === 'media' && screen.site === undefined) return screen;
+    if (screen.kind === 'sites' || screen.kind === 'people') return screen;
     return {
         kind: 'dashboard',
     };
 };
 
 /**
- * Who reads what a screen shows, for the end of the path bar: one site, or
- * every site for shared content. `undefined` for a screen of every site.
- */
-export const readerOf = (screen: Screen): AdminSite | 'every site' | undefined => {
-    if (showsShared(screen)) return screen.kind === 'document' && screen.site !== undefined ? siteNamed(screen.site) : 'every site';
-    if (screen.kind === 'media' && screen.site === undefined) return 'every site';
-    const ref = screen.kind === 'document' ? parseRef(screen.ref) : undefined;
-    return siteNamed(ref?.site ?? screen.site);
-};
-
-/**
  * Where every screen's trail starts: the dashboard, or with several sites
- * the site whose content it is, Shared, or All sites for the dashboard and
+ * the site whose content it is, Shared, or Overview for the dashboard and
  * the pages of every site.
  */
 export const trailStart = (): { label: string; href?: string } => {
@@ -899,6 +1034,8 @@ export const isCurrent = (entry: Screen, shown: Screen): boolean => {
         return (shown.kind === 'view' && shown.name === entry.name) || (shown.kind === 'record' && shown.view === entry.name);
     }
     if (entry.kind === 'media') return shown.kind === 'media' && shown.site === entry.site;
+    if (entry.kind === 'waiting') return shown.kind === 'waiting' && shown.site === entry.site;
+    if (entry.kind === 'sites' || entry.kind === 'people') return shown.kind === entry.kind;
     if (entry.kind === 'pages') {
         const ref = shown.kind === 'document' ? parseRef(shown.ref) : undefined;
         return (shown.kind === 'pages' && shown.site === entry.site) || (ref?.type === 'page' && ref.site === entry.site);

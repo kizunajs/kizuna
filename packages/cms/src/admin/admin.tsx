@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
 import { Toast } from '@base-ui/react/toast';
-import { File, FileText, Image, LayoutGrid, List, Menu as MenuIcon, Table2, X, type LucideIcon } from 'lucide-react';
+import { File, FileText, Globe, Image, Inbox, LayoutGrid, List, Menu as MenuIcon, Table2, Users, X, type LucideIcon } from 'lucide-react';
 import { EditorContext, ICON, type EditorContextValue } from '../view/context.js';
 import { singularOf } from '../view/array-rows.js';
 import { humanize } from '../view/schema.js';
@@ -18,8 +18,8 @@ import { MediaLibrary } from './media.js';
 import {
     ALL_PLACE,
     CONTENT_GROUP,
+    SHARED_GROUP,
     placeOf,
-    readerOf,
     hrefIn,
     hrefOf,
     inAppTargetOf,
@@ -39,7 +39,11 @@ import { Loading } from './parts.js';
 import { PageHeader } from './page-header.js';
 import { SignedIn } from './signed-in.js';
 import { SiteFact } from './site-switcher.js';
-import { PathBar, PlacesList, usePins, type PathStep } from './places.js';
+import { People } from './people.js';
+import { SitesScreen } from './sites-screen.js';
+import { useWaiting, WaitingScreen } from './waiting.js';
+import { waitingRowsOf } from './waiting-rows.js';
+import { PathBar, PlaceHead, usePins, useRecent, type PathStep } from './places.js';
 import { sharedNameOf, siteValuesRefOf } from './site-view.js';
 import { NotFound, shownAddress } from './states.js';
 import { useTabIcon } from './tab-icon.js';
@@ -110,6 +114,9 @@ const entryIconOf = (screen: Screen): LucideIcon | undefined => {
     if (screen.kind === 'media') return Image;
     if (screen.kind === 'view') return Table2;
     if (screen.kind === 'document') return FileText;
+    if (screen.kind === 'waiting') return Inbox;
+    if (screen.kind === 'sites') return Globe;
+    if (screen.kind === 'people') return Users;
     return undefined;
 };
 
@@ -196,19 +203,35 @@ export function Admin({ config }: { config: AdminConfig }) {
 
     const sites = useMemo(() => config.sites ?? [], [config.sites]);
     const allSites = sites.length > 0 && config.allSites !== false;
-    // Where the editor is, read from the address alone: All sites, a site or Shared.
+    // Where the editor is, read from the address alone: Overview, a site or Shared.
     const place = sites.length === 0 ? ALL_PLACE : placeOf(screen, allSites);
-    // An editor of some sites opens their first site where an admin opens All sites.
+    // An editor of some sites opens their first site where an admin opens Overview.
     useEffect(() => {
-        if (!allSites && place.kind === 'site' && screen.site === undefined && (screen.kind === 'dashboard' || screen.kind === 'pages')) {
+        if (
+            !allSites &&
+            place.kind === 'site' &&
+            screen.site === undefined &&
+            (screen.kind === 'dashboard' || screen.kind === 'pages' || screen.kind === 'waiting')
+        ) {
             replaceAddress(hrefIn(place.site, screen));
         }
     }, [allSites, place, screen]);
     showSite(place.kind === 'site' ? place.site : undefined);
     const [pinned, togglePin] = usePins(sites);
+    const recent = useRecent(place.kind === 'site' ? place.site : undefined);
     const site = place.kind === 'site' ? sites.find((candidate) => candidate.key === place.site) : undefined;
     const siteOfScreen = sites.find((candidate) => candidate.key === screen.site);
     const titleSite = site ?? siteOfScreen;
+    // What waits on someone, for Waiting, Sites and the count beside Waiting.
+    const openWork = useWaiting(connection, config.routes, screen);
+    const waitingCount =
+        openWork === undefined
+            ? 0
+            : waitingRowsOf(openWork.reviews, openWork.translations, {
+                  collectionLabel: (name) => collections?.find((collection) => collection.name === name)?.label,
+                  site: place.kind === 'site' ? place.site : undefined,
+                  me: people?.me,
+              }).length;
     const sections = navigationOf({
         globals: globals ?? [],
         collections: collections ?? [],
@@ -224,6 +247,39 @@ export function Admin({ config }: { config: AdminConfig }) {
      */
     const pathSteps = (): PathStep[] => {
         if (screen.kind === 'dashboard') return [];
+        if (screen.kind === 'waiting') {
+            return [
+                {
+                    label: 'Waiting',
+                },
+            ];
+        }
+        if (screen.kind === 'people') {
+            return [
+                {
+                    label: 'People',
+                },
+            ];
+        }
+        if (screen.kind === 'sites') {
+            const chosen =
+                screen.key === undefined ? undefined : (sites.find((candidate) => candidate.key === screen.key)?.label ?? SHARED_GROUP);
+            return [
+                {
+                    label: 'Sites',
+                    href: hrefOf({
+                        kind: 'sites',
+                    }),
+                },
+                ...(chosen === undefined
+                    ? []
+                    : [
+                          {
+                              label: chosen,
+                          },
+                      ]),
+            ];
+        }
         const ref = screen.kind === 'document' ? parseRef(screen.ref) : undefined;
         const site = ref?.site ?? screen.site;
         const listOf = (label: string, list: Screen): PathStep => ({
@@ -379,6 +435,13 @@ export function Admin({ config }: { config: AdminConfig }) {
 
     const shown = (() => {
         if (screen.kind === 'missing') return missing('screen');
+        if (screen.kind === 'waiting') {
+            return <WaitingScreen waiting={openWork} sites={sites} site={screen.site} me={people?.me} collectionLabel={collectionLabel} />;
+        }
+        if (screen.kind === 'sites') {
+            return <SitesScreen sites={sites} chosen={screen.key} waiting={openWork} people={people} collectionLabel={collectionLabel} />;
+        }
+        if (screen.kind === 'people') return <People connection={connection} sites={sites} />;
         if (screen.kind === 'pages') {
             return (
                 <PagesList
@@ -533,6 +596,7 @@ export function Admin({ config }: { config: AdminConfig }) {
                 aria-current={isCurrent(entry.screen, screen) ? 'page' : undefined}>
                 {Icon === undefined ? null : <Icon {...ICON} className="k-sidebar__icon" />}
                 <span className="k-sidebar__label k-ellipsis">{entry.label}</span>
+                {entry.screen.kind === 'waiting' && waitingCount > 0 ? <span className="k-sidebar__waiting">{waitingCount}</span> : null}
             </a>
         );
     };
@@ -542,7 +606,6 @@ export function Admin({ config }: { config: AdminConfig }) {
             <div className="k-sidebar__groups">
                 {sections.map((section) => (
                     <div key={section.label} className="k-sidebar__group">
-                        <h2 className="k-heading k-sidebar__heading">{section.label}</h2>
                         {place.kind === 'shared' ? null : dashboardItem}
                         {section.entries.map(entryLink)}
                     </div>
@@ -565,22 +628,16 @@ export function Admin({ config }: { config: AdminConfig }) {
         allSites,
         screen,
         pinned,
+        recent,
         onPin: togglePin,
     };
-    const places =
-        sites.length === 0 ? null : (
-            <>
-                <PlacesList {...placeProps} />
-                <div className="k-sidebar__rule" role="separator" />
-            </>
-        );
+    const places = sites.length === 0 ? null : <PlaceHead place={place} sites={sites} />;
     const pathBar =
         sites.length === 0 ? null : (
             <PathBar
                 {...placeProps}
-                dashboard={screen.kind === 'dashboard' ? undefined : dashboardHref}
+                dashboard={place.kind === 'shared' ? false : screen.kind === 'dashboard' ? undefined : dashboardHref}
                 steps={pathSteps()}
-                reader={readerOf(screen)}
                 search={phone ? null : <SearchButton onOpen={openSearch} />}
             />
         );

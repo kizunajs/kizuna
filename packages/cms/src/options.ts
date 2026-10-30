@@ -260,6 +260,76 @@ export interface PeopleOptions {
      * show.
      */
     imageOrigins?: readonly string[];
+    /**
+     * Adds someone to your app's users with the role they hold on each site,
+     * for People's Invite. Return a link they sign in with when your app
+     * sends no email of its own, and the admin shows it to copy.
+     *
+     * @example
+     * ```ts
+     * invite: async ({ email, sites }) => {
+     *     await createEditor(email, sites);
+     *     return {
+     *         link: await signInLinkFor(email),
+     *     };
+     * },
+     * ```
+     */
+    invite?: (invitation: Invitation) => InvitationResult | Promise<InvitationResult>;
+    /**
+     * Stores the role someone holds on each site, for People. `sites` names
+     * every site they keep, so one left out is one they no longer edit.
+     *
+     * @example
+     * ```ts
+     * setSites: ({ id, sites }) => updateEditorSites(id, sites),
+     * ```
+     */
+    setSites?: (change: SitesChange) => void | Promise<void>;
+}
+
+/**
+ * Someone an admin invites, as `invite` receives them.
+ */
+export interface Invitation {
+    email: string;
+    /**
+     * The role they hold on each site.
+     */
+    sites: Record<string, string>;
+    /**
+     * Who invited them, by their id.
+     */
+    invitedBy: string;
+}
+
+export interface InvitationResult {
+    /**
+     * Their id in the people list.
+     */
+    id: string;
+    /**
+     * A link that signs them in, for the admin to copy to them.
+     */
+    link?: string;
+}
+
+/**
+ * New roles for someone on the sites, as `setSites` receives them.
+ */
+export interface SitesChange {
+    /**
+     * Their id in the people list.
+     */
+    id: string;
+    /**
+     * The role they hold on each site they keep.
+     */
+    sites: Record<string, string | readonly string[]>;
+    /**
+     * Who changed it, by their id.
+     */
+    changedBy: string;
 }
 
 /**
@@ -680,6 +750,8 @@ export const CmsPluginOptionsSchema = z
                             })
                         )
                         .optional(),
+                    invite: z.custom<PeopleOptions['invite']>(isFunction).optional(),
+                    setSites: z.custom<PeopleOptions['setSites']>(isFunction).optional(),
                 })
                 .optional(),
             invalidate: RouteAuthSchema.optional(),

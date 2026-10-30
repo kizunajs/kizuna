@@ -366,6 +366,8 @@ describe('the admin with several sites', () => {
                 label: 'Hagen UK',
                 icon: 'https://hagen.example.co.uk/icons/uk.svg',
                 country: 'GB',
+                url: 'https://hagen.example.co.uk',
+                locales: ['en-GB'],
                 pages: ['frontPage'],
                 globals: [],
                 collections: [
@@ -380,6 +382,7 @@ describe('the admin with several sites', () => {
                 label: 'Hagen Norge',
                 icon: 'https://cdn.hagen.example.no/norway.svg',
                 country: null,
+                url: 'https://hagen.example.no',
                 pages: ['frontPage'],
                 globals: [],
                 collections: [],

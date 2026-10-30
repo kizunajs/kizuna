@@ -231,6 +231,8 @@ export const DocumentLocalesSchema = z
                 code: z.string(),
                 status: PageStatusSchema,
                 sourceChanged: z.int().describe('How many of its fields changed in the source since they were translated or kept.'),
+                changed: z.array(z.string()).describe('The fields whose source changed since they were translated or kept.'),
+                missing: z.array(z.string()).describe('The translated fields the source holds and this language leaves empty.'),
             })
         ),
         translate: z.boolean().optional().describe("True when the translate tool drafts a language from the source's published text."),
@@ -672,9 +674,47 @@ export const PeopleSchema = Kizuna.model({
                 PersonSchema.extend({
                     email: z.string().optional().describe('Their email, when the app gives one.'),
                     roles: z.array(z.string()).optional().describe('Their roles, as the app gives them.'),
+                    sites: z
+                        .record(z.string(), z.array(z.string()))
+                        .optional()
+                        .describe('Their roles on each site you may open, like `{ uk: ["editor"] }`. Left out without sites.'),
                 })
             )
             .describe('Everyone who edits, to name as an owner or a reviewer.'),
+        manage: z
+            .object({
+                sites: z.array(z.string()).describe('The sites you may invite people to and change their roles on.'),
+                roles: z.array(z.string()).describe('The roles a person may hold on a site.'),
+                invite: z.boolean().describe('Whether the app adds the people you invite.'),
+                change: z.boolean().describe("Whether the app stores changes to people's roles."),
+            })
+            .optional()
+            .describe('What you may change about people. Left out without sites.'),
+    }),
+});
+
+export const InvitePersonBodySchema = Kizuna.model({
+    title: 'CMS.InvitePerson',
+    schema: z.object({
+        email: z.email(),
+        sites: z.record(z.string(), z.string()).describe('The role they hold on each site, like `{ uk: "editor" }`.'),
+    }),
+});
+
+export const InvitedPersonSchema = Kizuna.model({
+    title: 'CMS.InvitedPerson',
+    schema: z.object({
+        id: z.string().describe('Their id in the people list.'),
+        link: z.string().optional().describe('A link that signs them in, to send them, when the app sends no email of its own.'),
+    }),
+});
+
+export const ChangePersonBodySchema = Kizuna.model({
+    title: 'CMS.ChangePerson',
+    schema: z.object({
+        sites: z
+            .record(z.string(), z.string().nullable())
+            .describe('A new role on each site named, or null to take that site away. Sites left out keep their role.'),
     }),
 });
 
@@ -727,6 +767,22 @@ export const WaitingReviewsSchema = Kizuna.model({
                 ref: z.string(),
                 label: z.string(),
                 path: z.string().nullable(),
+            })
+        ),
+    }),
+});
+
+export const WaitingTranslationsSchema = Kizuna.model({
+    title: 'CMS.WaitingTranslations',
+    schema: z.object({
+        translations: z.array(
+            z.object({
+                ref: z.string().describe('The translation, like page:norway:frontPage@en.'),
+                source: z.string().describe('The document it translates.'),
+                locale: z.string(),
+                label: z.string(),
+                changed: z.array(z.string()).describe('The fields whose source changed since they were translated or kept.'),
+                missing: z.array(z.string()).describe('The fields its source has a value for and it has none.'),
             })
         ),
     }),

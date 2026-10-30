@@ -67,7 +67,7 @@ export interface AdminConfig {
      */
     sites?: AdminSite[];
     /**
-     * Whether the editor is an admin over every site, who opens All sites.
+     * Whether the editor is an admin over every site, who opens Overview.
      */
     allSites?: boolean;
     /**
@@ -94,6 +94,19 @@ export interface AdminSite {
      * `NO`, which the switcher groups many sites by.
      */
     country?: string | null;
+    /**
+     * Where the site is served, like `https://hagen.example.co.uk`.
+     */
+    url?: string;
+    /**
+     * The languages the site is written in, its source first.
+     */
+    locales?: string[];
+    /**
+     * The code the site's tile shows when it has no icon of its own, from a
+     * `code` the site declares.
+     */
+    code?: string;
     /**
      * The names of the site's pages.
      */

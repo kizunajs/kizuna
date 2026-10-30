@@ -1,20 +1,8 @@
-import { useState, type ReactNode } from 'react';
-import { ChevronsUpDown, Library, Search } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { ChevronsUpDown, Library } from 'lucide-react';
 import { ICON } from '../view/context.js';
 import type { AdminSite } from './config.js';
-import {
-    ALL_PLACE,
-    ALL_SITES,
-    MANY_SITES,
-    SHARED_GROUP,
-    SHARED_PLACE,
-    hrefIn,
-    samePlace,
-    screenInPlace,
-    sitePlace,
-    type Place,
-    type Screen,
-} from './navigation.js';
+import { ALL_SITES, SHARED_GROUP, type Place, type Screen } from './navigation.js';
 import { AllSitesIcon, SiteFinder, SiteIcon } from './site-switcher.js';
 
 const PINS_KEY = 'kizuna-cms:pinned-sites';
@@ -52,6 +40,41 @@ export const usePins = (sites: readonly AdminSite[]): [ReadonlySet<string>, (sit
     return [pinned, toggle];
 };
 
+const RECENT_KEY = 'kizuna-cms:recent-sites';
+
+/**
+ * How many recently opened sites the finder lists.
+ */
+const RECENT_SITES = 3;
+
+/**
+ * The sites the editor opened lately, newest first, kept for their next
+ * visit, following the site shown.
+ */
+export const useRecent = (site: string | undefined): readonly string[] => {
+    const [recent, setRecent] = useState<readonly string[]>(() => {
+        try {
+            return JSON.parse(window.localStorage.getItem(RECENT_KEY) ?? '[]') as string[];
+        } catch {
+            return [];
+        }
+    });
+    useEffect(() => {
+        if (site === undefined) return;
+        setRecent((current) => {
+            if (current[0] === site) return current;
+            const next = [site, ...current.filter((key) => key !== site)].slice(0, RECENT_SITES);
+            try {
+                window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+            } catch {
+                // Storage may be blocked, so the list lasts the visit.
+            }
+            return next;
+        });
+    }, [site]);
+    return recent;
+};
+
 /**
  * What a place is called and shows as, for the places list and the path bar.
  */
@@ -80,48 +103,18 @@ interface PlaceProps {
     allSites: boolean;
     screen: Screen;
     pinned: ReadonlySet<string>;
+    recent: readonly string[];
     onPin: (site: string) => void;
 }
 
 /**
- * The places at the top of the sidebar: All sites for an admin over every
- * site, the editor's sites, and Shared, the one shown marked. With many
- * sites it lists the pinned ones and the site open, and All sites' count
- * opens the finder.
+ * The head of the sidebar: the place shown, its mark and name.
  */
-export function PlacesList({ sites, place, allSites, screen, pinned, onPin }: PlaceProps) {
-    const many = sites.length > MANY_SITES;
-    const listed = many ? sites.filter((site) => pinned.has(site.key) || (place.kind === 'site' && place.site === site.key)) : sites;
-    const link = (target: Place) => (
-        <a
-            key={target.kind === 'site' ? target.site : target.kind}
-            className="k-sidebar__item k-place"
-            href={hrefIn(target.kind === 'site' ? target.site : undefined, screenInPlace(screen, target))}
-            aria-current={samePlace(target, place) ? 'page' : undefined}>
-            <PlaceIcon place={target} sites={sites} />
-            <span className="k-sidebar__label k-ellipsis">{placeLabelOf(target, sites)}</span>
-        </a>
-    );
+export function PlaceHead({ place, sites }: { place: Place; sites: readonly AdminSite[] }) {
     return (
-        <div className="k-sidebar__group k-places">
-            {allSites ? link(ALL_PLACE) : null}
-            {listed.map((site) => link(sitePlace(site.key)))}
-            {many ? (
-                <SiteFinder
-                    sites={sites}
-                    place={place}
-                    allSites={allSites}
-                    screen={screen}
-                    pinned={pinned}
-                    onPin={onPin}
-                    className="k-sidebar__item k-place">
-                    <span className="k-site-icon" aria-hidden="true">
-                        <Search {...ICON} />
-                    </span>
-                    <span className="k-sidebar__label k-ellipsis">{`All ${sites.length} sites`}</span>
-                </SiteFinder>
-            ) : null}
-            {link(SHARED_PLACE)}
+        <div className="k-place-head">
+            <PlaceIcon place={place} sites={sites} />
+            <span className="k-place-head__name">{placeLabelOf(place, sites)}</span>
         </div>
     );
 }
@@ -136,23 +129,20 @@ export interface PathStep {
 
 /**
  * The bar across the top of a screen: the place, which opens the finder,
- * its dashboard, then the steps to the screen, and at its end who reads
- * what it shows.
+ * its dashboard, then the steps to the screen.
  */
 export function PathBar({
     dashboard,
     steps,
-    reader,
     search,
     ...props
 }: PlaceProps & {
     /**
-     * The place's dashboard, which follows the place, or `undefined` on the
-     * dashboard itself.
+     * The place's dashboard, which follows the place, `undefined` on the
+     * dashboard itself, or `false` for a place without one, like Shared.
      */
-    dashboard: string | undefined;
+    dashboard: string | false | undefined;
     steps: readonly PathStep[];
-    reader: AdminSite | 'every site' | undefined;
     search: ReactNode;
 }) {
     return (
@@ -163,17 +153,21 @@ export function PathBar({
                     <span className="k-ellipsis">{placeLabelOf(props.place, props.sites)}</span>
                     <ChevronsUpDown {...ICON} className="k-path-bar__chevron" />
                 </SiteFinder>
-                <span className="k-path-bar__separator" aria-hidden="true">
-                    /
-                </span>
-                {dashboard === undefined ? (
-                    <span className="k-path-bar__step" aria-current="page">
-                        Dashboard
-                    </span>
-                ) : (
-                    <a className="k-path-bar__step" href={dashboard}>
-                        Dashboard
-                    </a>
+                {dashboard === false ? null : (
+                    <>
+                        <span className="k-path-bar__separator" aria-hidden="true">
+                            /
+                        </span>
+                        {dashboard === undefined ? (
+                            <span className="k-path-bar__step" aria-current="page">
+                                Dashboard
+                            </span>
+                        ) : (
+                            <a className="k-path-bar__step" href={dashboard}>
+                                Dashboard
+                            </a>
+                        )}
+                    </>
                 )}
                 {steps.map((step, index) => (
                     <span key={`${index}:${step.label}`} className="k-path-bar__step">
@@ -192,19 +186,6 @@ export function PathBar({
                     </span>
                 ))}
             </nav>
-            {reader === undefined ? null : (
-                <p className="k-path-bar__reader">
-                    <span className="k-path-bar__reader-label">Read by</span>
-                    {reader === 'every site' ? (
-                        'every site'
-                    ) : (
-                        <>
-                            <SiteIcon site={reader} />
-                            {reader.label}
-                        </>
-                    )}
-                </p>
-            )}
             {search}
         </header>
     );

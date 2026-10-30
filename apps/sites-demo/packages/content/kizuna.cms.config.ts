@@ -11,7 +11,7 @@ import { Articles } from './src/articles';
 import { PrivacyPolicy } from './src/privacy-policy';
 import { sites } from './src/sites';
 import { db } from './src/db';
-import { editors } from './src/people';
+import { editors, inviteEditor, setEditorSites } from './src/people';
 import { localMediaStorage } from './src/media-storage';
 import { auth } from './src/auth';
 import { dashboard, overview } from './src/dashboard';
@@ -86,6 +86,8 @@ export default defineConfig({
             },
             people: {
                 list: editors,
+                invite: inviteEditor,
+                setSites: setEditorSites,
             },
         },
         reviews: {
