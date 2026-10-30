@@ -700,8 +700,8 @@
         height: 32px;
         padding: 0 10px 0 8px;
         border-radius: 8px;
-        font-size: 13.5px;
-        font-weight: 400;
+        font-size: 13px;
+        font-weight: 500;
     }
 
     .k-document__source-toggle[aria-pressed='true'],
