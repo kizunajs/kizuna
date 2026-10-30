@@ -87,6 +87,14 @@ export interface DescribedField {
     searchTool?: string;
     schema: JsonSchema;
     value?: unknown;
+    /**
+     * Whose value this is: `Shared`, or the label of the site that sets it.
+     */
+    belongsTo?: string;
+    /**
+     * The shared value, which the site shows while it sets none of its own.
+     */
+    sharedValue?: unknown;
 }
 
 /**

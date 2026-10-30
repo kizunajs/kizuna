@@ -198,6 +198,11 @@ export const DescribedFieldSchema = Kizuna.model({
         searchTool: z.string().optional().describe('The tool that finds ids for the brand.'),
         schema: z.record(z.string(), z.unknown()).describe('The JSON Schema of the value.'),
         value: z.unknown().optional().describe('The current draft value.'),
+        belongsTo: z
+            .string()
+            .optional()
+            .describe("Whose value this is, when the CMS serves several sites: 'Shared', or the label of the site that sets it."),
+        sharedValue: z.unknown().optional().describe('The shared value, which the site shows while it sets none of its own.'),
     }),
 });
 
@@ -461,6 +466,7 @@ const mediaFields = {
     focalPoint: FocalPointSchema.optional().describe('The default focal point, used where a field sets none.'),
     uploadedAt: z.string(),
     uploadedBy: z.string(),
+    site: z.string().optional().describe('The site the image belongs to. Left out for a shared image, which any site may show.'),
 };
 
 export const MediaSchema = Kizuna.model({

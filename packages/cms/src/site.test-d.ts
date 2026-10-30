@@ -219,3 +219,66 @@ describe("the current site's view", () => {
         content.of(['denmark']);
     });
 });
+
+describe('per-site fields and pages', () => {
+    it('takes perSite and sites on a field', () => {
+        defineCollection({
+            name: 'offices',
+            id: Kizuna.brand('OfficeId', z.string()),
+            fields: [
+                {
+                    name: 'phone',
+                    schema: z.string(),
+                    perSite: true,
+                },
+                {
+                    name: 'openingHours',
+                    schema: z.string().optional(),
+                    sites: ['uk'],
+                },
+            ],
+        });
+    });
+
+    it('leaves a page out of the sites it does not name', async () => {
+        const OfficesPage = definePage({
+            name: 'officesPage',
+            sites: ['uk'],
+            fields: [
+                {
+                    name: 'heading',
+                    schema: z.string(),
+                },
+            ],
+        });
+        const pages = definePages({
+            frontPage: {
+                path: '/',
+                page: FrontPage,
+            },
+            officesPage: {
+                path: '/offices',
+                page: OfficesPage,
+            },
+        });
+        const countries = declareSites(SiteSchema, {
+            uk: {
+                label: 'Hagen UK',
+                url: 'https://hagen.example.co.uk',
+                icon: '/icons/uk.svg',
+                pages,
+            },
+            norway: {
+                label: 'Hagen Norge',
+                url: 'https://hagen.example.no',
+                icon: '/icons/norway.svg',
+                pages,
+            },
+        });
+        const view = ({} as CmsContent<{}, readonly [], readonly [], typeof countries>).of(['uk', 'norway']);
+        expectTypeOf((await view.pages.frontPage.get()).heading).toEqualTypeOf<string>();
+        // @ts-expect-error only the uk site has the offices page
+        void view.pages.officesPage;
+        if (view.site === 'uk') expectTypeOf((await view.pages.officesPage.get()).heading).toEqualTypeOf<string>();
+    });
+});

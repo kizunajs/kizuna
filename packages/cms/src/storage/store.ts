@@ -287,6 +287,19 @@ export class DocumentStore {
         return row === undefined ? undefined : toRow(row);
     }
 
+    /**
+     * A media document by its id, on whichever site it belongs to, since
+     * media ids are unique across sites.
+     */
+    async media(key: string): Promise<DocumentRow | undefined> {
+        const [row] = await this.db
+            .select()
+            .from(cmsDocuments)
+            .where(and(eq(cmsDocuments.kind, 'media'), eq(cmsDocuments.locale, LOCALE), eq(cmsDocuments.key, key)))
+            .limit(1);
+        return row === undefined ? undefined : toRow(row);
+    }
+
     async getById(id: string): Promise<DocumentRow | undefined> {
         const [row] = await this.db.select().from(cmsDocuments).where(eq(cmsDocuments.id, id)).limit(1);
         return row === undefined ? undefined : toRow(row);
@@ -733,16 +746,21 @@ export class DocumentStore {
      * Writes or replaces a media document. Media has no draft: its metadata
      * is published the moment it exists.
      */
-    async saveMedia(key: string, data: Content, author: string): Promise<DocumentRow> {
+    async saveMedia(key: string, data: Content, author: string, site = SITE): Promise<DocumentRow> {
         return this.db.transaction(async (tx) => {
             const now = new Date();
-            const [existing] = await tx.select().from(cmsDocuments).where(identity('media', key)).for('update');
+            const [existing] = await tx
+                .select()
+                .from(cmsDocuments)
+                .where(identity('media', key, site))
+                .for('update');
             const id = existing?.id ?? randomUUID();
             const latest = existing === undefined ? 0 : await this.latestVersionIn(tx, id);
             if (existing === undefined) {
                 await tx.insert(cmsDocuments).values({
                     id,
                     kind: 'media',
+                    site,
                     key,
                     published: data,
                     publishedVersion: latest + 1,

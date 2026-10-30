@@ -635,7 +635,8 @@ export interface SitePages {
 }
 
 /**
- * Every site's pages, keyed by site.
+ * Every site's pages, keyed by site, leaving out a page whose `sites` names
+ * others.
  */
 export const sitesOf = (options: {
     pages?: PageMap;
@@ -663,7 +664,11 @@ export const sitesOf = (options: {
               Object.entries(options.sites.entries).map(([site, entry]) => [
                   site,
                   {
-                      pages: entry.pages ?? {},
+                      pages: Object.fromEntries(
+                          Object.entries(entry.pages ?? {}).filter(
+                              ([, page]) => page.page.sites === undefined || page.page.sites.includes(site)
+                          )
+                      ),
                   },
               ])
           );

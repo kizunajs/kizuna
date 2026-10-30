@@ -161,7 +161,18 @@ type ElementOf<List> = List extends readonly (infer Each)[] ? Each : never;
 
 type OwnOf<Entry, Key extends 'globals' | 'collections'> = Entry extends { readonly [Name in Key]?: infer List } ? ElementOf<List> : never;
 
-type PagesOf<Entry> = Entry extends { readonly pages?: infer Pages extends PageMap } ? Pages : {};
+/**
+ * A site's pages, leaving out those whose `sites` names only others.
+ */
+type PagesOf<Entry, Key extends string> = Entry extends { readonly pages?: infer Pages extends PageMap }
+    ? {
+          [Name in keyof Pages as Pages[Name]['page'] extends { readonly sites: readonly (infer Named)[] }
+              ? Key extends Named
+                  ? Name
+                  : never
+              : Name]: Pages[Name];
+      }
+    : {};
 
 /**
  * One site's content, as `kizuna.content.of()` narrows to: its pages, the
@@ -184,7 +195,7 @@ export interface CmsSiteView<Key extends string, Pages extends PageMap, Globals,
 export type CmsSiteViews<Sites, Globals, Collections> = {
     [Key in keyof SiteEntriesOf<Sites> & string]: CmsSiteView<
         Key,
-        PagesOf<SiteEntriesOf<Sites>[Key]>,
+        PagesOf<SiteEntriesOf<Sites>[Key], Key>,
         readonly (ElementOf<Globals> | OwnOf<SiteEntriesOf<Sites>[Key], 'globals'>)[],
         readonly (ElementOf<Collections> | OwnOf<SiteEntriesOf<Sites>[Key], 'collections'>)[]
     >;
@@ -300,14 +311,10 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
         );
         return async (): Promise<Record<string, unknown> | undefined> => {
             if (await showsDrafts()) {
-                const draft = await service.draft(ref);
-                if (draft !== undefined)
-                    return encodeSourcePaths(draft.state.target.definition, draft.content, formatRef(ref), plainOf(ref));
-                if (!fallBack) return undefined;
-                const published = await service.published(ref);
-                return published === undefined
+                const draft = await service.draftOn(ref, site, fallBack);
+                return draft === undefined
                     ? undefined
-                    : encodeSourcePaths(service.target(ref).definition, published.content, formatRef(ref), plainOf(ref));
+                    : encodeSourcePaths(service.target(ref).definition, draft, formatRef(ref), plainOf(ref));
             }
             return (await readPublished()) ?? undefined;
         };
@@ -333,7 +340,7 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
         const readPublished = cached(
             async (params: string) => {
                 const id = await service.findItem(listing.name, JSON.parse(params) as Record<string, string>, 'published', listing.site);
-                return id === undefined ? null : ((await service.published(listing.refOf(id)))?.content ?? null);
+                return id === undefined ? null : ((await service.publishedOn(listing.refOf(id), site))?.content ?? null);
             },
             keyOf(
                 listing.definition,
@@ -350,12 +357,12 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
             if (!(await showsDrafts())) return (await readPublished(JSON.stringify(params))) ?? undefined;
             const drafted = await service.findItem(listing.name, params, 'draft', listing.site);
             if (drafted !== undefined) {
-                const draft = await service.draft(listing.refOf(drafted));
+                const draft = await service.draftOn(listing.refOf(drafted), site, false);
                 if (draft !== undefined)
-                    return encodeSourcePaths(listing.definition, draft.content, formatRef(listing.refOf(drafted)), listing.pathFields);
+                    return encodeSourcePaths(listing.definition, draft, formatRef(listing.refOf(drafted)), listing.pathFields);
             }
             const live = await service.findItem(listing.name, params, 'published', listing.site);
-            const published = live === undefined ? undefined : await service.published(listing.refOf(live));
+            const published = live === undefined ? undefined : await service.publishedOn(listing.refOf(live), site);
             return published === undefined || live === undefined
                 ? undefined
                 : encodeSourcePaths(listing.definition, published.content, formatRef(listing.refOf(live)), listing.pathFields);
@@ -402,7 +409,8 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
                         draft: false,
                         ...(JSON.parse(input) as ListInput<unknown>),
                     },
-                    listing.site
+                    listing.site,
+                    site
                 ),
             keyOf(listing.definition, 'list', site === DEFAULT_SITE ? listing.name : `${site}:${listing.name}`),
             [collectionCacheTag(listing.name, site)]
@@ -416,7 +424,8 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
                     ...input,
                     where: input.where as Record<string, unknown> | undefined,
                 },
-                listing.site
+                listing.site,
+                site
             );
             return {
                 items: result.items.map((content) =>

@@ -8,7 +8,8 @@ import { routeProblems } from './dynamic.js';
 import { CmsPluginOptionsSchema, DEFAULT_SITE, sitesOf, type CmsPluginOptions, type PageMap, type ResolvedCmsOptions } from './options.js';
 import type { DeclaredSites } from './site.js';
 import type { Collection, ContentDefinition, Global } from './definitions.js';
-import { describeFields, type DescribedField } from './content.js';
+import { describeFields, fieldChain, type DescribedField } from './content.js';
+import { dataFields } from './field.js';
 import { defaultPagesOutput, discoverPages, findAppDir, renderPagesModule } from './discovery.js';
 import { PREVIEW_COOKIE, PREVIEW_TTL_SECONDS } from './preview-token.js';
 import { PREVIEW_PROXY_PATH, PROXY_CORS, previewProxyUrl, proxyToSite } from './preview-proxy.js';
@@ -257,6 +258,7 @@ const validate = (service: CmsService, options: ResolvedCmsOptions, api: PluginA
             }
         }
     }
+    assertSiteFields(service, options);
     const relationshipNames = new Set<string>();
     for (const relationship of options.relationships ?? []) {
         if (relationshipNames.has(relationship.name)) {
@@ -277,6 +279,84 @@ const validate = (service: CmsService, options: ResolvedCmsOptions, api: PluginA
         }
     }
     void api;
+};
+
+/**
+ * Checks `perSite` and `sites` on fields and pages: the sites they name are
+ * declared, `perSite` sits on a shared global's or collection's own field that
+ * is no part of an address or an index, and a field some sites leave out may
+ * be empty.
+ */
+const assertSiteFields = (service: CmsService, options: ResolvedCmsOptions): void => {
+    const declared = service.siteNames();
+    const known = (owner: string, sites: readonly string[]): void => {
+        for (const site of sites) {
+            if (declared.includes(site)) continue;
+            throw new Error(
+                declared.length === 0
+                    ? `${owner} names the site '${site}', but cms() declares no sites. Declare them with declareSites().`
+                    : `${owner} names the site '${site}', which declareSites() does not declare. It declares ${declared.join(', ')}.`
+            );
+        }
+    };
+    const check = (label: string, definition: ContentDefinition, shared: boolean, locked: readonly string[]): void => {
+        for (const field of allFields(describeFields(definition))) {
+            const declaredField = dataFields(definition.fields).find((candidate) => candidate.name === field.path);
+            const own = declaredField ?? findNested(definition, field.path);
+            if (own?.perSite !== true && own?.sites === undefined) continue;
+            const owner = `${label} field '${field.path}'`;
+            if (declaredField === undefined) {
+                throw new Error(`${owner} sits inside another field. perSite and sites go on a field of the document itself.`);
+            }
+            if (declaredField.sites !== undefined) {
+                known(owner, declaredField.sites);
+                if (!z.safeParse(declaredField.schema, undefined).success) {
+                    throw new Error(`${owner} is missing on every other site, so its schema needs \`.optional()\`.`);
+                }
+            }
+            if (declaredField.perSite === true) {
+                if (!shared) {
+                    throw new Error(`${owner} is perSite, but only shared content has values a site sets. Take off \`perSite\`.`);
+                }
+                if (declared.length === 0)
+                    throw new Error(`${owner} is perSite, but cms() declares no sites. Declare them with declareSites().`);
+                if (locked.includes(field.path)) {
+                    throw new Error(`${owner} is indexed, so every site shares it. Take off \`perSite\`.`);
+                }
+            }
+        }
+    };
+    for (const definition of options.globals ?? []) check(`Global '${definition.name}'`, definition, true, []);
+    for (const definition of options.collections ?? []) {
+        const listing = service.listing(definition.name);
+        check(`Collection '${definition.name}'`, definition, true, [
+            ...listing.indexes,
+            ...(definition.tree === undefined ? [] : [definition.tree]),
+        ]);
+    }
+    for (const [site, entry] of Object.entries(options.sites?.entries ?? {})) {
+        for (const definition of [...(entry.globals ?? []), ...(entry.collections ?? [])]) {
+            check(`The ${site} site's '${definition.name}'`, definition, false, []);
+        }
+        for (const [name, page] of Object.entries(entry.pages ?? {})) {
+            if (page.page.sites !== undefined) known(`Page '${name}'`, page.page.sites);
+            check(`Page '${name}' of the ${site} site`, page.page, false, []);
+        }
+    }
+    if (options.sites === undefined) {
+        for (const [name, page] of Object.entries(options.pages ?? {})) {
+            if (page.page.sites !== undefined) known(`Page '${name}'`, page.page.sites);
+            check(`Page '${name}'`, page.page, false, []);
+        }
+    }
+};
+
+/**
+ * A field inside another, by its dotted path, to name it in an error.
+ */
+const findNested = (definition: ContentDefinition, path: string): { perSite?: boolean; sites?: readonly string[] } | undefined => {
+    const chain = fieldChain(definition.fields, path);
+    return chain?.[chain.length - 1];
 };
 
 const definition = definePlugin({

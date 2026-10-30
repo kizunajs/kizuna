@@ -3,7 +3,7 @@ import { route, type PluginDeclaration } from 'kizunajs/plugin';
 import { BinarySchema, ProblemDetailsSchema, ValidationErrorSchema } from 'kizunajs/schemas';
 import type { RouteAuth } from 'kizunajs';
 import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
-import { addressOf, CmsHttpError, previewPathOf, type CmsService, type DraftState } from './cms.js';
+import { addressOf, CmsHttpError, fieldOnSite, previewPathOf, type CmsService, type DraftState } from './cms.js';
 import { DEFAULT_SITE, routePrefix, sitesOf, type CmsPluginOptions, type PageMap } from './options.js';
 import type { Collection, ContentDefinition, Global } from './definitions.js';
 import { dataFields } from './field.js';
@@ -156,6 +156,16 @@ const reviewFields = async (cms: CmsService, state: DraftState, people?: readonl
 };
 
 /**
+ * The shared document a site's values apply to, as its draft stands, for the
+ * values to show it in place of their own.
+ */
+const sharedContentOf = async (cms: CmsService, state: DraftState): Promise<Record<string, unknown> | null> => {
+    if (state.target.shared === undefined) return null;
+    const shared = await cms.draftState(state.target.shared);
+    return shared.row?.draft ?? shared.row?.published ?? null;
+};
+
+/**
  * What a draft changes from what is published: one entry per field shown in
  * the editor, the fields of a block counted one by one.
  */
@@ -262,6 +272,30 @@ const searchInput = (args: Args): { query?: string; ids?: string[]; headers: Rec
               }),
         headers: forwardedHeaders(args),
     };
+};
+
+/**
+ * A definition's schema as one site reads it, without the fields whose
+ * `sites` name others.
+ */
+const schemaOnSite = (definition: ContentDefinition, site: string): z.ZodType => {
+    const left = dataFields(definition.fields).filter((field) => !fieldOnSite(field, site));
+    if (left.length === 0) return definition.schema;
+    const names = left.map((field) => field.name);
+    return z.object(Object.fromEntries(Object.entries((definition.schema as z.ZodObject).shape).filter(([name]) => !names.includes(name))));
+};
+
+/**
+ * The `site` a media route takes, naming the library it works in.
+ */
+const MediaSiteQuery = z
+    .string()
+    .optional()
+    .describe('The site whose own images to list, upload to or change. Leave it out for the shared images, which shared content holds.');
+
+const mediaSiteOf = (args: Args): string | undefined => {
+    const site = (args.query as { site?: unknown } | undefined)?.site;
+    return typeof site === 'string' ? site : undefined;
 };
 
 const listQueryOf = (definition: ContentDefinition, indexes: readonly string[]) => {
@@ -765,7 +799,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         plural: string;
         single: string;
     }) => {
-        const item = (resolvedSchema(input.definition.schema) as z.ZodObject).extend({
+        const item = (resolvedSchema(schemaOnSite(input.definition, input.readingSite)) as z.ZodObject).extend({
             id: z.string(),
         });
         return {
@@ -798,7 +832,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                             ...(typeof limit === 'number' ? { limit } : {}),
                             ...(typeof cursor === 'string' ? { cursor } : {}),
                         },
-                        input.site
+                        input.site,
+                        input.readingSite
                     );
                     return {
                         status: 200,
@@ -914,7 +949,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     body: z.object({
                         version: z.int(),
                         updatedAt: z.string(),
-                        content: resolvedSchema(definition.schema),
+                        content: resolvedSchema(schemaOnSite(definition, site)),
                     }),
                     ...(publicCache as object),
                 },
@@ -1028,7 +1063,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             ]),
         ]);
 
-    // One shape or the other, so the groups type as plain route maps.
     const contentReads: Record<string, ReturnType<typeof pageReadsOf>> = siteEntries.length === 0
         ? {
               pages: pageReadsOf(sites[DEFAULT_SITE]?.pages ?? {}, DEFAULT_SITE),
@@ -1679,11 +1713,11 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     version: state.version,
                     complete: state.complete,
                     missing: state.missing,
-                    fields: cms.describe(ref, draft, cms.caller(args.auth)),
+                    fields: cms.describe(ref, draft, cms.caller(args.auth), await sharedContentOf(cms, state)),
                     layout: cms.describeLayout(ref),
                     draft,
                     ...(await reviewFields(cms, state)),
-                    ...(ref.type === 'item'
+                    ...(ref.type === 'item' && state.target.shared === undefined
                         ? {
                               actions: await itemActions(cms, cms.collection(ref.collection, ref.site), ref, cms.caller(args.auth)),
                           }
@@ -1781,22 +1815,36 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         })) as never
     );
 
+    // A single-site project has one library, so its media routes take no `site`.
+    const mediaQuery =
+        siteEntries.length === 0
+            ? {}
+            : {
+                  query: z.object({
+                      site: MediaSiteQuery,
+                  }),
+              };
+
     const listMedia = route({
         method: 'GET',
         path: `${editingBase}/media`,
         auth: editor,
         summary: 'List uploaded media, with how many pages hold each image',
+        description: "With `site`, that site's own images beside the shared ones, each own image naming its site.",
         tool: true,
+        ...mediaQuery,
         responses: {
             200: MediaListSchema,
+            404: ProblemDetailsSchema,
         },
     }).handler(
-        guarded(async (cms) => {
+        guarded(async (cms, args) => {
+            const site = cms.mediaSiteOf(mediaSiteOf(args));
             const uses = await cms.mediaUses();
             return {
                 status: 200,
                 body: {
-                    media: (await cms.media.list()).map((record) => ({
+                    media: (await cms.media.list(site)).map((record) => ({
                         ...withUrl(cms, record),
                         uses: uses.get(record.id)?.length ?? 0,
                     })),
@@ -1848,13 +1896,18 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         pathParams: z.object({
             id: z.string(),
         }),
+        ...mediaQuery,
         responses: {
             204: z.void(),
+            403: ProblemDetailsSchema,
             404: ProblemDetailsSchema,
         },
     }).handler(
         guarded(async (cms, args) => {
             const id = args.params['id']!;
+            const record = await cms.media.get(id);
+            if (record === undefined) throw new CmsHttpError(404, { detail: `No media item '${id}'.` });
+            cms.assertOwnMedia(record, cms.mediaSiteOf(mediaSiteOf(args)));
             const uses = (await cms.mediaUses()).get(id) ?? [];
             if (!(await cms.media.delete(id))) throw new CmsHttpError(404, { detail: `No media item '${id}'.` });
             await cms.revalidateMedia(uses);
@@ -1967,13 +2020,18 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         pathParams: z.object({
             id: z.string(),
         }),
+        ...mediaQuery,
         body: UpdateMediaBodySchema,
         responses: {
             200: MediaSchema,
+            403: ProblemDetailsSchema,
             404: ProblemDetailsSchema,
         },
     }).handler(
         guarded(async (cms, args) => {
+            const current = await cms.media.get(args.params['id']!);
+            if (current === undefined) throw new CmsHttpError(404, { detail: `No media item '${args.params['id']}'.` });
+            cms.assertOwnMedia(current, cms.mediaSiteOf(mediaSiteOf(args)));
             const record = await cms.media.update(
                 args.params['id']!,
                 args.body as z.output<typeof UpdateMediaBodySchema>,
@@ -1993,16 +2051,21 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         path: `${editingBase}/media/uploads`,
         auth: editor,
         summary: 'Start an upload: a presigned URL the browser sends the file to',
+        ...mediaQuery,
         body: CreateUploadBodySchema,
         responses: {
             201: UploadSchema,
+            404: ProblemDetailsSchema,
             422: ValidationErrorSchema,
         },
     }).handler(
-        guarded(async (cms, args) => ({
-            status: 201,
-            body: await cms.media.createUpload(args.body as z.output<typeof CreateUploadBodySchema>),
-        })) as never
+        guarded(async (cms, args) => {
+            cms.mediaSiteOf(mediaSiteOf(args));
+            return {
+                status: 201,
+                body: await cms.media.createUpload(args.body as z.output<typeof CreateUploadBodySchema>),
+            };
+        }) as never
     );
 
     const completeUpload = route({
@@ -2013,13 +2076,19 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         pathParams: z.object({
             uploadId: z.string(),
         }),
+        ...mediaQuery,
         responses: {
             201: MediaSchema,
+            404: ProblemDetailsSchema,
             422: ValidationErrorSchema,
         },
     }).handler(
         guarded(async (cms, args) => {
-            const record = await cms.media.completeUpload(args.params['uploadId']!, authorOf(cms, args));
+            const record = await cms.media.completeUpload(
+                args.params['uploadId']!,
+                authorOf(cms, args),
+                cms.mediaSiteOf(mediaSiteOf(args))
+            );
             return {
                 status: 201,
                 body: withUrl(cms, record),

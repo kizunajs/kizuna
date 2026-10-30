@@ -20,6 +20,10 @@ export interface MediaRecord {
     focalPoint?: z.output<typeof FocalPointSchema>;
     uploadedAt: string;
     uploadedBy: string;
+    /**
+     * The site the image belongs to. Left out for a shared image.
+     */
+    site?: string;
 }
 
 /**
@@ -28,6 +32,7 @@ export interface MediaRecord {
 export class UploadRejectedError extends Error {}
 
 const UPLOAD_PREFIX = 'uploads/';
+const SHARED = 'default';
 const MEDIA_PREFIX = 'media/';
 
 export interface MediaServiceOptions {
@@ -81,7 +86,10 @@ export class MediaService {
      * Checks the uploaded bytes and makes the media document, or refuses and
      * removes the upload.
      */
-    async completeUpload(uploadId: string, author: string): Promise<MediaRecord> {
+    /**
+     * With `site`, the new image belongs to that site; without, it is shared.
+     */
+    async completeUpload(uploadId: string, author: string, site?: string): Promise<MediaRecord> {
         if (!/^[A-Za-z0-9._-]+$/.test(uploadId)) throw new UploadRejectedError('Unknown upload.');
         const key = `${UPLOAD_PREFIX}${uploadId}`;
         const head = await this.options.storage.head(key);
@@ -92,13 +100,13 @@ export class MediaService {
         }
         const bytes = await this.options.storage.get(key);
         if (bytes === undefined) throw new UploadRejectedError('Nothing was uploaded yet.');
-        return this.storeBytes(bytes, uploadId.slice(37), author, key);
+        return this.storeBytes(bytes, uploadId.slice(37), author, key, site);
     }
 
     /**
      * Stores bytes that arrived some other way, such as `kizuna cms push`.
      */
-    async storeBytes(bytes: Uint8Array, filename: string, author: string, uploadKey?: string): Promise<MediaRecord> {
+    async storeBytes(bytes: Uint8Array, filename: string, author: string, uploadKey?: string, site?: string): Promise<MediaRecord> {
         let inspected;
         try {
             inspected = await inspectImage(bytes);
@@ -110,8 +118,10 @@ export class MediaService {
         const stripped = await stripMetadata(bytes, inspected);
         const size = inspected.hasExif ? await inspectImage(stripped) : inspected;
         const hash = createHash('sha256').update(stripped).digest('hex').slice(0, 24);
-        const id = `med_${hash}`;
-        const mediaKey = `${MEDIA_PREFIX}${hash}.${inspected.extension}`;
+        // A site's copy of a file is an image of its own, so deleting it leaves the shared one.
+        const id = site === undefined ? `med_${hash}` : `med_${site}_${hash}`;
+        const mediaKey =
+            site === undefined ? `${MEDIA_PREFIX}${hash}.${inspected.extension}` : `${MEDIA_PREFIX}${site}/${hash}.${inspected.extension}`;
         const existing = await this.get(id);
         if (existing !== undefined) {
             if (uploadKey !== undefined) await this.options.storage.delete(uploadKey);
@@ -130,19 +140,29 @@ export class MediaService {
             alt: '',
             uploadedAt: new Date().toISOString(),
             uploadedBy: author,
+            ...(site === undefined
+                ? {}
+                : {
+                      site,
+                  }),
         };
-        await this.options.store.saveMedia(id, record as unknown as Record<string, unknown>, author);
+        await this.options.store.saveMedia(id, record as unknown as Record<string, unknown>, author, site);
         return record;
     }
 
     async get(id: string): Promise<MediaRecord | undefined> {
-        const row = await this.options.store.get('media', id);
+        const row = await this.options.store.media(id);
         return row?.published === null || row?.published === undefined ? undefined : (row.published as unknown as MediaRecord);
     }
 
-    async list(): Promise<MediaRecord[]> {
+    /**
+     * The shared images, and with `site`, that site's own beside them.
+     */
+    async list(site?: string): Promise<MediaRecord[]> {
         const rows = await this.options.store.list('media');
-        return rows.filter((row) => row.published !== null).map((row) => row.published as unknown as MediaRecord);
+        return rows
+            .filter((row) => row.published !== null && (row.site === SHARED || row.site === site))
+            .map((row) => row.published as unknown as MediaRecord);
     }
 
     /**
@@ -173,7 +193,7 @@ export class MediaService {
                       focalPoint: changes.focalPoint,
                   }),
         };
-        await this.options.store.saveMedia(id, next as unknown as Record<string, unknown>, author);
+        await this.options.store.saveMedia(id, next as unknown as Record<string, unknown>, author, current.site);
         return next;
     }
 
@@ -184,7 +204,7 @@ export class MediaService {
     async delete(id: string): Promise<boolean> {
         const current = await this.get(id);
         if (current === undefined) return false;
-        await this.options.store.delete('media', id);
+        await this.options.store.delete('media', id, current.site);
         await this.options.storage.delete(current.key);
         return true;
     }

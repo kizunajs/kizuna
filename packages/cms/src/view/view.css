@@ -589,6 +589,13 @@
         white-space: nowrap;
     }
 
+    /* Whose value a field holds, when the CMS serves several sites. */
+    .k-field__owner {
+        margin-left: 8px;
+        font-weight: 400;
+        color: var(--k-muted);
+    }
+
     /* A field the editor cannot change: its input's shape on the fainter surface fill, muted text, and a lock on the right. */
     .k-read-only {
         display: flex;

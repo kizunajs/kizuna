@@ -306,6 +306,7 @@ export function FieldForm({
                         labels={field.options}
                         blocks={field.blocks}
                         help={list ? field.help : undefined}
+                        placeholder={typeof field.sharedValue === 'string' ? field.sharedValue : undefined}
                         required
                     />
                 </div>
@@ -366,6 +367,7 @@ export function FieldForm({
             <label className="k-field__label" htmlFor={folds ? undefined : fieldDomId(field.path) + '-input'}>
                 {labelOf(field)}
                 {field.required ? <Required /> : null}
+                {field.belongsTo === undefined ? null : <span className="k-field__owner">{field.belongsTo}</span>}
             </label>
         );
         const needed = field.parent === undefined && missing?.includes(field.name) === true;
@@ -377,6 +379,7 @@ export function FieldForm({
                     <span className="k-field__label" id={fieldDomId(field.path) + '-label'}>
                         {labelOf(field)}
                         {field.required ? <Required /> : null}
+                        {field.belongsTo === undefined ? null : <span className="k-field__owner">{field.belongsTo}</span>}
                     </span>
                     <div className="k-field__control" data-changed={isMarked(field.path, changed)}>
                         <p className="k-read-only" aria-labelledby={fieldDomId(field.path) + '-label'} data-empty={text === undefined}>

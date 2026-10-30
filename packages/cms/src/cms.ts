@@ -18,7 +18,7 @@ import {
 } from './content.js';
 import { blocksForWire, blocksHint, fieldChain, hiddenIn } from './content.js';
 import { conditionText } from './condition.js';
-import { dataFields } from './field.js';
+import { dataFields, objectOf, type Field } from './field.js';
 import { randomBytes } from 'node:crypto';
 import type { ContentDefinition, Collection, Global } from './definitions.js';
 import { servesCollection } from './page.js';
@@ -274,7 +274,32 @@ export interface Target {
      * shows its collection.
      */
     pattern?: string;
+    /**
+     * For a site's values on a shared global or item, the shared document
+     * they apply to.
+     */
+    shared?: DocumentRef;
 }
+
+/**
+ * Whether a value counts as set, so a site's empty value shows the shared
+ * one.
+ */
+const isSet = (value: unknown): boolean =>
+    value !== undefined && value !== null && value !== '' && !(Array.isArray(value) && value.length === 0);
+
+/**
+ * Whether a definition has fields that differ by site.
+ */
+export const variesBySite = (definition: ContentDefinition): boolean =>
+    dataFields(definition.fields).some((field) => field.perSite === true || field.sites !== undefined);
+
+/**
+ * Whether a site shows and stores a field: every site, unless its `sites`
+ * names others.
+ */
+export const fieldOnSite = (field: { sites?: readonly string[] }, site: string): boolean =>
+    field.sites === undefined || site === DEFAULT_SITE || field.sites.includes(site);
 
 /**
  * Where a document is served: a page's path, or the path an item's content
@@ -442,6 +467,7 @@ export class CmsService {
     readonly basePath: '' | `/${string}`;
     readonly mediaPath: string;
     private warned = new Set<string>();
+    private readonly siteValueDefinitions = new Map<string, ContentDefinition | null>();
 
     /**
      * The framework's cache, draft mode and cookies, from the adapter, once
@@ -572,8 +598,125 @@ export class CmsService {
         ];
     }
 
+    /**
+     * The collection an item belongs to. `undefined` for anything else, and
+     * for a site's values on a shared item.
+     */
     listingOf(ref: DocumentRef): Listing | undefined {
-        return ref.type === 'item' ? this.listing(ref.collection, ref.site) : undefined;
+        if (ref.type !== 'item') return undefined;
+        if (ref.site !== undefined && ref.site !== DEFAULT_SITE && this.siteCollections[ref.site]?.[ref.collection] === undefined) {
+            return undefined;
+        }
+        return this.listing(ref.collection, ref.site);
+    }
+
+    /**
+     * What a site stores of a shared global or collection: its `perSite`
+     * fields, each of which it may leave empty, and the fields whose `sites`
+     * name it.
+     */
+    siteValuesOf(definition: ContentDefinition, site: string, what: string): ContentDefinition {
+        if (!this.siteNames().includes(site)) throw new CmsHttpError(404, { detail: `There is no site named '${site}'.` });
+        const key = `${site}:${definition.name}`;
+        if (!this.siteValueDefinitions.has(key)) {
+            const fields = dataFields(definition.fields)
+                .filter((field) => field.perSite === true || field.sites?.includes(site) === true)
+                .map(
+                    ({ condition: _, ...field }): Field =>
+                        field.perSite === true
+                            ? {
+                                  ...field,
+                                  schema: field.schema.optional(),
+                              }
+                            : field
+                );
+            this.siteValueDefinitions.set(
+                key,
+                fields.length === 0
+                    ? null
+                    : {
+                          name: definition.name,
+                          ...(definition.label === undefined
+                              ? {}
+                              : {
+                                    label: definition.label,
+                                }),
+                          fields,
+                          schema: objectOf(fields),
+                      }
+            );
+        }
+        const found = this.siteValueDefinitions.get(key);
+        if (found === null || found === undefined) {
+            throw new CmsHttpError(404, {
+                detail: `${what} has no field the ${site} site sets. Mark one \`perSite\`, or name the site in its \`sites\`.`,
+            });
+        }
+        return found;
+    }
+
+    /**
+     * Shared content as a site shows it: its fields for that site, with the
+     * site's values in place of the shared ones it sets.
+     */
+    withSiteValues(
+        definition: ContentDefinition,
+        content: Record<string, unknown>,
+        values: Record<string, unknown> | undefined,
+        site: string
+    ): Record<string, unknown> {
+        const shown: Record<string, unknown> = {
+            ...content,
+        };
+        for (const field of dataFields(definition.fields)) {
+            if (!fieldOnSite(field, site)) {
+                delete shown[field.name];
+                continue;
+            }
+            const value = values?.[field.name];
+            if (field.sites !== undefined) {
+                if (value === undefined) delete shown[field.name];
+                else shown[field.name] = value;
+                continue;
+            }
+            if (field.perSite === true && isSet(value)) shown[field.name] = value;
+        }
+        return shown;
+    }
+
+    /**
+     * Whether a site reads a document with values of its own: shared content
+     * with fields that differ by site.
+     */
+    private readsSiteValues(ref: DocumentRef, site: string): boolean {
+        if (site === DEFAULT_SITE || ref.type === 'page' || (ref.site !== undefined && ref.site !== DEFAULT_SITE)) return false;
+        return variesBySite(this.target(ref).definition);
+    }
+
+    /**
+     * The ref of a site's values on a shared document.
+     */
+    private siteValuesRef(ref: DocumentRef, site: string): DocumentRef {
+        return {
+            ...ref,
+            site,
+        } as DocumentRef;
+    }
+
+    /**
+     * A site's own values on a shared document, `undefined` when it sets
+     * none or has no field of its own there.
+     */
+    private async siteValues(ref: DocumentRef, site: string, copy: 'draft' | 'published'): Promise<Record<string, unknown> | undefined> {
+        const definition = this.target(ref).definition;
+        if (!dataFields(definition.fields).some((field) => field.perSite === true || field.sites?.includes(site) === true))
+            return undefined;
+        const values = this.siteValuesRef(ref, site);
+        if (copy === 'draft') {
+            const draft = await this.draft(values);
+            if (draft !== undefined) return draft.content;
+        }
+        return (await this.published(values))?.content;
     }
 
     /**
@@ -670,7 +813,21 @@ export class CmsService {
         }
         if (ref.type === 'global') {
             const site = ref.site ?? DEFAULT_SITE;
-            const found = site === DEFAULT_SITE ? this.globals[ref.name] : this.siteGlobals[site]?.[ref.name];
+            const shared = this.globals[ref.name];
+            if (site !== DEFAULT_SITE && shared !== undefined) {
+                return {
+                    ref,
+                    kind: 'global',
+                    site,
+                    key: ref.name,
+                    definition: this.siteValuesOf(shared, site, `The ${ref.name} global`),
+                    shared: {
+                        type: 'global',
+                        name: ref.name,
+                    },
+                };
+            }
+            const found = site === DEFAULT_SITE ? shared : this.siteGlobals[site]?.[ref.name];
             if (found === undefined) {
                 throw new CmsHttpError(404, {
                     detail:
@@ -685,6 +842,17 @@ export class CmsService {
                 site,
                 key: ref.name,
                 definition: found,
+            };
+        }
+        if (ref.site !== undefined && ref.site !== DEFAULT_SITE && this.siteCollections[ref.site]?.[ref.collection] === undefined) {
+            const shared = this.listing(ref.collection);
+            return {
+                ref,
+                kind: 'item',
+                site: ref.site,
+                key: `${shared.keyPrefix}${ref.id}`,
+                definition: this.siteValuesOf(shared.definition, ref.site, `The ${ref.collection} collection`),
+                shared: shared.refOf(ref.id),
             };
         }
         const listing = this.listing(ref.collection, ref.site);
@@ -810,8 +978,23 @@ export class CmsService {
         ref: DocumentRef,
         site: string
     ): Promise<{ content: Record<string, unknown>; version: number; updatedAt: Date } | undefined> {
-        void site;
-        return this.published(ref);
+        const shared = await this.published(ref);
+        if (shared === undefined || !this.readsSiteValues(ref, site)) return shared;
+        return {
+            ...shared,
+            content: this.withSiteValues(this.target(ref).definition, shared.content, await this.siteValues(ref, site, 'published'), site),
+        };
+    }
+
+    /**
+     * The draft as a site shows it in draft mode: the shared draft, or with
+     * `fallBack` the published copy, with the site's draft values, or else
+     * its published ones, in place.
+     */
+    async draftOn(ref: DocumentRef, site: string, fallBack: boolean): Promise<Record<string, unknown> | undefined> {
+        const content = (await this.draft(ref))?.content ?? (fallBack ? (await this.published(ref))?.content : undefined);
+        if (content === undefined || !this.readsSiteValues(ref, site)) return content;
+        return this.withSiteValues(this.target(ref).definition, content, await this.siteValues(ref, site, 'draft'), site);
     }
 
     /**
@@ -1062,7 +1245,8 @@ export class CmsService {
             limit?: number;
             cursor?: string;
         },
-        site = DEFAULT_SITE
+        site = DEFAULT_SITE,
+        readingSite = site
     ): Promise<{ items: Array<Record<string, unknown>>; next: string | undefined }> {
         const listing = this.listing(name, site);
         const result = await this.store.query({
@@ -1102,7 +1286,18 @@ export class CmsService {
                 (query.draft ? this.passes(target, migrated.draft) : undefined) ??
                 this.passes(target, migrated.published) ??
                 (migrated.published === null ? undefined : (await this.publishedAsStored(target.ref))?.content);
-            if (content !== undefined) items.push(await this.present(target, content));
+            if (content === undefined) continue;
+            const presented = await this.present(target, content);
+            items.push(
+                this.readsSiteValues(target.ref, readingSite)
+                    ? this.withSiteValues(
+                          listing.definition,
+                          presented,
+                          await this.siteValues(target.ref, readingSite, query.draft ? 'draft' : 'published'),
+                          readingSite
+                      )
+                    : presented
+            );
         }
         return {
             items,
@@ -1659,15 +1854,33 @@ export class CmsService {
             : `${what}; ids of ${relationship.name}, found with ${own}, brand ${brand}.`;
     }
 
+    /**
+     * Every field of a document as editors and tools meet it. With sites,
+     * each is marked `Shared` or with the label of the site whose value it
+     * is, and a site's value carries the shared one it stands in for.
+     */
     describe(
         ref: DocumentRef,
         draft: Record<string, unknown> | null,
-        caller: Caller
+        caller: Caller,
+        shared?: Record<string, unknown> | null
     ): z.output<typeof import('./wire.js').DescribedFieldSchema>[] {
-        const { definition } = this.target(ref);
+        const target = this.target(ref);
+        const { definition } = target;
         const listing = this.listingOf(ref);
+        const belongsTo =
+            this.siteNames().length === 0
+                ? undefined
+                : target.site === DEFAULT_SITE
+                  ? 'Shared'
+                  : String(this.siteInfo(target.site)['label']);
+        const declared = dataFields(definition.fields);
         const described: z.output<typeof import('./wire.js').DescribedFieldSchema>[] = [];
         const push = (field: DescribedField, parent: string | undefined): void => {
+            const own = parent === undefined ? declared.find((candidate) => candidate.name === field.path) : undefined;
+            if (own !== undefined && own.sites !== undefined && !own.sites.includes(target.site)) return;
+            const sharedValue =
+                target.shared !== undefined && own?.perSite === true ? getAtPath(shared ?? undefined, field.path) : undefined;
             const brand = this.referenceBrandOf(field.schema);
             const isList = readDef(unwrapOptionalWrappers(field.schema).inner).type === 'array';
             const roles =
@@ -1744,6 +1957,16 @@ export class CmsService {
                 ...(brand === undefined ? {} : { searchTool: this.ownSearchTool() ?? `editing.searchItems` }),
                 schema: this.fieldJsonSchema(field.schema),
                 ...(draft === null ? {} : { value: getAtPath(draft, field.path) }),
+                ...(belongsTo === undefined
+                    ? {}
+                    : {
+                          belongsTo,
+                      }),
+                ...(sharedValue === undefined
+                    ? {}
+                    : {
+                          sharedValue,
+                      }),
             });
             for (const inner of field.fields ?? []) push(inner, field.path);
         };
@@ -1816,7 +2039,25 @@ export class CmsService {
         const fields = target.definition.fields;
         const paths = Object.keys(input.changes);
         if (paths.length === 0) throw new CmsHttpError(400, { detail: 'No changes were sent.' });
+        if (target.shared !== undefined && (await this.store.get(target.kind, target.key, DEFAULT_SITE)) === undefined) {
+            throw new CmsHttpError(404, {
+                detail: `'${formatRef(target.shared)}' has no content yet. Save the shared item first, then the values the ${target.site} site sets.`,
+            });
+        }
         for (const path of paths) {
+            const top = dataFields(fields).find((field) => field.name === path.split('.')[0]);
+            if (top !== undefined && top.sites !== undefined && !top.sites.includes(target.site)) {
+                throw new CmsHttpError(422, {
+                    detail: `'${top.name}' is stored by only the ${top.sites.join(', ')} site${top.sites.length === 1 ? '' : 's'}. Set it on ${formatRef(this.siteValuesRef(input.ref, top.sites[0]!))}.`,
+                    errors: [
+                        {
+                            code: 'custom',
+                            path: path.split('.'),
+                            message: 'Set per site',
+                        },
+                    ],
+                });
+            }
             if (fieldChain(fields, path) === undefined) {
                 throw new CmsHttpError(422, {
                     detail: `'${formatRef(input.ref)}' has no field at '${path}'.`,
@@ -1855,6 +2096,7 @@ export class CmsService {
             });
         }
         const stored = parsed.success ? (parsed.data as Record<string, unknown>) : draft;
+        await this.assertMediaOnSite(target, stored);
         const listing = this.listingOf(input.ref);
         if (listing !== undefined && paths.some((path) => listing.pathFields.includes(path.split('.')[0]!))) {
             await this.assertFreeAddress(listing, target.key, stored);
@@ -1894,6 +2136,48 @@ export class CmsService {
             paths,
         });
         return this.draftState(input.ref);
+    }
+
+    /**
+     * Refuses an image of another site: shared content holds shared images,
+     * and a site's content its own and shared ones.
+     */
+    private async assertMediaOnSite(target: Target, content: Record<string, unknown>): Promise<void> {
+        if (this.siteNames().length === 0) return;
+        for (const id of mediaIdsOf(target.definition, content)) {
+            const owner = (await this.media.get(id))?.site;
+            if (owner === undefined || owner === target.site) continue;
+            throw new CmsHttpError(422, {
+                detail:
+                    target.site === DEFAULT_SITE
+                        ? `The image '${id}' belongs to the ${owner} site, so shared content cannot hold it. Use a shared image.`
+                        : `The image '${id}' belongs to the ${owner} site. Use one of the ${target.site} site's images, or a shared one.`,
+                errors: [],
+            });
+        }
+    }
+
+    /**
+     * Which library a media route works in: a declared site's, or the shared
+     * one when `site` is left out.
+     */
+    mediaSiteOf(site: string | undefined): string | undefined {
+        if (site === undefined) return undefined;
+        if (!this.siteNames().includes(site)) throw new CmsHttpError(404, { detail: `There is no site named '${site}'.` });
+        return site;
+    }
+
+    /**
+     * Refuses a change to an image from another library than its own.
+     */
+    assertOwnMedia(record: MediaRecord, site: string | undefined): void {
+        if (record.site === site) return;
+        throw new CmsHttpError(403, {
+            detail:
+                record.site === undefined
+                    ? `The image '${record.id}' is shared. Change it in the shared library.`
+                    : `The image '${record.id}' belongs to the ${record.site} site. Change it in that site's library.`,
+        });
     }
 
     /**

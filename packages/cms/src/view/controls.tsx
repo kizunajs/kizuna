@@ -83,6 +83,11 @@ export interface ControlProps {
      * description and the labels of its fields.
      */
     blocks?: DescribedBlock[] | undefined;
+    /**
+     * What a text input shows while it is empty, like the shared value a
+     * site's own value stands in for.
+     */
+    placeholder?: string | undefined;
 }
 
 function SelectControl(props: {
@@ -217,6 +222,8 @@ function StringControl(props: ControlProps) {
     const input = stringInputOf(schema);
     if (props.name === 'slug' && input === 'text') return <SlugControl {...props} />;
     const over = schema.maxLength !== undefined && text.length > schema.maxLength;
+    // An empty field takes its default, like the shared value a site's own value falls back to, so it shows faintly.
+    const placeholder = props.placeholder ?? (typeof schema['default'] === 'string' ? schema['default'] : undefined);
     return (
         <div className="k-text-field" data-counted={counterShown(text.length, schema.maxLength)}>
             {input === 'textarea' ? (
@@ -224,6 +231,7 @@ function StringControl(props: ControlProps) {
                     id={id}
                     className="k-input k-textarea"
                     value={text}
+                    placeholder={placeholder}
                     disabled={disabled}
                     rows={3}
                     onChange={(event) => set(event.target.value)}
@@ -234,6 +242,7 @@ function StringControl(props: ControlProps) {
                     className="k-input"
                     type={input}
                     value={text}
+                    placeholder={placeholder}
                     disabled={disabled}
                     onChange={(event) => set(event.target.value)}
                 />

@@ -52,6 +52,13 @@ export interface PageDefinition<Name extends string, Fields extends FieldList> {
      * approve the draft.
      */
     requireReview?: boolean;
+    /**
+     * The sites that have the page, when several share its pages module.
+     *
+     * @example
+     * sites: ['uk'],
+     */
+    sites?: readonly string[];
 }
 
 /**
@@ -80,7 +87,21 @@ export interface CollectionPageDefinition<Name extends string, Served extends Co
      * Where the page is listed in `/cms` and for the agent.
      */
     group?: string;
+    /**
+     * The sites that have the page, when several share its pages module.
+     */
+    sites?: readonly string[];
 }
+
+/**
+ * The sites a page names, kept as written so a site's reader leaves the page
+ * out on every other site.
+ */
+export type PageSites<Sites extends readonly string[] | undefined> = [Sites] extends [readonly string[]]
+    ? {
+          readonly sites: Sites;
+      }
+    : {};
 
 // Registry-global: discovery reads it off a module another copy of this package may have made.
 export const PAGE: unique symbol = Symbol.for('kizuna.cms.page') as symbol as typeof PAGE;
@@ -117,9 +138,11 @@ const PAGE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
  *     collection: Articles,
  * });
  */
-export function definePage<const Name extends string, const Served extends Collection>(
-    definition: CollectionPageDefinition<Name, Served>
-): Page<Name, [], Served>;
+export function definePage<
+    const Name extends string,
+    const Served extends Collection,
+    const Sites extends readonly string[] | undefined = undefined,
+>(definition: CollectionPageDefinition<Name, Served> & { sites?: Sites }): Page<Name, [], Served> & PageSites<Sites>;
 /**
  * Define a page's editable content, as the default export of the `content.ts`
  * beside its route. Discovery finds every one under `app/`, and the page's
@@ -144,9 +167,11 @@ export function definePage<const Name extends string, const Served extends Colle
  *     ],
  * });
  */
-export function definePage<const Name extends string, const Fields extends FieldList>(
-    definition: PageDefinition<Name, Fields> & FieldsCheck<Fields>
-): Page<Name, Fields, undefined>;
+export function definePage<
+    const Name extends string,
+    const Fields extends FieldList,
+    const Sites extends readonly string[] | undefined = undefined,
+>(definition: PageDefinition<Name, Fields> & { sites?: Sites } & FieldsCheck<Fields>): Page<Name, Fields, undefined> & PageSites<Sites>;
 export function definePage(
     definition: Partial<PageDefinition<string, FieldList>> & {
         name: string;
@@ -165,6 +190,10 @@ export function definePage(
         );
     }
     if (definition.collection === undefined) assertFields(fields, owner);
+    const sites = (definition as { sites?: unknown }).sites;
+    if (sites !== undefined && (!Array.isArray(sites) || sites.length === 0 || !sites.every((site) => typeof site === 'string'))) {
+        throw new Error(`${owner} has sites that are not a list of site names, like ['uk'].`);
+    }
     for (const version of Object.keys(definition.migrate ?? {})) {
         if (!/^[1-9][0-9]*$/.test(version)) {
             throw new Error(`${owner} has a migrate step '${version}'. Steps are keyed by version number, starting at 1.`);

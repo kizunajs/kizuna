@@ -155,6 +155,10 @@ const service = (pluginExportsOf(config.api)['cms'] as CmsExports).service;
 const app = express();
 config.api.mount(app);
 
+const published = {
+    draft: false,
+};
+
 const event = (title: string, slug: string) => ({
     title,
     slug,
@@ -258,14 +262,14 @@ describe("a site's own globals and items", () => {
         });
     });
 
-    it('refuses a global the site does not have of its own', () => {
+    it('refuses a global the site neither has of its own nor sets values on', () => {
         expect(() =>
             service.target({
                 type: 'global',
                 name: 'footer',
                 site: 'uk',
             })
-        ).toThrow("The uk site has no global of its own named 'footer'.");
+        ).toThrow('The footer global has no field the uk site sets.');
         expect(() =>
             service.target({
                 type: 'global',
@@ -291,10 +295,10 @@ describe("a site's own globals and items", () => {
         expect(formatRef(uk.target.ref)).toMatch(/^item:uk:events:/);
         expect(formatRef(office.target.ref)).toMatch(/^item:offices:/);
         const titles = async (site: string) =>
-            (await service.listItems('events', { draft: false }, site)).items.map((item) => stripPaths(item['title']));
+            (await service.listItems('events', published, site)).items.map((item) => stripPaths(item['title']));
         expect(await titles('uk')).toEqual(['Open day']);
         expect(await titles('norway')).toEqual(['Åpen dag']);
-        expect((await service.listItems('offices', { draft: false })).items.map((item) => item['city'])).toEqual(['Oslo']);
+        expect((await service.listItems('offices', published)).items.map((item) => item['city'])).toEqual(['Oslo']);
         expect((await service.collectionSummaries()).map((summary) => [summary.name, summary.count])).toEqual([['offices', 1]]);
     });
 
