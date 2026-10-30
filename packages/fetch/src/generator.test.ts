@@ -4,7 +4,7 @@ import { Kizuna } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import { definePlugin, route } from 'kizunajs/plugin';
 import { generateFetchClient } from './generator.js';
-import { fetchClient } from './client-target.js';
+import { fetchClient, fetchIds } from './client-target.js';
 import { apiContract } from './api.fixture.js';
 
 const k = new Kizuna();
@@ -547,5 +547,104 @@ describe('fetchClient: groups', () => {
                 groups: ['contents'],
             }).render(api)
         ).toThrow("No route's key starts with 'contents'.");
+    });
+});
+
+describe('fetchIds', () => {
+    const OfficeId = Kizuna.brand('OfficeId', z.string());
+    const EmployeeId = Kizuna.brand('EmployeeId', z.string());
+    const Revision = Kizuna.brand('Revision', z.number());
+    const { api } = defineConfig({
+        routes: [
+            {
+                content: {
+                    getEmployee: k.route({
+                        method: 'GET',
+                        path: '/content/employees/:id',
+                        pathParams: z.object({
+                            id: EmployeeId,
+                        }),
+                        responses: {
+                            200: z.object({
+                                id: EmployeeId,
+                                revision: Revision,
+                            }),
+                        },
+                    }),
+                },
+                editing: {
+                    getOffice: k.route({
+                        method: 'GET',
+                        path: '/editing/offices/:id',
+                        pathParams: z.object({
+                            id: OfficeId,
+                        }),
+                        responses: {
+                            200: z.object({
+                                id: OfficeId,
+                            }),
+                        },
+                    }),
+                },
+            },
+        ],
+    });
+
+    it('declares every brand the routes carry as a Zod schema', () => {
+        const output = fetchIds({
+            output: './ids.ts',
+        }).render(api);
+
+        expect(output).toContain("import { Kizuna } from 'kizunajs';");
+        expect(output).toContain("import { z } from 'zod';");
+        expect(output).toContain("export const EmployeeId = Kizuna.brand('EmployeeId', z.string());");
+        expect(output).toContain("export const OfficeId = Kizuna.brand('OfficeId', z.string());");
+        expect(output).toContain("export const Revision = Kizuna.brand('Revision', z.number());");
+    });
+
+    it('holds only the brands of the routes in its groups', () => {
+        const output = fetchIds({
+            output: './ids.ts',
+            groups: ['content'],
+        }).render(api);
+
+        expect(output).toContain('EmployeeId');
+        expect(output).not.toContain('OfficeId');
+    });
+
+    it('declares the brands the client of the same groups names', () => {
+        const client = fetchClient({
+            output: './client.ts',
+            groups: ['content'],
+        }).render(api);
+        const ids = fetchIds({
+            output: './ids.ts',
+            groups: ['content'],
+        }).render(api);
+
+        const named = [...client.matchAll(/export type (\w+) = \w+ & KizunaBrand</g)].map((match) => match[1]);
+        const declared = [...ids.matchAll(/export const (\w+) = Kizuna\.brand/g)].map((match) => match[1]);
+        expect(declared).toEqual(named);
+    });
+
+    it('leaves the client importing nothing', () => {
+        const client = fetchClient({
+            output: './client.ts',
+        }).render(api);
+
+        expect(client).not.toMatch(/^import /m);
+    });
+
+    it('exports nothing when the routes carry no brand', () => {
+        const output = fetchIds({
+            output: './ids.ts',
+        }).render(
+            defineConfig({
+                routes: [routes],
+            }).api
+        );
+
+        expect(output).not.toMatch(/^import /m);
+        expect(output).toContain('export {};');
     });
 });

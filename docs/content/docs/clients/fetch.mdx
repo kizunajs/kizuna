@@ -471,6 +471,47 @@ const user = await client.users.getUser({
 
 It is still a `string`, so it renders and compares like one.
 
+## Sharing the ids
+
+Another API can hold your ids in its own schemas. `fetchIds` writes every brand the client's routes carry as a Zod schema, in a file beside the client. Give it the same `groups` as the client:
+
+```ts title="kizuna.config.ts"
+import { fetchClient, fetchIds } from '@kizunajs/fetch';
+
+clients: [
+    fetchClient({
+        output: './packages/users-client/src/index.ts',
+        groups: ['users'],
+    }),
+    fetchIds({
+        output: './packages/users-client/src/ids.ts',
+        groups: ['users'],
+    }),
+],
+```
+
+```ts title="packages/users-client/src/ids.ts"
+import { Kizuna } from 'kizunajs';
+import { z } from 'zod';
+
+export const UserId = Kizuna.brand('UserId', z.string());
+```
+
+The package exports the file as `./ids`, and the other API declares its fields with it:
+
+```ts title="invoice.ts"
+import { UserId } from 'users-client/ids';
+
+const InvoiceSchema = Kizuna.model({
+    title: 'Invoice',
+    schema: z.object({
+        customerId: UserId,
+    }),
+});
+```
+
+A `customerId` it parses is an `API.UserId`, so it passes into `client.users.getUser` as it is. The ids file imports `kizunajs` and `zod`, so the package names both as peer dependencies. The client still imports nothing and works without the ids file.
+
 ## Documentation in the client
 
 Each method carries what the route declared, so an editor shows it at the call site: the route's `summary` and `description`, `@deprecated` with its migration message, and an `@example` of the call with the arguments it cannot be called without.

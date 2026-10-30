@@ -97,4 +97,8 @@ export function UserCard({ user }: { user: API.User }) {
 }
 ```
 
+## The ids file
+
+`fetchIds({ output, groups })`, named under `clients` beside `fetchClient`, writes every brand the routes in `groups` carry as a Zod schema, `export const UserId = Kizuna.brand('UserId', z.string())`, for another API's schemas to hold your ids. A value one parses is the client's `API.UserId`. It takes `regenerateCommand` and `source` as `fetchClient` does, and imports `kizunajs` and `zod`. The client never imports it. See [Sharing the ids](/docs/clients/fetch#sharing-the-ids).
+
 See the [Fetch client guide](/docs/clients/fetch) for per-request headers, validation errors, refusals, and response type narrowing.

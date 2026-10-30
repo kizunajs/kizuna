@@ -37,9 +37,13 @@ fetchClient({
     output: '../uk-content/src/index.ts',
     groups: ['content.sites.uk'],
 }),
+fetchIds({
+    output: '../uk-content/src/ids.ts',
+    groups: ['content.sites.uk'],
+}),
 ```
 
-The generator writes the Zod brands, like `OfficeId`, beside the client, so the package has two entries: the client, and `./ids` with the brands, for the other repository's own schemas to hold your ids. Publish it where your packages go.
+`fetchIds` writes the Zod brands the client names, like `OfficeId`, so the package has two entries: the client, and `./ids` with the brands, for the other repository's own schemas to hold your ids. Publish it where your packages go.
 
 `kizuna diff` fails a change that would break a published client, judged by that client's `groups`, so a change to Norway never fails the UK's client. The snapshot records each brand's name, so renaming `EmployeeId` counts as breaking.
 

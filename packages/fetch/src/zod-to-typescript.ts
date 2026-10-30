@@ -107,16 +107,18 @@ export class TypeCollector {
     }
 
     /**
-     * Each brand's name, the type it wraps, and a value for its `@example`, for
-     * the constructors the file exports.
+     * Each brand's identifier, the name it was declared with, the type it
+     * wraps, and a value for its `@example`.
      */
     allBrands(): Array<{
         name: string;
+        brand: string;
         base: string;
         example: string;
     }> {
-        return [...this.brands].map(([name, { base, example }]) => ({
+        return [...this.brands].map(([name, { brand, base, example }]) => ({
             name,
+            brand,
             base,
             example,
         }));

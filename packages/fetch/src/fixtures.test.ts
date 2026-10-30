@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ApiDefinition } from 'kizunajs';
-import { generateFetchClient } from './generator.js';
+import { generateFetchClient, generateFetchIds } from './generator.js';
 import { apiContract } from './api.fixture.js';
 import { requiredContextContract } from './required-context.fixture.js';
 import { securedContract } from './secured.fixture.js';
@@ -21,4 +21,8 @@ describe('the generated fixtures are current', () => {
             await expect(generateFetchClient(api)).toMatchFileSnapshot(`./generated/${name}.ts`);
         });
     }
+
+    it('api-ids', async () => {
+        await expect(generateFetchIds(apiContract)).toMatchFileSnapshot('./generated/api-ids.ts');
+    });
 });
