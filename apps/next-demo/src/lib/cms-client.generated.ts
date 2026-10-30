@@ -122,6 +122,13 @@ export namespace API {
                  * How many items a collection holds. Null for a view, whose records live in the app.
                  */
                 count: number | null;
+                /**
+                 * The site a collection of its own belongs to. Null for a shared one.
+                 */
+                site?: {
+                    key: string;
+                    label: string;
+                } | null;
             }>;
         };
 
@@ -150,7 +157,7 @@ export namespace API {
             /**
              * The widgets the person may see, in the order listed.
              */
-            widgets: Array<CMS.StatWidget | CMS.ChartWidget | CMS.ReviewsWidget | CMS.CollectionsWidget>;
+            widgets: Array<CMS.StatWidget | CMS.ChartWidget | CMS.ReviewsWidget | CMS.CollectionsWidget | CMS.SitesWidget | CMS.RefreshesWidget | CMS.ReachWidget | CMS.EditorsWidget>;
         };
 
         export type DecideReview = {
@@ -217,6 +224,10 @@ export namespace API {
              * Whether publishing waits for an approval.
              */
             requireReview: boolean;
+            /**
+             * Whether the caller may publish it. Shared content, on a CMS with sites, takes an admin over every site.
+             */
+            canPublish: boolean;
         };
 
         export type Draft = {
@@ -268,6 +279,10 @@ export namespace API {
              * Whether publishing waits for an approval.
              */
             requireReview: boolean;
+            /**
+             * Whether the caller may publish it. Shared content, on a CMS with sites, takes an admin over every site.
+             */
+            canPublish: boolean;
             /**
              * Whether the caller may publish it before its review is approved, with `force`.
              */
@@ -327,6 +342,30 @@ export namespace API {
              * What an editor reads for the fields of `values` holding a choice or an id, like "Plant care" for care.
              */
             labels?: Record<string, string>;
+        };
+
+        export type EditorsWidget = {
+            type: "editors";
+            /**
+             * Every change made this period.
+             */
+            changes: number;
+            /**
+             * How many went live this period.
+             */
+            published: number;
+            editors: Array<{
+                id: string;
+                name: string;
+                image?: string;
+                roles: Array<string>;
+                sites: Array<{
+                    label: string;
+                    roles: Array<string>;
+                }>;
+                changes: number;
+                lastActive: string;
+            }>;
         };
 
         export type Field = {
@@ -617,6 +656,56 @@ export namespace API {
             image?: string;
         };
 
+        export type ReachWidget = {
+            type: "reach";
+            /**
+             * How many sites there are.
+             */
+            sites: number;
+            items: Array<{
+                ref: string;
+                label: string;
+                /**
+                 * The collection's label.
+                 */
+                kind: string;
+                /**
+                 * How many pages show it.
+                 */
+                pages: number;
+                /**
+                 * On how many sites.
+                 */
+                sites: number;
+                /**
+                 * Whether it has changes not yet published.
+                 */
+                changed: boolean;
+            }>;
+        };
+
+        export type RefreshesWidget = {
+            type: "refreshes";
+            /**
+             * Each site and partner refreshed this period. Empty until anything is.
+             */
+            targets: Array<{
+                key: string;
+                label: string;
+                kind: "site" | "partner";
+                last: {
+                    status: "answered" | "failed" | "retrying";
+                    /**
+                     * When it answered, or was last tried.
+                     */
+                    at: string;
+                    attempts: number;
+                } | null;
+                answered: number;
+                total: number;
+            }>;
+        };
+
         export type RequestReview = {
             /**
              * The documents to review, like page:frontPage. They are reviewed as one request.
@@ -719,6 +808,17 @@ export namespace API {
                 label: string;
                 path: string | null;
             }>;
+            /**
+             * On the overview, every site, which the reviews are grouped by after the shared ones.
+             */
+            sites?: Array<{
+                key: string;
+                label: string;
+                /**
+                 * The site's icon as a full URL.
+                 */
+                icon: string | null;
+            }>;
         };
 
         export type Rollback = {
@@ -733,6 +833,70 @@ export namespace API {
              * The id of the person who looks after it, from the people list, or null for nobody.
              */
             owner: string | null;
+        };
+
+        export type SitesWidget = {
+            type: "sites";
+            /**
+             * The chart each site draws, on one scale for every site's.
+             */
+            chart: {
+                label: string;
+                style: "bar" | "line";
+            } | null;
+            sites: Array<{
+                key: string;
+                label: string;
+                /**
+                 * The site's icon as a full URL.
+                 */
+                icon: string | null;
+                url: string;
+                /**
+                 * The stats named, without a value on a site the stat leaves out.
+                 */
+                stats: Array<{
+                    value?: string;
+                    /**
+                     * A line under the number, like "48 orders".
+                     */
+                    detail?: string;
+                    /**
+                     * How far the number moved since the period before, as a signed fraction: 0.081 is up 8.1%.
+                     */
+                    change?: number;
+                    label: string;
+                }>;
+                /**
+                 * Null on a site the chart leaves out.
+                 */
+                chart: Array<{
+                    label: string;
+                    value: number;
+                    /**
+                     * The same point in the period before.
+                     */
+                    previous?: number;
+                }> | null;
+                /**
+                 * How many reviews wait on the site.
+                 */
+                waiting: number;
+                lastPublish: {
+                    ref: string;
+                    label: string;
+                    by: string | null;
+                    at: string;
+                } | null;
+                lastRefresh: {
+                    status: "answered" | "failed" | "retrying";
+                    /**
+                     * When it answered, or was last tried.
+                     */
+                    at: string;
+                    attempts: number;
+                } | null;
+            }>;
         };
 
         export type StatWidget = {
@@ -2704,6 +2868,10 @@ export namespace API {
              * The period the numbers count over, ending now: the last 24 hours, 7, 30 or 90 days.
              */
             period?: "24h" | "7d" | "30d" | "90d";
+            /**
+             * The site the numbers count for. Without one, an admin over every site gets the sites compared.
+             */
+            site?: string;
         };
 
         export type Result =
@@ -4137,6 +4305,8 @@ export interface Client {
         people: {
             /**
              * List the people who edit, to name an owner or ask someone for a review
+             *
+             * With sites, the people who share a site with you, and the admins over every site.
              *
              * @example
              * const result = await client.editing.people.list();

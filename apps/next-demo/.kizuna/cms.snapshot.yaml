@@ -2410,6 +2410,10 @@ routes:
             optional: false
             schema:
               kind: boolean
+          canPublish:
+            optional: false
+            schema:
+              kind: boolean
       "400":
         kind: object
         fields:
@@ -3600,6 +3604,10 @@ routes:
                             kind: string
                             nullable: true
           requireReview:
+            optional: false
+            schema:
+              kind: boolean
+          canPublish:
             optional: false
             schema:
               kind: boolean
@@ -5570,6 +5578,10 @@ routes:
                             kind: string
                             nullable: true
           requireReview:
+            optional: false
+            schema:
+              kind: boolean
+          canPublish:
             optional: false
             schema:
               kind: boolean
@@ -8030,6 +8042,10 @@ routes:
                             kind: string
                             nullable: true
           requireReview:
+            optional: false
+            schema:
+              kind: boolean
+          canPublish:
             optional: false
             schema:
               kind: boolean
@@ -11287,6 +11303,10 @@ routes:
               - 30d
               - 7d
               - 90d
+        site:
+          optional: true
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -11592,6 +11612,26 @@ routes:
                                 schema:
                                   kind: string
                                   nullable: true
+                      sites:
+                        optional: true
+                        schema:
+                          kind: array
+                          element:
+                            kind: object
+                            fields:
+                              key:
+                                optional: false
+                                schema:
+                                  kind: string
+                              label:
+                                optional: false
+                                schema:
+                                  kind: string
+                              icon:
+                                optional: false
+                                schema:
+                                  kind: string
+                                  nullable: true
                   collections:
                     kind: object
                     fields:
@@ -11633,6 +11673,334 @@ routes:
                                 schema:
                                   kind: number
                                   nullable: true
+                              site:
+                                optional: true
+                                schema:
+                                  kind: object
+                                  nullable: true
+                                  fields:
+                                    key:
+                                      optional: false
+                                      schema:
+                                        kind: string
+                                    label:
+                                      optional: false
+                                      schema:
+                                        kind: string
+                  sites:
+                    kind: object
+                    fields:
+                      type:
+                        optional: false
+                        schema:
+                          kind: enum
+                          values:
+                            - sites
+                      chart:
+                        optional: false
+                        schema:
+                          kind: object
+                          nullable: true
+                          fields:
+                            label:
+                              optional: false
+                              schema:
+                                kind: string
+                            style:
+                              optional: false
+                              schema:
+                                kind: enum
+                                values:
+                                  - bar
+                                  - line
+                      sites:
+                        optional: false
+                        schema:
+                          kind: array
+                          element:
+                            kind: object
+                            fields:
+                              key:
+                                optional: false
+                                schema:
+                                  kind: string
+                              label:
+                                optional: false
+                                schema:
+                                  kind: string
+                              icon:
+                                optional: false
+                                schema:
+                                  kind: string
+                                  nullable: true
+                              url:
+                                optional: false
+                                schema:
+                                  kind: string
+                              stats:
+                                optional: false
+                                schema:
+                                  kind: array
+                                  element:
+                                    kind: object
+                                    fields:
+                                      value:
+                                        optional: true
+                                        schema:
+                                          kind: string
+                                      detail:
+                                        optional: true
+                                        schema:
+                                          kind: string
+                                      change:
+                                        optional: true
+                                        schema:
+                                          kind: number
+                                      label:
+                                        optional: false
+                                        schema:
+                                          kind: string
+                              chart:
+                                optional: false
+                                schema:
+                                  kind: array
+                                  nullable: true
+                                  element:
+                                    kind: object
+                                    fields:
+                                      label:
+                                        optional: false
+                                        schema:
+                                          kind: string
+                                      value:
+                                        optional: false
+                                        schema:
+                                          kind: number
+                                      previous:
+                                        optional: true
+                                        schema:
+                                          kind: number
+                              waiting:
+                                optional: false
+                                schema:
+                                  kind: number
+                              lastPublish:
+                                optional: false
+                                schema:
+                                  kind: object
+                                  nullable: true
+                                  fields:
+                                    ref:
+                                      optional: false
+                                      schema:
+                                        kind: string
+                                    label:
+                                      optional: false
+                                      schema:
+                                        kind: string
+                                    by:
+                                      optional: false
+                                      schema:
+                                        kind: string
+                                        nullable: true
+                                    at:
+                                      optional: false
+                                      schema:
+                                        kind: string
+                              lastRefresh:
+                                optional: false
+                                schema:
+                                  kind: object
+                                  nullable: true
+                                  fields:
+                                    status:
+                                      optional: false
+                                      schema:
+                                        kind: enum
+                                        values:
+                                          - answered
+                                          - failed
+                                          - retrying
+                                    at:
+                                      optional: false
+                                      schema:
+                                        kind: string
+                                    attempts:
+                                      optional: false
+                                      schema:
+                                        kind: number
+                  refreshes:
+                    kind: object
+                    fields:
+                      type:
+                        optional: false
+                        schema:
+                          kind: enum
+                          values:
+                            - refreshes
+                      targets:
+                        optional: false
+                        schema:
+                          kind: array
+                          element:
+                            kind: object
+                            fields:
+                              key:
+                                optional: false
+                                schema:
+                                  kind: string
+                              label:
+                                optional: false
+                                schema:
+                                  kind: string
+                              kind:
+                                optional: false
+                                schema:
+                                  kind: enum
+                                  values:
+                                    - partner
+                                    - site
+                              last:
+                                optional: false
+                                schema:
+                                  kind: object
+                                  nullable: true
+                                  fields:
+                                    status:
+                                      optional: false
+                                      schema:
+                                        kind: enum
+                                        values:
+                                          - answered
+                                          - failed
+                                          - retrying
+                                    at:
+                                      optional: false
+                                      schema:
+                                        kind: string
+                                    attempts:
+                                      optional: false
+                                      schema:
+                                        kind: number
+                              answered:
+                                optional: false
+                                schema:
+                                  kind: number
+                              total:
+                                optional: false
+                                schema:
+                                  kind: number
+                  reach:
+                    kind: object
+                    fields:
+                      type:
+                        optional: false
+                        schema:
+                          kind: enum
+                          values:
+                            - reach
+                      sites:
+                        optional: false
+                        schema:
+                          kind: number
+                      items:
+                        optional: false
+                        schema:
+                          kind: array
+                          element:
+                            kind: object
+                            fields:
+                              ref:
+                                optional: false
+                                schema:
+                                  kind: string
+                              label:
+                                optional: false
+                                schema:
+                                  kind: string
+                              kind:
+                                optional: false
+                                schema:
+                                  kind: string
+                              pages:
+                                optional: false
+                                schema:
+                                  kind: number
+                              sites:
+                                optional: false
+                                schema:
+                                  kind: number
+                              changed:
+                                optional: false
+                                schema:
+                                  kind: boolean
+                  editors:
+                    kind: object
+                    fields:
+                      type:
+                        optional: false
+                        schema:
+                          kind: enum
+                          values:
+                            - editors
+                      changes:
+                        optional: false
+                        schema:
+                          kind: number
+                      published:
+                        optional: false
+                        schema:
+                          kind: number
+                      editors:
+                        optional: false
+                        schema:
+                          kind: array
+                          element:
+                            kind: object
+                            fields:
+                              id:
+                                optional: false
+                                schema:
+                                  kind: string
+                              name:
+                                optional: false
+                                schema:
+                                  kind: string
+                              image:
+                                optional: true
+                                schema:
+                                  kind: string
+                              roles:
+                                optional: false
+                                schema:
+                                  kind: array
+                                  element:
+                                    kind: string
+                              sites:
+                                optional: false
+                                schema:
+                                  kind: array
+                                  element:
+                                    kind: object
+                                    fields:
+                                      label:
+                                        optional: false
+                                        schema:
+                                          kind: string
+                                      roles:
+                                        optional: false
+                                        schema:
+                                          kind: array
+                                          element:
+                                            kind: string
+                              changes:
+                                optional: false
+                                schema:
+                                  kind: number
+                              lastActive:
+                                optional: false
+                                schema:
+                                  kind: string
       "401":
         kind: object
         fields:
