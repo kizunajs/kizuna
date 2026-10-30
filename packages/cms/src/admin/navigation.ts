@@ -458,9 +458,9 @@ export const SHARED_NOTE = 'Read by every site';
  * The sidebar's headings: Content first, with the pages and the media, then each `group`
  * in the order the globals, collections and views first name it.
  *
- * With several sites, the sidebar has two headings: Shared, with the media
- * and every shared global, collection and view, and then the site shown,
- * under its label, with its pages and its own globals and collections.
+ * With several sites, the sidebar has two headings: the site shown, under its
+ * label, with its pages and its own globals and collections, and then Shared,
+ * with the media and every shared global, collection and view.
  */
 export const navigationOf = (options: {
     globals: readonly GlobalSummary[];
@@ -624,11 +624,11 @@ const siteNavigationOf = (options: Parameters<typeof navigationOf>[0], declared:
         }),
     ];
     return [
-        shared,
         {
             label: site.label,
             entries: own,
         },
+        shared,
     ];
 };
 

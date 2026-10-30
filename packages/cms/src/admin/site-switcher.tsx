@@ -27,19 +27,6 @@ export function SiteIcon({ site }: { site: AdminSite | undefined }) {
 }
 
 /**
- * Every site's icon, overlapping, beside the heading of what they all read.
- */
-export function SiteStack({ sites }: { sites: readonly AdminSite[] }) {
-    return (
-        <span className="k-site-stack" aria-hidden="true">
-            {sites.map((site) => (
-                <SiteIcon key={site.key} site={site} />
-            ))}
-        </span>
-    );
-}
-
-/**
  * Who a document or list belongs to, for its header's Site: the site's icon
  * and label, or Shared.
  */

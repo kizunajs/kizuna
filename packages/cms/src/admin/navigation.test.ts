@@ -421,7 +421,7 @@ describe('the admin navigation with several sites', () => {
         for (const [screen, site, address] of moves) expect(hrefIn(site, screenInSite(screen, site))).toBe(address);
     });
 
-    it("lists the shared content under Shared, read by every site, then the site's own under its label", () => {
+    it("lists the site's own content under its label, then the shared content under Shared, read by every site", () => {
         const sections = navigationOf({
             globals: [
                 {
@@ -451,17 +451,17 @@ describe('the admin navigation with several sites', () => {
             site: 'uk',
         });
         expect(sections.map((section) => [section.label, section.note, section.entries.map((entry) => entry.label)])).toEqual([
-            ['Shared', 'Read by every site', ['Media', 'Privacy policy', 'Employees', 'Offices']],
             ['Hagen UK', undefined, ['Pages', 'Settings', 'Events']],
+            ['Shared', 'Read by every site', ['Media', 'Privacy policy', 'Employees', 'Offices']],
         ]);
         expect(sections.flatMap((section) => section.entries).map((entry) => hrefOf(entry.screen))).toEqual([
+            '/admin/uk/pages',
+            '/admin/uk/globals/settings',
+            '/admin/uk/collections/events',
             '/admin/uk/media',
             '/admin/uk/globals/privacyPolicy',
             '/admin/uk/collections/employees',
             '/admin/uk/collections/offices',
-            '/admin/uk/pages',
-            '/admin/uk/globals/settings',
-            '/admin/uk/collections/events',
         ]);
     });
 

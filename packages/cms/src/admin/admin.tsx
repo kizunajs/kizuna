@@ -33,7 +33,7 @@ import {
 import { Loading } from './parts.js';
 import { PageHeader } from './page-header.js';
 import { SignedIn } from './signed-in.js';
-import { SiteFact, SiteStack, SiteSwitcher } from './site-switcher.js';
+import { SiteFact, SiteSwitcher } from './site-switcher.js';
 import { NotFound, shownAddress } from './states.js';
 import { useTabIcon } from './tab-icon.js';
 import { useTheme } from './theme.js';
@@ -419,10 +419,7 @@ export function Admin({ config }: { config: AdminConfig }) {
                 const shared = sites.length > 0 && section.label === SHARED_GROUP;
                 return (
                     <div key={section.label} className="k-sidebar__group" data-shared={shared ? '' : undefined}>
-                        <h2 className="k-heading k-sidebar__heading">
-                            {section.label}
-                            {shared ? <SiteStack sites={sites} /> : null}
-                        </h2>
+                        <h2 className="k-heading k-sidebar__heading">{section.label}</h2>
                         {section.note === undefined ? null : <p className="k-sidebar__note">{section.note}</p>}
                         {section.entries.map((entry) => {
                             const Icon = sites.length === 0 ? undefined : entryIconOf(entry.screen);

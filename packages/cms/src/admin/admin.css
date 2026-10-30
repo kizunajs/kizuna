@@ -146,21 +146,6 @@
         gap: 8px;
     }
 
-    .k-site-stack {
-        display: inline-flex;
-    }
-
-    .k-site-stack .k-site-icon {
-        width: 16px;
-        height: 16px;
-        border-radius: 4px;
-        box-shadow: 0 0 0 2px var(--k-canvas);
-    }
-
-    .k-site-stack .k-site-icon + .k-site-icon {
-        margin-left: -4px;
-    }
-
     .k-sidebar__icon {
         flex-shrink: 0;
         color: var(--k-muted);
