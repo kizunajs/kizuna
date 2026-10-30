@@ -174,16 +174,19 @@ export function SiteSwitcher({
 
 /**
  * The tabs of a shared document that sites set values on: Shared, then each
- * site the editor may open. The tab chosen is what the form edits.
+ * site the editor may open, with how many values it sets itself. The tab
+ * chosen is what the form edits.
  */
 export function SiteTabs({
     documentRef,
     sites,
     current,
+    counts = {},
 }: {
     documentRef: string;
     sites: readonly AdminSite[];
     current: string | undefined;
+    counts?: Readonly<Record<string, number>>;
 }) {
     const tab = (site: AdminSite | undefined) => (
         <a
@@ -196,6 +199,11 @@ export function SiteTabs({
             aria-current={site?.key === current ? 'page' : undefined}>
             <SiteIcon site={site} />
             {site?.label ?? SHARED_GROUP}
+            {site === undefined || (counts[site.key] ?? 0) === 0 ? null : (
+                <span className="k-site-tabs__count" aria-label={`${counts[site.key]} values of its own`}>
+                    {counts[site.key]}
+                </span>
+            )}
         </a>
     );
     return (

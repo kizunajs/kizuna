@@ -1,5 +1,4 @@
 import { formatRef, parseRef } from '../refs.js';
-import type { Description } from '../view/schema.js';
 
 /**
  * Whether a document is shared content: not a page, and not a site's own
@@ -33,48 +32,16 @@ export const siteValuesRefOf = (ref: string, site: string): string => {
           });
 };
 
-/**
- * A site's values on a shared document as its tab shows them: every field
- * of the shared document in its place, the site's own editable and every
- * other locked with the shared value.
- */
-export const withSharedFields = (values: Description, shared: Description): Description => {
-    const own = new Map(values.fields.map((field) => [field.path, field]));
-    const fields = [
-        ...shared.fields.map(
-            (field) =>
-                own.get(field.path) ?? {
-                    ...field,
-                    writable: false,
-                }
-        ),
-        ...values.fields.filter((field) => !shared.fields.some((candidate) => candidate.path === field.path)),
-    ];
-    return {
-        ...values,
-        fields,
-        layout: shared.layout,
-        draft: withSharedValues(shared.draft, values.fields, values.draft),
-    };
-};
+const isSet = (value: unknown): boolean =>
+    value !== undefined && value !== null && value !== '' && !(Array.isArray(value) && value.length === 0);
 
 /**
- * The shared values with a site's own in place of the fields it sets. A
- * field the site leaves empty stays empty, so its input shows the shared
- * value faintly.
+ * Whether a site sets a field itself, rather than showing the shared value.
  */
-export const withSharedValues = (
-    shared: Record<string, unknown> | null,
-    ownFields: Description['fields'],
-    own: Record<string, unknown> | null
-): Record<string, unknown> => {
-    const merged: Record<string, unknown> = {
-        ...shared,
-    };
-    for (const field of ownFields) {
-        if (field.parent !== undefined) continue;
-        delete merged[field.path];
-        if (own?.[field.path] !== undefined) merged[field.path] = own[field.path];
-    }
-    return merged;
-};
+export const setsOwnValue = (values: Record<string, unknown> | null, path: string): boolean => isSet(values?.[path]);
+
+/**
+ * How many values a site sets itself on a shared document, which its tab
+ * counts.
+ */
+export const ownValueCount = (values: Record<string, unknown> | null): number => Object.values(values ?? {}).filter(isSet).length;

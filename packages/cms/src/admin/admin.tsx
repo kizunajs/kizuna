@@ -37,7 +37,6 @@ import {
     navigate,
     navigationOf,
     replaceAddress,
-    screenInSite,
     screenOf,
     showSite,
     useAddress,
@@ -49,7 +48,7 @@ import {
 import { Loading } from './parts.js';
 import { PageHeader } from './page-header.js';
 import { SignedIn } from './signed-in.js';
-import { SiteFact, SiteSwitcher, SiteTabs } from './site-switcher.js';
+import { SiteFact, SiteSwitcher } from './site-switcher.js';
 import { sharedNameOf, siteValuesRefOf } from './site-view.js';
 import { NotFound, shownAddress } from './states.js';
 import { useTabIcon } from './tab-icon.js';
@@ -439,11 +438,14 @@ export function Admin({ config }: { config: AdminConfig }) {
                     key={documentRef}
                     connection={connection}
                     documentRef={documentRef}
-                    sharedRef={onSiteTab ? screen.ref : undefined}
                     siteTabs={
-                        tabSites.length === 0 ? undefined : (
-                            <SiteTabs documentRef={screen.ref} sites={tabSites} current={onSiteTab ? screen.site : undefined} />
-                        )
+                        tabSites.length === 0
+                            ? undefined
+                            : {
+                                  sharedRef: screen.ref,
+                                  sites: tabSites,
+                                  current: onSiteTab ? screen.site : undefined,
+                              }
                     }
                     siteUrl={config.siteUrl}
                     people={people}

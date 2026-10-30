@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import { Tabs } from '@base-ui/react/tabs';
 import { Toast } from '@base-ui/react/toast';
-import { Check, CircleAlert, ExternalLink, Info, PanelRight, RotateCcw } from 'lucide-react';
+import { Check, CircleAlert, ExternalLink, Info, PanelRight, RotateCcw, Undo2 } from 'lucide-react';
 import { toolsFor, type Connection, type ToolAnswer } from '../view/connection.js';
 import { EditorContext, ICON, type EditorContextValue } from '../view/context.js';
 import { FieldForm, fieldDomId, type FieldFormHandle, type SaveFailure, type SaveState } from '../view/form.js';
@@ -17,7 +17,8 @@ import { blockerOf, documentDatesOf, menuEntriesOf } from './document-menu.js';
 import { DocumentMore, type DocumentMoreHandle } from './document-more.js';
 import { savedAtOf, type VersionSummary } from './history.js';
 import { hasSites, hrefOf, navigate, siteOf } from './navigation.js';
-import { SiteFact } from './site-switcher.js';
+import { SiteFact, SiteTabs } from './site-switcher.js';
+import type { AdminSite } from './config.js';
 import { PageHeader, type Crumb } from './page-header.js';
 import { Loading, SaveIndicator, Status, problemOf } from './parts.js';
 import { documentNounOf, documentStateOf, roleSubjectOf, titleOfRef } from './access.js';
@@ -30,7 +31,7 @@ import { CommentLinks, FieldComments } from './review-comments.js';
 import { DecisionCard, PeopleFact, RequestChanges, ReviewScreen, type ViewedChange } from './review-screen.js';
 import { askAgainLabelOf, askAgainOf, gateNoteOf, mayUndoApproval, mayWithdraw, reviewStatusPartsOf, waitsForMe } from './review-state.js';
 import { sectionLabelOf } from './sections.js';
-import { withSharedFields, withSharedValues } from './site-view.js';
+import { ownValueCount, setsOwnValue, siteValuesRefOf } from './site-view.js';
 import { useOfferUndo } from './toasts.js';
 import { refreshLineOf, type Refresh } from './refresh-line.js';
 import { Versions } from './versions.js';
@@ -175,7 +176,6 @@ export function DocumentScreen({
     onSearch,
     onTitle,
     paletteActions,
-    sharedRef,
     siteTabs,
 }: {
     connection: Connection;
@@ -200,18 +200,21 @@ export function DocumentScreen({
      */
     paletteActions?: RefObject<(() => PaletteAction[]) | undefined>;
     /**
-     * The shared document whose fields a site's values sit among, when
-     * `documentRef` is a site's values on it.
+     * The tabs of a shared document that sites set values on: Shared, and
+     * each site the editor may open, with the one `documentRef` edits.
      */
-    sharedRef?: string | undefined;
-    /**
-     * The tabs of a shared document, one for its shared values and one for
-     * each site's, under the header.
-     */
-    siteTabs?: ReactNode;
+    siteTabs?:
+        | {
+              sharedRef: string;
+              sites: readonly AdminSite[];
+              /**
+               * The site whose values the screen edits, or `undefined` for
+               * the shared ones.
+               */
+              current: string | undefined;
+          }
+        | undefined;
 }) {
-    // The shared values, which a site's tab shows locked around its own.
-    const sharedDraft = useRef<Record<string, unknown> | null>(null);
     const [document, setDocument] = useState<Description | undefined>();
     const [loadProblem, setLoadProblem] = useState<string | undefined>();
     const [loadStatus, setLoadStatus] = useState<number | undefined>();
@@ -270,36 +273,24 @@ export function DocumentScreen({
 
     const describe = useCallback(
         async (ref: string, options: { remount?: boolean } = {}): Promise<Description | undefined> => {
-            const [answer, shared] = await Promise.all([
-                connection.call<Description>('editing_describe', {
-                    query: {
-                        ref,
-                    },
-                }),
-                sharedRef === undefined
-                    ? undefined
-                    : connection.call<Description>('editing_describe', {
-                          query: {
-                              ref: sharedRef,
-                          },
-                      }),
-            ]);
-            const failed = answer.status !== 200 ? answer : shared !== undefined && shared.status !== 200 ? shared : undefined;
-            if (failed !== undefined) {
-                setLoadProblem(problemOf(failed, 'The CMS answered'));
-                setLoadStatus(failed.status);
+            const answer = await connection.call<Description>('editing_describe', {
+                query: {
+                    ref,
+                },
+            });
+            if (answer.status !== 200) {
+                setLoadProblem(problemOf(answer, 'The CMS answered'));
+                setLoadStatus(answer.status);
                 return undefined;
             }
             setLoadProblem(undefined);
             setLoadStatus(undefined);
-            sharedDraft.current = shared?.body.draft ?? null;
-            const described = shared === undefined ? answer.body : withSharedFields(answer.body, shared.body);
-            setDocument(described);
+            setDocument(answer.body);
             if (options.remount !== false) setFormKey((key) => key + 1);
             seen.current = null;
-            return described;
+            return answer.body;
         },
-        [connection, sharedRef]
+        [connection]
     );
 
     useEffect(() => {
@@ -480,14 +471,7 @@ export function DocumentScreen({
                         version: answer.body.version,
                         complete: answer.body.complete,
                         missing: answer.body.missing,
-                        draft:
-                            sharedRef === undefined
-                                ? answer.body.content
-                                : withSharedValues(
-                                      sharedDraft.current,
-                                      current.fields.filter((field) => field.writable),
-                                      answer.body.content
-                                  ),
+                        draft: answer.body.content,
                     });
                 }
                 return undefined;
@@ -495,8 +479,55 @@ export function DocumentScreen({
                 busy.current = false;
             }
         },
-        [connection, describe, sharedRef]
+        [connection, describe]
     );
+
+    // Each tab counts the values its site sets itself. The open tab counts what the form holds.
+    const onSiteTab = siteTabs?.current !== undefined;
+    const [savedCounts, setSavedCounts] = useState<Readonly<Record<string, number>>>({});
+    const tabSharedRef = siteTabs?.sharedRef;
+    const tabSiteKeys = siteTabs?.sites.map((site) => site.key).join(',');
+    useEffect(() => {
+        if (tabSharedRef === undefined || tabSiteKeys === undefined || tabSiteKeys === '') return;
+        let current = true;
+        void Promise.all(
+            tabSiteKeys.split(',').map(async (key): Promise<[string, number]> => {
+                const tools = toolsFor(siteValuesRefOf(tabSharedRef, key));
+                if (tools === undefined) return [key, 0];
+                const answer = await connection.call<Draft>(`${tools.prefix}_get_draft`, {
+                    params: tools.params,
+                });
+                return [key, answer.status === 200 ? ownValueCount(answer.body.content) : 0];
+            })
+        ).then((counted) => {
+            if (current) setSavedCounts(Object.fromEntries(counted));
+        });
+        return () => {
+            current = false;
+        };
+    }, [connection, tabSharedRef, tabSiteKeys]);
+    const siteCounts =
+        siteTabs?.current === undefined || document === undefined
+            ? savedCounts
+            : {
+                  ...savedCounts,
+                  [siteTabs.current]: ownValueCount(document.draft),
+              };
+
+    /**
+     * Clears a value the site sets itself, so the site shows the shared one.
+     */
+    const clearToShared = async (path: string): Promise<void> => {
+        const current = latest.current;
+        if (current === undefined) return;
+        await form.current?.flush();
+        const failure = await save(current.ref, {
+            [path]: null,
+        });
+        if (failure === undefined) {
+            await describe(current.ref);
+        }
+    };
 
     /**
      * What the publish review looks at: the open document, the reviews
@@ -1264,7 +1295,9 @@ export function DocumentScreen({
                         )
                     }
                 />
-                {siteTabs}
+                {siteTabs === undefined ? null : (
+                    <SiteTabs documentRef={siteTabs.sharedRef} sites={siteTabs.sites} current={siteTabs.current} counts={siteCounts} />
+                )}
                 {linkProblem === undefined ? null : (
                     <p className="k-error k-document__problem" role="alert">
                         <CircleAlert {...ICON} />
@@ -1288,21 +1321,35 @@ export function DocumentScreen({
                             pointed={pointed}
                             missing={document.complete ? [] : document.missing}
                             aside={reviewAside}
-                            below={(field) =>
-                                document.review === null ? null : (
-                                    <FieldComments
-                                        review={document.review}
-                                        path={field.path}
-                                        label={fieldLabelOf(field.path)}
-                                        me={me}
-                                        now={now}
-                                        connection={connection}
-                                        composing={replyingOn === field.path}
-                                        onComposingChange={(next) => setReplyingOn(next ? field.path : undefined)}
-                                        onChanged={reviewChanged}
-                                    />
-                                )
-                            }
+                            below={(field) => (
+                                <>
+                                    {onSiteTab &&
+                                    field.parent === undefined &&
+                                    field.writable &&
+                                    setsOwnValue(document.draft, field.path) ? (
+                                        <button
+                                            type="button"
+                                            className="k-text-button k-use-shared"
+                                            onClick={() => void clearToShared(field.path)}>
+                                            <Undo2 {...ICON} />
+                                            Use shared
+                                        </button>
+                                    ) : null}
+                                    {document.review === null ? null : (
+                                        <FieldComments
+                                            review={document.review}
+                                            path={field.path}
+                                            label={fieldLabelOf(field.path)}
+                                            me={me}
+                                            now={now}
+                                            connection={connection}
+                                            composing={replyingOn === field.path}
+                                            onComposingChange={(next) => setReplyingOn(next ? field.path : undefined)}
+                                            onChanged={reviewChanged}
+                                        />
+                                    )}
+                                </>
+                            )}
                         />
                     </div>
                     {previewOpened && siteUrl !== null && previewPath !== null ? (

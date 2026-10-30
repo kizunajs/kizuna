@@ -729,8 +729,8 @@
     }
 
     .k-admin__body.k-dashboard {
-        gap: 32px;
-        padding-top: 28px;
+        gap: 12px;
+        padding-top: 24px;
     }
 
     .k-dashboard__tiles,
@@ -748,15 +748,15 @@
         display: flex;
         flex-direction: column;
         min-width: 0;
-        padding: 20px 20px 16px;
+        padding: 14px 16px 12px;
         border-radius: var(--k-radius-card);
         background: var(--k-surface);
         box-shadow: var(--k-elevation);
     }
 
     .k-stat {
-        gap: 10px;
-        padding: 18px 18px 16px;
+        gap: 6px;
+        padding: 14px 16px 14px;
     }
 
     .k-waiting {
@@ -838,7 +838,8 @@
     }
 
     .k-dashboard__panels > :last-child:nth-child(odd),
-    .k-dashboard__panels > .k-waiting--reviews:not(.k-waiting--grouped) {
+    .k-dashboard__panels > .k-waiting--reviews:not(.k-waiting--grouped),
+    .k-dashboard__panels > :nth-child(odd):has(+ .k-waiting--reviews:not(.k-waiting--grouped)) {
         grid-column: 1 / -1;
     }
 
@@ -892,103 +893,228 @@
         border-radius: 4px;
     }
 
-    /* The sites side by side: a column each, every chart on the scale the columns share. */
-    .k-sites {
+    /* A panel: its title on the card, then rows on the collection list's own table. */
+    .k-panel {
         display: flex;
         flex-direction: column;
-        gap: 16px;
         min-width: 0;
-        padding: 20px 20px 16px;
+        padding-bottom: 4px;
         border-radius: var(--k-radius-card);
         background: var(--k-surface);
         box-shadow: var(--k-elevation);
     }
 
-    .k-sites__grid {
-        display: grid;
-        grid-template-columns: repeat(var(--k-sites-columns, 3), minmax(0, 1fr));
-        gap: 28px 36px;
-    }
-
-    .k-sites__grid[data-count='1'] {
-        --k-sites-columns: 1;
-    }
-
-    .k-sites__grid[data-count='2'] {
-        --k-sites-columns: 2;
-    }
-
-    @media (max-width: 1180px) {
-        .k-sites__grid {
-            --k-sites-columns: 1;
-        }
-    }
-
-    .k-site {
+    .k-panel__head {
         display: flex;
-        flex-direction: column;
-        gap: 12px;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 2px 10px;
         min-width: 0;
+        padding: 14px 16px 4px;
     }
 
-    .k-site__name {
-        display: flex;
-        align-items: center;
-        gap: 9px;
-        min-width: 0;
+    .k-panel__title {
         margin: 0;
         font-size: 14px;
         font-weight: 600;
     }
 
-    .k-site__name .k-site-icon {
+    .k-panel__description {
+        font-size: 12.5px;
+        color: var(--k-muted);
+    }
+
+    .k-panel__empty {
+        padding: 2px 16px 12px;
+    }
+
+    .k-panel__table {
+        min-width: 0;
+        overflow-x: auto;
+    }
+
+    /* Rows a little shorter than the collection list's, which has room to spare. */
+    .k-table.k-dashboard-table th {
+        height: 34px;
+    }
+
+    .k-table.k-dashboard-table td {
+        height: 44px;
+        padding-block: 6px;
+    }
+
+    .k-table.k-dashboard-table tbody th {
+        height: 44px;
+    }
+
+    .k-table.k-dashboard-table tbody tr:last-child th {
+        border-bottom: 0;
+    }
+
+    .k-dashboard-table :is(th, td)[data-kind='number'] {
+        width: 1%;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* The name takes what the numbers leave, and cuts off rather than wrapping. */
+    .k-dashboard-table td.k-dashboard-table__name {
+        width: 100%;
+        max-width: 0;
+    }
+
+    .k-dashboard-table__number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        max-width: 100%;
+        min-width: 0;
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .k-dashboard-table__person {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+    }
+
+    .k-dashboard-table td.k-dashboard-table__bar {
+        width: 28%;
+        min-width: 64px;
+    }
+
+    .k-ranked__track {
+        display: block;
+        height: 8px;
+    }
+
+    .k-ranked__bar {
+        display: block;
+        min-width: 4px;
+        height: 8px;
+        border-radius: 0 4px 4px 0;
+        background: var(--k-ink);
+        opacity: 0.85;
+    }
+
+    /* The sites as columns: each site's name heads its column, its chart under the name, and each measure a row across them. */
+    .k-sites__table {
+        table-layout: fixed;
+    }
+
+    .k-sites__measure {
+        width: 132px;
+    }
+
+    .k-sites__table th[data-kind='number'],
+    .k-sites__table td[data-kind='number'] {
+        width: auto;
+        overflow: hidden;
+    }
+
+    .k-sites__name {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        max-width: 100%;
+        min-width: 0;
+        vertical-align: middle;
+    }
+
+    .k-sites__label {
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--k-ink);
+    }
+
+    .k-sites__url {
+        font-weight: 400;
+    }
+
+    .k-sites__name .k-site-icon {
         border-radius: 5px;
     }
 
-    .k-site__url {
-        font-size: 12.5px;
-        font-weight: 400;
-        color: var(--k-muted);
+    .k-table.k-sites__table thead th {
+        height: 44px;
     }
 
-    .k-site__figure {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
+    .k-table.k-sites__table .k-sites__charts td {
+        padding-block: 10px 6px;
+        vertical-align: top;
     }
 
-    .k-facts {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        margin: 0;
-        font-size: 13px;
+    .k-table.k-sites__table .k-sites__charts th {
+        vertical-align: top;
+        padding-top: 14px;
     }
 
-    .k-facts__row {
-        display: grid;
-        grid-template-columns: 96px minmax(0, 1fr);
-        gap: 12px;
-    }
-
-    .k-facts dt {
-        color: var(--k-muted);
-    }
-
-    .k-facts dd {
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-        margin: 0;
-    }
-
-    .k-facts .k-help {
-        font-size: 12px;
-        line-height: 17px;
-    }
-
-    .k-facts__link:hover {
+    .k-sites__publish:hover .k-ellipsis {
         text-decoration: underline;
+    }
+
+    .k-sites__when {
+        flex-shrink: 0;
+    }
+
+    /* On a phone, a dashboard table stays a table, which the collection list stacks into cards. */
+    @media (max-width: 640px) {
+        .k-dashboard .k-table.k-dashboard-table {
+            display: table;
+        }
+
+        .k-dashboard .k-table.k-dashboard-table thead {
+            display: table-header-group;
+        }
+
+        .k-dashboard .k-table.k-dashboard-table tbody {
+            display: table-row-group;
+        }
+
+        .k-dashboard .k-table.k-dashboard-table tr {
+            position: static;
+            display: table-row;
+            min-height: 0;
+            padding: 0;
+            border: 0;
+        }
+
+        .k-dashboard .k-table.k-dashboard-table :is(th, td) {
+            display: table-cell;
+            height: 40px;
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--k-line);
+            font-size: 13px;
+        }
+
+        .k-dashboard .k-table.k-dashboard-table tbody tr:last-child :is(th, td) {
+            border-bottom: 0;
+        }
+
+        .k-dashboard .k-table.k-dashboard-table :is(th, td):first-child {
+            padding-left: 16px;
+        }
+
+        .k-dashboard .k-table.k-dashboard-table :is(th, td):last-child {
+            padding-right: 16px;
+        }
+
+        .k-dashboard .k-table.k-dashboard-table .k-table__link {
+            font-size: 13.5px;
+        }
+
+        .k-dashboard .k-dashboard-table td.k-dashboard-table__bar {
+            width: 22%;
+            min-width: 40px;
+        }
+
+        .k-sites__table {
+            min-width: 560px;
+        }
     }
 
     .k-signal {
@@ -1010,162 +1136,8 @@
         color: var(--k-ink);
     }
 
-    .k-refresh__list {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        margin: 0;
-        padding: 0;
-        list-style: none;
-    }
-
-    .k-refresh__row {
-        display: grid;
-        grid-template-columns: 18px minmax(0, 1fr) auto;
-        align-items: start;
-        column-gap: 10px;
-        padding: 8px 10px;
-        border-radius: 8px;
-        font-size: 13.5px;
-    }
-
-    .k-refresh__row > svg {
-        margin-top: 2px;
-        color: var(--k-muted);
-    }
-
-    .k-refresh__row--wrong > svg {
-        color: var(--k-ink);
-    }
-
-    .k-refresh__who {
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-    }
-
-    .k-refresh__when {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        text-align: right;
-    }
-
-    .k-refresh__row--wrong .k-refresh__when > :first-child {
-        font-weight: 600;
-    }
-
-    /* Ranked rows with a bar: shared content by reach, and editors. */
-    .k-reach {
-        --k-ranked-columns: minmax(96px, 1fr) minmax(0, 120px) 28px 56px;
-    }
-
-    .k-editors {
-        --k-ranked-columns: 26px minmax(96px, 1fr) minmax(0, 96px) 28px 80px;
-    }
-
-    .k-ranked {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        margin: 0;
-        padding: 0;
-        list-style: none;
-    }
-
-    .k-ranked__row,
-    .k-columns-head {
-        display: grid;
-        grid-template-columns: var(--k-ranked-columns);
-        align-items: center;
-        column-gap: 12px;
-    }
-
-    .k-ranked__row {
-        min-height: 40px;
-        padding: 4px 10px;
-        border-radius: 8px;
-        font-size: 13.5px;
-    }
-
-    a.k-ranked__row:hover {
-        background: var(--k-tint);
-    }
-
-    .k-ranked__name {
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-    }
-
-    .k-ranked__name .k-help {
-        font-size: 12px;
-        line-height: 17px;
-    }
-
-    .k-ranked__track {
-        display: block;
-        height: 8px;
-    }
-
-    .k-ranked__bar {
-        display: block;
-        min-width: 4px;
-        height: 8px;
-        border-radius: 0 4px 4px 0;
-        background: var(--k-ink);
-        opacity: 0.85;
-    }
-
-    .k-ranked__value {
-        font-size: 13px;
-        font-variant-numeric: tabular-nums;
-        text-align: right;
-    }
-
-    .k-ranked__sites,
-    .k-ranked__when {
-        font-size: 12px;
-        font-variant-numeric: tabular-nums;
-        text-align: right;
-        color: var(--k-muted);
-    }
-
-    .k-columns-head {
-        padding: 0 10px 2px;
-        font-size: 11px;
-        font-weight: 600;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--k-muted);
-    }
-
-    .k-columns-head > :last-child {
-        text-align: right;
-    }
-
-    .k-columns-head__span {
-        grid-column: span 2;
-    }
-
-    @media (max-width: 640px) {
-        .k-reach {
-            --k-ranked-columns: minmax(0, 1fr) 28px 56px;
-        }
-
-        .k-editors {
-            --k-ranked-columns: 26px minmax(0, 1fr) 28px;
-        }
-
-        .k-ranked__track,
-        .k-ranked__when,
-        .k-columns-head {
-            display: none;
-        }
-    }
-
     .k-chart {
-        gap: 14px;
+        gap: 8px;
     }
 
     .k-chart__head {
@@ -1244,7 +1216,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        min-height: 190px;
+        min-height: 168px;
     }
 
     .k-chart__grid {
@@ -1489,6 +1461,23 @@
         background: var(--k-control);
         box-shadow: var(--k-control-elevation);
         color: var(--k-ink);
+    }
+
+    .k-site-tabs__count {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--k-muted);
+    }
+
+    /* On a site's tab, Use shared sits at the right of each value the site sets itself. */
+    .k-document__fields .k-field:has(> .k-use-shared) {
+        position: relative;
+    }
+
+    .k-use-shared {
+        position: absolute;
+        top: 0;
+        right: 0;
     }
 
     .k-site-tabs .k-site-icon {
