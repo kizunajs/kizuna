@@ -159,6 +159,42 @@ export interface ChartBar {
     previous?: number;
 }
 
+/**
+ * One row of a list, in the order your function ranks them.
+ */
+export interface ListRow {
+    label: string;
+    /**
+     * A line under the label, like "Hagen UK" or "38 sold".
+     */
+    detail?: string;
+    /**
+     * The number the row's bar is drawn from.
+     */
+    value: number;
+    /**
+     * The value as the row shows it, like "£1,240". Without it, the number.
+     */
+    formatted?: string;
+    /**
+     * The most `value` can reach, like a workshop's seats. The bar then fills
+     * to it, rather than to the largest value in the list.
+     */
+    of?: number;
+    /**
+     * How far the value moved since the period before, as a signed fraction.
+     */
+    change?: number;
+}
+
+/**
+ * One step of a funnel, from the first step every visitor takes.
+ */
+export interface FunnelStep {
+    label: string;
+    value: number;
+}
+
 interface WidgetAccess {
     /**
      * Who sees the widget, in a field's words. Its function never runs for
@@ -216,6 +252,60 @@ export interface ChartWidget<Sites = undefined> extends WidgetAccess, SiteScope<
 }
 
 /**
+ * Rows ranked by a number, each with a bar, from your function.
+ *
+ * @example
+ * {
+ *     type: 'list',
+ *     label: 'Top pages',
+ *     data: topPages,
+ * }
+ */
+export interface ListWidget<Sites = undefined> extends WidgetAccess, SiteScope<Sites> {
+    type: 'list';
+    label: string;
+    /**
+     * What the numbers count, in a line under the label, like "Views".
+     */
+    description?: string;
+    /**
+     * The headings over the rows' labels and their values, like
+     * `{ label: 'Page', value: 'Views' }`.
+     */
+    columns?: {
+        label: string;
+        value: string;
+    };
+    data: (context: DashboardContext<Sites>) => readonly ListRow[] | Promise<readonly ListRow[]>;
+}
+
+/**
+ * Steps that each keep some of the step before, like a checkout, from your
+ * function.
+ *
+ * @example
+ * {
+ *     type: 'funnel',
+ *     label: 'Checkout',
+ *     data: checkout,
+ * }
+ */
+export interface FunnelWidget<Sites = undefined> extends WidgetAccess, SiteScope<Sites> {
+    type: 'funnel';
+    label: string;
+    description?: string;
+    /**
+     * The headings over the rows' labels and their values, like
+     * `{ label: 'Page', value: 'Views' }`.
+     */
+    columns?: {
+        label: string;
+        value: string;
+    };
+    data: (context: DashboardContext<Sites>) => readonly FunnelStep[] | Promise<readonly FunnelStep[]>;
+}
+
+/**
  * The reviews waiting on the person signed in.
  */
 export interface ReviewsWidget extends WidgetAccess {
@@ -232,7 +322,13 @@ export interface CollectionsWidget extends WidgetAccess {
 /**
  * One widget of the dashboard. With sites, it runs for the site open.
  */
-export type DashboardWidget<Sites = undefined> = StatWidget<Sites> | ChartWidget<Sites> | ReviewsWidget | CollectionsWidget;
+export type DashboardWidget<Sites = undefined> =
+    | StatWidget<Sites>
+    | ChartWidget<Sites>
+    | ListWidget<Sites>
+    | FunnelWidget<Sites>
+    | ReviewsWidget
+    | CollectionsWidget;
 
 /**
  * One number across the sites, from your function.
@@ -255,9 +351,46 @@ export interface OverviewChartWidget<Sites = undefined> extends WidgetAccess {
 }
 
 /**
- * The sites side by side: the stats it names, its chart on one scale for
- * every site, the reviews waiting, the last publish and the last refresh.
- * The functions are the site dashboard's own, run once per site.
+ * Ranked rows across the sites, from your function.
+ */
+export interface OverviewListWidget<Sites = undefined> extends WidgetAccess {
+    type: 'list';
+    label: string;
+    description?: string;
+    /**
+     * The headings over the rows' labels and their values, like
+     * `{ label: 'Page', value: 'Views' }`.
+     */
+    columns?: {
+        label: string;
+        value: string;
+    };
+    data: (context: OverviewContext<Sites>) => readonly ListRow[] | Promise<readonly ListRow[]>;
+}
+
+/**
+ * A funnel across the sites, from your function.
+ */
+export interface OverviewFunnelWidget<Sites = undefined> extends WidgetAccess {
+    type: 'funnel';
+    label: string;
+    description?: string;
+    /**
+     * The headings over the rows' labels and their values, like
+     * `{ label: 'Page', value: 'Views' }`.
+     */
+    columns?: {
+        label: string;
+        value: string;
+    };
+    data: (context: OverviewContext<Sites>) => readonly FunnelStep[] | Promise<readonly FunnelStep[]>;
+}
+
+/**
+ * The sites side by side, a column each: its chart on one scale for every
+ * site, then a row for each stat it names, the reviews waiting, the last
+ * publish and the last refresh. The functions are the site dashboard's own,
+ * run once per site.
  *
  * @example
  * {
@@ -277,7 +410,7 @@ export interface OverviewChartWidget<Sites = undefined> extends WidgetAccess {
 export interface SitesWidget<Sites = undefined> extends WidgetAccess {
     type: 'sites';
     /**
-     * The first is drawn large, over the chart.
+     * A row each, in the order listed.
      */
     stats: ReadonlyArray<
         SiteScope<Sites> & {
@@ -285,6 +418,9 @@ export interface SitesWidget<Sites = undefined> extends WidgetAccess {
             value: (context: DashboardContext<Sites>) => StatValue | Promise<StatValue>;
         }
     >;
+    /**
+     * Drawn small under each site's name, on one scale across the sites.
+     */
     chart?: SiteScope<Sites> & {
         label: string;
         style?: 'bar' | 'line';
@@ -319,6 +455,8 @@ export interface EditorsWidget extends WidgetAccess {
 export type OverviewWidget<Sites = undefined> =
     | OverviewStatWidget<Sites>
     | OverviewChartWidget<Sites>
+    | OverviewListWidget<Sites>
+    | OverviewFunnelWidget<Sites>
     | SitesWidget<Sites>
     | ReviewsWidget
     | RefreshesWidget
@@ -384,6 +522,35 @@ const chartSchema = z.object({
     auth: WidgetAuthSchema,
 });
 
+const ColumnsSchema = z
+    .object({
+        label: z.string().min(1),
+        value: z.string().min(1),
+    })
+    .optional();
+
+const listSchema = z.object({
+    type: z.literal('list'),
+    label: z.string().min(1),
+    description: z.string().min(1).optional(),
+    columns: ColumnsSchema,
+    data: z.custom<ListWidget<AnySites>['data']>(isFunction, {
+        error: "must be a function returning the list's rows",
+    }),
+    auth: WidgetAuthSchema,
+});
+
+const funnelSchema = z.object({
+    type: z.literal('funnel'),
+    label: z.string().min(1),
+    description: z.string().min(1).optional(),
+    columns: ColumnsSchema,
+    data: z.custom<FunnelWidget<AnySites>['data']>(isFunction, {
+        error: "must be a function returning the funnel's steps",
+    }),
+    auth: WidgetAuthSchema,
+});
+
 const builtIn = <const Type extends string>(type: Type) =>
     z.object({
         type: z.literal(type),
@@ -398,6 +565,12 @@ export const DashboardWidgetSchema = z.discriminatedUnion('type', [
         sites: SiteNamesSchema,
     }),
     chartSchema.extend({
+        sites: SiteNamesSchema,
+    }),
+    listSchema.extend({
+        sites: SiteNamesSchema,
+    }),
+    funnelSchema.extend({
         sites: SiteNamesSchema,
     }),
     builtIn('reviews'),
@@ -416,6 +589,16 @@ export const OverviewWidgetSchema = z.discriminatedUnion('type', [
     chartSchema.extend({
         data: z.custom<OverviewChartWidget<AnySites>['data']>(isFunction, {
             error: "must be a function returning the chart's points",
+        }),
+    }),
+    listSchema.extend({
+        data: z.custom<OverviewListWidget<AnySites>['data']>(isFunction, {
+            error: "must be a function returning the list's rows",
+        }),
+    }),
+    funnelSchema.extend({
+        data: z.custom<OverviewFunnelWidget<AnySites>['data']>(isFunction, {
+            error: "must be a function returning the funnel's steps",
         }),
     }),
     z.object({

@@ -11,7 +11,7 @@ import {
     type ChartBar,
 } from './chart-geometry.js';
 
-const HEIGHT = 190;
+const HEIGHT = 168;
 const TOP = 10;
 const AXIS_SPACE = 24;
 const TICK_GAP = 8;

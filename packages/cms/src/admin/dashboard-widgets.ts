@@ -147,6 +147,48 @@ export interface ChartWidgetBody {
     data: ChartBar[];
 }
 
+export interface ListRowBody {
+    label: string;
+    detail?: string;
+    value: number;
+    /**
+     * The value as the row shows it.
+     */
+    formatted: string;
+    /**
+     * The most the value can reach, which the bar fills to.
+     */
+    of?: number;
+    change?: number;
+}
+
+/**
+ * The headings over a list's labels and values.
+ */
+export interface WidgetColumns {
+    label: string;
+    value: string;
+}
+
+export interface ListWidgetBody {
+    type: 'list';
+    label: string;
+    description?: string;
+    columns?: WidgetColumns;
+    rows: ListRowBody[];
+}
+
+export interface FunnelWidgetBody {
+    type: 'funnel';
+    label: string;
+    description?: string;
+    columns?: WidgetColumns;
+    steps: Array<{
+        label: string;
+        value: number;
+    }>;
+}
+
 /**
  * A site as a dashboard widget names it.
  */
@@ -275,6 +317,8 @@ export interface EditorsWidgetBody {
 export type DashboardWidgetBody =
     | StatWidgetBody
     | ChartWidgetBody
+    | ListWidgetBody
+    | FunnelWidgetBody
     | ReviewsWidgetBody
     | CollectionsWidgetBody
     | SitesWidgetBody
@@ -285,7 +329,14 @@ export type DashboardWidgetBody =
 /**
  * A widget drawn as a panel, two to a row.
  */
-export type PanelWidgetBody = ChartWidgetBody | ReviewsWidgetBody | RefreshesWidgetBody | ReachWidgetBody | EditorsWidgetBody;
+export type PanelWidgetBody =
+    | ChartWidgetBody
+    | ListWidgetBody
+    | FunnelWidgetBody
+    | ReviewsWidgetBody
+    | RefreshesWidgetBody
+    | ReachWidgetBody
+    | EditorsWidgetBody;
 
 /**
  * Widgets that sit together on the dashboard: stats in a row of tiles,
@@ -367,6 +418,38 @@ export const groupsOf = (collections: readonly DashboardCollection[]): Collectio
             label,
             collections: members,
         }));
+};
+
+/**
+ * The collections under the headings the dashboard draws them in: each
+ * site's own under its label, then the shared ones under `shared`, leaving
+ * out a heading with nothing under it. Without sites, one "Collections".
+ */
+export const collectionSectionsOf = (
+    collections: readonly DashboardCollection[],
+    shared: string
+): Array<{ heading: string; collections: DashboardCollection[] }> => {
+    if (collections.every((collection) => collection.site === undefined)) {
+        return collections.length === 0
+            ? []
+            : [
+                  {
+                      heading: 'Collections',
+                      collections: [...collections],
+                  },
+              ];
+    }
+    const sections = new Map<string, DashboardCollection[]>();
+    for (const collection of collections) {
+        if (collection.site === undefined || collection.site === null) continue;
+        sections.set(collection.site.label, [...(sections.get(collection.site.label) ?? []), collection]);
+    }
+    const common = collections.filter((collection) => collection.site === undefined || collection.site === null);
+    if (common.length > 0) sections.set(shared, common);
+    return [...sections].map(([heading, members]) => ({
+        heading,
+        collections: members,
+    }));
 };
 
 /**
@@ -496,3 +579,59 @@ export const sharedScaleOf = (sites: readonly SiteColumn[]): number[] =>
     sites.flatMap((site) =>
         (site.chart ?? []).flatMap((point) => [point.value, ...(point.previous === undefined ? [] : [point.previous])])
     );
+
+/**
+ * How much of its track a list row's bar fills, from 0 to 1: its share of
+ * `of` when the row has one, or else of the list's largest value.
+ */
+export const barShareOf = (row: { value: number; of?: number }, rows: ReadonlyArray<{ value: number }>): number => {
+    const whole = row.of ?? Math.max(0, ...rows.map((candidate) => candidate.value));
+    if (whole <= 0 || row.value <= 0) return 0;
+    return Math.min(1, row.value / whole);
+};
+
+const PERCENT = new Intl.NumberFormat('en-GB', {
+    style: 'percent',
+    maximumFractionDigits: 1,
+});
+
+/**
+ * A funnel's steps as the dashboard draws them: each one's share of the
+ * first, which sizes its bar, and the share of the step before that went on
+ * to it, as a percentage. The first step has none.
+ */
+export const funnelRowsOf = (
+    steps: ReadonlyArray<{ label: string; value: number }>
+): Array<{ label: string; value: number; share: number; kept: string | undefined }> => {
+    const first = steps[0]?.value ?? 0;
+    return steps.map((step, index) => {
+        const before = index === 0 ? undefined : steps[index - 1]!.value;
+        return {
+            label: step.label,
+            value: step.value,
+            share: first <= 0 ? 0 : Math.min(1, Math.max(0, step.value / first)),
+            kept: before === undefined || before <= 0 ? undefined : PERCENT.format(step.value / before),
+        };
+    });
+};
+
+/**
+ * How long ago something happened, short enough for one line beside a
+ * title: "now", "4 min", "2 h", "3 d", and the day after a week.
+ */
+export const agoOf = (iso: string, now: Date = new Date()): string => {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    const elapsed = Math.max(0, now.getTime() - date.getTime());
+    const minutes = Math.round(elapsed / 60_000);
+    if (minutes < 1) return 'now';
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.round(minutes / 60);
+    if (hours < 24) return `${hours} h`;
+    const days = Math.round(hours / 24);
+    if (days < 7) return `${days} d`;
+    return new Intl.DateTimeFormat('en-GB', {
+        day: 'numeric',
+        month: 'short',
+    }).format(date);
+};

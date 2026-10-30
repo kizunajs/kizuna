@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronRight, CircleAlert, CircleCheck, Plus } from 'lucide-react';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
@@ -6,8 +6,12 @@ import { Hint } from '../view/hint.js';
 import { parseRef } from '../refs.js';
 import { Chart, Legend } from './chart.js';
 import {
+    agoOf,
     askedOf,
+    barShareOf,
     changeOf,
+    collectionSectionsOf,
+    funnelRowsOf,
     DEFAULT_PERIOD,
     groupsOf,
     isNewOf,
@@ -28,6 +32,8 @@ import {
     type DashboardCollection,
     type DashboardWidgetBody,
     type EditorsWidgetBody,
+    type FunnelWidgetBody,
+    type ListWidgetBody,
     type PanelWidgetBody,
     type ReachWidgetBody,
     type RefreshesWidgetBody,
@@ -191,20 +197,29 @@ function ReviewsCard({ widget, collections }: { widget: ReviewsWidgetBody; colle
     );
 }
 
+/**
+ * A site's last refresh as a time, or a word when it did not answer, with
+ * the rest on hover.
+ */
 function RefreshFact({ refresh }: { refresh: RefreshState | null }) {
-    if (refresh === null) return <span className="k-help">No refreshes yet</span>;
+    if (refresh === null) return <span>–</span>;
     const words = refreshWordsOf(refresh);
     const Icon = words.wrong ? CircleAlert : CircleCheck;
+    const text = words.wrong ? (refresh.status === 'retrying' ? 'Retrying' : 'Failed') : CLOCK.format(new Date(refresh.at));
     return (
-        <>
-            <span className={words.wrong ? 'k-signal k-signal--wrong' : 'k-signal'}>
-                <Icon {...ICON} size={14} aria-hidden="true" />
-                {words.text}
-            </span>
-            {words.detail === undefined ? null : <span className="k-help">{words.detail}</span>}
-        </>
+        <span
+            className={words.wrong ? 'k-signal k-signal--wrong' : 'k-signal'}
+            title={[words.text, words.detail].filter(Boolean).join('. ')}>
+            <Icon {...ICON} size={14} aria-hidden="true" />
+            {text}
+        </span>
     );
 }
+
+const CLOCK = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+});
 
 const hostOf = (url: string): string => {
     try {
@@ -214,233 +229,329 @@ const hostOf = (url: string): string => {
     }
 };
 
-function SiteColumnView({ site, chart, domain }: { site: SiteColumn; chart: SitesWidgetBody['chart']; domain: readonly number[] }) {
-    const [lead, ...rest] = site.stats;
+/**
+ * A number cell: right-aligned, with the change before the value.
+ */
+function NumberCell({ value, change }: { value: ReactNode; change?: number | undefined }) {
     return (
-        <div className="k-site">
-            <h3 className="k-site__name">
-                <WidgetSiteIcon site={site} />
-                <span className="k-site__label k-ellipsis">{site.label}</span>
-                <span className="k-site__url k-ellipsis">{hostOf(site.url)}</span>
-            </h3>
-            {lead === undefined ? null : (
-                <div className="k-site__figure">
-                    <span className="k-stat__head">
-                        <span className="k-stat__label">{lead.label}</span>
-                        <ChangeBadge change={lead.change} />
-                    </span>
-                    <strong className="k-stat__value">{lead.value ?? 'Not counted'}</strong>
-                </div>
-            )}
-            {chart === null || site.chart === null ? null : site.chart.length === 0 ? (
-                <p className="k-help">No numbers yet.</p>
-            ) : (
-                <Chart label={`${chart.label}, ${site.label}`} style={chart.style} data={site.chart} domain={domain} height={140} />
-            )}
-            <dl className="k-facts">
-                {rest.map((stat) => (
-                    <div key={stat.label} className="k-facts__row">
-                        <dt>{stat.label}</dt>
-                        <dd>
-                            {stat.value === undefined ? (
-                                <span className="k-help">Not counted</span>
-                            ) : (
-                                <span className="k-signal">
-                                    {stat.value}
-                                    <ChangeBadge change={stat.change} />
-                                </span>
-                            )}
-                        </dd>
-                    </div>
-                ))}
-                <div className="k-facts__row">
-                    <dt>Waiting</dt>
-                    <dd>{site.waiting === 0 ? 'No reviews' : site.waiting === 1 ? '1 review' : `${WHOLE.format(site.waiting)} reviews`}</dd>
-                </div>
-                <div className="k-facts__row">
-                    <dt>Last publish</dt>
-                    <dd>
-                        {site.lastPublish === null ? (
-                            <span className="k-help">Nothing published yet</span>
-                        ) : (
-                            <>
-                                <a
-                                    className="k-ellipsis k-facts__link"
-                                    href={hrefOf({
-                                        kind: 'document',
-                                        ref: site.lastPublish.ref,
-                                    })}>
-                                    {site.lastPublish.label}
-                                </a>
-                                <span className="k-help">
-                                    {site.lastPublish.by === null
-                                        ? relativeTimeOf(site.lastPublish.at)
-                                        : `${site.lastPublish.by}, ${relativeTimeOf(site.lastPublish.at)}`}
-                                </span>
-                            </>
-                        )}
-                    </dd>
-                </div>
-                <div className="k-facts__row">
-                    <dt>Last refresh</dt>
-                    <dd>
-                        <RefreshFact refresh={site.lastRefresh} />
-                    </dd>
-                </div>
-            </dl>
-        </div>
+        <td data-kind="number">
+            <span className="k-dashboard-table__number">
+                <ChangeBadge change={change} />
+                <span>{value}</span>
+            </span>
+        </td>
     );
 }
 
 /**
- * The sites side by side, each chart on the scale every column shares.
+ * The sites as the columns of one table: each site's name heads its column,
+ * its chart sits under the name on the scale every column shares, and each
+ * measure is a row across them.
  */
 function SitesCard({ widget }: { widget: SitesWidgetBody }) {
     const domain = sharedScaleOf(widget.sites);
+    const chart = widget.chart;
+    const measures = widget.sites[0]?.stats.map((stat) => stat.label) ?? [];
     return (
-        <section className="k-sites" aria-labelledby="k-admin-sites">
-            <h2 id="k-admin-sites" className="k-chart__title">
-                Sites
-            </h2>
-            <div className="k-sites__grid" data-count={Math.min(widget.sites.length, 3)}>
-                {widget.sites.map((site) => (
-                    <SiteColumnView key={site.key} site={site} chart={widget.chart} domain={domain} />
-                ))}
+        <section className="k-panel k-sites" aria-labelledby="k-admin-sites">
+            <div className="k-panel__head">
+                <h2 id="k-admin-sites" className="k-panel__title">
+                    Sites
+                </h2>
+            </div>
+            <div className="k-panel__table">
+                <table className="k-table k-dashboard-table k-sites__table">
+                    <colgroup>
+                        <col className="k-sites__measure" />
+                        {widget.sites.map((site) => (
+                            <col key={site.key} />
+                        ))}
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th scope="col">
+                                <span className="k-visually-hidden">Measure</span>
+                            </th>
+                            {widget.sites.map((site) => (
+                                <th key={site.key} scope="col" data-kind="number">
+                                    <span className="k-sites__name">
+                                        <WidgetSiteIcon site={site} />
+                                        <span className="k-sites__label k-ellipsis">{site.label}</span>
+                                        <span className="k-sites__url k-ellipsis">{hostOf(site.url)}</span>
+                                    </span>
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {chart === null ? null : (
+                            <tr className="k-sites__charts">
+                                <th scope="row">{chart.label}</th>
+                                {widget.sites.map((site) => (
+                                    <td key={site.key}>
+                                        {site.chart === null ? null : site.chart.length === 0 ? (
+                                            <span className="k-table__detail">No numbers yet</span>
+                                        ) : (
+                                            <Chart
+                                                label={`${chart.label}, ${site.label}`}
+                                                style={chart.style}
+                                                data={site.chart}
+                                                domain={domain}
+                                                height={104}
+                                            />
+                                        )}
+                                    </td>
+                                ))}
+                            </tr>
+                        )}
+                        {measures.map((measure, index) => (
+                            <tr key={measure} className="k-table__row">
+                                <th scope="row">{measure}</th>
+                                {widget.sites.map((site) => {
+                                    const stat = site.stats[index];
+                                    return <NumberCell key={site.key} value={stat?.value ?? '–'} change={stat?.change} />;
+                                })}
+                            </tr>
+                        ))}
+                        <tr className="k-table__row">
+                            <th scope="row">Waiting</th>
+                            {widget.sites.map((site) => (
+                                <NumberCell key={site.key} value={site.waiting === 0 ? '–' : WHOLE.format(site.waiting)} />
+                            ))}
+                        </tr>
+                        <tr className="k-table__row">
+                            <th scope="row">Last publish</th>
+                            {widget.sites.map((site) => {
+                                const published = site.lastPublish;
+                                if (published === null) return <NumberCell key={site.key} value="–" />;
+                                return (
+                                    <td key={site.key} data-kind="number">
+                                        <a
+                                            className="k-dashboard-table__number k-sites__publish"
+                                            title={`${published.label}, published ${published.by === null ? '' : `by ${published.by} `}${relativeTimeOf(published.at)}`}
+                                            href={hrefOf({
+                                                kind: 'document',
+                                                ref: published.ref,
+                                            })}>
+                                            <span className="k-ellipsis">{published.label}</span>
+                                            <span className="k-sites__when">· {agoOf(published.at)}</span>
+                                        </a>
+                                    </td>
+                                );
+                            })}
+                        </tr>
+                        <tr className="k-table__row">
+                            <th scope="row">Last refresh</th>
+                            {widget.sites.map((site) => (
+                                <td key={site.key} data-kind="number">
+                                    <RefreshFact refresh={site.lastRefresh} />
+                                </td>
+                            ))}
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </section>
     );
 }
 
-function RefreshesCard({ widget }: { widget: RefreshesWidgetBody }) {
+/**
+ * A panel on its card: the title, what its numbers count beside it, and the
+ * rows under them.
+ */
+function PanelCard({
+    label,
+    description,
+    className,
+    children,
+}: {
+    label: string;
+    description?: string | undefined;
+    className?: string;
+    children: ReactNode;
+}) {
+    const id = `k-admin-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
     return (
-        <section className="k-waiting" aria-labelledby="k-admin-refreshes">
-            <h2 id="k-admin-refreshes" className="k-waiting__title">
-                Refreshes
-            </h2>
-            {widget.targets.length === 0 ? (
-                <p className="k-help">No refreshes yet.</p>
-            ) : (
-                <ul className="k-refresh__list">
-                    {widget.targets.map((target) => {
-                        const words = target.last === null ? undefined : refreshWordsOf(target.last);
-                        const Icon = words?.wrong === true ? CircleAlert : CircleCheck;
-                        return (
-                            <li
-                                key={target.key}
-                                className={words?.wrong === true ? 'k-refresh__row k-refresh__row--wrong' : 'k-refresh__row'}>
-                                <Icon {...ICON} aria-hidden="true" />
-                                <span className="k-refresh__who">
-                                    <span className="k-ellipsis">{target.label}</span>
-                                    <span className="k-help">{target.kind === 'site' ? 'Site' : 'Partner'}</span>
-                                </span>
-                                <span className="k-refresh__when">
-                                    {words === undefined ? null : <span>{words.text}</span>}
-                                    {words?.detail === undefined ? null : <span className="k-help">{words.detail}</span>}
-                                    <span className="k-help">
-                                        {target.answered} of {target.total} this period
-                                    </span>
-                                </span>
-                            </li>
-                        );
-                    })}
-                </ul>
-            )}
+        <section className={className === undefined ? 'k-panel' : `k-panel ${className}`} aria-labelledby={id}>
+            <div className="k-panel__head">
+                <h2 id={id} className="k-panel__title">
+                    {label}
+                </h2>
+                {description === undefined ? null : <span className="k-panel__description">{description}</span>}
+            </div>
+            {children}
         </section>
     );
 }
 
 /**
- * A bar from the row's own value, as a share of the largest.
+ * Rows on the collection list's table, with column headings when there are
+ * any.
  */
-function RankBar({ value, most }: { value: number; most: number }) {
+function PanelTable({
+    label,
+    headings,
+    empty,
+    children,
+}: {
+    label: string;
+    headings: ReadonlyArray<{ text: string; number?: boolean }> | undefined;
+    empty: string;
+    children: ReactNode[];
+}) {
+    if (children.length === 0) return <p className="k-help k-panel__empty">{empty}</p>;
+    return (
+        <div className="k-panel__table">
+            <table className="k-table k-dashboard-table" aria-label={label}>
+                {headings === undefined ? null : (
+                    <thead>
+                        <tr>
+                            {headings.map((heading, index) => (
+                                <th key={index} scope="col" data-kind={heading.number === true ? 'number' : undefined}>
+                                    {heading.text}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                )}
+                <tbody>{children}</tbody>
+            </table>
+        </div>
+    );
+}
+
+/**
+ * The primary cell of a row: its name in the ink, and a muted line under it.
+ */
+function NameCell({ label, detail, href }: { label: string; detail?: string | undefined; href?: string }) {
+    return (
+        <td className="k-dashboard-table__name">
+            <span className="k-table__name">
+                {href === undefined ? (
+                    <span className="k-table__link k-ellipsis">{label}</span>
+                ) : (
+                    <a className="k-table__link k-ellipsis" href={href}>
+                        {label}
+                    </a>
+                )}
+                {detail === undefined ? null : <span className="k-table__detail k-ellipsis">{detail}</span>}
+            </span>
+        </td>
+    );
+}
+
+/**
+ * A bar filling `share` of its track, for a row measured against a whole.
+ */
+function ShareBar({ share }: { share: number }) {
     return (
         <span className="k-ranked__track" aria-hidden="true">
             <span
                 className="k-ranked__bar"
                 style={{
-                    width: `${most === 0 ? 0 : (value / most) * 100}%`,
+                    width: `${share * 100}%`,
                 }}
             />
         </span>
     );
 }
 
-function ReachCard({ widget }: { widget: ReachWidgetBody }) {
-    const most = Math.max(0, ...widget.items.map((item) => item.pages));
+function RefreshesCard({ widget }: { widget: RefreshesWidgetBody }) {
     return (
-        <section className="k-waiting k-reach" aria-labelledby="k-admin-reach">
-            <h2 id="k-admin-reach" className="k-waiting__title">
-                Shared content by reach
-            </h2>
-            {widget.items.length === 0 ? (
-                <p className="k-help">No page shows shared content yet.</p>
-            ) : (
-                <>
-                    <div className="k-columns-head" aria-hidden="true">
-                        <span />
-                        <span className="k-columns-head__span">Pages</span>
-                        <span>Sites</span>
-                    </div>
-                    <ul className="k-ranked">
-                        {widget.items.map((item) => (
-                            <li key={item.ref}>
-                                <a
-                                    className="k-ranked__row"
-                                    href={hrefOf({
-                                        kind: 'document',
-                                        ref: item.ref,
-                                    })}>
-                                    <span className="k-ranked__name">
-                                        <span className="k-ellipsis">{item.label}</span>
-                                        <span className="k-help k-ellipsis">
-                                            {item.changed ? `${item.kind} · Unpublished changes` : item.kind}
-                                        </span>
-                                    </span>
-                                    <RankBar value={item.pages} most={most} />
-                                    <span className="k-ranked__value">
-                                        {WHOLE.format(item.pages)}
-                                        <span className="k-visually-hidden"> pages</span>
-                                    </span>
-                                    <span className="k-ranked__sites">
-                                        {item.sites} of {widget.sites}
-                                        <span className="k-visually-hidden"> sites</span>
-                                    </span>
-                                </a>
-                            </li>
-                        ))}
-                    </ul>
-                </>
-            )}
-        </section>
+        <PanelCard label="Refreshes">
+            <PanelTable
+                label="Refreshes"
+                headings={[
+                    {
+                        text: 'Site or partner',
+                    },
+                    {
+                        text: 'Last refresh',
+                        number: true,
+                    },
+                    {
+                        text: 'Answered',
+                        number: true,
+                    },
+                ]}
+                empty="No refreshes yet.">
+                {widget.targets.map((target) => (
+                    <tr key={target.key} className="k-table__row">
+                        <NameCell label={target.label} detail={target.kind === 'site' ? 'Site' : 'Partner'} />
+                        <td data-kind="number">
+                            <RefreshFact refresh={target.last} />
+                        </td>
+                        <NumberCell value={`${target.answered} of ${target.total}`} />
+                    </tr>
+                ))}
+            </PanelTable>
+        </PanelCard>
+    );
+}
+
+function ReachCard({ widget }: { widget: ReachWidgetBody }) {
+    return (
+        <PanelCard label="Shared content by reach">
+            <PanelTable
+                label="Shared content by reach"
+                headings={[
+                    {
+                        text: 'Item',
+                    },
+                    {
+                        text: 'Pages',
+                        number: true,
+                    },
+                    {
+                        text: 'Sites',
+                        number: true,
+                    },
+                ]}
+                empty="No page shows shared content yet.">
+                {widget.items.map((item) => (
+                    <tr key={item.ref} className="k-table__row">
+                        <NameCell
+                            label={item.label}
+                            detail={item.changed ? `${item.kind} · Unpublished changes` : item.kind}
+                            href={hrefOf({
+                                kind: 'document',
+                                ref: item.ref,
+                            })}
+                        />
+                        <NumberCell value={WHOLE.format(item.pages)} />
+                        <NumberCell value={`${item.sites} of ${widget.sites}`} />
+                    </tr>
+                ))}
+            </PanelTable>
+        </PanelCard>
     );
 }
 
 function EditorsCard({ widget }: { widget: EditorsWidgetBody }) {
-    const most = Math.max(0, ...widget.editors.map((editor) => editor.changes));
     return (
-        <section className="k-waiting k-editors" aria-labelledby="k-admin-editors">
-            <span className="k-chart__heading">
-                <h2 id="k-admin-editors" className="k-waiting__title">
-                    Editors
-                </h2>
-                <span className="k-chart__description">
-                    {widget.changes === 1 ? '1 change' : `${WHOLE.format(widget.changes)} changes`} this period,{' '}
-                    {WHOLE.format(widget.published)} published
-                </span>
-            </span>
-            {widget.editors.length === 0 ? (
-                <p className="k-help">Nobody changed anything this period.</p>
-            ) : (
-                <>
-                    <div className="k-columns-head" aria-hidden="true">
-                        <span />
-                        <span />
-                        <span className="k-columns-head__span">Changes</span>
-                        <span>Last active</span>
-                    </div>
-                    <ul className="k-ranked">
-                        {widget.editors.map((editor) => (
-                            <li key={editor.id} className="k-ranked__row">
+        <PanelCard
+            label="Editors"
+            description={`${widget.changes === 1 ? '1 change' : `${WHOLE.format(widget.changes)} changes`}, ${WHOLE.format(widget.published)} published`}>
+            <PanelTable
+                label="Editors"
+                headings={[
+                    {
+                        text: 'Editor',
+                    },
+                    {
+                        text: 'Changes',
+                        number: true,
+                    },
+                    {
+                        text: 'Last active',
+                        number: true,
+                    },
+                ]}
+                empty="Nobody changed anything this period.">
+                {widget.editors.map((editor) => (
+                    <tr key={editor.id} className="k-table__row">
+                        <td className="k-dashboard-table__name">
+                            <span className="k-dashboard-table__person">
                                 <Avatar
                                     person={{
                                         id: editor.id,
@@ -453,27 +564,120 @@ function EditorsCard({ widget }: { widget: EditorsWidgetBody }) {
                                     }}
                                     size={26}
                                 />
-                                <span className="k-ranked__name">
-                                    <span className="k-ellipsis">{editor.name}</span>
-                                    <span className="k-help k-ellipsis">{roleOf(editor)}</span>
+                                <span className="k-table__name">
+                                    <span className="k-table__link k-ellipsis">{editor.name}</span>
+                                    <span className="k-table__detail k-ellipsis">{roleOf(editor)}</span>
                                 </span>
-                                <RankBar value={editor.changes} most={most} />
-                                <span className="k-ranked__value">
-                                    {WHOLE.format(editor.changes)}
-                                    <span className="k-visually-hidden"> changes</span>
-                                </span>
-                                <span className="k-ranked__when">{relativeTimeOf(editor.lastActive)}</span>
-                            </li>
-                        ))}
-                    </ul>
-                </>
-            )}
-        </section>
+                            </span>
+                        </td>
+                        <NumberCell value={WHOLE.format(editor.changes)} />
+                        <NumberCell value={relativeTimeOf(editor.lastActive)} />
+                    </tr>
+                ))}
+            </PanelTable>
+        </PanelCard>
+    );
+}
+
+function ListCard({ widget }: { widget: ListWidgetBody }) {
+    const changes = widget.rows.some((row) => row.change !== undefined);
+    const measured = widget.rows.some((row) => row.of !== undefined);
+    return (
+        <PanelCard label={widget.label} description={widget.description}>
+            <PanelTable
+                label={widget.label}
+                headings={
+                    widget.columns === undefined
+                        ? undefined
+                        : [
+                              {
+                                  text: widget.columns.label,
+                              },
+                              ...(measured
+                                  ? [
+                                        {
+                                            text: '',
+                                        },
+                                    ]
+                                  : []),
+                              {
+                                  text: widget.columns.value,
+                                  number: true,
+                              },
+                              ...(changes
+                                  ? [
+                                        {
+                                            text: 'Change',
+                                            number: true,
+                                        },
+                                    ]
+                                  : []),
+                          ]
+                }
+                empty="Nothing yet.">
+                {widget.rows.map((row, index) => (
+                    <tr key={`${row.label} ${index}`} className="k-table__row">
+                        <NameCell label={row.label} detail={row.detail} />
+                        {measured ? (
+                            <td className="k-dashboard-table__bar">
+                                <ShareBar share={barShareOf(row, widget.rows)} />
+                            </td>
+                        ) : null}
+                        <NumberCell value={row.formatted} />
+                        {changes ? <NumberCell value={null} change={row.change} /> : null}
+                    </tr>
+                ))}
+            </PanelTable>
+        </PanelCard>
+    );
+}
+
+function FunnelCard({ widget }: { widget: FunnelWidgetBody }) {
+    const rows = funnelRowsOf(widget.steps);
+    return (
+        <PanelCard label={widget.label} description={widget.description} className="k-funnel">
+            <PanelTable
+                label={widget.label}
+                headings={
+                    widget.columns === undefined
+                        ? undefined
+                        : [
+                              {
+                                  text: widget.columns.label,
+                              },
+                              {
+                                  text: '',
+                              },
+                              {
+                                  text: widget.columns.value,
+                                  number: true,
+                              },
+                              {
+                                  text: 'Of previous',
+                                  number: true,
+                              },
+                          ]
+                }
+                empty="Nothing yet.">
+                {rows.map((row, index) => (
+                    <tr key={`${row.label} ${index}`} className="k-table__row">
+                        <NameCell label={row.label} />
+                        <td className="k-dashboard-table__bar">
+                            <ShareBar share={row.share} />
+                        </td>
+                        <NumberCell value={WHOLE.format(row.value)} />
+                        <NumberCell value={row.kept ?? '–'} />
+                    </tr>
+                ))}
+            </PanelTable>
+        </PanelCard>
     );
 }
 
 function Panel({ widget, collections }: { widget: PanelWidgetBody; collections: readonly CollectionSummary[] }) {
     if (widget.type === 'chart') return <ChartCard widget={widget} />;
+    if (widget.type === 'list') return <ListCard widget={widget} />;
+    if (widget.type === 'funnel') return <FunnelCard widget={widget} />;
     if (widget.type === 'reviews') return <ReviewsCard widget={widget} collections={collections} />;
     if (widget.type === 'refreshes') return <RefreshesCard widget={widget} />;
     if (widget.type === 'reach') return <ReachCard widget={widget} />;
@@ -495,25 +699,7 @@ function CollectionCards({
 }) {
     const collections = groupsOf(widget.collections).flatMap((group) => group.collections);
     if (collections.length === 0) return <p className="k-help">There are no collections for you to open.</p>;
-    const own = collections.filter((collection) => collection.site !== undefined && collection.site !== null);
-    const sections =
-        own.length === 0
-            ? [
-                  {
-                      heading: 'Collections',
-                      collections,
-                  },
-              ]
-            : [
-                  {
-                      heading: own[0]!.site!.label,
-                      collections: own,
-                  },
-                  {
-                      heading: SHARED_GROUP,
-                      collections: collections.filter((collection) => !own.includes(collection)),
-                  },
-              ];
+    const sections = collectionSectionsOf(collections, SHARED_GROUP);
     return (
         <>
             {sections
