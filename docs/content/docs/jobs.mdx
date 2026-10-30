@@ -404,7 +404,7 @@ Configure both under `jobRunner` on [`defineConfig`](/docs/reference/define-conf
 
 `method` moves `/jobs/dispatch` only: `/jobs/run` takes a body, so it is always `POST`. Nothing is served on `/jobs` itself.
 
-`mode: 'in-process'` serves neither, for a long-running server whose schedules `startJobs` ticks. It takes none of the options below `mode`, and its jobs need no identity. Served endpoints do need one, so `defineConfig` throws when jobs without an identity would be reachable. Use `'http'` when a transport delivers to `/jobs/run` or platform cron ticks `/jobs/dispatch`.
+`mode: 'in-process'` serves neither, for a long-running server whose schedules `startJobs` ticks. It takes none of the options below `mode`, and its jobs need no identity. Served endpoints do need one, so `defineConfig` throws when jobs without an identity would be reachable. One identity guards both endpoints, so with `'http'` every job that names one names the same. Use `'http'` when a transport delivers to `/jobs/run` or platform cron ticks `/jobs/dispatch`.
 
 A tick runs each due job inline, in the request the scheduler made, so the function's timeout is the budget for all of them. Keep the tick short by having a scheduled job queue one job per unit of work:
 

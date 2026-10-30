@@ -447,12 +447,36 @@ export const assertJobRunner = (jobs: Jobs | undefined, config: JobsConfig | und
                 "or `jobRunner: { mode: 'in-process' }` when `startJobs` ticks them in this process."
         );
     }
-    if (config.mode === 'in-process' || flattened.some(({ job }) => job.identity !== undefined)) return;
+    if (config.mode === 'in-process') return;
+    const identities = [...new Set(flattened.map(({ job }) => job.identity).filter((identity) => identity !== undefined))];
+    if (identities.length > 1) {
+        throw new Error(
+            `The jobs name the identities ${identities.map((identity) => `'${identity}'`).join(' and ')}, and one identity guards \`${config.path ?? DEFAULT_JOBS_PATH}/run\` for every job. ` +
+                'Declare them all with the same one.'
+        );
+    }
+    if (identities.length > 0) return;
     const base = config.path ?? DEFAULT_JOBS_PATH;
     throw new Error(
         `The jobs declare no identity, so \`${base}/dispatch\` and \`${base}/run\` would let anyone trigger them. ` +
             "Pass an identity to `k.jobs`, or set `jobRunner: { mode: 'in-process' }` when the jobs run in this process with `startJobs`."
     );
+};
+
+/**
+ * The app's jobs with a content provider's beside them, under `content`.
+ */
+export const withContentJobs = (jobs: Jobs | undefined, provided: Jobs | undefined, key: string): Jobs | undefined => {
+    if (provided === undefined || flattenJobs(provided).length === 0) return jobs;
+    if (jobs !== undefined && key in jobs) {
+        throw new Error(
+            `\`content\` declares its jobs under '${key}', and \`jobs\` has a group of the same name. Rename yours, since both would answer \`POST /jobs/run\` under it.`
+        );
+    }
+    return {
+        ...jobs,
+        [key]: provided,
+    };
 };
 
 export const jobClaims = (jobs: Jobs | undefined, config: JobsConfig | undefined): PathClaim[] => {

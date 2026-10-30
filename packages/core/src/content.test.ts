@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { defineConfig, Kizuna } from './index.js';
-import { authenticate, contentOf } from './adapter.js';
+import { authenticate, contentOf, JOBS_META, jobFnAt, jobRunnerFrom, type JobsMeta } from './adapter.js';
+import { buildJobs, flattenJobs, type Jobs } from './jobs.js';
 import { defineContentProvider, definePlugin, route, type ContentRuntime } from './plugin.js';
 
 const k = new Kizuna();
@@ -186,5 +187,125 @@ describe('authenticate', () => {
                 headers: {},
             })
         ).rejects.toThrow("no guard for the identity 'staff'");
+    });
+});
+
+describe('jobs a content provider declares', () => {
+    const refreshed: string[] = [];
+    const refreshJobs = (identity?: 'scheduler' | 'worker') => {
+        const definitions = {
+            refreshSite: k
+                .job({
+                    retry: 3,
+                    input: z.object({
+                        site: z.string(),
+                        brand: z.string(),
+                        id: z.string(),
+                    }),
+                })
+                .handler(({ input }) => {
+                    refreshed.push(`${input.site} ${input.brand} ${input.id}`);
+                }),
+        };
+        return buildJobs(identity, definitions);
+    };
+    const contentWithJobs = (jobs: Jobs) =>
+        defineContentProvider({
+            plugin: notesPlugin(),
+            routes: {
+                content: {
+                    notes: readNotes,
+                },
+            },
+            reader: () => undefined,
+            documents: () => [],
+            jobs,
+        });
+
+    it("registers them under 'content', beside the app's own", async () => {
+        const { api } = defineConfig({
+            content: contentWithJobs(refreshJobs()),
+            jobRunner: {
+                mode: 'in-process',
+            },
+        });
+
+        expect(flattenJobs(api.jobs as Jobs).map(({ jobKey }) => jobKey)).toEqual(['content.refreshSite']);
+        const runner = jobRunnerFrom((api as unknown as Record<typeof JOBS_META, JobsMeta>)[JOBS_META]);
+        await jobFnAt(runner, 'content.refreshSite')?.run({
+            site: 'uk',
+            brand: 'EmployeeId',
+            id: 'ada',
+        });
+        expect(refreshed).toEqual(['uk EmployeeId ada']);
+    });
+
+    it("keeps the app's jobs, guarded by the identity they share", () => {
+        const { api } = defineConfig({
+            auth: {
+                identities: {
+                    scheduler: k.identity.bearer({
+                        context: z.object({
+                            invokedBy: z.string(),
+                        }),
+                    }),
+                },
+            },
+            jobs: buildJobs('scheduler', {
+                sendDigests: k.job({}),
+            }),
+            content: contentWithJobs(refreshJobs()),
+            jobRunner: {
+                mode: 'http',
+            },
+        });
+
+        expect(flattenJobs(api.jobs as Jobs).map(({ jobKey }) => jobKey)).toEqual(['sendDigests', 'content.refreshSite']);
+    });
+
+    it('requires jobRunner.mode, as app jobs do', () => {
+        expect(() =>
+            defineConfig({
+                content: contentWithJobs(refreshJobs()),
+            } as never)
+        ).toThrow('The jobs do not say how they run.');
+    });
+
+    it("refuses an app job group named 'content'", () => {
+        expect(() =>
+            defineConfig({
+                jobs: k.jobs({
+                    content: {
+                        sendDigests: k.job({}),
+                    },
+                }),
+                content: contentWithJobs(refreshJobs()),
+                jobRunner: {
+                    mode: 'in-process',
+                },
+            })
+        ).toThrow("`content` declares its jobs under 'content'");
+    });
+
+    it('refuses jobs that name two identities', () => {
+        expect(() =>
+            defineConfig({
+                jobs: buildJobs('worker', {
+                    sendDigests: k.job({}),
+                }),
+                content: contentWithJobs(refreshJobs('scheduler')),
+                jobRunner: {
+                    mode: 'http',
+                },
+            })
+        ).toThrow("The jobs name the identities 'worker' and 'scheduler'");
+    });
+
+    it('adds no jobs for a provider without any', () => {
+        expect(
+            defineConfig({
+                content: notesContent(),
+            }).api.jobs
+        ).toBeUndefined();
     });
 });

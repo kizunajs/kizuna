@@ -134,6 +134,7 @@ What the provider brings:
 - **Routes.** They join this API's at the top level, as `content`, `editing` and `invalidate`, and reach the clients, the OpenAPI document and MCP like any route of yours.
 - **A reader.** `kizuna.content` sits beside `kizuna.api`, typed from every page, global and collection: `kizuna.content.pages.frontPage.get()`.
 - **Documents.** Every page, global and collection has a name and a schema. `kizuna generate` records them in the snapshot, and [`kizuna diff`](/docs/breaking-changes#content) fails on a change the stored content cannot survive.
+- **Jobs.** A provider's [jobs](/docs/jobs) join yours under `content`, so `refreshSite` runs as `content.refreshSite`. They run however `jobRunner` says, so a config whose provider declares jobs names `jobRunner.mode`.
 
 The adapter supplies what reading needs from the framework. `nextAdapter()` gives the reader Next's cache, draft mode and `notFound()`, and lets publishing revalidate in process.
 

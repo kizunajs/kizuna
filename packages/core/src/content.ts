@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import type { PluginApi, PluginDeclaration } from './plugin.js';
 import type { Routes } from './types.js';
+import type { Jobs } from './jobs.js';
 
 // Registry-global, like the plugin keys: a dual ESM/CJS install would otherwise
 // hold two different symbols.
@@ -79,7 +80,7 @@ export interface ContentRuntime {
  * API's own, its server half as a plugin, the reader `kizuna.content` hands
  * out, and the documents `kizuna diff` compares.
  */
-export interface ContentProvider<Reader = unknown, ProviderRoutes extends Routes = Routes> {
+export interface ContentProvider<Reader = unknown, ProviderRoutes extends Routes = Routes, ProviderJobs extends Jobs = Jobs> {
     readonly [CONTENT_PROVIDER]: true;
     /**
      * Its server half: exports its routes' handlers reach, hidden routes,
@@ -100,14 +101,26 @@ export interface ContentProvider<Reader = unknown, ProviderRoutes extends Routes
      * Every document editors change.
      */
     readonly documents: () => readonly ContentDocument[];
+    /**
+     * Jobs registered beside the app's own, under `content`, so a job named
+     * `refreshSite` is addressed as `content.refreshSite`. Declare them with
+     * `k.jobs`. They run however `jobRunner` says, so a config whose
+     * provider declares any names `jobRunner.mode`.
+     */
+    readonly jobs?: ProviderJobs;
 }
+
+/**
+ * The key a provider's jobs sit under, beside the app's own.
+ */
+export const CONTENT_JOBS_KEY = 'content';
 
 /**
  * Builds a value `content` takes.
  */
-export const defineContentProvider = <Reader, ProviderRoutes extends Routes>(
-    provider: Omit<ContentProvider<Reader, ProviderRoutes>, typeof CONTENT_PROVIDER>
-): ContentProvider<Reader, ProviderRoutes> => ({
+export const defineContentProvider = <Reader, ProviderRoutes extends Routes, ProviderJobs extends Jobs = Jobs>(
+    provider: Omit<ContentProvider<Reader, ProviderRoutes, ProviderJobs>, typeof CONTENT_PROVIDER>
+): ContentProvider<Reader, ProviderRoutes, ProviderJobs> => ({
     ...provider,
     [CONTENT_PROVIDER]: true,
 });
@@ -133,9 +146,14 @@ export const contentOf = (api: unknown): ContentMeta | undefined =>
 /**
  * The reader type a provider hands out.
  */
-export type ContentReaderOf<Value> = Value extends ContentProvider<infer Reader, any> ? Reader : undefined;
+export type ContentReaderOf<Value> = Value extends ContentProvider<infer Reader, any, any> ? Reader : undefined;
 
 /**
  * The route groups a provider adds.
  */
-export type ContentRoutesOf<Value> = Value extends ContentProvider<any, infer ProviderRoutes> ? ProviderRoutes : {};
+export type ContentRoutesOf<Value> = Value extends ContentProvider<any, infer ProviderRoutes, any> ? ProviderRoutes : {};
+
+/**
+ * The jobs a provider adds, or none.
+ */
+export type ContentJobsOf<Value> = Value extends ContentProvider<any, any, infer ProviderJobs> ? ProviderJobs : Record<string, never>;

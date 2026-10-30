@@ -8,7 +8,7 @@ import { assertValidCache } from './cache.js';
 import { assertValidViews } from './tool-view.js';
 import { injectGuardResponses } from './guard-responses.js';
 import { flattenRoutes, type RoutesWithHandlerContext } from './handler-pipeline.js';
-import { assertJobRunner, jobClaims, type Jobs, type JobsArg, type JobRunnerConfig } from './jobs.js';
+import { assertJobRunner, jobClaims, withContentJobs, type Jobs, type JobsArg, type JobRunnerConfig } from './jobs.js';
 import type { GroupOptions, GroupSet } from './groups.js';
 import type { AssembledRoutes } from './group-routes.js';
 import { assembleRoutes } from './routes.js';
@@ -23,7 +23,15 @@ import { GUARD } from './identity-builder.js';
 import { RESOLVER } from './request-context-builder.js';
 import { buildApi, type Api } from './api.js';
 import type { DiffSettings, GeneratedFile } from './config.js';
-import { CONTENT_META_KEY, isContentProvider, type ContentMeta, type ContentProvider, type ContentReaderOf } from './content.js';
+import {
+    CONTENT_JOBS_KEY,
+    CONTENT_META_KEY,
+    isContentProvider,
+    type ContentJobsOf,
+    type ContentMeta,
+    type ContentProvider,
+    type ContentReaderOf,
+} from './content.js';
 
 /**
  * Kizuna sends the guard body itself when a route's `requires` turns a caller
@@ -295,12 +303,17 @@ export type KizunaConfigInput<
      * }
      */
     diff?: DiffSettings;
-} & JobRunnerInput<J>;
+} & JobRunnerInput<J, ContentJobsOf<ContentValue>>;
 
 /**
- * `jobRunner`, required once `jobs` declares one.
+ * Whether a job tree names any job. An untyped tree names none.
  */
-type JobRunnerInput<J extends Jobs> = string extends keyof J
+type DeclaresJobs<J extends Jobs> = string extends keyof J ? false : true;
+
+/**
+ * `jobRunner`, required once `jobs` or the content provider declares one.
+ */
+type JobRunnerInput<J extends Jobs, ProviderJobs extends Jobs> = [DeclaresJobs<J> | DeclaresJobs<ProviderJobs>] extends [false]
     ? {
           jobRunner?: JobRunnerConfig;
       }
@@ -406,7 +419,7 @@ export const defineConfig = <
         }
         (routes as Record<string, unknown>)[group] = provided;
     }
-    const jobs = options.jobs as Jobs | undefined;
+    const jobs = withContentJobs(options.jobs as Jobs | undefined, content?.jobs, CONTENT_JOBS_KEY);
     const identities = options.auth?.identities as Record<string, SecurityScheme> | undefined;
     const apiReference = createApiReference();
     const plugins = resolvePlugins([...(options.plugins ?? []), ...(content === undefined ? [] : [content.plugin])], apiReference.api);

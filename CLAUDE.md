@@ -49,6 +49,7 @@ Jobs (`k.jobs`) are the one non-HTTP-shaped concept. Settled; don't relitigate.
 - `mode: 'http'` serves two endpoints, both under the `jobRunner.path` namespace (default `/jobs`, which serves nothing itself): `POST /jobs/dispatch` runs whatever is due, `POST /jobs/run` runs the one job its `{ job, input }` body names. The jobs' identity guards both, and jobs without one make `defineConfig` throw. A job is addressed by its dotted key.
 - `mode: 'in-process'` mounts neither, for a long-running server whose schedules `startJobs` ticks. Jobs there need no identity.
 - `run` and `queue`, never a bare call. `run` takes the input; `queue` takes a message (`input`, `runAt`, `dedupeKey`).
+- A content provider may declare jobs. They register under `content`, like `content.refreshSite`, and need `jobRunner.mode` the same as app jobs.
 
 Deliberate omissions: no first-party transports, no stored state, and no per-job cron generation. Retries, deduplication, and run history belong to the transport. An occurrence's dedupe key is `job@occurrenceISO`.
 
