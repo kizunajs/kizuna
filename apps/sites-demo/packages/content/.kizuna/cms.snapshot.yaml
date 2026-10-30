@@ -403,10 +403,31 @@ routes:
                     optional: false
                     schema:
                       kind: string
-                  openingHours:
+                  photo:
                     optional: true
                     schema:
-                      kind: string
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        url:
+                          optional: false
+                          schema:
+                            kind: string
+                        alt:
+                          optional: false
+                          schema:
+                            kind: string
+                        width:
+                          optional: false
+                          schema:
+                            kind: number
+                        height:
+                          optional: false
+                          schema:
+                            kind: number
                   order:
                     optional: false
                     schema:
@@ -473,10 +494,31 @@ routes:
             optional: false
             schema:
               kind: string
-          openingHours:
+          photo:
             optional: true
             schema:
-              kind: string
+              kind: object
+              fields:
+                id:
+                  optional: false
+                  schema:
+                    kind: string
+                url:
+                  optional: false
+                  schema:
+                    kind: string
+                alt:
+                  optional: false
+                  schema:
+                    kind: string
+                width:
+                  optional: false
+                  schema:
+                    kind: number
+                height:
+                  optional: false
+                  schema:
+                    kind: number
           order:
             optional: false
             schema:
@@ -912,6 +954,31 @@ routes:
                     optional: true
                     schema:
                       kind: string
+                  photo:
+                    optional: true
+                    schema:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        url:
+                          optional: false
+                          schema:
+                            kind: string
+                        alt:
+                          optional: false
+                          schema:
+                            kind: string
+                        width:
+                          optional: false
+                          schema:
+                            kind: number
+                        height:
+                          optional: false
+                          schema:
+                            kind: number
                   order:
                     optional: false
                     schema:
@@ -982,6 +1049,31 @@ routes:
             optional: true
             schema:
               kind: string
+          photo:
+            optional: true
+            schema:
+              kind: object
+              fields:
+                id:
+                  optional: false
+                  schema:
+                    kind: string
+                url:
+                  optional: false
+                  schema:
+                    kind: string
+                alt:
+                  optional: false
+                  schema:
+                    kind: string
+                width:
+                  optional: false
+                  schema:
+                    kind: number
+                height:
+                  optional: false
+                  schema:
+                    kind: number
           order:
             optional: false
             schema:
@@ -1073,6 +1165,31 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                  image:
+                    optional: true
+                    schema:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        url:
+                          optional: false
+                          schema:
+                            kind: string
+                        alt:
+                          optional: false
+                          schema:
+                            kind: string
+                        width:
+                          optional: false
+                          schema:
+                            kind: number
+                        height:
+                          optional: false
+                          schema:
+                            kind: number
                   office:
                     optional: false
                     schema:
@@ -1144,6 +1261,31 @@ routes:
             optional: false
             schema:
               kind: string
+          image:
+            optional: true
+            schema:
+              kind: object
+              fields:
+                id:
+                  optional: false
+                  schema:
+                    kind: string
+                url:
+                  optional: false
+                  schema:
+                    kind: string
+                alt:
+                  optional: false
+                  schema:
+                    kind: string
+                width:
+                  optional: false
+                  schema:
+                    kind: number
+                height:
+                  optional: false
+                  schema:
+                    kind: number
           office:
             optional: false
             schema:
@@ -1206,57 +1348,6 @@ routes:
                     kind: string
                 intro:
                   optional: false
-                  schema:
-                    kind: string
-      "404":
-        kind: object
-        fields:
-          type:
-            optional: false
-            schema:
-              kind: string
-          title:
-            optional: false
-            schema:
-              kind: string
-          status:
-            optional: false
-            schema:
-              kind: number
-          detail:
-            optional: false
-            schema:
-              kind: string
-  content.sites.norway.pages.eventsPage:
-    method: GET
-    path: /content/sites/norway/pages/eventsPage
-    statuses:
-      - 200
-      - 404
-    deprecated: false
-    responses:
-      "200":
-        kind: object
-        fields:
-          version:
-            optional: false
-            schema:
-              kind: number
-          updatedAt:
-            optional: false
-            schema:
-              kind: string
-          content:
-            optional: false
-            schema:
-              kind: object
-              fields:
-                heading:
-                  optional: false
-                  schema:
-                    kind: string
-                intro:
-                  optional: true
                   schema:
                     kind: string
       "404":
@@ -1580,10 +1671,31 @@ routes:
                     optional: false
                     schema:
                       kind: string
-                  openingHours:
+                  photo:
                     optional: true
                     schema:
-                      kind: string
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        url:
+                          optional: false
+                          schema:
+                            kind: string
+                        alt:
+                          optional: false
+                          schema:
+                            kind: string
+                        width:
+                          optional: false
+                          schema:
+                            kind: number
+                        height:
+                          optional: false
+                          schema:
+                            kind: number
                   order:
                     optional: false
                     schema:
@@ -1650,10 +1762,31 @@ routes:
             optional: false
             schema:
               kind: string
-          openingHours:
+          photo:
             optional: true
             schema:
-              kind: string
+              kind: object
+              fields:
+                id:
+                  optional: false
+                  schema:
+                    kind: string
+                url:
+                  optional: false
+                  schema:
+                    kind: string
+                alt:
+                  optional: false
+                  schema:
+                    kind: string
+                width:
+                  optional: false
+                  schema:
+                    kind: number
+                height:
+                  optional: false
+                  schema:
+                    kind: number
           order:
             optional: false
             schema:
@@ -2012,6 +2145,14 @@ routes:
                     schema:
                       kind: record
                   value:
+                    optional: true
+                    schema:
+                      kind: unknown
+                  belongsTo:
+                    optional: true
+                    schema:
+                      kind: string
+                  sharedValue:
                     optional: true
                     schema:
                       kind: unknown
@@ -15281,7 +15422,15 @@ routes:
       - 200
       - 401
       - 403
+      - 404
     deprecated: false
+    query:
+      kind: object
+      fields:
+        site:
+          optional: true
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -15346,6 +15495,10 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                  site:
+                    optional: true
+                    schema:
+                      kind: string
                   uses:
                     optional: false
                     schema:
@@ -15374,6 +15527,25 @@ routes:
             schema:
               kind: string
       "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
         kind: object
         fields:
           type:
@@ -15463,6 +15635,10 @@ routes:
               kind: string
           uploadedBy:
             optional: false
+            schema:
+              kind: string
+          site:
+            optional: true
             schema:
               kind: string
       "401":
@@ -15742,6 +15918,13 @@ routes:
                 optional: false
                 schema:
                   kind: number
+    query:
+      kind: object
+      fields:
+        site:
+          optional: true
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -15799,6 +15982,10 @@ routes:
             optional: false
             schema:
               kind: string
+          site:
+            optional: true
+            schema:
+              kind: string
       "401":
         kind: object
         fields:
@@ -15819,24 +16006,7 @@ routes:
             schema:
               kind: string
       "403":
-        kind: object
-        fields:
-          type:
-            optional: false
-            schema:
-              kind: string
-          title:
-            optional: false
-            schema:
-              kind: string
-          status:
-            optional: false
-            schema:
-              kind: number
-          detail:
-            optional: false
-            schema:
-              kind: string
+        kind: union
       "404":
         kind: object
         fields:
@@ -15872,6 +16042,13 @@ routes:
           optional: false
           schema:
             kind: string
+    query:
+      kind: object
+      fields:
+        site:
+          optional: true
+          schema:
+            kind: string
     responses:
       "204":
         kind: void
@@ -15895,24 +16072,7 @@ routes:
             schema:
               kind: string
       "403":
-        kind: object
-        fields:
-          type:
-            optional: false
-            schema:
-              kind: string
-          title:
-            optional: false
-            schema:
-              kind: string
-          status:
-            optional: false
-            schema:
-              kind: number
-          detail:
-            optional: false
-            schema:
-              kind: string
+        kind: union
       "404":
         kind: object
         fields:
@@ -15939,6 +16099,7 @@ routes:
       - 201
       - 401
       - 403
+      - 404
       - 422
     deprecated: false
     body:
@@ -15956,6 +16117,13 @@ routes:
           optional: false
           schema:
             kind: number
+    query:
+      kind: object
+      fields:
+        site:
+          optional: true
+          schema:
+            kind: string
     responses:
       "201":
         kind: object
@@ -15996,6 +16164,25 @@ routes:
             schema:
               kind: string
       "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
         kind: object
         fields:
           type:
@@ -16061,6 +16248,7 @@ routes:
       - 201
       - 401
       - 403
+      - 404
       - 422
     deprecated: false
     params:
@@ -16068,6 +16256,13 @@ routes:
       fields:
         uploadId:
           optional: false
+          schema:
+            kind: string
+    query:
+      kind: object
+      fields:
+        site:
+          optional: true
           schema:
             kind: string
     responses:
@@ -16127,6 +16322,10 @@ routes:
             optional: false
             schema:
               kind: string
+          site:
+            optional: true
+            schema:
+              kind: string
       "401":
         kind: object
         fields:
@@ -16147,6 +16346,25 @@ routes:
             schema:
               kind: string
       "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
         kind: object
         fields:
           type:
@@ -19364,6 +19582,53 @@ content:
           optional: true
           schema:
             kind: string
+        photo:
+          optional: true
+          schema:
+            kind: object
+            fields:
+              id:
+                optional: false
+                schema:
+                  kind: string
+              alt:
+                optional: false
+                schema:
+                  kind: string
+              crop:
+                optional: true
+                schema:
+                  kind: object
+                  fields:
+                    x:
+                      optional: false
+                      schema:
+                        kind: number
+                    y:
+                      optional: false
+                      schema:
+                        kind: number
+                    width:
+                      optional: false
+                      schema:
+                        kind: number
+                    height:
+                      optional: false
+                      schema:
+                        kind: number
+              focalPoint:
+                optional: true
+                schema:
+                  kind: object
+                  fields:
+                    x:
+                      optional: false
+                      schema:
+                        kind: number
+                    y:
+                      optional: false
+                      schema:
+                        kind: number
         order:
           optional: true
           schema:
@@ -19390,6 +19655,53 @@ content:
           optional: false
           schema:
             kind: string
+        image:
+          optional: true
+          schema:
+            kind: object
+            fields:
+              id:
+                optional: false
+                schema:
+                  kind: string
+              alt:
+                optional: false
+                schema:
+                  kind: string
+              crop:
+                optional: true
+                schema:
+                  kind: object
+                  fields:
+                    x:
+                      optional: false
+                      schema:
+                        kind: number
+                    y:
+                      optional: false
+                      schema:
+                        kind: number
+                    width:
+                      optional: false
+                      schema:
+                        kind: number
+                    height:
+                      optional: false
+                      schema:
+                        kind: number
+              focalPoint:
+                optional: true
+                schema:
+                  kind: object
+                  fields:
+                    x:
+                      optional: false
+                      schema:
+                        kind: number
+                    y:
+                      optional: false
+                      schema:
+                        kind: number
         office:
           optional: false
           schema:
@@ -19442,20 +19754,6 @@ content:
             kind: string
         intro:
           optional: false
-          schema:
-            kind: string
-  page:norway:eventsPage:
-    kind: page
-    migration: 0
-    schema:
-      kind: object
-      fields:
-        heading:
-          optional: false
-          schema:
-            kind: string
-        intro:
-          optional: true
           schema:
             kind: string
   page:norway:frontPage:

@@ -79,6 +79,63 @@ test.describe('the shared content', () => {
     });
 });
 
+/**
+ * The London shop as a site's shops page shows it.
+ */
+const london = (page: Page) =>
+    page.locator('section').filter({
+        has: page.getByRole('heading', {
+            level: 2,
+            name: 'Hagen London',
+        }),
+    });
+
+test.describe("a site's own values on shared content", () => {
+    test("show the UK's own number for London on the UK", async ({ page }) => {
+        await page.goto(`${urls.uk}/offices`);
+        await expect(
+            london(page).getByRole('link', {
+                name: '+44 20 7946 0321',
+            })
+        ).toBeVisible();
+    });
+
+    test('leave the shared number on the sites that set none', async ({ page }) => {
+        for (const url of [urls.norway, urls.group]) {
+            await page.goto(`${url}/offices`);
+            await expect(
+                london(page).getByRole('link', {
+                    name: '+47 22 41 08 00',
+                })
+            ).toBeVisible();
+            await expect(london(page)).not.toContainText('+44 20 7946 0321');
+        }
+    });
+
+    test('show opening hours on the UK alone', async ({ page }) => {
+        await page.goto(`${urls.uk}/offices`);
+        await expect(london(page)).toContainText('Tuesday to Sunday, 9 to 17');
+        for (const url of [urls.norway, urls.group]) {
+            await page.goto(`${url}/offices`);
+            await expect(london(page)).not.toContainText('Tuesday to Sunday');
+        }
+    });
+});
+
+test.describe('the images', () => {
+    test("show the shared Oslo photo on every site, and the UK's own on its event", async ({ page }) => {
+        for (const url of Object.values(urls)) {
+            await page.goto(`${url}/offices`);
+            await expect(page.getByAltText('Close up of fern fronds unfurled in the shade')).toBeVisible();
+        }
+        await page.goto(`${urls.uk}/events`);
+        const image = page.getByAltText('Tall spruce trunks above a green understorey');
+        await expect(image).toBeVisible();
+        await expect(image).toHaveJSProperty('complete', true);
+        expect(await image.evaluate((element: HTMLImageElement) => element.naturalWidth)).toBeGreaterThan(0);
+    });
+});
+
 test.describe("the UK's events", () => {
     test('list on the UK, in date order', async ({ page }) => {
         await page.goto(`${urls.uk}/events`);

@@ -1,10 +1,11 @@
 import { z } from 'zod';
 import { defineCollection } from '@kizunajs/cms';
+import { ImageSchema } from '@kizunajs/cms/schemas';
 import { OfficeId } from './ids';
 
 /**
  * Hagen's shops. Every site shows them, and each site may answer the phones
- * with its own number.
+ * with its own number. Only the UK lists opening hours.
  */
 export const Offices = defineCollection({
     name: 'offices',
@@ -31,12 +32,17 @@ export const Offices = defineCollection({
         {
             name: 'phone',
             schema: z.string().min(1).max(30),
-            // TODO(sites): `perSite: true`, so the UK sets its own number.
+            perSite: true,
         },
         {
             name: 'openingHours',
             schema: z.string().max(120).optional(),
-            // TODO(sites): `sites: ['uk']`, so only the UK shows and stores it.
+            sites: ['uk'],
+        },
+        {
+            name: 'photo',
+            schema: ImageSchema.optional(),
+            position: 'sidebar',
         },
         {
             name: 'order',

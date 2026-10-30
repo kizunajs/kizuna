@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineCollection } from '@kizunajs/cms';
+import { ImageSchema } from '@kizunajs/cms/schemas';
 import { EventId, OfficeId } from './ids';
 
 /**
@@ -30,6 +31,10 @@ export const Events = defineCollection({
                     schema: z.string().min(1).max(20).describe('Like 10:00 to 12:30.'),
                 },
             ],
+        },
+        {
+            name: 'image',
+            schema: ImageSchema.optional(),
         },
         {
             name: 'office',

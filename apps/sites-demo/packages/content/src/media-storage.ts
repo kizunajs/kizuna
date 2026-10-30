@@ -7,7 +7,8 @@ import type { MediaStorage } from '@kizunajs/cms';
 const ROOT = process.env.KIZUNA_MEDIA_ROOT ?? resolve(/* turbopackIgnore: true */ process.cwd(), '../../.media');
 const SECRET = process.env.BETTER_AUTH_SECRET ?? 'kizuna-demo-secret-set-BETTER_AUTH_SECRET-anywhere-real';
 const ORIGIN = process.env.BETTER_AUTH_URL ?? 'http://group.localhost:3040';
-const KEY = /^(uploads|media)\/[A-Za-z0-9._-]+$/;
+// A site's own images sit in a folder named after it, like `media/uk/`.
+const KEY = /^(uploads|media)\/([a-z][a-z0-9-]*\/)?[A-Za-z0-9_-][A-Za-z0-9._-]*$/;
 
 const signature = (key: string, expires: number): string => createHmac('sha256', SECRET).update(`${key}:${expires}`).digest('base64url');
 

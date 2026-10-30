@@ -1,3 +1,4 @@
+import { CmsImage, type Image } from './Image';
 import styles from './EventList.module.css';
 
 export interface Event {
@@ -7,6 +8,7 @@ export interface Event {
     date: string;
     time: string;
     price?: string | undefined;
+    image?: Image | undefined;
 }
 
 const dateFormat = new Intl.DateTimeFormat('en-GB', {
@@ -30,6 +32,9 @@ export function EventList({ events }: { events: Event[] }) {
                         {event.price === undefined ? null : <span>{event.price}</span>}
                     </p>
                     <div className={styles.body}>
+                        {event.image === undefined ? null : (
+                            <CmsImage className={styles.image} image={event.image} width={480} height={300} />
+                        )}
                         <h2 className={styles.title}>{event.title}</h2>
                         <p className={styles.summary}>{event.summary}</p>
                     </div>

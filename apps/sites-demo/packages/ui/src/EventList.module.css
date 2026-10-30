@@ -28,6 +28,15 @@
     max-width: var(--narrow);
 }
 
+.image {
+    width: 100%;
+    max-width: 480px;
+    margin-bottom: 14px;
+    border-radius: 4px;
+    object-fit: cover;
+    aspect-ratio: 8 / 5;
+}
+
 .title {
     font-size: var(--display-s);
 }

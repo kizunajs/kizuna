@@ -1,3 +1,4 @@
+import { CmsImage, type Image } from './Image';
 import styles from './OfficeCard.module.css';
 
 export interface Office {
@@ -6,6 +7,7 @@ export interface Office {
     address: string;
     phone: string;
     openingHours?: string | undefined;
+    photo?: Image | undefined;
 }
 
 /**
@@ -23,6 +25,7 @@ export function OfficeCard({ office }: { office: Office }) {
                     {office.phone}
                 </a>
             </div>
+            {office.photo === undefined ? null : <CmsImage className={styles.photo} image={office.photo} width={360} height={240} />}
         </section>
     );
 }

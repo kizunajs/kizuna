@@ -26,3 +26,11 @@
     color: var(--ink);
     font-weight: 500;
 }
+
+.photo {
+    width: 100%;
+    margin-top: 14px;
+    border-radius: 4px;
+    object-fit: cover;
+    aspect-ratio: 3 / 2;
+}

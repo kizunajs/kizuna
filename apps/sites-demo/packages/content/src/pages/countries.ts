@@ -19,7 +19,7 @@ const frontPage = definePage({
 const eventsPage = definePage({
     name: 'eventsPage',
     label: 'Events',
-    // TODO(sites): `sites: ['uk']`, so the page exists on the UK alone.
+    sites: ['uk'],
     fields: [
         {
             name: 'heading',

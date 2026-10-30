@@ -1,15 +1,16 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { formatRef, type CmsService, type DocumentRef } from '@kizunajs/cms';
 
 const AUTHOR = 'seed';
+const PHOTOS = join(process.cwd(), 'seed/photos');
 
 const offices = [
     {
         name: 'Hagen London',
         city: 'London',
         address: '14 Columbia Road, London E2 7RG',
-        // TODO(sites): the UK's own number, +44 20 7946 0321, as its `perSite` value once `perSite` lands.
         phone: '+47 22 41 08 00',
-        openingHours: 'Tuesday to Sunday, 9 to 17',
         order: 0,
     },
     {
@@ -27,6 +28,31 @@ const offices = [
         order: 2,
     },
 ];
+
+/**
+ * What the UK sets of its own on the London shop: the number its customers
+ * call, and the opening hours only the UK lists.
+ */
+const londonOnTheUk = {
+    phone: '+44 20 7946 0321',
+    openingHours: 'Tuesday to Sunday, 9 to 17',
+};
+
+/**
+ * Photos from Unsplash, free to use under the Unsplash License, the same ones
+ * the single-site demo uses. The Oslo shop's photo is shared, and the wreath
+ * evening's belongs to the UK's own library.
+ */
+const photos = {
+    oslo: {
+        file: 'fern-fronds.jpg',
+        alt: 'Close up of fern fronds unfurled in the shade',
+    },
+    wreathEvening: {
+        file: 'forest-trunks.jpg',
+        alt: 'Tall spruce trunks above a green understorey',
+    },
+};
 
 const employees = [
     {
@@ -220,6 +246,67 @@ export const seedContent = async (service: CmsService): Promise<void> => {
         return found.id;
     };
 
+    await fill(
+        {
+            type: 'item',
+            collection: 'offices',
+            id: officeId('Hagen London'),
+            site: 'uk',
+        },
+        londonOnTheUk
+    );
+
+    /**
+     * Stores a photo in the shared library, or in a site's own when `site`
+     * names one.
+     */
+    const upload = async (photo: { file: string; alt: string }, site?: string): Promise<{ id: string; alt: string }> => {
+        const bytes = new Uint8Array(await readFile(join(PHOTOS, photo.file)));
+        const record = await service.media.storeBytes(bytes, photo.file, AUTHOR, undefined, site);
+        if (record.alt === '') {
+            await service.media.update(
+                record.id,
+                {
+                    alt: photo.alt,
+                },
+                AUTHOR
+            );
+        }
+        return {
+            id: record.id,
+            alt: photo.alt,
+        };
+    };
+
+    /**
+     * Gives a published document an image it has none of yet.
+     */
+    const addImage = async (ref: DocumentRef, field: string, photo: { file: string; alt: string }, site?: string): Promise<void> => {
+        const { row } = await service.document(ref);
+        if (row === undefined || row.published?.[field] !== undefined) return;
+        await service.update({
+            ref,
+            changes: {
+                [field]: await upload(photo, site),
+            },
+            caller,
+            author: AUTHOR,
+            summary: 'Seeded',
+        });
+        await publish(ref);
+        console.log(`[demo] seeded the ${field} of ${formatRef(ref)}`);
+    };
+
+    await addImage(
+        {
+            type: 'item',
+            collection: 'offices',
+            id: officeId('Hagen Oslo'),
+        },
+        'photo',
+        photos.oslo
+    );
+
     if ((await service.editorItems('employees')).length === 0) {
         for (const employee of employees) {
             const created = await service.createItem(
@@ -251,6 +338,21 @@ export const seedContent = async (service: CmsService): Promise<void> => {
             await publish(created.target.ref);
         }
         console.log(`[demo] seeded ${events.length} UK events`);
+    }
+
+    const wreathEvening = (await service.editorItems('events', 'uk')).find((event) => event.label === 'Wreath evening');
+    if (wreathEvening !== undefined) {
+        await addImage(
+            {
+                type: 'item',
+                collection: 'events',
+                id: wreathEvening.id,
+                site: 'uk',
+            },
+            'image',
+            photos.wreathEvening,
+            'uk'
+        );
     }
 
     await fill(
