@@ -16,7 +16,8 @@ import {
     setAtPath,
     type DescribedField,
 } from './content.js';
-import { blocksForWire, blocksHint, fieldChain } from './content.js';
+import { blocksForWire, blocksHint, fieldChain, hiddenIn } from './content.js';
+import { conditionText } from './condition.js';
 import { dataFields } from './field.js';
 import { randomBytes } from 'node:crypto';
 import type { ContentDefinition, Collection, Global } from './definitions.js';
@@ -1547,11 +1548,13 @@ export class CmsService {
                 route === undefined
                     ? undefined
                     : `Part of the address, ${route.pattern}, and unique. Changing it on a published item breaks links to the old address.`;
+            const hidden = draft !== null && hiddenIn(field, draft, parent);
             const description = [
                 field.description,
                 brand === undefined ? undefined : this.brandHint(brand, isList),
                 field.blocks === undefined ? undefined : blocksHint(field.blocks),
                 address,
+                field.condition === undefined ? undefined : conditionText(field.condition),
             ]
                 .filter(Boolean)
                 .join(' ');
@@ -1592,6 +1595,16 @@ export class CmsService {
                       }),
                 readOnly: field.readOnly,
                 required: field.required,
+                ...(field.condition === undefined
+                    ? {}
+                    : {
+                          condition: field.condition,
+                      }),
+                ...(hidden
+                    ? {
+                          hidden,
+                      }
+                    : {}),
                 writable: pathRefusal(definition.fields, field.path, caller) === undefined,
                 ...(roles === undefined ? {} : { roles }),
                 ...(brand === undefined ? {} : { brand }),

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { readMetaBrand } from 'kizunajs/generator';
-import { assertFields, dataFields, shapeOf, type DataFieldOf, type FieldList, type FieldsCheck, type ShapeOf } from './field.js';
+import { assertFields, dataFields, objectOf, type DataFieldOf, type FieldList, type FieldsCheck, type ShapeOf } from './field.js';
 import type { PageMigration } from './page.js';
 import { assertActions, type Action } from './action.js';
 import type { Resolved } from './output.js';
@@ -210,7 +210,7 @@ export const defineGlobal = <const Name extends string, const Fields extends Fie
     return {
         ...definition,
         [GLOBAL]: true,
-        schema: z.object(shapeOf(definition.fields)),
+        schema: objectOf(definition.fields),
     } as Global<Name, Fields>;
 };
 
@@ -256,7 +256,7 @@ export const defineCollection = <const Name extends string, const Fields extends
     return {
         ...definition,
         [COLLECTION]: true,
-        schema: z.object(shapeOf(definition.fields)),
+        schema: objectOf(definition.fields),
     } as Collection<Name, Fields, Id>;
 };
 

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { assertFields, shapeOf, type FieldList, type FieldsCheck, type ShapeOf } from './field.js';
+import { assertFields, objectOf, type FieldList, type FieldsCheck, type ShapeOf } from './field.js';
 import type { Collection } from './definitions.js';
 
 /**
@@ -175,7 +175,7 @@ export function definePage(
         fields,
         collection: definition.collection,
         [PAGE]: true,
-        schema: z.object(shapeOf(fields)),
+        schema: objectOf(fields),
     } as Page;
 }
 

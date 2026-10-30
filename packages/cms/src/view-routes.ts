@@ -5,7 +5,7 @@ import { ProblemDetailsSchema, ValidationErrorSchema } from 'kizunajs/schemas';
 import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { brandOf, CmsHttpError, type CmsService } from './cms.js';
 import { dataFields, type Field } from './field.js';
-import { blocksForWire, describeFields, describeLayout, getAtPath, type DescribedField } from './content.js';
+import { blocksForWire, describeFields, describeLayout, getAtPath, hiddenIn, type DescribedField } from './content.js';
 import { parseFilter, type ItemCondition } from './item-list.js';
 import { pathRefusal, type Caller } from './rules.js';
 import { sameContent } from './same-content.js';
@@ -245,6 +245,16 @@ const describeRecord = (cms: CmsService, view: View, record: object, caller: Cal
                   }),
             readOnly: field.readOnly,
             required: field.required,
+            ...(field.condition === undefined
+                ? {}
+                : {
+                      condition: field.condition,
+                  }),
+            ...(hiddenIn(field, record as Record<string, unknown>, parent)
+                ? {
+                      hidden: true,
+                  }
+                : {}),
             writable: saves && pathRefusal(view.fields, field.path, caller) === undefined,
             ...(roles === undefined
                 ? {}

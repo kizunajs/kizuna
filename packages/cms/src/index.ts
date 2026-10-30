@@ -75,6 +75,7 @@ export {
     type Tab,
     type UndeclaredFieldRole,
 } from './field.js';
+export { type ConditionValue, type FieldCondition } from './condition.js';
 export { isImageSchema, type ImageRef, type ResolvedImage } from './image.js';
 export { type Output, type Resolved } from './output.js';
 export { cms } from './provider.js';

@@ -2,7 +2,17 @@ import type { z } from 'zod';
 import { readMetaBrand, readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { readBlock, readBlocks } from './block.js';
 import { optionOf } from './union.js';
-import { dataFields, fieldDescription, isLayoutItem, type Field, type FieldAuth, type FieldList, type LayoutItem } from './field.js';
+import { conditionForWire, conditionHolds, type WireCondition } from './condition.js';
+import {
+    comparedValue,
+    dataFields,
+    fieldDescription,
+    isLayoutItem,
+    type Field,
+    type FieldAuth,
+    type FieldList,
+    type LayoutItem,
+} from './field.js';
 import type { ContentDefinition } from './definitions.js';
 import type { Ref } from './storage/store.js';
 
@@ -22,12 +32,22 @@ export interface DescribedField {
     auth: FieldAuth | undefined;
     readOnly: boolean;
     /**
-     * Whether the document needs a value here before it can publish.
+     * Whether the document needs a value here before it can publish, while
+     * the field shows.
      */
     required: boolean;
     schema: z.ZodType;
     position: 'sidebar' | undefined;
     width: string | undefined;
+    /**
+     * When the field shows, from a field beside it.
+     */
+    condition: WireCondition | undefined;
+    /**
+     * The schema of the field the condition reads, whose default stands in
+     * while it holds no value.
+     */
+    conditionSchema: z.ZodType | undefined;
     /**
      * The ids of the layout items the field sits in, outermost first.
      */
@@ -70,9 +90,15 @@ export interface DescribedLayout {
  * layout item on the way. A layout item's id is where it sits: its index under
  * the item or block field that holds it, as `/0/1` or `hero/0`.
  */
-const describeList = (items: FieldList, parentPath: string, within: readonly string[], layout: DescribedLayout[]): DescribedField[] =>
+const describeList = (
+    items: FieldList,
+    parentPath: string,
+    within: readonly string[],
+    layout: DescribedLayout[],
+    siblings: readonly Field[] = dataFields(items)
+): DescribedField[] =>
     items.flatMap((item, index) => {
-        if (!isLayoutItem(item)) return [describe(item, parentPath, within, layout)];
+        if (!isLayoutItem(item)) return [describe(item, parentPath, within, layout, siblings)];
         const id = `${within.at(-1) ?? parentPath}/${index}`;
         layout.push({
             id,
@@ -80,10 +106,16 @@ const describeList = (items: FieldList, parentPath: string, within: readonly str
             label: item.type === 'row' ? undefined : item.label,
             position: item.type === 'collapsible' ? item.position : undefined,
         });
-        return describeList(item.fields, parentPath, [...within, id], layout);
+        return describeList(item.fields, parentPath, [...within, id], layout, siblings);
     });
 
-const describe = (field: Field, parentPath: string, within: readonly string[], layout: DescribedLayout[]): DescribedField => {
+const describe = (
+    field: Field,
+    parentPath: string,
+    within: readonly string[],
+    layout: DescribedLayout[],
+    siblings: readonly Field[]
+): DescribedField => {
     const path = parentPath === '' ? field.name : `${parentPath}.${field.name}`;
     const block = readBlock(field.schema);
     return {
@@ -98,6 +130,8 @@ const describe = (field: Field, parentPath: string, within: readonly string[], l
         schema: field.schema,
         position: field.position,
         width: field.width,
+        condition: field.condition === undefined ? undefined : conditionForWire(field.condition),
+        conditionSchema: siblings.find((candidate) => candidate.name === field.condition?.field)?.schema,
         layout: [...within],
         block: block?.name,
         fields: block === undefined ? undefined : describeList(block.fields, path, [], layout),
@@ -150,8 +184,25 @@ export const blocksForWire = (blocks: readonly DescribedBlock[]) =>
                       description: field.description,
                   }),
             required: field.required,
+            ...(field.condition === undefined
+                ? {}
+                : {
+                      condition: field.condition,
+                  }),
         })),
     }));
+
+/**
+ * Whether a described field is hidden in a draft: its condition fails on the
+ * values of the object holding it.
+ */
+export const hiddenIn = (field: DescribedField, draft: Record<string, unknown>, parent: string | undefined): boolean => {
+    if (field.condition === undefined) return false;
+    const holder = parent === undefined ? draft : getAtPath(draft, parent);
+    const stored = holder !== null && typeof holder === 'object' ? (holder as Record<string, unknown>)[field.condition.field] : undefined;
+    const value = field.conditionSchema === undefined ? stored : comparedValue(field.conditionSchema, stored);
+    return !conditionHolds(field.condition, value);
+};
 
 /**
  * What the agent reads about a list of blocks: the key an item names its

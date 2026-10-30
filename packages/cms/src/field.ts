@@ -1,6 +1,7 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 import type { RequiredPermissions } from 'kizunajs';
 import { isZodSchema, readMetaDescription, readModelSchema, unwrapOptionalWrappers } from 'kizunajs/generator';
+import { conditionHolds, type FieldCondition } from './condition.js';
 
 /**
  * Who may write a field, narrowing the plugin's own `auth`. The vocabulary is a
@@ -73,6 +74,17 @@ export interface Field<Name extends string = string, Schema extends z.ZodType = 
      * How much of a row the field takes, like `'50%'`.
      */
     width?: string;
+    /**
+     * Shows the field only while another field beside it holds a value. A
+     * hidden field never holds up publishing, and a value it holds is kept.
+     *
+     * @example
+     * condition: {
+     *     field: 'category',
+     *     is: 'guide',
+     * },
+     */
+    condition?: FieldCondition;
 }
 
 /**
@@ -167,11 +179,16 @@ type DataFieldUnion<Item, Depth extends unknown[] = []> = Item extends {
 export type DataFieldOf<Fields extends FieldList> = DataFieldUnion<Fields[number]>;
 
 /**
- * The object shape a field list builds: each field's name to its schema.
- * Layout items add nothing of their own.
+ * The object shape a field list builds: each field's name to its schema, made
+ * optional for a field with a `condition`, which a document may leave empty
+ * while it is hidden. Layout items add nothing of their own.
  */
 export type ShapeOf<Fields extends FieldList> = {
-    [Each in DataFieldOf<Fields> as Each['name']]: Each['schema'];
+    [Each in DataFieldOf<Fields> as Each['name']]: Each extends {
+        condition: object;
+    }
+        ? z.ZodOptional<Each['schema']>
+        : Each['schema'];
 };
 
 type DataFieldTuple<Items extends readonly unknown[]> = Items extends readonly [infer Head, ...infer Rest]
@@ -209,18 +226,52 @@ type UnknownFieldOptions<Items extends readonly object[]> = {
     [Index in keyof Items]: Exclude<keyof Items[Index], ItemOption<Items[Index]>> & string;
 }[number];
 
+type ConditionValues<Condition> = Condition extends {
+    is: infer Value;
+}
+    ? Value
+    : Condition extends {
+            isNot: infer Value;
+        }
+      ? Value
+      : never;
+
+type ListedValue<Value> = Value extends readonly (infer Each)[] ? Each : Value;
+
+type ConditionIssue<Item, Siblings extends { name: string; schema: z.ZodType }> = Item extends {
+    name: infer Own extends string;
+    condition: infer Condition extends {
+        field: string;
+    };
+}
+    ? [Extract<Siblings, { name: Condition['field'] }>] extends [never]
+        ? `the field "${Own}" shows by "${Condition['field']}", which is not a field beside it`
+        : [ListedValue<ConditionValues<Condition>>] extends [ListedValue<z.output<Extract<Siblings, { name: Condition['field'] }>['schema']>>]
+          ? never
+          : `the field "${Own}" compares "${Condition['field']}" with a value it cannot hold`
+    : never;
+
+type ConditionIssues<Fields extends readonly { name: string; schema: z.ZodType }[]> = {
+    [Index in keyof Fields]: ConditionIssue<Fields[Index], Fields[number]>;
+}[number];
+
 /**
  * Rejects a field list that names a field twice, inside its layout items or
- * out, or gives an item an option it does not take. Intersect it with the
- * definition (`definition: Definition & FieldsCheck<Fields>`): a sound list
- * gives `unknown`, leaving the definition untouched, and anything else
- * resolves `fields` to a message.
+ * out, gives an item an option it does not take, or gives a field a
+ * `condition` naming no field beside it or a value that field cannot hold.
+ * Intersect it with the definition (`definition: Definition &
+ * FieldsCheck<Fields>`): a sound list gives `unknown`, leaving the definition
+ * untouched, and anything else resolves `fields` to a message.
  */
 export type FieldsCheck<Fields extends FieldList> = [DuplicateFieldNames<DataFieldTuple<FlatItems<Fields>>>] extends [never]
     ? [UnknownFieldOptions<FlatItems<Fields>>] extends [never]
-        ? unknown
+        ? [ConditionIssues<DataFieldTuple<FlatItems<Fields>>>] extends [never]
+            ? unknown
+            : {
+                  fields: `kizuna: ${ConditionIssues<DataFieldTuple<FlatItems<Fields>>>}`;
+              }
         : {
-              fields: `kizuna: "${UnknownFieldOptions<FlatItems<Fields>>}" is not an option there. A field takes name, label, schema, description, auth, readOnly, options, position and width, and a layout item takes type, label, fields and, on a collapsible, position`;
+              fields: `kizuna: "${UnknownFieldOptions<FlatItems<Fields>>}" is not an option there. A field takes name, label, schema, description, auth, readOnly, options, position, width and condition, and a layout item takes type, label, fields and, on a collapsible, position`;
           }
     : {
           fields: `kizuna: the field "${DuplicateFieldNames<DataFieldTuple<FlatItems<Fields>>>}" is listed twice`;
@@ -313,6 +364,46 @@ export const assertFields = (fields: FieldList, owner: string): void => {
             throw new Error(`${owner} gives the field '${field.name}' a width that is no CSS length, like '50%'.`);
         }
     }
+    for (const field of dataFields(fields)) {
+        if (field.condition !== undefined) assertCondition(field, dataFields(fields), owner);
+    }
+};
+
+const isConditionValue = (value: unknown): boolean => typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+
+/**
+ * Checks a field's condition against the fields beside it.
+ */
+const assertCondition = (field: Field, siblings: readonly Field[], owner: string): void => {
+    const condition = field.condition as unknown as Record<string, unknown>;
+    const named = `${owner} gives the field '${field.name}' a condition`;
+    if (typeof condition !== 'object' || condition === null || typeof condition.field !== 'string') {
+        throw new Error(`${named} with no field to read, like { field: 'category', is: 'guide' }.`);
+    }
+    const keys = ['is', 'isNot'].filter((key) => key in condition);
+    if (keys.length !== 1) {
+        throw new Error(`${named} that takes one of is and isNot, like { field: 'category', is: 'guide' }.`);
+    }
+    const expected = condition[keys[0]!];
+    const values = Array.isArray(expected) ? expected : [expected];
+    if (values.length === 0 || !values.every(isConditionValue)) {
+        throw new Error(`${named} comparing with something other than text, a number or true or false, or a list of them.`);
+    }
+    if (condition.field === field.name) {
+        throw new Error(`${named} that reads the field itself. It reads another field beside it.`);
+    }
+    const sibling = siblings.find((candidate) => candidate.name === condition.field);
+    if (sibling === undefined) {
+        throw new Error(`${named} reading '${condition.field}', which is not a field beside it.`);
+    }
+    if (sibling.condition !== undefined) {
+        throw new Error(`${named} reading '${condition.field}', which shows by a condition of its own. A condition reads a field that always shows.`);
+    }
+    const choices = enumValuesOf(sibling.schema);
+    const unknown = choices === undefined ? undefined : values.find((value) => !choices.includes(String(value)));
+    if (unknown !== undefined) {
+        throw new Error(`${named} comparing '${condition.field}' with '${String(unknown)}', which its enum does not have.`);
+    }
 };
 
 /**
@@ -335,12 +426,66 @@ const enumValuesOf = (schema: z.ZodType): string[] | undefined => {
 };
 
 /**
- * The shape a field list builds, for `z.object`.
+ * The shape a field list builds, for `z.object`. A field with a condition is
+ * optional in it, since a hidden field may stay empty.
  */
 export const shapeOf = <Fields extends FieldList>(fields: Fields): ShapeOf<Fields> => {
     const shape: Record<string, z.ZodType> = {};
-    for (const field of dataFields(fields)) shape[field.name] = field.schema;
+    for (const field of dataFields(fields)) {
+        shape[field.name] = field.condition === undefined || unwrapOptionalWrappers(field.schema).optional ? field.schema : field.schema.optional();
+    }
     return shape as ShapeOf<Fields>;
+};
+
+/**
+ * The value a condition compares: the field's own, or its schema's default
+ * while it holds none.
+ */
+export const comparedValue = (schema: z.ZodType, value: unknown): unknown => {
+    if (value !== undefined) return value;
+    const parsed = schema.safeParse(undefined);
+    return parsed.success ? parsed.data : undefined;
+};
+
+/**
+ * Whether a field shows beside the values of the object holding it.
+ */
+export const fieldShows = (field: Field, siblings: readonly Field[], values: unknown): boolean => {
+    if (field.condition === undefined) return true;
+    const named = siblings.find((candidate) => candidate.name === field.condition!.field);
+    const stored = values !== null && typeof values === 'object' ? (values as Record<string, unknown>)[field.condition.field] : undefined;
+    return conditionHolds(field.condition, named === undefined ? stored : comparedValue(named.schema, stored));
+};
+
+/**
+ * The object schema a field list builds. A required field with a condition is
+ * required only while it shows, so a hidden one never holds up publishing.
+ *
+ * @example
+ * const schema = objectOf(HeroBlockSchema.fields);
+ */
+export const objectOf = <Fields extends FieldList>(
+    fields: Fields,
+    extra: z.core.$ZodShape = {}
+): z.ZodObject<ShapeOf<Fields>, z.core.$strip> => {
+    const siblings = dataFields(fields);
+    let schema = z.object({
+        ...extra,
+        ...shapeOf(fields),
+    }) as z.ZodObject;
+    for (const field of siblings) {
+        if (field.condition === undefined || unwrapOptionalWrappers(field.schema).optional) continue;
+        schema = schema.refine(
+            (value: Record<string, unknown>) => value[field.name] !== undefined || !fieldShows(field, siblings, value),
+            {
+                path: [field.name],
+                message: 'Required while it shows',
+                // It runs beside other issues, so every field the draft is missing is listed at once.
+                when: (payload) => typeof payload.value === 'object' && payload.value !== null,
+            }
+        );
+    }
+    return schema as unknown as z.ZodObject<ShapeOf<Fields>, z.core.$strip>;
 };
 
 const agentFacingSchemas = new WeakSet<z.core.$ZodType>();

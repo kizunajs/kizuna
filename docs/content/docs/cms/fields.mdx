@@ -28,7 +28,7 @@ A page is a list of fields beside its route. A block is a set of fields several 
 | `localized`   | Whether the field is translated, when the schema's own default is wrong. See [Localization](/docs/cms/localization#what-is-translated).     |
 | `position`    | `'sidebar'` puts the field beside the main column. See [Layout](#layout).                                                                   |
 | `width`       | How much of a row the field takes, like `'50%'`.                                                                                            |
-| `condition`   | Shows the field only when it returns true, from the other fields' values: `({ data }) => data.category === 'guide'`.                        |
+| `condition`   | Shows the field only while a field beside it holds a value: `{ field: 'category', is: 'guide' }`. See [Conditions](#conditions).            |
 
 A field listed twice fails to compile, and a role the editor identity does not declare fails when the config assembles.
 
@@ -86,6 +86,39 @@ fields: [
 | `{ type: 'collapsible', label, fields }` | Its fields in a section that folds |
 
 An item with `type` arranges the screen, and an item with `name` is content. Layout never shapes the content itself: the page above reads `title`, `body`, `image`, `summary` and `category`, all at the top level, so moving a field into a tab changes nothing a page or a client reads. `position: 'sidebar'` works on a field and on a collapsible section.
+
+## Conditions
+
+`condition` shows a field only while another field beside it holds a value. This article shows its difficulty only when it is a guide:
+
+```ts
+fields: [
+    {
+        name: 'category',
+        schema: z.enum(['news', 'guide']),
+    },
+    {
+        name: 'difficulty',
+        schema: z.enum(['easy', 'hard']),
+        condition: {
+            field: 'category',
+            is: 'guide',
+        },
+    },
+],
+```
+
+`is` takes one value or a list of them, and shows the field while the other field holds any of them. `isNot` shows it while the other field holds none of them. On a field holding a list, holding a value means the list contains it, and a field with no value yet reads as its schema's default.
+
+A condition reads a field of the same page, global, item or view, or of the same block, so a field inside a block, or inside each item of a block list, reads the other fields of that block or item. The field it reads carries no condition of its own. A name that is no field beside it, or a value that field cannot hold, fails to compile.
+
+While a field is hidden, the editor leaves it out, along with a tab, row or collapsible that holds nothing else, and publishing does not need it, even when its schema is required. The agent reads the condition in the field's description, and `describe` marks the field `hidden` while the draft hides it. A value the field holds is kept and still reaches the page, which reads the field as possibly `undefined`, so check the same field before showing it:
+
+```tsx
+{
+    article.category === 'guide' && article.difficulty !== undefined ? <Difficulty level={article.difficulty} /> : null;
+}
+```
 
 ## Limits that keep the design
 

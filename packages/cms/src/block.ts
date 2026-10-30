@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
-import { assertFields, dataFields, isLayoutItem, shapeOf, type FieldList, type FieldsCheck, type ShapeOf } from './field.js';
+import { assertFields, dataFields, isLayoutItem, objectOf, type FieldList, type FieldsCheck, type ShapeOf } from './field.js';
 
 /**
  * What {@link defineBlock} takes.
@@ -106,7 +106,7 @@ export const defineBlock = <const Name extends string, const Fields extends Fiel
             throw new Error(`${owner} has a ${option} that is no text. Leave it out, or give it words editors read.`);
         }
     }
-    const schema = z.object(shapeOf(definition.fields));
+    const schema = objectOf(definition.fields);
     Object.defineProperty(schema, BLOCK, {
         value: definition.name,
     });
@@ -205,9 +205,8 @@ export const blocks = <const List extends readonly [BlockSchema, ...BlockSchema[
         }
         assertWholeItem(block.fields, block.name);
         held.push(block);
-        const option = z.object({
+        const option = objectOf(block.fields, {
             [BLOCK_KEY]: z.literal(block.name),
-            ...schema.shape,
         });
         return block.description === undefined ? option : option.describe(block.description);
     });

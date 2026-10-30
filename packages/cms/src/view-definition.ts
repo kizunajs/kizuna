@@ -2,7 +2,7 @@ import { z } from 'zod';
 import {
     assertFields,
     dataFields,
-    shapeOf,
+    objectOf,
     type DataFieldOf,
     type FieldAuth,
     type FieldList,
@@ -264,7 +264,7 @@ export const defineView = <
     return {
         ...definition,
         [VIEW]: true,
-        schema: z.object(shapeOf(definition.fields)),
+        schema: objectOf(definition.fields),
     } as View<Name, Fields, Item, Filter, Sort>;
 };
 

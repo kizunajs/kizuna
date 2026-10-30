@@ -122,6 +122,25 @@ export const DraftHeadersSchema = z.object({
     etag: z.string(),
 });
 
+const ConditionValueSchema = z.union([z.string(), z.number(), z.boolean()]);
+
+export const FieldConditionSchema = Kizuna.model({
+    title: 'CMS.FieldCondition',
+    schema: z
+        .object({
+            field: z.string().describe('The field beside it whose value decides, in the same page, block or item.'),
+            is: z
+                .union([ConditionValueSchema, z.array(ConditionValueSchema)])
+                .optional()
+                .describe('Shown while that field holds the value, or one of the values. A list holds it when it contains it.'),
+            isNot: z
+                .union([ConditionValueSchema, z.array(ConditionValueSchema)])
+                .optional()
+                .describe('Shown while that field holds none of the values.'),
+        })
+        .describe('When the field shows. A hidden field never holds up publishing, and a value it holds is kept.'),
+});
+
 export const DescribedBlockSchema = Kizuna.model({
     title: 'CMS.Block',
     schema: z.object({
@@ -135,7 +154,8 @@ export const DescribedBlockSchema = Kizuna.model({
                     label: z.string().optional(),
                     options: z.record(z.string(), z.string()).optional().describe('For an enum, the label editors see for each value.'),
                     description: z.string().optional(),
-                    required: z.boolean(),
+                    required: z.boolean().describe('Whether the item needs a value here, while the field shows.'),
+                    condition: FieldConditionSchema.optional(),
                 })
             )
             .describe("The block's fields, in the order editors see them, named as the item holds them."),
@@ -166,7 +186,12 @@ export const DescribedFieldSchema = Kizuna.model({
             .optional()
             .describe('The ids of the tabs, rows and collapsibles it sits in, outermost first, from the layout list.'),
         readOnly: z.boolean(),
-        required: z.boolean().describe('Whether the document needs a value here before it can publish.'),
+        required: z.boolean().describe('Whether the document needs a value here before it can publish, while the field shows.'),
+        condition: FieldConditionSchema.optional(),
+        hidden: z
+            .boolean()
+            .optional()
+            .describe('True when the condition hides the field in the current draft, so publishing does not need it.'),
         writable: z.boolean().describe('Whether the caller may write this field.'),
         roles: z.array(z.string()).optional().describe('The roles that may write it, when narrowed.'),
         brand: z.string().optional().describe('The brand of the ids this field holds, when a collection or relationship holds them.'),

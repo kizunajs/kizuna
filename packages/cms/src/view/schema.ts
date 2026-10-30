@@ -1,3 +1,5 @@
+import type { WireCondition } from '../condition.js';
+
 /**
  * The JSON Schema `describe` hands out for each field, as much of it as the
  * editor reads.
@@ -38,6 +40,7 @@ export interface DescribedBlock {
         options?: Record<string, string>;
         description?: string;
         required: boolean;
+        condition?: WireCondition;
     }>;
 }
 
@@ -70,9 +73,14 @@ export interface DescribedField {
     layout?: string[];
     readOnly: boolean;
     /**
-     * Whether the document needs a value here before it can publish.
+     * Whether the document needs a value here before it can publish, while
+     * the field shows.
      */
     required: boolean;
+    /**
+     * When the field shows, from a field beside it.
+     */
+    condition?: WireCondition;
     writable: boolean;
     roles?: string[];
     brand?: string;
