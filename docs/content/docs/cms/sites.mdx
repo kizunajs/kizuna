@@ -222,6 +222,65 @@ Inside a site, the [one-site rules](/docs/cms/editing/permissions#on-one-site) a
 
 Each site has images of its own beside a shared library. Shared content holds shared images, and a site's content holds its own and the shared ones. Every editor may upload to the shared library, and changing or deleting a shared image takes an admin over every site, since every site shows it.
 
+## Articles across sites
+
+Hagen UK writes "Winter care for houseplants", and Hagen Norge wants it too. Either the article is shared and both shops show it, or Norway starts its own article from the UK's.
+
+### A shared article that some sites show
+
+`chooseSites: true` on a shared collection lets each item pick the sites that show it:
+
+```ts title="packages/content/src/articles.ts"
+export const Articles = defineCollection({
+    name: 'articles',
+    id: ArticleId,
+    chooseSites: true,
+    fields: [
+        {
+            name: 'title',
+            schema: z.string().max(80),
+        },
+        {
+            name: 'shopNote',
+            schema: z.string().max(200).optional(),
+            perSite: true,
+        },
+    ],
+});
+```
+
+It adds a `showsOn` field to the sidebar, **Shows on: Hagen UK, Hagen Norge**, holding site keys. A site lists and reads only the articles that show on it, and an item shows on no site until one is picked. `showsOn` is a shared field, so an admin over every site publishes a change to it, and a site's editor proposes adding their own site, which goes to review like any shared change.
+
+`perSite` fields hold what differs by shop, like a note about the local shop, and each language is a [translation](/docs/cms/localization#translating) of the same article. `showsOn` decides which items appear on a site, and `sites` on a field decides which fields exist there, independently of each other.
+
+### A site's own article, started from another site's
+
+When both sites list `Articles` under their own `collections`, each keeps its own articles. A Norwegian editor picks from the articles published on the other sites, which the picker lists read-only, since published content is public. Drafts on other sites stay hidden.
+
+**Start from Hagen UK's article** creates Hagen Norge's own article, linked to the one it came from. With a [translation model](/docs/cms/localization#translating-with-a-model) on `cms()`, it drafts the copy for Norway: in Norwegian, with prices in the currency Hagen Norge's site declares, and with the UK's own references, like its events, swapped for Norway's or left empty. Shared references, like an office or an employee, stay as they are. The currency is a field of the site:
+
+```ts title="packages/content/src/sites.ts"
+export const Site = SiteSchema.extend({
+    companyName: z.string(),
+    currency: z.enum(['gbp', 'nok']),
+});
+```
+
+Each site's entry in `declareSites` sets it, as in `currency: 'nok'` on Hagen Norge.
+
+From then on the article is Norway's own, edited and published by Norway's editors. The link remembers the version of the UK's article it started from, the same way a translation does. `describe` and the MCP tools show it as `startedFrom: { site, id, version }`, so a model sees where the article came from, and `kizuna.content` reads leave it out.
+
+When the UK's article changes after that version, Norway's shows **The original changed**, with a suggested update drafted from the change. An editor accepts it into the draft or ignores it, and either way the link moves to the new version.
+
+### What the model does
+
+The model drafts. It writes the copy, the translation and the suggested update into a draft, and a person reads it and publishes.
+
+### Rules
+
+- A site's editor starts from any article published on another site.
+- The link survives [`kizuna cms rename-site`](/docs/cms/cli#kizuna-cms-rename-site), which moves it to the new key.
+
 ## Publishing
 
 Before a shared document publishes, the editor shows where it appears on each site: the pages whose content holds it, and the pages that listed it when they last rendered.
