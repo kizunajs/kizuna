@@ -1,0 +1,7 @@
+# The travel agency's own repository, kept apart from the Kizuna workspace around it.
+allowBuilds:
+  sharp: false
+
+minimumReleaseAgeExclude:
+  - 'next@16.3.8'
+  - '@next/*'

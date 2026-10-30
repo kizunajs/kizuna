@@ -1,0 +1,5 @@
+node_modules
+vendor
+.next
+.next-*
+next-env.d.ts

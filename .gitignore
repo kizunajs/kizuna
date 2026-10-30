@@ -34,6 +34,8 @@ tests/.generated-client-*.ts
 
 # Playwright runs of the Next demo
 .pglite-e2e/
+.pglite-partner-e2e/
+.media-partner-e2e/
 .next-*/
 test-results/
 playwright-report/

@@ -16,3 +16,4 @@ tsconfig.json
 *.generated.ts
 **/*.generated.ts
 packages/*/src/generated/
+apps/sites-demo/uk-content/src/

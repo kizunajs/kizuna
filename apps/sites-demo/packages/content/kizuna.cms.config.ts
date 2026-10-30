@@ -1,7 +1,9 @@
+import { anthropic } from '@ai-sdk/anthropic';
 import { defineConfig } from 'kizunajs';
 import { nextAdapter } from '@kizunajs/next';
 import { mcpPlugin } from '@kizunajs/mcp';
 import { cms } from '@kizunajs/cms';
+import { fetchClient, fetchIds } from '@kizunajs/fetch';
 import { editor } from './src/identities';
 import { Employees } from './src/employees';
 import { Offices } from './src/offices';
@@ -12,6 +14,7 @@ import { editors } from './src/people';
 import { localMediaStorage } from './src/media-storage';
 import { auth } from './src/auth';
 import { dashboard, overview } from './src/dashboard';
+import { partner, partners } from './src/partners';
 
 /**
  * The site this deployment shows. The setup script names none, and reads as the group.
@@ -31,6 +34,7 @@ export default defineConfig({
     auth: {
         identities: {
             editor,
+            partner,
         },
     },
     jobRunner: {
@@ -40,9 +44,17 @@ export default defineConfig({
         name: 'Hagen',
         db,
         locales: ['en', 'nb'],
+        ...(process.env.ANTHROPIC_API_KEY === undefined
+            ? {}
+            : {
+                  translate: {
+                      model: anthropic('claude-sonnet-5-5'),
+                  },
+              }),
         collections: [Employees, Offices],
         globals: [PrivacyPolicy],
         sites,
+        partners,
         dashboard,
         overview,
         site: () => process.env.KIZUNA_SITE,
@@ -50,6 +62,7 @@ export default defineConfig({
             identity: 'editor',
             roles: ['editor', 'admin'],
             sites: (editor) => editor.sites,
+            read: 'partner',
             signIn: ({ email, password, headers }) =>
                 auth.api.signInEmail({
                     body: {
@@ -86,6 +99,16 @@ export default defineConfig({
             url: current.url,
         },
     }),
+    clients: [
+        fetchClient({
+            output: '../../uk-content/src/index.ts',
+            groups: ['content.sites.uk'],
+        }),
+        fetchIds({
+            output: '../../uk-content/src/ids.ts',
+            groups: ['content.sites.uk'],
+        }),
+    ],
     plugins: [
         mcpPlugin({
             name: 'Hagen content',

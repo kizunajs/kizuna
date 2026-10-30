@@ -4,6 +4,8 @@ routes:
     path: /content/sites/group/pages/frontPage
     statuses:
       - 200
+      - 401
+      - 403
       - 404
     deprecated: false
     responses:
@@ -31,6 +33,44 @@ routes:
                   optional: false
                   schema:
                     kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "404":
         kind: object
         fields:
@@ -55,6 +95,8 @@ routes:
     path: /content/sites/group/pages/aboutPage
     statuses:
       - 200
+      - 401
+      - 403
       - 404
     deprecated: false
     responses:
@@ -82,6 +124,44 @@ routes:
                   optional: false
                   schema:
                     kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "404":
         kind: object
         fields:
@@ -106,6 +186,8 @@ routes:
     path: /content/sites/group/globals/privacyPolicy
     statuses:
       - 200
+      - 401
+      - 403
       - 404
     deprecated: false
     responses:
@@ -137,6 +219,44 @@ routes:
                   optional: false
                   schema:
                     kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "404":
         kind: object
         fields:
@@ -162,6 +282,8 @@ routes:
     statuses:
       - 200
       - 400
+      - 401
+      - 403
     deprecated: false
     query:
       kind: object
@@ -268,11 +390,51 @@ routes:
             optional: false
             schema:
               kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
   content.sites.group.collections.employees.get:
     method: GET
     path: /content/sites/group/collections/employees/:id
     statuses:
       - 200
+      - 401
+      - 403
       - 404
     deprecated: false
     params:
@@ -315,6 +477,44 @@ routes:
             optional: false
             schema:
               kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "404":
         kind: object
         fields:
@@ -340,6 +540,8 @@ routes:
     statuses:
       - 200
       - 400
+      - 401
+      - 403
     deprecated: false
     query:
       kind: object
@@ -460,11 +662,51 @@ routes:
             optional: false
             schema:
               kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
   content.sites.group.collections.offices.get:
     method: GET
     path: /content/sites/group/collections/offices/:id
     statuses:
       - 200
+      - 401
+      - 403
       - 404
     deprecated: false
     params:
@@ -527,6 +769,44 @@ routes:
             optional: false
             schema:
               kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "404":
         kind: object
         fields:
@@ -551,6 +831,8 @@ routes:
     path: /content/sites/uk/pages/frontPage
     statuses:
       - 200
+      - 401
+      - 403
       - 404
     deprecated: false
     responses:
@@ -578,6 +860,44 @@ routes:
                   optional: false
                   schema:
                     kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "404":
         kind: object
         fields:
@@ -602,6 +922,8 @@ routes:
     path: /content/sites/uk/pages/eventsPage
     statuses:
       - 200
+      - 401
+      - 403
       - 404
     deprecated: false
     responses:
@@ -629,6 +951,44 @@ routes:
                   optional: true
                   schema:
                     kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "404":
         kind: object
         fields:
@@ -653,6 +1013,8 @@ routes:
     path: /content/sites/uk/globals/privacyPolicy
     statuses:
       - 200
+      - 401
+      - 403
       - 404
     deprecated: false
     responses:
@@ -684,6 +1046,44 @@ routes:
                   optional: false
                   schema:
                     kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "404":
         kind: object
         fields:
@@ -709,6 +1109,8 @@ routes:
     statuses:
       - 200
       - 400
+      - 401
+      - 403
     deprecated: false
     query:
       kind: object
@@ -815,11 +1217,51 @@ routes:
             optional: false
             schema:
               kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
   content.sites.uk.collections.employees.get:
     method: GET
     path: /content/sites/uk/collections/employees/:id
     statuses:
       - 200
+      - 401
+      - 403
       - 404
     deprecated: false
     params:
@@ -862,6 +1304,44 @@ routes:
             optional: false
             schema:
               kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "404":
         kind: object
         fields:
@@ -887,6 +1367,8 @@ routes:
     statuses:
       - 200
       - 400
+      - 401
+      - 403
     deprecated: false
     query:
       kind: object
@@ -1011,11 +1493,51 @@ routes:
             optional: false
             schema:
               kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
   content.sites.uk.collections.offices.get:
     method: GET
     path: /content/sites/uk/collections/offices/:id
     statuses:
       - 200
+      - 401
+      - 403
       - 404
     deprecated: false
     params:
@@ -1082,6 +1604,44 @@ routes:
             optional: false
             schema:
               kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "404":
         kind: object
         fields:
@@ -1107,6 +1667,8 @@ routes:
     statuses:
       - 200
       - 400
+      - 401
+      - 403
     deprecated: false
     query:
       kind: object
@@ -1227,11 +1789,51 @@ routes:
             optional: false
             schema:
               kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
   content.sites.uk.collections.events.get:
     method: GET
     path: /content/sites/uk/collections/events/:id
     statuses:
       - 200
+      - 401
+      - 403
       - 404
     deprecated: false
     params:
@@ -1299,6 +1901,44 @@ routes:
             optional: false
             schema:
               kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "404":
         kind: object
         fields:
@@ -1323,6 +1963,8 @@ routes:
     path: /content/sites/norway/pages/frontPage
     statuses:
       - 200
+      - 401
+      - 403
       - 404
     deprecated: false
     responses:
@@ -1350,6 +1992,44 @@ routes:
                   optional: false
                   schema:
                     kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "404":
         kind: object
         fields:
@@ -1374,6 +2054,8 @@ routes:
     path: /content/sites/norway/globals/privacyPolicy
     statuses:
       - 200
+      - 401
+      - 403
       - 404
     deprecated: false
     responses:
@@ -1405,6 +2087,44 @@ routes:
                   optional: false
                   schema:
                     kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "404":
         kind: object
         fields:
@@ -1430,6 +2150,8 @@ routes:
     statuses:
       - 200
       - 400
+      - 401
+      - 403
     deprecated: false
     query:
       kind: object
@@ -1536,11 +2258,51 @@ routes:
             optional: false
             schema:
               kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
   content.sites.norway.collections.employees.get:
     method: GET
     path: /content/sites/norway/collections/employees/:id
     statuses:
       - 200
+      - 401
+      - 403
       - 404
     deprecated: false
     params:
@@ -1583,6 +2345,44 @@ routes:
             optional: false
             schema:
               kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "404":
         kind: object
         fields:
@@ -1608,6 +2408,8 @@ routes:
     statuses:
       - 200
       - 400
+      - 401
+      - 403
     deprecated: false
     query:
       kind: object
@@ -1728,11 +2530,51 @@ routes:
             optional: false
             schema:
               kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
   content.sites.norway.collections.offices.get:
     method: GET
     path: /content/sites/norway/collections/offices/:id
     statuses:
       - 200
+      - 401
+      - 403
       - 404
     deprecated: false
     params:
@@ -1795,6 +2637,44 @@ routes:
             optional: false
             schema:
               kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "404":
         kind: object
         fields:
@@ -1819,6 +2699,8 @@ routes:
     path: /content/media/:id/image
     statuses:
       - 200
+      - 401
+      - 403
       - 404
     deprecated: false
     params:
@@ -1850,6 +2732,44 @@ routes:
     responses:
       "200":
         kind: custom
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "404":
         kind: object
         fields:
@@ -1949,6 +2869,21 @@ routes:
                           schema:
                             kind: string
                         path:
+                          optional: false
+                          schema:
+                            kind: string
+                partners:
+                  optional: false
+                  schema:
+                    kind: array
+                    element:
+                      kind: object
+                      fields:
+                        key:
+                          optional: false
+                          schema:
+                            kind: string
+                        label:
                           optional: false
                           schema:
                             kind: string
@@ -2393,6 +3328,10 @@ routes:
                             kind: string
                             nullable: true
           requireReview:
+            optional: false
+            schema:
+              kind: boolean
+          canPublish:
             optional: false
             schema:
               kind: boolean
@@ -3586,6 +4525,10 @@ routes:
                             kind: string
                             nullable: true
           requireReview:
+            optional: false
+            schema:
+              kind: boolean
+          canPublish:
             optional: false
             schema:
               kind: boolean
@@ -5495,6 +6438,10 @@ routes:
                             kind: string
                             nullable: true
           requireReview:
+            optional: false
+            schema:
+              kind: boolean
+          canPublish:
             optional: false
             schema:
               kind: boolean
@@ -7520,6 +8467,10 @@ routes:
                             kind: string
                             nullable: true
           requireReview:
+            optional: false
+            schema:
+              kind: boolean
+          canPublish:
             optional: false
             schema:
               kind: boolean
@@ -10050,6 +11001,10 @@ routes:
             optional: false
             schema:
               kind: boolean
+          canPublish:
+            optional: false
+            schema:
+              kind: boolean
           canPublishPastReview:
             optional: false
             schema:
@@ -12057,6 +13012,10 @@ routes:
                             kind: string
                             nullable: true
           requireReview:
+            optional: false
+            schema:
+              kind: boolean
+          canPublish:
             optional: false
             schema:
               kind: boolean
@@ -14520,6 +15479,10 @@ routes:
             optional: false
             schema:
               kind: boolean
+          canPublish:
+            optional: false
+            schema:
+              kind: boolean
           canPublishPastReview:
             optional: false
             schema:
@@ -16443,6 +17406,10 @@ routes:
               - 30d
               - 7d
               - 90d
+        site:
+          optional: true
+          schema:
+            kind: string
     responses:
       "200":
         kind: object
@@ -16748,6 +17715,26 @@ routes:
                                 schema:
                                   kind: string
                                   nullable: true
+                      sites:
+                        optional: true
+                        schema:
+                          kind: array
+                          element:
+                            kind: object
+                            fields:
+                              key:
+                                optional: false
+                                schema:
+                                  kind: string
+                              label:
+                                optional: false
+                                schema:
+                                  kind: string
+                              icon:
+                                optional: false
+                                schema:
+                                  kind: string
+                                  nullable: true
                   collections:
                     kind: object
                     fields:
@@ -16789,6 +17776,334 @@ routes:
                                 schema:
                                   kind: number
                                   nullable: true
+                              site:
+                                optional: true
+                                schema:
+                                  kind: object
+                                  nullable: true
+                                  fields:
+                                    key:
+                                      optional: false
+                                      schema:
+                                        kind: string
+                                    label:
+                                      optional: false
+                                      schema:
+                                        kind: string
+                  sites:
+                    kind: object
+                    fields:
+                      type:
+                        optional: false
+                        schema:
+                          kind: enum
+                          values:
+                            - sites
+                      chart:
+                        optional: false
+                        schema:
+                          kind: object
+                          nullable: true
+                          fields:
+                            label:
+                              optional: false
+                              schema:
+                                kind: string
+                            style:
+                              optional: false
+                              schema:
+                                kind: enum
+                                values:
+                                  - bar
+                                  - line
+                      sites:
+                        optional: false
+                        schema:
+                          kind: array
+                          element:
+                            kind: object
+                            fields:
+                              key:
+                                optional: false
+                                schema:
+                                  kind: string
+                              label:
+                                optional: false
+                                schema:
+                                  kind: string
+                              icon:
+                                optional: false
+                                schema:
+                                  kind: string
+                                  nullable: true
+                              url:
+                                optional: false
+                                schema:
+                                  kind: string
+                              stats:
+                                optional: false
+                                schema:
+                                  kind: array
+                                  element:
+                                    kind: object
+                                    fields:
+                                      value:
+                                        optional: true
+                                        schema:
+                                          kind: string
+                                      detail:
+                                        optional: true
+                                        schema:
+                                          kind: string
+                                      change:
+                                        optional: true
+                                        schema:
+                                          kind: number
+                                      label:
+                                        optional: false
+                                        schema:
+                                          kind: string
+                              chart:
+                                optional: false
+                                schema:
+                                  kind: array
+                                  nullable: true
+                                  element:
+                                    kind: object
+                                    fields:
+                                      label:
+                                        optional: false
+                                        schema:
+                                          kind: string
+                                      value:
+                                        optional: false
+                                        schema:
+                                          kind: number
+                                      previous:
+                                        optional: true
+                                        schema:
+                                          kind: number
+                              waiting:
+                                optional: false
+                                schema:
+                                  kind: number
+                              lastPublish:
+                                optional: false
+                                schema:
+                                  kind: object
+                                  nullable: true
+                                  fields:
+                                    ref:
+                                      optional: false
+                                      schema:
+                                        kind: string
+                                    label:
+                                      optional: false
+                                      schema:
+                                        kind: string
+                                    by:
+                                      optional: false
+                                      schema:
+                                        kind: string
+                                        nullable: true
+                                    at:
+                                      optional: false
+                                      schema:
+                                        kind: string
+                              lastRefresh:
+                                optional: false
+                                schema:
+                                  kind: object
+                                  nullable: true
+                                  fields:
+                                    status:
+                                      optional: false
+                                      schema:
+                                        kind: enum
+                                        values:
+                                          - answered
+                                          - failed
+                                          - retrying
+                                    at:
+                                      optional: false
+                                      schema:
+                                        kind: string
+                                    attempts:
+                                      optional: false
+                                      schema:
+                                        kind: number
+                  refreshes:
+                    kind: object
+                    fields:
+                      type:
+                        optional: false
+                        schema:
+                          kind: enum
+                          values:
+                            - refreshes
+                      targets:
+                        optional: false
+                        schema:
+                          kind: array
+                          element:
+                            kind: object
+                            fields:
+                              key:
+                                optional: false
+                                schema:
+                                  kind: string
+                              label:
+                                optional: false
+                                schema:
+                                  kind: string
+                              kind:
+                                optional: false
+                                schema:
+                                  kind: enum
+                                  values:
+                                    - partner
+                                    - site
+                              last:
+                                optional: false
+                                schema:
+                                  kind: object
+                                  nullable: true
+                                  fields:
+                                    status:
+                                      optional: false
+                                      schema:
+                                        kind: enum
+                                        values:
+                                          - answered
+                                          - failed
+                                          - retrying
+                                    at:
+                                      optional: false
+                                      schema:
+                                        kind: string
+                                    attempts:
+                                      optional: false
+                                      schema:
+                                        kind: number
+                              answered:
+                                optional: false
+                                schema:
+                                  kind: number
+                              total:
+                                optional: false
+                                schema:
+                                  kind: number
+                  reach:
+                    kind: object
+                    fields:
+                      type:
+                        optional: false
+                        schema:
+                          kind: enum
+                          values:
+                            - reach
+                      sites:
+                        optional: false
+                        schema:
+                          kind: number
+                      items:
+                        optional: false
+                        schema:
+                          kind: array
+                          element:
+                            kind: object
+                            fields:
+                              ref:
+                                optional: false
+                                schema:
+                                  kind: string
+                              label:
+                                optional: false
+                                schema:
+                                  kind: string
+                              kind:
+                                optional: false
+                                schema:
+                                  kind: string
+                              pages:
+                                optional: false
+                                schema:
+                                  kind: number
+                              sites:
+                                optional: false
+                                schema:
+                                  kind: number
+                              changed:
+                                optional: false
+                                schema:
+                                  kind: boolean
+                  editors:
+                    kind: object
+                    fields:
+                      type:
+                        optional: false
+                        schema:
+                          kind: enum
+                          values:
+                            - editors
+                      changes:
+                        optional: false
+                        schema:
+                          kind: number
+                      published:
+                        optional: false
+                        schema:
+                          kind: number
+                      editors:
+                        optional: false
+                        schema:
+                          kind: array
+                          element:
+                            kind: object
+                            fields:
+                              id:
+                                optional: false
+                                schema:
+                                  kind: string
+                              name:
+                                optional: false
+                                schema:
+                                  kind: string
+                              image:
+                                optional: true
+                                schema:
+                                  kind: string
+                              roles:
+                                optional: false
+                                schema:
+                                  kind: array
+                                  element:
+                                    kind: string
+                              sites:
+                                optional: false
+                                schema:
+                                  kind: array
+                                  element:
+                                    kind: object
+                                    fields:
+                                      label:
+                                        optional: false
+                                        schema:
+                                          kind: string
+                                      roles:
+                                        optional: false
+                                        schema:
+                                          kind: array
+                                          element:
+                                            kind: string
+                              changes:
+                                optional: false
+                                schema:
+                                  kind: number
+                              lastActive:
+                                optional: false
+                                schema:
+                                  kind: string
       "401":
         kind: object
         fields:
@@ -16903,6 +18218,142 @@ routes:
             schema:
               kind: string
       "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.refreshes:
+    method: GET
+    path: /editing/refreshes
+    statuses:
+      - 200
+      - 400
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    query:
+      kind: object
+      fields:
+        ref:
+          optional: false
+          schema:
+            kind: string
+    responses:
+      "200":
+        kind: object
+        fields:
+          refreshes:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  target:
+                    optional: false
+                    schema:
+                      kind: string
+                  kind:
+                    optional: false
+                    schema:
+                      kind: enum
+                      values:
+                        - partner
+                        - site
+                  label:
+                    optional: false
+                    schema:
+                      kind: string
+                  status:
+                    optional: false
+                    schema:
+                      kind: enum
+                      values:
+                        - answered
+                        - failed
+                        - queued
+                        - retrying
+                  attempts:
+                    optional: false
+                    schema:
+                      kind: number
+                  updatedAt:
+                    optional: false
+                    schema:
+                      kind: string
+      "400":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
         kind: object
         fields:
           type:
@@ -19032,19 +20483,10 @@ routes:
     statuses:
       - 200
       - 401
-      - 403
+      - 404
     deprecated: false
     body:
-      kind: object
-      fields:
-        relationship:
-          optional: false
-          schema:
-            kind: string
-        id:
-          optional: false
-          schema:
-            kind: string
+      kind: union
     responses:
       "200":
         kind: object
@@ -19074,7 +20516,7 @@ routes:
             optional: false
             schema:
               kind: string
-      "403":
+      "404":
         kind: object
         fields:
           type:
@@ -19428,7 +20870,8 @@ routes:
               kind: string
 brands:
   - OfficeId
-jobs: []
+jobs:
+  - content.refreshSite
 tools:
   editing.describe: editing_describe
   editing.pages.list: editing_pages_list
@@ -19515,6 +20958,7 @@ tools:
   editing.media.delete: editing_media_delete
   editing.dashboard: editing_dashboard
   editing.whereUsed: editing_where_used
+  editing.refreshes: editing_refreshes
   editing.searchItems: editing_search_items
   editing.createPreview: editing_create_preview
   editing.people.list: editing_people_list

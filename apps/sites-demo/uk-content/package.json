@@ -1,0 +1,33 @@
+{
+  "name": "@hagen/uk-content",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Hagen UK's content client and the ids its routes carry, for partners to install.",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./ids": {
+      "types": "./dist/ids.d.ts",
+      "default": "./dist/ids.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "kizunajs": "workspace:^",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "kizunajs": "workspace:*",
+    "typescript": "catalog:",
+    "zod": "catalog:"
+  }
+}

@@ -6,12 +6,14 @@
 import type { nextAdapter } from '@kizunajs/next';
 import type { mcpPlugin } from '@kizunajs/mcp';
 import type { editor } from './identities';
+import type { partner } from './partners';
 
 export interface Config {
     adapter: ReturnType<typeof nextAdapter>;
     auth: {
         identities: {
             editor: typeof editor;
+            partner: typeof partner;
         };
     };
     plugins: [ReturnType<typeof mcpPlugin>];

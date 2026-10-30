@@ -19,6 +19,8 @@
   "include": [
     "scripts/**/*.ts",
     "e2e/**/*.ts",
-    "playwright.config.ts"
+    "e2e-partner/**/*.ts",
+    "playwright.config.ts",
+    "playwright.partner.config.ts"
   ]
 }

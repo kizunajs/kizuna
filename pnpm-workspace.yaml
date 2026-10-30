@@ -3,6 +3,7 @@ packages:
   - 'apps/*'
   - 'apps/sites-demo/packages/*'
   - 'apps/sites-demo/apps/*'
+  - 'apps/sites-demo/uk-content'
   - 'docs'
 
 allowBuilds:

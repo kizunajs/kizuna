@@ -17,6 +17,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.91",
     "@electric-sql/pglite": "^0.5.8",
+    "@kizunajs/fetch": "workspace:*",
     "@kizunajs/mcp": "workspace:*",
     "@kizunajs/next": "workspace:*",
     "ai": "^7.0.156",

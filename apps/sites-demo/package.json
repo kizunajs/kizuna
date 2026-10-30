@@ -8,9 +8,13 @@
     "db": "tsx scripts/database.ts --db=.pglite --port=5497",
     "setup": "pnpm --filter @kizunajs-demo/sites-content run setup",
     "dev:apps": "concurrently -n group,uk,norway -c green,cyan,magenta \"pnpm --filter @kizunajs-demo/sites-group run dev\" \"pnpm --filter @kizunajs-demo/sites-countries run dev:uk\" \"pnpm --filter @kizunajs-demo/sites-countries run dev:norway\"",
+    "dev:partner": "pnpm run partner:install && cd partner && pnpm dev",
+    "partner:install": "pnpm --filter @hagen/uk-content build && pnpm --filter @hagen/uk-content pack --out \"$PWD/partner/vendor/hagen-uk-content.tgz\" && pnpm --filter kizunajs pack --out \"$PWD/partner/vendor/kizunajs.tgz\" && cd partner && pnpm install --offline",
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test",
-    "e2e:server": "rm -rf .pglite-e2e && tsx scripts/database.ts --db=.pglite-e2e --port=5496 --run \"pnpm run setup && pnpm run dev:apps\""
+    "e2e:server": "rm -rf .pglite-e2e && tsx scripts/database.ts --db=.pglite-e2e --port=5496 --run \"pnpm run setup && pnpm run dev:apps\"",
+    "e2e:partner": "playwright test -c playwright.partner.config.ts",
+    "e2e:partner:hagen": "rm -rf .pglite-partner-e2e && tsx scripts/database.ts --db=.pglite-partner-e2e --port=5495 --run \"pnpm run setup && pnpm --filter @kizunajs-demo/sites-countries run dev:uk\""
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8"
