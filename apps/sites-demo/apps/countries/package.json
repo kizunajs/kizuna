@@ -1,0 +1,29 @@
+{
+  "name": "@kizunajs-demo/sites-countries",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev:uk": "KIZUNA_SITE=uk BETTER_AUTH_URL=${KIZUNA_UK_URL:-http://uk.localhost:3041} NEXT_DIST_DIR=${UK_DIST_DIR:-.next/uk} next dev -p ${UK_PORT:-3041}",
+    "dev:norway": "KIZUNA_SITE=norway BETTER_AUTH_URL=${KIZUNA_NORWAY_URL:-http://norway.localhost:3042} NEXT_DIST_DIR=${NORWAY_DIST_DIR:-.next/norway} next dev -p ${NORWAY_PORT:-3042}",
+    "build:uk": "KIZUNA_SITE=uk NEXT_DIST_DIR=.next/uk next build",
+    "build:norway": "KIZUNA_SITE=norway NEXT_DIST_DIR=.next/norway next build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@kizunajs-demo/sites-content": "workspace:*",
+    "@kizunajs-demo/sites-ui": "workspace:*",
+    "@kizunajs/cms": "workspace:*",
+    "better-auth": "^1.7.6",
+    "kizunajs": "workspace:*",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:"
+  }
+}

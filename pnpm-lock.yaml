@@ -426,6 +426,172 @@ importers:
         specifier: 'catalog:'
         version: 24.12.2
 
+  apps/sites-demo:
+    dependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.5.8
+        version: 0.5.8
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.12.2
+      concurrently:
+        specifier: 'catalog:'
+        version: 9.2.1
+      tsx:
+        specifier: 'catalog:'
+        version: 4.21.0
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  apps/sites-demo/apps/countries:
+    dependencies:
+      '@kizunajs-demo/sites-content':
+        specifier: workspace:*
+        version: link:../../packages/content
+      '@kizunajs-demo/sites-ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@kizunajs/cms':
+        specifier: workspace:*
+        version: link:../../../../packages/cms
+      better-auth:
+        specifier: ^1.7.6
+        version: 1.7.7(drizzle-orm@0.45.3(@electric-sql/pglite@0.5.8)(kysely@0.29.6)(postgres@3.4.9))(next@16.3.8(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.63.0)(@types/node@24.12.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.9(@typescript-eslint/types@8.67.0))(vitest@3.2.4(@types/debug@4.1.13)(@types/node@24.12.2)(jiti@2.7.0)(lightningcss@1.33.0)(supports-color@8.1.1)(tsx@4.21.0)(yaml@2.8.4))(vue@3.5.41(typescript@6.0.3))
+      kizunajs:
+        specifier: workspace:*
+        version: link:../../../../packages/core
+      next:
+        specifier: 'catalog:'
+        version: 16.3.8(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.63.0)(@types/node@24.12.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react:
+        specifier: 'catalog:'
+        version: 19.2.8
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.2.8(react@19.2.8)
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.12.2
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.5(@types/react@19.2.18)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  apps/sites-demo/apps/group:
+    dependencies:
+      '@kizunajs-demo/sites-content':
+        specifier: workspace:*
+        version: link:../../packages/content
+      '@kizunajs-demo/sites-ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@kizunajs/cms':
+        specifier: workspace:*
+        version: link:../../../../packages/cms
+      better-auth:
+        specifier: ^1.7.6
+        version: 1.7.7(drizzle-orm@0.45.3(@electric-sql/pglite@0.5.8)(kysely@0.29.6)(postgres@3.4.9))(next@16.3.8(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.63.0)(@types/node@24.12.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.9(@typescript-eslint/types@8.67.0))(vitest@3.2.4(@types/debug@4.1.13)(@types/node@24.12.2)(jiti@2.7.0)(lightningcss@1.33.0)(supports-color@8.1.1)(tsx@4.21.0)(yaml@2.8.4))(vue@3.5.41(typescript@6.0.3))
+      kizunajs:
+        specifier: workspace:*
+        version: link:../../../../packages/core
+      next:
+        specifier: 'catalog:'
+        version: 16.3.8(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.63.0)(@types/node@24.12.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react:
+        specifier: 'catalog:'
+        version: 19.2.8
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.2.8(react@19.2.8)
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.12.2
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.5(@types/react@19.2.18)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  apps/sites-demo/packages/content:
+    dependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.5.8
+        version: 0.5.8
+      '@kizunajs/mcp':
+        specifier: workspace:*
+        version: link:../../../../packages/mcp
+      '@kizunajs/next':
+        specifier: workspace:*
+        version: link:../../../../packages/next
+      better-auth:
+        specifier: ^1.7.6
+        version: 1.7.7(drizzle-orm@0.45.3(@electric-sql/pglite@0.5.8)(kysely@0.29.6)(postgres@3.4.9))(next@16.3.8(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.63.0)(@types/node@24.12.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.9(@typescript-eslint/types@8.67.0))(vitest@3.2.4(@types/debug@4.1.13)(@types/node@24.12.2)(jiti@2.7.0)(lightningcss@1.33.0)(supports-color@8.1.1)(tsx@4.21.0)(yaml@2.8.4))(vue@3.5.41(typescript@6.0.3))
+      drizzle-orm:
+        specifier: ^0.45.3
+        version: 0.45.3(@electric-sql/pglite@0.5.8)(kysely@0.29.6)(postgres@3.4.9)
+      postgres:
+        specifier: ^3.4.9
+        version: 3.4.9
+    devDependencies:
+      '@kizunajs/cli':
+        specifier: workspace:*
+        version: link:../../../../packages/cli
+      '@kizunajs/cms':
+        specifier: workspace:*
+        version: link:../../../../packages/cms
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.12.2
+      kizunajs:
+        specifier: workspace:*
+        version: link:../../../../packages/core
+      next:
+        specifier: 'catalog:'
+        version: 16.3.8(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.63.0)(@types/node@24.12.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      tsx:
+        specifier: 'catalog:'
+        version: 4.21.0
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
+
+  apps/sites-demo/packages/ui:
+    devDependencies:
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      next:
+        specifier: 'catalog:'
+        version: 16.3.8(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.63.0)(@types/node@24.12.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react:
+        specifier: 'catalog:'
+        version: 19.2.8
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
   apps/swift-demo:
     dependencies:
       '@kizunajs-demo/shared':
@@ -14042,7 +14208,7 @@ snapshots:
       unist-util-remove-position: 5.0.0
       unist-util-visit: 5.1.0
       vfile: 6.0.3
-      zod: 4.3.6
+      zod: 4.6.5
     optionalDependencies:
       '@types/mdast': 4.0.4
       '@types/mdx': 2.0.13

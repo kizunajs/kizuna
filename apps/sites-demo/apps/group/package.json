@@ -1,0 +1,28 @@
+{
+  "name": "@kizunajs-demo/sites-group",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "KIZUNA_SITE=group BETTER_AUTH_URL=${KIZUNA_GROUP_URL:-http://group.localhost:3040} next dev -p ${PORT:-3040}",
+    "build": "KIZUNA_SITE=group next build",
+    "start": "KIZUNA_SITE=group next start -p ${PORT:-3040}",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@kizunajs-demo/sites-content": "workspace:*",
+    "@kizunajs-demo/sites-ui": "workspace:*",
+    "@kizunajs/cms": "workspace:*",
+    "better-auth": "^1.7.6",
+    "kizunajs": "workspace:*",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:"
+  }
+}

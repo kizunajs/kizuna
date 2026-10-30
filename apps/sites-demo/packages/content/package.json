@@ -1,0 +1,41 @@
+{
+  "name": "@kizunajs-demo/sites-content",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./config": "./kizuna.cms.config.ts",
+    "./auth": "./src/auth/index.ts",
+    "./media": "./src/media-storage.ts"
+  },
+  "scripts": {
+    "setup": "tsx scripts/setup.ts",
+    "typecheck": "tsc --noEmit",
+    "kizuna:generate": "kizuna generate --config kizuna.cms.config.ts"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@kizunajs/mcp": "workspace:*",
+    "@kizunajs/next": "workspace:*",
+    "better-auth": "^1.7.6",
+    "drizzle-orm": "^0.45.3",
+    "postgres": "^3.4.9"
+  },
+  "peerDependencies": {
+    "@kizunajs/cms": "workspace:*",
+    "kizunajs": "workspace:*",
+    "next": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@kizunajs/cli": "workspace:*",
+    "@kizunajs/cms": "workspace:*",
+    "@types/node": "catalog:",
+    "kizunajs": "workspace:*",
+    "next": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
+  }
+}

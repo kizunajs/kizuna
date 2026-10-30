@@ -1,0 +1,22 @@
+{
+  "name": "@kizunajs-demo/sites",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx scripts/database.ts --db=.pglite --port=5497 --run \"pnpm run setup && pnpm run dev:apps\"",
+    "db": "tsx scripts/database.ts --db=.pglite --port=5497",
+    "setup": "pnpm --filter @kizunajs-demo/sites-content run setup",
+    "dev:apps": "concurrently -n group,uk,norway -c green,cyan,magenta \"pnpm --filter @kizunajs-demo/sites-group run dev\" \"pnpm --filter @kizunajs-demo/sites-countries run dev:uk\" \"pnpm --filter @kizunajs-demo/sites-countries run dev:norway\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.8"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "concurrently": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
+  }
+}
