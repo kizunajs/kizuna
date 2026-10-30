@@ -829,6 +829,10 @@
         opacity: 0.045;
     }
 
+    :root[data-theme='light'] .k-chart__area {
+        opacity: 0.062;
+    }
+
     .k-chart__crosshair {
         stroke: var(--k-line-strong);
         stroke-width: 1;
