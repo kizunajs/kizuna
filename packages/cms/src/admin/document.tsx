@@ -195,7 +195,7 @@ const useNow = (): Date => {
 
 /**
  * One document's fields in the editor's form, saved to its draft as the
- * person types, with its owner, its review and Publish in the bar above. Its
+ * person types, with its review and Publish in the bar above. Its
  * tabs put the site in draft mode beside the fields, and list its versions.
  */
 export function DocumentScreen({
@@ -1462,12 +1462,6 @@ export function DocumentScreen({
                                                       />
                                                   ),
                                           },
-                                  owner === null
-                                      ? null
-                                      : {
-                                            label: 'Owner',
-                                            value: owner,
-                                        },
                                   document.usedOn.everywhere
                                       ? {
                                             label: 'Shows on',
