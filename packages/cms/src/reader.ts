@@ -1,5 +1,6 @@
 import type { ContentRuntime } from 'kizunajs/plugin';
-import { DEFAULT_SITE, type PageMap, type SiteOptions } from './options.js';
+import { DEFAULT_SITE, type PageMap } from './options.js';
+import type { DeclaredSites } from './site.js';
 import type { Output } from './output.js';
 import { CmsHttpError, collectionCacheTag, documentCacheTag, pageCacheTag, type CmsService } from './cms.js';
 import { servesCollection } from './page.js';
@@ -147,14 +148,20 @@ export interface CmsReader<Pages extends PageMap, Globals = readonly [], Collect
  * What `kizuna.content` holds: the default site's reader, and one per named
  * site when several apps share the CMS.
  */
-export type CmsContent<Pages extends PageMap, Globals, Collections, Sites extends Record<string, SiteOptions>> = CmsReader<
+export type CmsContent<Pages extends PageMap, Globals, Collections, Sites extends DeclaredSites | undefined> = CmsReader<
     Pages,
     Globals,
     Collections
 > & {
-    sites: {
-        [Site in keyof Sites]: CmsReader<Sites[Site]['pages'], Globals, Collections>;
-    };
+    sites: Sites extends DeclaredSites<any, infer Entries>
+        ? {
+              [Site in keyof Entries]: CmsReader<
+                  Entries[Site]['pages'] extends PageMap ? Entries[Site]['pages'] : {},
+                  Globals,
+                  Collections
+              >;
+          }
+        : {};
 };
 
 /**
@@ -389,7 +396,7 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
 export const createReader = (
     service: CmsService,
     runtime: ContentRuntime | undefined
-): CmsContent<PageMap, readonly Global[], readonly Collection[], Record<string, SiteOptions>> => {
+): CmsContent<PageMap, readonly Global[], readonly Collection[], DeclaredSites> => {
     service.runtime = runtime;
     const sites: Record<string, CmsReader<PageMap>> = {};
     for (const site of Object.keys(service.sites)) {

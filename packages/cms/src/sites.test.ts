@@ -7,7 +7,8 @@ import { drizzle } from 'drizzle-orm/pglite';
 import { defineConfig, Kizuna } from 'kizunajs';
 import { expressAdapter } from '@kizunajs/express';
 import { definePage } from './page.js';
-import { defineGlobal } from './definitions.js';
+import { defineCollection, defineGlobal } from './definitions.js';
+import { declareSites, SiteSchema } from './site.js';
 import { cms } from './provider.js';
 import { definePages } from './options.js';
 import { memoryMediaStorage } from './media/storage.js';
@@ -68,28 +69,42 @@ const Footer = defineGlobal({
 
 const pglite = new PGlite();
 const db = drizzle(pglite);
+const Site = SiteSchema.extend({
+    companyName: z.string(),
+});
+
+const sites = declareSites(Site, {
+    web: {
+        label: 'Hagen',
+        url: 'https://hagen.example.com',
+        icon: '/icons/web.svg',
+        companyName: 'Hagen AS',
+        pages: definePages({
+            frontPage: {
+                path: '/',
+                page: WebFrontPage,
+            },
+        }),
+        app: 'src/__fixtures__/app',
+    },
+    campaign: {
+        label: 'Hagen Campaign',
+        url: 'https://campaign.hagen.example.com',
+        icon: 'https://cdn.hagen.example.com/campaign.svg',
+        companyName: 'Hagen AS',
+        pages: definePages({
+            frontPage: {
+                path: '/',
+                page: CampaignFrontPage,
+            },
+        }),
+        app: 'src/__fixtures__/app',
+    },
+});
+
 const content = cms({
     db,
-    sites: {
-        web: {
-            pages: definePages({
-                frontPage: {
-                    path: '/',
-                    page: WebFrontPage,
-                },
-            }),
-            app: 'src/__fixtures__/app',
-        },
-        campaign: {
-            pages: definePages({
-                frontPage: {
-                    path: '/',
-                    page: CampaignFrontPage,
-                },
-            }),
-            app: 'src/__fixtures__/app',
-        },
-    },
+    sites,
     globals: [Footer],
     auth: {
         identity: 'editor',
@@ -183,7 +198,7 @@ describe('several sites sharing one CMS', () => {
         expect(Object.keys(config.content.sites)).toEqual(['web', 'campaign']);
     });
 
-    it('takes pages for one app or sites for several, not both', () => {
+    it('takes pages for one site or sites for several, not both', () => {
         expect(() =>
             defineConfig({
                 auth: {
@@ -194,12 +209,217 @@ describe('several sites sharing one CMS', () => {
                 content: cms({
                     db,
                     pages: {},
-                    sites: {},
+                    sites,
                     auth: {
                         identity: 'editor',
                     },
                 }),
             })
         ).toThrow('not both');
+    });
+});
+
+const EventId = Kizuna.brand('EventId', z.string());
+
+const Events = defineCollection({
+    name: 'events',
+    id: EventId,
+    fields: [
+        {
+            name: 'title',
+            schema: z.string(),
+        },
+    ],
+});
+
+const configWith = (siteSites: ReturnType<typeof declareSites>) =>
+    defineConfig({
+        auth: {
+            identities: {
+                editor,
+            },
+        },
+        content: cms({
+            db,
+            sites: siteSites,
+            globals: [Footer],
+            collections: [Events],
+            auth: {
+                identity: 'editor',
+            },
+        }),
+    });
+
+describe('declaring sites', () => {
+    it('parses each site against its schema and keeps its fields', () => {
+        expect(sites.values.campaign).toEqual({
+            label: 'Hagen Campaign',
+            url: 'https://campaign.hagen.example.com',
+            icon: 'https://cdn.hagen.example.com/campaign.svg',
+            companyName: 'Hagen AS',
+        });
+        expectTypeOf(sites.values.web.companyName).toEqualTypeOf<string>();
+        expectTypeOf<keyof typeof sites.entries>().toEqualTypeOf<'web' | 'campaign'>();
+    });
+
+    it('names the site and the field that fails its schema', () => {
+        expect(() =>
+            declareSites(SiteSchema, {
+                uk: {
+                    label: 'Hagen UK',
+                    url: 'not a url',
+                    icon: '/icons/uk.svg',
+                },
+            })
+        ).toThrow('declareSites() gives the uk site a `url` that fail');
+        expect(() =>
+            declareSites(SiteSchema, {
+                uk: {
+                    label: 'Hagen UK',
+                    url: 'https://hagen.example.co.uk',
+                    icon: 'icons/uk.svg',
+                },
+            })
+        ).toThrow('`icon`');
+    });
+
+    it('refuses a site named like shared storage, or not lowercase', () => {
+        const entry = {
+            label: 'Hagen',
+            url: 'https://hagen.example.com',
+            icon: '/icon.svg',
+        };
+        expect(() =>
+            declareSites(SiteSchema, {
+                default: entry,
+            })
+        ).toThrow("site named 'default'");
+        expect(() =>
+            declareSites(SiteSchema, {
+                Norway: entry,
+            })
+        ).toThrow('lowercase');
+    });
+
+    it('refuses a site of its own named like shared content', () => {
+        expect(() =>
+            configWith(
+                declareSites(SiteSchema, {
+                    uk: {
+                        label: 'Hagen UK',
+                        url: 'https://hagen.example.co.uk',
+                        icon: '/icons/uk.svg',
+                        collections: [Events],
+                    },
+                })
+            )
+        ).toThrow("The uk site has its own 'events', which repeats a shared global or collection");
+        expect(() =>
+            configWith(
+                declareSites(SiteSchema, {
+                    uk: {
+                        label: 'Hagen UK',
+                        url: 'https://hagen.example.co.uk',
+                        icon: '/icons/uk.svg',
+                        globals: [Footer],
+                    },
+                })
+            )
+        ).toThrow("The uk site has its own 'footer'");
+    });
+});
+
+describe('two sites sharing one pages module', () => {
+    const countryPages = definePages({
+        frontPage: {
+            path: '/',
+            page: WebFrontPage,
+        },
+    });
+    const shared = defineConfig({
+        adapter: expressAdapter(),
+        auth: {
+            identities: {
+                editor,
+            },
+        },
+        content: cms({
+            db,
+            sites: declareSites(SiteSchema, {
+                uk: {
+                    label: 'Hagen UK',
+                    url: 'https://hagen.example.co.uk',
+                    icon: '/icons/uk.svg',
+                    pages: countryPages,
+                    app: 'src/__fixtures__/app',
+                },
+                norway: {
+                    label: 'Hagen Norge',
+                    url: 'https://hagen.example.no',
+                    icon: '/icons/norway.svg',
+                    pages: countryPages,
+                    app: 'src/__fixtures__/app',
+                },
+            }),
+            auth: {
+                identity: 'editor',
+            },
+            media: {
+                storage: memoryMediaStorage(),
+            },
+        }),
+    });
+    const countries = express();
+    shared.api.mount(countries);
+
+    it('keeps a page document for each site', async () => {
+        for (const [site, heading] of [
+            ['uk', 'Plants for every room'],
+            ['norway', 'Planter til hvert rom'],
+        ]) {
+            await asEditor(request(countries).patch(`/editing/sites/${site}/pages/frontPage/draft`)).send({
+                changes: {
+                    heading,
+                },
+            });
+            await asEditor(request(countries).post(`/editing/sites/${site}/pages/frontPage/publish`)).send({});
+        }
+        expect((await request(countries).get('/content/sites/uk/pages/frontPage')).body.content).toEqual({
+            heading: 'Plants for every room',
+        });
+        expect((await request(countries).get('/content/sites/norway/pages/frontPage')).body.content).toEqual({
+            heading: 'Planter til hvert rom',
+        });
+        const norway = await shared.content.sites.norway.pages.frontPage.get();
+        expectTypeOf(norway.heading).toEqualTypeOf<string>();
+        expect(stripPaths(norway.heading)).toBe('Planter til hvert rom');
+    });
+
+    it('generates the app’s pages module once', () => {
+        expect(shared.generators.filter((file) => file.output.endsWith('cms.pages.ts'))).toHaveLength(1);
+    });
+
+    it('refuses one app written to two pages modules', () => {
+        expect(() =>
+            configWith(
+                declareSites(SiteSchema, {
+                    uk: {
+                        label: 'Hagen UK',
+                        url: 'https://hagen.example.co.uk',
+                        icon: '/icons/uk.svg',
+                        pages: countryPages,
+                        app: 'src/__fixtures__/app',
+                    },
+                    norway: {
+                        label: 'Hagen Norge',
+                        url: 'https://hagen.example.no',
+                        icon: '/icons/norway.svg',
+                        pages: countryPages,
+                        app: 'src/__fixtures__/app',
+                        output: 'src/norway.pages.ts',
+                    },
+                })
+            )
+        ).toThrow('Two sites render the app at src/__fixtures__/app');
     });
 });

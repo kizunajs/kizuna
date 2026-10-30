@@ -10,3 +10,4 @@ export {
     type RichTextValue,
 } from './rich-text.js';
 export { SeoSchema, SEO_GOALS, type SeoValue } from './seo.js';
+export { SiteSchema, type SiteValues } from './site.js';

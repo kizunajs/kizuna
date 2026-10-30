@@ -8,6 +8,7 @@ import type { MediaStorage } from './media/storage.js';
 import { isRelationship, type CmsRelationship } from './relationships.js';
 import { isView, type View } from './view-definition.js';
 import { DashboardWidgetSchema, type DashboardWidget } from './dashboard.js';
+import { isDeclaredSites, type DeclaredSites } from './site.js';
 
 /**
  * One discovered page: where it is served, and what it declares.
@@ -264,37 +265,11 @@ export interface ReviewOptions {
 }
 
 /**
- * One Next.js app of several sharing the CMS: its pages, as the module
- * generated into it exports them, and where its `app` directory is.
- */
-export interface SiteOptions<Pages extends PageMap = PageMap> {
-    /**
-     * The pages, as the `cms.pages.ts` written into this app exports them.
-     */
-    pages: Pages;
-    /**
-     * The app's `app` directory, relative to the working directory, which
-     * `kizuna generate` scans for `content.ts` files.
-     */
-    app: string;
-    /**
-     * Where this app's pages module is written.
-     *
-     * @default beside `app`, as `cms.pages.ts`
-     */
-    output?: string;
-}
-
-/**
- * The site a single-app project's pages belong to, and the one a document
- * with no site of its own is stored under.
+ * Where shared content is stored, and a single-site project's pages.
  */
 export const DEFAULT_SITE = 'default';
 
-export interface CmsPluginOptions<
-    Pages extends PageMap = PageMap,
-    Sites extends Record<string, SiteOptions> = Record<string, SiteOptions>,
-> {
+export interface CmsPluginOptions<Pages extends PageMap = PageMap, Sites extends DeclaredSites | undefined = DeclaredSites | undefined> {
     /**
      * What editors call the site, which the admin's sign-in screen asks them
      * to sign in to and its tab titles end with.
@@ -316,23 +291,30 @@ export interface CmsPluginOptions<
      */
     pages?: Pages;
     /**
-     * Several Next.js apps sharing one CMS, keyed by a site name, in place of
-     * `pages`. Each app's pages are stored and read under its site; globals
-     * and collections are shared.
+     * The sites this CMS serves, made with `declareSites()`, in place of
+     * `pages`. Each site has its own pages and may have globals and
+     * collections of its own. The globals and collections here are shared by
+     * every site.
      *
      * @example
-     * sites: {
-     *     web: {
-     *         pages: webPages,
-     *         app: '../../apps/web/src/app',
+     * sites: declareSites(Site, {
+     *     uk: {
+     *         label: 'Hagen UK',
+     *         url: 'https://hagen.example.co.uk',
+     *         icon: '/icons/uk.svg',
+     *         pages: countryPages,
      *     },
-     *     campaign: {
-     *         pages: campaignPages,
-     *         app: '../../apps/campaign/src/app',
-     *     },
-     * },
+     * }),
      */
     sites?: Sites;
+    /**
+     * The site this deployment shows, which `kizuna.content` reads in
+     * process.
+     *
+     * @example
+     * site: () => process.env.KIZUNA_SITE,
+     */
+    site?: () => string | undefined;
     /**
      * Content with one instance and no route, made with `defineGlobal()`.
      */
@@ -472,6 +454,26 @@ const PageMapSchema = z.custom<PageMap>(
     }
 );
 
+const SiteContentSchema = z.object({
+    pages: PageMapSchema.optional(),
+    globals: z
+        .array(
+            z.custom<Global>(isGlobal, {
+                error: 'must be made with defineGlobal()',
+            })
+        )
+        .optional(),
+    collections: z
+        .array(
+            z.custom<Collection>(isCollection, {
+                error: 'must be made with defineCollection()',
+            })
+        )
+        .optional(),
+    app: z.string().optional(),
+    output: z.string().optional(),
+});
+
 export const CmsPluginOptionsSchema = z
     .object({
         name: z.string().min(1).optional(),
@@ -494,17 +496,23 @@ export const CmsPluginOptionsSchema = z
             .optional(),
         pages: PageMapSchema.optional(),
         sites: z
-            .record(
-                z.string().regex(/^[a-z][a-z0-9-]*$/, {
-                    error: 'is a site name, lowercase like web or campaign',
-                }),
-                z.object({
-                    pages: PageMapSchema,
-                    app: z.string(),
-                    output: z.string().optional(),
-                })
-            )
+            .custom<DeclaredSites>(isDeclaredSites, {
+                error: 'must be made with declareSites()',
+            })
+            .superRefine((sites, context) => {
+                for (const [name, entry] of Object.entries(sites.entries)) {
+                    const parsed = SiteContentSchema.safeParse(entry);
+                    for (const issue of parsed.success ? [] : parsed.error.issues) {
+                        context.addIssue({
+                            code: 'custom',
+                            message: issue.message,
+                            path: [name, ...issue.path],
+                        });
+                    }
+                }
+            })
             .optional(),
+        site: z.custom<() => string | undefined>(isFunction).optional(),
         auth: z.object({
             identity: z.string().min(1),
             roles: z.union([z.string(), z.array(z.string())]).optional(),
@@ -616,27 +624,55 @@ export const routePrefix = (path: string | undefined): '' | `/${string}` => {
 };
 
 /**
- * Every site's pages: the `sites` option, or the `pages` of a single-app
- * project under the default site.
+ * One site's pages and where its app is: a declared site's, or the `pages`
+ * of a single-site project under the default site.
+ */
+export interface SitePages {
+    pages: PageMap;
+    app?: string;
+    output?: string;
+}
+
+/**
+ * Every site's pages, keyed by site.
  */
 export const sitesOf = (options: {
     pages?: PageMap;
-    sites?: Record<string, { pages: PageMap; app?: string; output?: string }>;
+    sites?: DeclaredSites;
     appDir?: string;
     pagesOutput?: string;
-}): Record<string, { pages: PageMap; app?: string; output?: string }> =>
-    options.sites ?? {
-        [DEFAULT_SITE]: {
-            pages: options.pages ?? {},
-            ...(options.appDir === undefined
-                ? {}
-                : {
-                      app: options.appDir,
-                  }),
-            ...(options.pagesOutput === undefined
-                ? {}
-                : {
-                      output: options.pagesOutput,
-                  }),
-        },
-    };
+}): Record<string, SitePages> =>
+    options.sites === undefined
+        ? {
+              [DEFAULT_SITE]: {
+                  pages: options.pages ?? {},
+                  ...(options.appDir === undefined
+                      ? {}
+                      : {
+                            app: options.appDir,
+                        }),
+                  ...(options.pagesOutput === undefined
+                      ? {}
+                      : {
+                            output: options.pagesOutput,
+                        }),
+              },
+          }
+        : Object.fromEntries(
+              Object.entries(options.sites.entries).map(([site, entry]) => [
+                  site,
+                  {
+                      pages: entry.pages ?? {},
+                      ...(entry.app === undefined
+                          ? {}
+                          : {
+                                app: entry.app,
+                            }),
+                      ...(entry.output === undefined
+                          ? {}
+                          : {
+                                output: entry.output,
+                            }),
+                  },
+              ])
+          );

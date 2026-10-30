@@ -5,15 +5,8 @@ import { defineGenerator, encodeForWire, readDef, readMetaBrand, unwrapOptionalW
 import { CmsService } from './cms.js';
 import { brandOf } from './cms.js';
 import { routeProblems } from './dynamic.js';
-import {
-    CmsPluginOptionsSchema,
-    DEFAULT_SITE,
-    sitesOf,
-    type CmsPluginOptions,
-    type PageMap,
-    type ResolvedCmsOptions,
-    type SiteOptions,
-} from './options.js';
+import { CmsPluginOptionsSchema, DEFAULT_SITE, sitesOf, type CmsPluginOptions, type PageMap, type ResolvedCmsOptions } from './options.js';
+import type { DeclaredSites } from './site.js';
 import type { Collection, ContentDefinition, Global } from './definitions.js';
 import { describeFields, type DescribedField } from './content.js';
 import { defaultPagesOutput, discoverPages, findAppDir, renderPagesModule } from './discovery.js';
@@ -36,14 +29,14 @@ export interface CmsExports<
     Pages extends PageMap = PageMap,
     Globals extends readonly Global[] = readonly Global[],
     Collections extends readonly Collection[] = readonly Collection[],
-    Sites extends Record<string, SiteOptions> = Record<string, SiteOptions>,
+    Sites extends DeclaredSites | undefined = DeclaredSites | undefined,
 > {
     /**
      * The pages, as the generated module declared them.
      */
     pages: Pages;
     /**
-     * Every site's pages, when several apps share the CMS.
+     * The sites `declareSites()` made, when the CMS serves several.
      */
     sites: Sites;
     /**
@@ -76,7 +69,7 @@ export interface CmsSetup<
     Pages extends PageMap = PageMap,
     Globals extends readonly Global[] = readonly Global[],
     Collections extends readonly Collection[] = readonly Collection[],
-    Sites extends Record<string, SiteOptions> = Record<string, SiteOptions>,
+    Sites extends DeclaredSites | undefined = DeclaredSites | undefined,
 > {
     exports: CmsExports<Pages, Globals, Collections, Sites>;
 }
@@ -84,14 +77,39 @@ export interface CmsSetup<
 const pagesGenerator = defineGenerator({
     options: z.object({
         appDir: z.string(),
+        pagesModule: z.string(),
     }),
     generate: ({ options }) => ({
         finalize: () => {
             const appDir = resolve(/* turbopackIgnore: true */ process.cwd(), options.appDir);
-            return renderPagesModule(discoverPages(appDir), resolve(/* turbopackIgnore: true */ process.cwd(), defaultPagesOutput(appDir)));
+            return renderPagesModule(discoverPages(appDir), resolve(/* turbopackIgnore: true */ process.cwd(), options.pagesModule));
         },
     }),
 });
+
+/**
+ * One pages module per app, however many sites it serves.
+ */
+const pagesGenerators = (options: ResolvedCmsOptions) => {
+    const modules = new Map<string, string>();
+    for (const declared of Object.values(sitesOf(options))) {
+        const appDir = declared.app ?? (options.sites === undefined ? findAppDir() : undefined);
+        if (appDir === undefined) continue;
+        const output = declared.output ?? defaultPagesOutput(appDir);
+        const known = modules.get(appDir);
+        if (known !== undefined && known !== output) {
+            throw new Error(`Two sites render the app at ${appDir}, and write its pages module to ${known} and ${output}. Name one output.`);
+        }
+        modules.set(appDir, output);
+    }
+    return [...modules].map(([appDir, output]) =>
+        pagesGenerator({
+            output,
+            appDir,
+            pagesModule: output,
+        })
+    );
+};
 
 /**
  * The schema that carries a brand, under any `.optional()` or array around it.
@@ -140,6 +158,10 @@ const validate = (service: CmsService, options: ResolvedCmsOptions, api: PluginA
         }
     }
     const brandSchemas = new Map<string, string>();
+    const siteEntries = Object.entries(options.sites?.entries ?? {});
+    const ownCollections = [...new Set(siteEntries.flatMap(([, entry]) => entry.collections ?? []))];
+    const ownGlobals = [...new Set(siteEntries.flatMap(([, entry]) => entry.globals ?? []))];
+    const allCollections = [...new Set([...(options.collections ?? []), ...ownCollections])];
     const definitions: Array<[string, ContentDefinition]> = [
         ...Object.entries(sitesOf(options)).flatMap(([site, declared]) =>
             Object.entries(declared.pages).map(([name, entry]): [string, ContentDefinition] => [
@@ -147,8 +169,11 @@ const validate = (service: CmsService, options: ResolvedCmsOptions, api: PluginA
                 entry.page,
             ])
         ),
-        ...(options.globals ?? []).map((definition): [string, ContentDefinition] => [`Global '${definition.name}'`, definition]),
-        ...(options.collections ?? []).map((definition): [string, ContentDefinition] => [`Collection '${definition.name}'`, definition]),
+        ...[...(options.globals ?? []), ...ownGlobals].map((definition): [string, ContentDefinition] => [
+            `Global '${definition.name}'`,
+            definition,
+        ]),
+        ...allCollections.map((definition): [string, ContentDefinition] => [`Collection '${definition.name}'`, definition]),
     ];
     const names = new Map<string, string>();
     for (const definition of [...(options.globals ?? []), ...(options.collections ?? [])]) {
@@ -157,11 +182,27 @@ const validate = (service: CmsService, options: ResolvedCmsOptions, api: PluginA
         }
         names.set(definition.name, definition.name);
     }
+    for (const [site, entry] of siteEntries) {
+        const own = new Set<string>();
+        for (const definition of [...(entry.globals ?? []), ...(entry.collections ?? [])]) {
+            if (names.has(definition.name)) {
+                throw new Error(
+                    `The ${site} site has its own '${definition.name}', which repeats a shared global or collection. Give it another name.`
+                );
+            }
+            if (own.has(definition.name)) {
+                throw new Error(
+                    `The ${site} site has two globals or collections named '${definition.name}'. Give one of them another name.`
+                );
+            }
+            own.add(definition.name);
+        }
+    }
     const allPages = Object.values(sitesOf(options)).flatMap((declared) => Object.values(declared.pages));
     const problems = allPages.flatMap((entry) => routeProblems(entry.path, entry.page));
     if (problems.length > 0) throw new Error(problems.join('\n'));
     const owners = new Map<string, string>();
-    for (const definition of options.collections ?? []) {
+    for (const definition of allCollections) {
         const brand = brandOf(definition.id);
         if (brand === undefined) continue;
         const other = owners.get(brand);
@@ -173,16 +214,22 @@ const validate = (service: CmsService, options: ResolvedCmsOptions, api: PluginA
         owners.set(brand, definition.name);
         brandSchemas.set(brand, brandShape(definition.id));
     }
-    for (const definition of options.collections ?? []) {
+    for (const definition of allCollections) {
         assertActionAccess(resolveActions(definition.actions), `Collection '${definition.name}'`, identityRoles, label);
         assertTree(definition);
     }
     assertViews(options.views ?? [], [...names.keys()], identityRoles, label);
     assertDashboard(options.dashboard ?? [], identityRoles, label);
-    for (const entry of allPages) {
-        const served = entry.page.collection;
-        if (served !== undefined && !(options.collections ?? []).includes(served)) {
-            throw new Error(`${entry.page.name} shows the ${served.name} collection, which cms() is not given. Add it to \`collections\`.`);
+    for (const [site, declared] of Object.entries(sitesOf(options))) {
+        const reachable = [...(options.collections ?? []), ...(options.sites?.entries[site]?.collections ?? [])];
+        for (const entry of Object.values(declared.pages)) {
+            const served = entry.page.collection;
+            if (served === undefined || reachable.includes(served)) continue;
+            throw new Error(
+                site === DEFAULT_SITE
+                    ? `${entry.page.name} shows the ${served.name} collection, which cms() is not given. Add it to \`collections\`.`
+                    : `${entry.page.name} of the ${site} site shows the ${served.name} collection, which neither cms() nor the ${site} site has. Add it to \`collections\` on one of them.`
+            );
         }
     }
     for (const [name, definition] of definitions) {
@@ -243,21 +290,11 @@ const definition = definePlugin({
     options: CmsPluginOptionsSchema,
     setup: ({ options, api }) => {
         const service = new CmsService(options, api);
-        const generators = Object.values(sitesOf(options)).flatMap((declared) => {
-            const appDir = declared.app ?? (options.sites === undefined ? findAppDir() : undefined);
-            return appDir === undefined
-                ? []
-                : [
-                      pagesGenerator({
-                          output: declared.output ?? defaultPagesOutput(appDir),
-                          appDir,
-                      }),
-                  ];
-        });
+        const generators = pagesGenerators(options);
         const base = routePrefix(options.path);
         const exports: CmsExports = {
             pages: service.pages,
-            sites: options.sites ?? {},
+            sites: options.sites,
             globals: options.globals ?? [],
             collections: options.collections ?? [],
             invalidate: (brand, id) => service.invalidate(brand, id),

@@ -79,6 +79,7 @@ export { type ConditionValue, type FieldCondition } from './condition.js';
 export { isImageSchema, type ImageRef, type ResolvedImage } from './image.js';
 export { type Output, type Resolved } from './output.js';
 export { cms } from './provider.js';
+export { SiteSchema, declareSites, isDeclaredSites, type DeclaredSites, type SiteContent, type SiteValues } from './site.js';
 export { type CmsExports, type CmsSetup } from './setup.js';
 export { type CmsRoutes } from './routes.js';
 export {
@@ -115,6 +116,7 @@ export {
     type ChatTokenRequest,
     type PageEntry,
     type PageMap,
+    type SitePages,
     definePages,
 } from './options.js';
 export { CmsService, CmsHttpError, pageCacheTag, documentCacheTag, collectionCacheTag, brandOf, type ContentProblem } from './cms.js';

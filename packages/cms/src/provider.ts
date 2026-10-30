@@ -3,7 +3,8 @@ import { pluginExportsOf } from 'kizunajs/adapter';
 import { cmsPluginDeclaration, type CmsExports } from './setup.js';
 import { cmsRoutes, type CmsRoutes } from './routes.js';
 import { createReader, type CmsContent } from './reader.js';
-import { DEFAULT_SITE, sitesOf, type CmsPluginOptions, type PageMap, type SiteOptions } from './options.js';
+import { DEFAULT_SITE, sitesOf, type CmsPluginOptions, type PageMap } from './options.js';
+import type { DeclaredSites } from './site.js';
 import type { Collection, Global } from './definitions.js';
 import { servesCollection } from './page.js';
 import { latestMigration } from './content.js';
@@ -71,7 +72,7 @@ export function cms<
     const Pages extends PageMap = PageMap,
     const Globals extends readonly Global[] = readonly [],
     const Collections extends readonly Collection[] = readonly [],
-    const Sites extends Record<string, SiteOptions> = {},
+    const Sites extends DeclaredSites | undefined = undefined,
 >(
     options: CmsPluginOptions<Pages, Sites> & {
         globals?: Globals;
