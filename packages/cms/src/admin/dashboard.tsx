@@ -25,7 +25,7 @@ import {
     type StatWidgetBody,
 } from './dashboard-widgets.js';
 import { createItem } from './list.js';
-import { hrefOf, replaceQuery, useAddress, type CollectionSummary } from './navigation.js';
+import { hrefOf, replaceQuery, screenOf, useAddress, type CollectionSummary } from './navigation.js';
 import { PageHeader } from './page-header.js';
 import { Loading, problemOf } from './parts.js';
 import { SelectMenu } from '../view/select-menu.js';
@@ -207,7 +207,9 @@ export function Dashboard({
     const [failure, setFailure] = useState<string | undefined>();
     const [creating, setCreating] = useState<string | undefined>();
     const [problem, setProblem] = useState<string | undefined>();
-    const period = periodOfSearch(useAddress().search);
+    const address = useAddress();
+    const period = periodOfSearch(address.search);
+    const site = screenOf(address.pathname).site;
     const [counted, setCounted] = useState<DashboardPeriod | undefined>();
     const [loading, setLoading] = useState(false);
     const requests = useRef(0);
@@ -226,6 +228,7 @@ export function Dashboard({
         const answer = await connection.call<{ widgets: DashboardWidgetBody[]; period?: DashboardPeriod }>('editing_dashboard', {
             query: {
                 period,
+                site,
             },
         });
         if (request !== requests.current) return;
@@ -240,7 +243,7 @@ export function Dashboard({
         }
         setWidgets(answer.body.widgets);
         setCounted(answer.body.period);
-    }, [connection, period, choosePeriod]);
+    }, [connection, period, site, choosePeriod]);
 
     useEffect(() => {
         void load();
