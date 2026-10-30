@@ -95,8 +95,67 @@ const diffContent = (before: NonNullable<ApiSnapshot['content']>, after: NonNull
     return changes;
 };
 
-export const diffSnapshots = (before: ApiSnapshot, after: ApiSnapshot, options: DiffOptions = {}): Change[] => {
+/**
+ * A schema node with its brands left off, at any depth.
+ */
+const withoutBrands = (node: SchemaNode): SchemaNode => {
+    const { brand: _brand, ...rest } = node as SchemaNode & { brand?: string };
+    const copy = rest as Record<string, unknown>;
+    if ('fields' in copy) {
+        copy.fields = Object.fromEntries(
+            Object.entries(copy.fields as Record<string, { optional: boolean; schema: SchemaNode }>).map(([key, field]) => [
+                key,
+                {
+                    ...field,
+                    schema: withoutBrands(field.schema),
+                },
+            ])
+        );
+    }
+    if ('element' in copy) copy.element = withoutBrands(copy.element as SchemaNode);
+    if ('options' in copy) {
+        copy.options = Object.fromEntries(
+            Object.entries(copy.options as Record<string, SchemaNode>).map(([tag, option]) => [tag, withoutBrands(option)])
+        );
+    }
+    return copy as SchemaNode;
+};
+
+/**
+ * The routes with every brand left off, to compare against a snapshot written
+ * before brands were recorded.
+ */
+const routesWithoutBrands = (routes: ApiSnapshot['routes']): ApiSnapshot['routes'] =>
+    Object.fromEntries(
+        Object.entries(routes).map(([key, route]) => {
+            const strip = (node: SchemaNode | undefined): SchemaNode | undefined => (node === undefined ? undefined : withoutBrands(node));
+            return [
+                key,
+                {
+                    ...route,
+                    params: strip(route.params),
+                    body: strip(route.body),
+                    query: strip(route.query),
+                    headers: strip(route.headers),
+                    responses: Object.fromEntries(
+                        Object.entries(route.responses).map(([status, node]) => [status, node === null ? null : withoutBrands(node)])
+                    ),
+                },
+            ];
+        })
+    );
+
+export const diffSnapshots = (before: ApiSnapshot, latest: ApiSnapshot, options: DiffOptions = {}): Change[] => {
     const changes: Change[] = [];
+
+    // A snapshot from before brands were recorded says nothing about them.
+    const after =
+        before.brands === undefined
+            ? {
+                  ...latest,
+                  routes: routesWithoutBrands(latest.routes),
+              }
+            : latest;
 
     const beforeRoutes = new Map(Object.entries(before.routes));
     const afterRoutes = new Map(Object.entries(after.routes));
@@ -193,6 +252,10 @@ export const diffSnapshots = (before: ApiSnapshot, after: ApiSnapshot, options: 
         }
 
         const inputs: Array<[Direction, string, SchemaNode | undefined, SchemaNode | undefined]> = [
+            // The path already says which parameters there are, so only their schemas are compared.
+            ...(gone.params !== undefined && arrived.params !== undefined
+                ? [['request', 'params', gone.params, arrived.params] as [Direction, string, SchemaNode, SchemaNode]]
+                : []),
             ['request', 'body', gone.body, arrived.body],
             ['request', 'query', gone.query, arrived.query],
             ['request', 'headers', gone.headers, arrived.headers],

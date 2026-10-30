@@ -5,6 +5,7 @@ import {
     walkApi,
     flattenJobs,
     readDef,
+    readMetaBrand,
     readObjectShape,
     resolveResponseBody,
     toToolName,
@@ -15,14 +16,15 @@ import type { z } from 'zod';
 
 /**
  * A schema reduced to what a comparison needs: its kind, whether it accepts
- * `null`, its fields, and the values it accepts when it is closed.
+ * `null`, its fields, the values it accepts when it is closed, and the brand
+ * a scalar carries.
  */
 export type SchemaNode =
     | { kind: 'object'; nullable?: true; fields: Record<string, { optional: boolean; schema: SchemaNode }>; refinements?: number }
     | { kind: 'array'; nullable?: true; element: SchemaNode; refinements?: number }
     | { kind: 'enum'; nullable?: true; values: string[]; refinements?: number }
     | { kind: 'union'; nullable?: true; discriminator: string; options: Record<string, SchemaNode>; refinements?: number }
-    | { kind: string; nullable?: true; refinements?: number };
+    | { kind: string; nullable?: true; brand?: string; refinements?: number };
 
 export interface RouteSnapshot {
     method: string;
@@ -34,6 +36,10 @@ export interface RouteSnapshot {
      */
     hidden?: true;
     sunset?: string;
+    /**
+     * The route's `pathParams`, when it declares them.
+     */
+    params?: SchemaNode;
     body?: SchemaNode;
     query?: SchemaNode;
     headers?: SchemaNode;
@@ -45,6 +51,12 @@ export interface RouteSnapshot {
 
 export interface ApiSnapshot {
     routes: Record<string, RouteSnapshot>;
+    /**
+     * Every brand the routes' schemas carry, sorted. A snapshot written
+     * before brands were recorded has no list, and `kizuna diff` reports no
+     * brand change against it.
+     */
+    brands?: string[];
     jobs: string[];
     /**
      * MCP tool name, keyed by the route key that publishes it.
@@ -99,19 +111,30 @@ const refinementCount = (schema: z.core.$ZodType): number | undefined => {
     return custom === 0 ? undefined : custom;
 };
 
+export interface SchemaNodeOptions {
+    /**
+     * Record the brand each scalar carries. A generated client names its
+     * type after the brand, so a rename breaks the code using it.
+     *
+     * @default true
+     */
+    brands?: boolean;
+}
+
 /**
  * A Zod schema reduced to the shape a comparison reads.
  */
-export const toSchemaNode = (schema: z.core.$ZodType): SchemaNode => {
+export const toSchemaNode = (schema: z.core.$ZodType, nodeOptions: SchemaNodeOptions = {}): SchemaNode => {
     const { inner, nullable } = unwrapOptionalWrappers(schema);
     const def = readDef(inner);
+    const child = (nested: z.core.$ZodType): SchemaNode => toSchemaNode(nested, nodeOptions);
 
     // `z.union([UserSchema, z.null()])` says what `.nullable()` says.
     const options = def.type === 'union' ? (def.options ?? []) : [];
     const nonNull = options.filter((option) => readDef(option).type !== 'null');
     if (nonNull.length === 1 && options.length > 1) {
         return {
-            ...toSchemaNode(nonNull[0]!),
+            ...child(nonNull[0]!),
             nullable: true,
         };
     }
@@ -126,7 +149,7 @@ export const toSchemaNode = (schema: z.core.$ZodType): SchemaNode => {
         const tagged: Record<string, SchemaNode> = {};
         for (const option of def.options ?? []) {
             const literal = readObjectShape(option)?.[discriminator];
-            for (const value of literal === undefined ? [] : (readDef(literal).values ?? [])) tagged[String(value)] = toSchemaNode(option);
+            for (const value of literal === undefined ? [] : (readDef(literal).values ?? [])) tagged[String(value)] = child(option);
         }
         return {
             kind: 'union',
@@ -141,12 +164,12 @@ export const toSchemaNode = (schema: z.core.$ZodType): SchemaNode => {
     if (shape) {
         const fields: Record<string, { optional: boolean; schema: SchemaNode }> = {};
         for (const [key, field] of Object.entries(shape)) {
-            fields[key] = { optional: unwrapOptionalWrappers(field).optional, schema: toSchemaNode(field) };
+            fields[key] = { optional: unwrapOptionalWrappers(field).optional, schema: child(field) };
         }
         return { kind: 'object', ...nullability, fields, ...carry };
     }
 
-    if (def.type === 'array' && def.element) return { kind: 'array', ...nullability, element: toSchemaNode(def.element), ...carry };
+    if (def.type === 'array' && def.element) return { kind: 'array', ...nullability, element: child(def.element), ...carry };
     if (def.type === 'enum') {
         return {
             kind: 'enum',
@@ -159,8 +182,43 @@ export const toSchemaNode = (schema: z.core.$ZodType): SchemaNode => {
     }
     if (def.type === 'literal') return { kind: 'enum', ...nullability, values: (def.values ?? []).map(String).sort(), ...carry };
 
-    return { kind: def.type ?? 'unknown', ...nullability, ...carry };
+    const brand = nodeOptions.brands === false ? undefined : (readMetaBrand(schema) ?? readMetaBrand(inner));
+    return {
+        kind: def.type ?? 'unknown',
+        ...nullability,
+        ...(brand === undefined
+            ? {}
+            : {
+                  brand,
+              }),
+        ...carry,
+    };
 };
+
+/**
+ * Every brand a schema node carries, at any depth.
+ */
+export const brandsOf = (node: SchemaNode | null | undefined): string[] => {
+    if (node === null || node === undefined) return [];
+    const nested: Array<SchemaNode | undefined> = [
+        ...Object.values((node as { fields?: Record<string, { schema: SchemaNode }> }).fields ?? {}).map((field) => field.schema),
+        (node as { element?: SchemaNode }).element,
+        ...Object.values((node as { options?: Record<string, SchemaNode> }).options ?? {}),
+    ];
+    const own = (node as { brand?: string }).brand;
+    return [...(own === undefined ? [] : [own]), ...nested.flatMap((child) => brandsOf(child))];
+};
+
+/**
+ * Every schema a route snapshot holds.
+ */
+export const routeSchemas = (route: RouteSnapshot): Array<SchemaNode | null | undefined> => [
+    route.params,
+    route.body,
+    route.query,
+    route.headers,
+    ...Object.values(route.responses),
+];
 
 const sunsetOf = (route: RouteDefinition): string | undefined => {
     const declared = route.sunset;
@@ -192,6 +250,11 @@ const routeSnapshots = (api: ApiDefinition): Record<string, RouteSnapshot> => {
                       }
                     : {}),
                 ...(sunset === undefined ? {} : { sunset }),
+                ...(route.pathParams
+                    ? {
+                          params: toSchemaNode(route.pathParams),
+                      }
+                    : {}),
                 ...(route.body ? { body: toSchemaNode(route.body) } : {}),
                 ...(route.query ? { query: toSchemaNode(route.query) } : {}),
                 ...(route.headers ? { headers: toSchemaNode(route.headers) } : {}),
@@ -225,8 +288,12 @@ export const toSnapshot = (api: ApiDefinition): ApiSnapshot => {
 
     const documents = contentOf(api)?.provider.documents();
 
+    const routes = routeSnapshots(api);
+    const brands = [...new Set(Object.values(routes).flatMap((route) => routeSchemas(route).flatMap((node) => brandsOf(node))))].sort();
+
     return {
-        routes: routeSnapshots(api),
+        routes,
+        brands,
         jobs,
         tools,
         ...(documents === undefined
@@ -240,7 +307,10 @@ export const toSnapshot = (api: ApiDefinition): ApiSnapshot => {
                               {
                                   kind: document.kind,
                                   migration: document.migration,
-                                  schema: toSchemaNode(document.schema),
+                                  // Stored content holds the value, never the type a client names it by.
+                                  schema: toSchemaNode(document.schema, {
+                                      brands: false,
+                                  }),
                               },
                           ])
                   ),

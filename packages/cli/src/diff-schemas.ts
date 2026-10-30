@@ -79,6 +79,30 @@ export const diffSchemas = (
 
     const changes: SchemaChange[] = [];
 
+    // A generated client names a branded value's type after its brand, so the
+    // code holding one stops compiling when the brand changes or leaves.
+    const wasBrand = (before as { brand?: string }).brand;
+    const isBrand = (after as { brand?: string }).brand;
+    if (wasBrand !== isBrand) {
+        const label = path || 'the body';
+        changes.push(
+            wasBrand === undefined
+                ? {
+                      breaking: direction === 'request',
+                      path,
+                      summary: `${label} is now branded ${isBrand}`,
+                  }
+                : {
+                      breaking: true,
+                      path,
+                      summary:
+                          isBrand === undefined
+                              ? `${label} is no longer branded ${wasBrand}`
+                              : `${label} is branded ${isBrand} instead of ${wasBrand}`,
+                  }
+        );
+    }
+
     // A caller decodes a response it never expected to hold `null`, and a
     // server rejects the `null` a caller was allowed to send.
     const wasNullable = before.nullable === true;

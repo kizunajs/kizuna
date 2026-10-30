@@ -164,7 +164,25 @@ BREAKING POST /users body.address.postcode is now required
 BREAKING GET /users 200.items[].id is number instead of string
 ```
 
+Path parameters declared with `pathParams` are compared too, as `params`.
+
 **What it cannot read** is the rule inside a `.refine()` or `.superRefine()`, because a predicate is a function rather than a declaration. It does see one arrive or leave, so adding a refinement is reported as tightened validation, but a rewritten predicate that accepts less than it did passes quietly.
+
+## Brands
+
+A [branded ID](/docs/zod#branded-ids) is a type in every generated client, `API.EmployeeId`, so the code holding one depends on its name. The snapshot records the brand at each place a route's schemas carry one:
+
+| Change          | Request      | Response     |
+| --------------- | ------------ | ------------ |
+| A brand renamed | **breaking** | **breaking** |
+| A brand removed | **breaking** | **breaking** |
+| A brand added   | **breaking** | changed      |
+
+```
+BREAKING PATCH /employees/:id params.id is branded StaffId instead of EmployeeId
+```
+
+A snapshot committed before brands were recorded has no `brands` list, and `diff` reports no brand change against it. The next snapshot you commit records them.
 
 ## Reference
 

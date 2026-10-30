@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna, type AuthoredRoutes } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
-import { diffApis, formatChange, hasBreakingChange, type Change } from './diff-apis.js';
+import { diffApis, diffSnapshots, formatChange, hasBreakingChange, type Change } from './diff-apis.js';
+import { toSnapshot } from './snapshot.js';
 
 const k = new Kizuna();
 
@@ -295,5 +296,106 @@ describe('hidden routes', () => {
                 key: 'users.listUsers',
             })
         );
+    });
+});
+
+describe('brands, which a generated client names its types after', () => {
+    const EmployeeId = Kizuna.brand('EmployeeId', z.string());
+    const StaffId = Kizuna.brand('StaffId', z.string());
+    const employeeApi = (options: { params: z.ZodType; body: z.ZodType; response: z.ZodType }) =>
+        defineConfig({
+            routes: [
+                {
+                    employees: {
+                        updateEmployee: k.route({
+                            method: 'PATCH',
+                            path: '/employees/:id',
+                            pathParams: z.object({
+                                id: options.params,
+                            }),
+                            body: z.object({
+                                managerId: options.body,
+                            }),
+                            responses: {
+                                200: z.object({
+                                    id: options.response,
+                                }),
+                            },
+                        }),
+                    },
+                },
+            ],
+        }).api;
+    const branded = employeeApi({
+        params: EmployeeId,
+        body: EmployeeId,
+        response: EmployeeId,
+    });
+
+    it('reports a renamed brand as breaking, wherever it sits', () => {
+        const changes = diffApis(
+            branded,
+            employeeApi({
+                params: StaffId,
+                body: StaffId,
+                response: StaffId,
+            })
+        );
+
+        expect(summaries(changes)).toEqual([
+            'PATCH /employees/:id params.id is branded StaffId instead of EmployeeId',
+            'PATCH /employees/:id body.managerId is branded StaffId instead of EmployeeId',
+            'PATCH /employees/:id 200.id is branded StaffId instead of EmployeeId',
+        ]);
+        expect(changes.every((change) => change.level === 'breaking')).toBe(true);
+    });
+
+    it('reports a removed brand as breaking', () => {
+        const changes = diffApis(
+            branded,
+            employeeApi({
+                params: EmployeeId,
+                body: z.string(),
+                response: z.string(),
+            })
+        );
+
+        expect(summaries(changes)).toEqual([
+            'PATCH /employees/:id body.managerId is no longer branded EmployeeId',
+            'PATCH /employees/:id 200.id is no longer branded EmployeeId',
+        ]);
+        expect(changes.every((change) => change.level === 'breaking')).toBe(true);
+    });
+
+    it('reports a new brand as breaking a request and changing a response', () => {
+        const changes = diffApis(
+            employeeApi({
+                params: z.string(),
+                body: z.string(),
+                response: z.string(),
+            }),
+            employeeApi({
+                params: z.string(),
+                body: EmployeeId,
+                response: EmployeeId,
+            })
+        );
+
+        expect(changes.map((change) => [change.level, change.summary])).toEqual([
+            ['breaking', 'PATCH /employees/:id body.managerId is now branded EmployeeId'],
+            ['changed', 'PATCH /employees/:id 200.id is now branded EmployeeId'],
+        ]);
+    });
+
+    it('reports no brand change against a snapshot written before brands were recorded', () => {
+        const { brands: _brands, ...unbranded } = toSnapshot(
+            employeeApi({
+                params: z.string(),
+                body: z.string(),
+                response: z.string(),
+            })
+        );
+
+        expect(diffSnapshots(unbranded, toSnapshot(branded))).toEqual([]);
     });
 });
