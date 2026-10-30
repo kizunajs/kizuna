@@ -189,7 +189,7 @@
         display: flex;
         flex: 1;
         align-items: center;
-        gap: 8px;
+        gap: 12px;
         min-width: 0;
         color: var(--k-muted);
     }
@@ -200,8 +200,8 @@
         align-items: center;
         gap: 8px;
         /* The padding gives the hover room, and the margins take it back, so the first slash sits as far from the mark as every other. */
-        margin: 0 -4px 0 -8px;
-        padding: 4px 4px 4px 8px;
+        margin: 0 -12px 0 -8px;
+        padding: 4px 8px;
         border: 0;
         border-radius: 8px;
         background: none;
@@ -221,16 +221,14 @@
         height: 18px;
     }
 
-    /* The mark's own whitespace is taken back, so the slash after it sits as far as after any crumb. */
     .k-path-bar__chevron {
-        margin-right: -4px;
         color: var(--k-muted);
     }
 
     .k-path-bar__step {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
+        gap: 12px;
         min-width: 0;
     }
 
