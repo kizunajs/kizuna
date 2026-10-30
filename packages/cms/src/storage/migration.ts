@@ -93,6 +93,11 @@ create index if not exists cms_refreshes_subject on cms_refreshes (target, subje
 create index if not exists cms_refreshes_ref on cms_refreshes (ref, created_at);
 
 create index if not exists cms_refreshes_updated on cms_refreshes (updated_at);
+
+create table if not exists cms_translations (
+    document_id text primary key,
+    source_versions jsonb not null
+);
 `;
 
 /**

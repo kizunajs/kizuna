@@ -39,6 +39,7 @@ export default defineConfig({
     content: cms({
         name: 'Hagen',
         db,
+        locales: ['en', 'nb'],
         collections: [Employees, Offices],
         globals: [PrivacyPolicy],
         sites,

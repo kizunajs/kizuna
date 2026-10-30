@@ -327,6 +327,7 @@ const withSites = defineConfig({
     },
     content: cms({
         db: drizzle(pglite),
+        locales: ['en-GB'],
         collections: [Articles, Offices],
         sites: declareSites(SiteSchema, {
             uk: {

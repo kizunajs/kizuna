@@ -98,6 +98,14 @@ export interface Field<Name extends string = string, Schema extends z.ZodType = 
      * sites: ['uk'],
      */
     sites?: readonly string[];
+    /**
+     * Whether each language holds its own value. Text, rich text and an
+     * image's alt text are translated, and every other value is shared.
+     *
+     * @example
+     * localized: false,
+     */
+    localized?: boolean;
 }
 
 /**
@@ -286,7 +294,7 @@ export type FieldsCheck<Fields extends FieldList> = [DuplicateFieldNames<DataFie
                   fields: `kizuna: ${ConditionIssues<DataFieldTuple<FlatItems<Fields>>>}`;
               }
         : {
-              fields: `kizuna: "${UnknownFieldOptions<FlatItems<Fields>>}" is not an option there. A field takes name, label, schema, description, auth, readOnly, options, position, width, condition, perSite and sites, and a layout item takes type, label, fields and, on a collapsible, position`;
+              fields: `kizuna: "${UnknownFieldOptions<FlatItems<Fields>>}" is not an option there. A field takes name, label, schema, description, auth, readOnly, options, position, width, condition, perSite, sites and localized, and a layout item takes type, label, fields and, on a collapsible, position`;
           }
     : {
           fields: `kizuna: the field "${DuplicateFieldNames<DataFieldTuple<FlatItems<Fields>>>}" is listed twice`;
@@ -386,6 +394,9 @@ export const assertFields = (fields: FieldList, owner: string): void => {
             (!Array.isArray(field.sites) || field.sites.length === 0 || !field.sites.every((site) => typeof site === 'string'))
         ) {
             throw new Error(`${owner} gives the field '${field.name}' sites that are not a list of site names, like ['uk'].`);
+        }
+        if (field.localized !== undefined && typeof field.localized !== 'boolean') {
+            throw new Error(`${owner} gives the field '${field.name}' a localized that is not true or false.`);
         }
         if (field.perSite === true && field.sites !== undefined) {
             throw new Error(

@@ -34,7 +34,8 @@ import type { ContentDefinition, Collection, Global } from './definitions.js';
 import { servesCollection } from './page.js';
 import { fillPath, matchPath, routesOf, type ServedRoute } from './dynamic.js';
 import { DEFAULT_SITE, routePrefix, sitesOf, type PageEntry, type PageMap, type ResolvedCmsOptions } from './options.js';
-import { formatRef, parseRef, type DocumentRef } from './refs.js';
+import { formatRef, parseRef, sourceRefOf, type DocumentRef } from './refs.js';
+import { translationOf } from './locales.js';
 import { CMS_MIGRATION_SQL, indexSql, type IndexType, type IndexedField } from './storage/migration.js';
 import { MediaService, type MediaRecord } from './media/media.js';
 import { memoryMediaStorage, type MediaStorage } from './media/storage.js';
@@ -45,6 +46,7 @@ import { EditorAccess } from './site-access.js';
 import { queueRefreshes, refreshTargets, REFRESH_JOB } from './refresh.js';
 import {
     DocumentStore,
+    SOURCE_LOCALE,
     VersionConflictError,
     type DocumentKind,
     type DocumentRow,
@@ -276,6 +278,11 @@ export interface Target {
      */
     site: string;
     key: string;
+    /**
+     * The locale it is stored under: the source's, or a translation's
+     * language.
+     */
+    locale: string;
     definition: ContentDefinition;
     /**
      * Where a page is served.
@@ -291,6 +298,10 @@ export interface Target {
      * they apply to.
      */
     shared?: DocumentRef;
+    /**
+     * For a translation, the source it translates.
+     */
+    source?: DocumentRef;
 }
 
 const isList = (value: unknown): value is readonly string[] => Array.isArray(value);
@@ -617,7 +628,7 @@ export class CmsService {
      * for a site's values on a shared item.
      */
     listingOf(ref: DocumentRef): Listing | undefined {
-        if (ref.type !== 'item') return undefined;
+        if (ref.type !== 'item' || ref.locale !== undefined) return undefined;
         if (ref.site !== undefined && ref.site !== DEFAULT_SITE && this.siteCollections[ref.site]?.[ref.collection] === undefined) {
             return undefined;
         }
@@ -807,6 +818,81 @@ export class CmsService {
      * Where a reference is stored and what its content follows.
      */
     target(ref: DocumentRef): Target {
+        if (ref.locale !== undefined) return this.translationTarget(ref);
+        return {
+            ...this.sourceTarget(ref),
+            locale: SOURCE_LOCALE,
+        };
+    }
+
+    /**
+     * Where a translation is stored: beside its source, under its language,
+     * holding the source's translated fields.
+     */
+    private translationTarget(ref: DocumentRef): Target {
+        const source = this.target(sourceRefOf(ref));
+        const locale = ref.locale!;
+        if (this.locales().length === 0) throw new CmsHttpError(404, { detail: `cms() lists no locales, so nothing is in '${locale}'.` });
+        if (source.shared !== undefined) {
+            throw new CmsHttpError(400, {
+                detail: `A site's values are the same in every language. Translate '${formatRef(source.shared)}' instead.`,
+            });
+        }
+        if (locale === this.sourceLocaleOf(source.site)) return source;
+        if (!this.siteLocales(source.site).includes(locale)) {
+            throw new CmsHttpError(404, {
+                detail: `'${formatRef(source.ref)}' is written in ${this.siteLocales(source.site).join(', ')}, not '${locale}'.`,
+            });
+        }
+        const definition = translationOf(source.definition);
+        if (definition === undefined) {
+            throw new CmsHttpError(404, {
+                detail: `'${formatRef(source.ref)}' has no field that is translated, so it is the same in every language.`,
+            });
+        }
+        return {
+            ...source,
+            ref,
+            locale,
+            definition,
+            source: source.ref,
+        };
+    }
+
+    /**
+     * A ref with the source's own language left out, since the source is
+     * addressed without one.
+     */
+    canonical(ref: DocumentRef): DocumentRef {
+        return ref.locale === undefined ? ref : this.target(ref).ref;
+    }
+
+    /**
+     * The languages cms() lists. The first is the source of shared content.
+     */
+    locales(): readonly string[] {
+        return this.options.locales ?? [];
+    }
+
+    /**
+     * The languages a site serves, its default first: its own `locales`, or
+     * every language cms() lists.
+     */
+    siteLocales(site: string): readonly string[] {
+        if (site === DEFAULT_SITE) return this.locales();
+        const own = (this.options.sites?.values[site] as { locales?: readonly string[] } | undefined)?.locales;
+        return own ?? this.locales();
+    }
+
+    /**
+     * The language the source of a site's content is written in, or of
+     * shared content for the default site. `undefined` without locales.
+     */
+    sourceLocaleOf(site: string): string | undefined {
+        return this.siteLocales(site)[0];
+    }
+
+    private sourceTarget(ref: DocumentRef): Omit<Target, 'locale'> {
         if (ref.type === 'page') {
             const site = ref.site ?? DEFAULT_SITE;
             const entry = this.entry(ref.name, site);
@@ -964,7 +1050,7 @@ export class CmsService {
         const target = this.target(ref);
         return {
             target,
-            row: this.migrated(target, await this.store.get(target.kind, target.key, target.site)),
+            row: this.migrated(target, await this.store.get(target.kind, target.key, target.site, target.locale)),
         };
     }
 
@@ -2087,13 +2173,19 @@ export class CmsService {
     }): Promise<DraftState> {
         const expected = parseIfMatch(input.ifMatch);
         const target = this.target(input.ref);
-        const row = this.migrated(target, await this.store.get(target.kind, target.key, target.site));
+        const row = this.migrated(target, await this.store.get(target.kind, target.key, target.site, target.locale));
         const fields = target.definition.fields;
         const paths = Object.keys(input.changes);
         if (paths.length === 0) throw new CmsHttpError(400, { detail: 'No changes were sent.' });
         if (target.shared !== undefined && (await this.store.get(target.kind, target.key, DEFAULT_SITE)) === undefined) {
             throw new CmsHttpError(404, {
                 detail: `'${formatRef(target.shared)}' has no content yet. Save the shared item first, then the values the ${target.site} site sets.`,
+            });
+        }
+        const source = target.source === undefined ? undefined : await this.store.get(target.kind, target.key, target.site);
+        if (target.source !== undefined && source === undefined) {
+            throw new CmsHttpError(404, {
+                detail: `'${formatRef(target.source)}' has no content yet. Write the source first, then translate it.`,
             });
         }
         for (const path of paths) {
@@ -2157,10 +2249,11 @@ export class CmsService {
             await this.assertNoLoop(input.ref, stored, 'latest');
         }
         try {
-            await this.store.saveDraft({
+            const saved = await this.store.saveDraft({
                 kind: target.kind,
                 key: target.key,
                 site: target.site,
+                locale: target.locale,
                 draft: stored,
                 author: input.author,
                 summary: input.summary,
@@ -2173,6 +2266,13 @@ export class CmsService {
                 refs: refsOf(target.definition, stored),
                 migration: migrationOf(target.definition),
             });
+            if (source !== undefined) {
+                const version = await this.store.latestVersion(source.id);
+                await this.store.recordSourceVersions(
+                    saved.document.id,
+                    Object.fromEntries([...new Set(paths.map((path) => path.split('.')[0]!))].map((name) => [name, version]))
+                );
+            }
         } catch (error) {
             if (error instanceof VersionConflictError) {
                 throw new CmsHttpError(409, {
@@ -2291,7 +2391,7 @@ export class CmsService {
             });
         }
         await this.assertNoLoop(ref, state.row?.draft, 'published');
-        await this.store.publish(state.target.kind, state.target.key, author, state.target.site);
+        await this.store.publish(state.target.kind, state.target.key, author, state.target.site, state.target.locale);
         await this.revalidateDocument(ref);
         await queueRefreshes(this, ref);
         return this.draftState(ref);
@@ -2308,7 +2408,7 @@ export class CmsService {
                 detail: `There is no item '${ref.id}' in '${ref.collection}'.`,
             });
         }
-        if ((await this.store.unpublish(target.kind, target.key, author, target.site)) === undefined) {
+        if ((await this.store.unpublish(target.kind, target.key, author, target.site, target.locale)) === undefined) {
             throw new CmsHttpError(409, {
                 detail: `'${formatRef(ref)}' is not published.`,
             });
@@ -2345,6 +2445,7 @@ export class CmsService {
             kind: target.kind,
             key: target.key,
             site: target.site,
+            locale: target.locale,
             draft: migrated,
             author,
             summary: `Restored version ${version}`,
@@ -2377,6 +2478,7 @@ export class CmsService {
         const rows = await this.store.whereUsed(brand, id);
         const used = [];
         for (const row of rows) {
+            if (row.locale !== SOURCE_LOCALE) continue;
             if (row.kind === 'page') {
                 const entry = this.sites[row.site]?.[row.key];
                 if (entry !== undefined) {

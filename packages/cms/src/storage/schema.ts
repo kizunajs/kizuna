@@ -1,8 +1,9 @@
 import { integer, jsonb, pgTable, primaryKey, text, timestamp, unique, index } from 'drizzle-orm/pg-core';
 
 /**
- * One document: a page, a global, an item of a collection, or a media item. `site` and `locale` are fixed to
- * `default` in v1 and exist so later features need no data migration.
+ * One document: a page, a global, an item of a collection, or a media item.
+ * `site` is `default` for shared content, and `locale` is `default` for the
+ * source and a language code for a translation of it.
  */
 export const cmsDocuments = pgTable(
     'cms_documents',
@@ -32,6 +33,15 @@ export const cmsDocuments = pgTable(
     },
     (table) => [unique('cms_documents_identity').on(table.kind, table.site, table.locale, table.key)]
 );
+
+/**
+ * The source version each translated field of a translation was written
+ * from, by field name.
+ */
+export const cmsTranslations = pgTable('cms_translations', {
+    documentId: text('document_id').primaryKey(),
+    sourceVersions: jsonb('source_versions').notNull(),
+});
 
 /**
  * Every save of a document, with who made it, what they said about it, the

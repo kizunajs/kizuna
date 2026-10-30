@@ -362,6 +362,26 @@ export interface CmsPluginOptions<
      */
     sites?: Sites;
     /**
+     * The languages content is written in. The first is the source, and every
+     * other holds a translation of it. With sites, every language a site
+     * serves.
+     *
+     * @example
+     * locales: ['nb', 'en'],
+     */
+    locales?: readonly string[];
+    /**
+     * The languages a language shows, in order, while it has no published
+     * translation of its own. Without it, an untranslated page is not found
+     * in that language.
+     *
+     * @example
+     * fallback: {
+     *     fr: ['de'],
+     * },
+     */
+    fallback?: Readonly<Record<string, readonly string[]>>;
+    /**
      * The site this deployment shows, which `kizuna.content` reads in
      * process.
      *
@@ -384,6 +404,19 @@ export interface CmsPluginOptions<
      * },
      */
     partners?: Record<string, PartnerOptions>;
+    /**
+     * The identity the refresh job runs as, one of the config's identities.
+     * With `jobRunner: { mode: 'http' }`, name it when the app declares no
+     * jobs of its own. Otherwise the job runs as the app's jobs do.
+     *
+     * @example
+     * jobs: {
+     *     identity: 'scheduler',
+     * },
+     */
+    jobs?: {
+        identity: string;
+    };
     /**
      * Content with one instance and no route, made with `defineGlobal()`.
      */
@@ -585,6 +618,14 @@ export const CmsPluginOptionsSchema = z
             })
             .optional(),
         site: z.custom<() => string | undefined>(isFunction).optional(),
+        locales: z
+            .array(z.string().regex(/^[A-Za-z][A-Za-z0-9-]*$/, { error: "is a language code, like 'nb' or 'en-GB'" }))
+            .min(1)
+            .refine((locales) => new Set(locales).size === locales.length, {
+                error: 'lists a language twice',
+            })
+            .optional(),
+        fallback: z.record(z.string(), z.array(z.string())).optional(),
         partners: z
             .record(
                 z.string().min(1),
@@ -597,6 +638,11 @@ export const CmsPluginOptionsSchema = z
                     }),
                 })
             )
+            .optional(),
+        jobs: z
+            .object({
+                identity: z.string().min(1),
+            })
             .optional(),
         auth: z.object({
             identity: z.string().min(1),
@@ -710,6 +756,35 @@ export const CmsPluginOptionsSchema = z
                             ? `reads the site '${site}', but cms() declares no sites. Declare them with declareSites()`
                             : `reads the site '${site}', which declareSites() does not declare. It declares ${declared.join(', ')}`,
                     path: ['partners', name, 'reads'],
+                });
+            }
+        }
+    })
+    .superRefine((options, context) => {
+        const locales = options.locales ?? [];
+        for (const [name, values] of Object.entries(options.sites?.values ?? {})) {
+            for (const locale of (values as { locales?: readonly string[] }).locales ?? []) {
+                if (locales.includes(locale)) continue;
+                context.addIssue({
+                    code: 'custom',
+                    message:
+                        locales.length === 0
+                            ? `serves '${locale}', but cms() lists no locales. List every language a site serves in \`locales\``
+                            : `serves '${locale}', which \`locales\` on cms() does not list. It lists ${locales.join(', ')}`,
+                    path: ['sites', name, 'locales'],
+                });
+            }
+        }
+        for (const [locale, chain] of Object.entries(options.fallback ?? {})) {
+            for (const named of [locale, ...chain]) {
+                if (locales.includes(named)) continue;
+                context.addIssue({
+                    code: 'custom',
+                    message:
+                        locales.length === 0
+                            ? `names '${named}', but cms() lists no locales`
+                            : `names '${named}', which \`locales\` does not list. It lists ${locales.join(', ')}`,
+                    path: ['fallback', locale],
                 });
             }
         }

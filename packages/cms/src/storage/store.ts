@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, gte, inArray, isNotNull, lt, max, ne, sql } from 'drizzle-orm';
 import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
-import { cmsDocuments, cmsRefreshes, cmsRefs, cmsReviewComments, cmsReviews, cmsVersions } from './schema.js';
+import { cmsDocuments, cmsRefreshes, cmsRefs, cmsReviewComments, cmsReviews, cmsTranslations, cmsVersions } from './schema.js';
 import { CMS_MIGRATION_SQL, likePrefix, type IndexType } from './migration.js';
 
 /**
@@ -28,6 +28,10 @@ export interface DocumentRow {
      * shared content.
      */
     site: string;
+    /**
+     * `default` for the source, or the language a translation is in.
+     */
+    locale: string;
     key: string;
     published: Content | null;
     draft: Content | null;
@@ -261,15 +265,21 @@ export class VersionConflictError extends Error {
 }
 
 const SITE = 'default';
-const LOCALE = 'default';
 
-const identity = (kind: DocumentKind, key: string, site = SITE) =>
-    and(eq(cmsDocuments.kind, kind), eq(cmsDocuments.site, site), eq(cmsDocuments.locale, LOCALE), eq(cmsDocuments.key, key));
+/**
+ * The locale a document's source is stored under. A translation is stored
+ * under its language.
+ */
+export const SOURCE_LOCALE = 'default';
+
+const identity = (kind: DocumentKind, key: string, site = SITE, locale = SOURCE_LOCALE) =>
+    and(eq(cmsDocuments.kind, kind), eq(cmsDocuments.site, site), eq(cmsDocuments.locale, locale), eq(cmsDocuments.key, key));
 
 const toRow = (row: typeof cmsDocuments.$inferSelect): DocumentRow => ({
     id: row.id,
     kind: row.kind as DocumentKind,
     site: row.site,
+    locale: row.locale,
     key: row.key,
     published: row.published as Content | null,
     draft: row.draft as Content | null,
@@ -306,11 +316,11 @@ export class DocumentStore {
         }
     }
 
-    async get(kind: DocumentKind, key: string, site = SITE): Promise<DocumentRow | undefined> {
+    async get(kind: DocumentKind, key: string, site = SITE, locale = SOURCE_LOCALE): Promise<DocumentRow | undefined> {
         const [row] = await this.db
             .select()
             .from(cmsDocuments)
-            .where(identity(kind, key, site))
+            .where(identity(kind, key, site, locale))
             .limit(1);
         return row === undefined ? undefined : toRow(row);
     }
@@ -323,7 +333,7 @@ export class DocumentStore {
         const [row] = await this.db
             .select()
             .from(cmsDocuments)
-            .where(and(eq(cmsDocuments.kind, 'media'), eq(cmsDocuments.locale, LOCALE), eq(cmsDocuments.key, key)))
+            .where(and(eq(cmsDocuments.kind, 'media'), eq(cmsDocuments.locale, SOURCE_LOCALE), eq(cmsDocuments.key, key)))
             .limit(1);
         return row === undefined ? undefined : toRow(row);
     }
@@ -334,15 +344,72 @@ export class DocumentStore {
     }
 
     /**
-     * Every document of a kind, on one site when `site` is given.
+     * Every source document of a kind, on one site when `site` is given.
      */
     async list(kind: DocumentKind, site?: string): Promise<DocumentRow[]> {
         const rows = await this.db
             .select()
             .from(cmsDocuments)
-            .where(site === undefined ? eq(cmsDocuments.kind, kind) : and(eq(cmsDocuments.kind, kind), eq(cmsDocuments.site, site)))
+            .where(
+                and(
+                    eq(cmsDocuments.kind, kind),
+                    eq(cmsDocuments.locale, SOURCE_LOCALE),
+                    ...(site === undefined ? [] : [eq(cmsDocuments.site, site)])
+                )
+            )
             .orderBy(asc(cmsDocuments.key));
         return rows.map(toRow);
+    }
+
+    /**
+     * The translations of a document, by language.
+     */
+    async translations(kind: DocumentKind, key: string, site = SITE): Promise<DocumentRow[]> {
+        const rows = await this.db
+            .select()
+            .from(cmsDocuments)
+            .where(
+                and(
+                    eq(cmsDocuments.kind, kind),
+                    eq(cmsDocuments.site, site),
+                    eq(cmsDocuments.key, key),
+                    ne(cmsDocuments.locale, SOURCE_LOCALE)
+                )
+            )
+            .orderBy(asc(cmsDocuments.locale));
+        return rows.map(toRow);
+    }
+
+    /**
+     * The source version each field of a translation was written from.
+     */
+    async sourceVersions(documentId: string): Promise<Record<string, number>> {
+        const [row] = await this.db.select().from(cmsTranslations).where(eq(cmsTranslations.documentId, documentId)).limit(1);
+        return (row?.sourceVersions as Record<string, number> | undefined) ?? {};
+    }
+
+    /**
+     * Records the source version the fields given were written from, keeping
+     * the others.
+     */
+    async recordSourceVersions(documentId: string, versions: Record<string, number>): Promise<void> {
+        if (Object.keys(versions).length === 0) return;
+        const merged = {
+            ...(await this.sourceVersions(documentId)),
+            ...versions,
+        };
+        await this.db
+            .insert(cmsTranslations)
+            .values({
+                documentId,
+                sourceVersions: merged,
+            })
+            .onConflictDoUpdate({
+                target: cmsTranslations.documentId,
+                set: {
+                    sourceVersions: merged,
+                },
+            });
     }
 
     async setOwner(documentId: string, owner: string | null): Promise<void> {
@@ -622,6 +689,7 @@ export class DocumentStore {
         kind: DocumentKind;
         key: string;
         site?: string;
+        locale?: string;
         draft: Content;
         author: string;
         summary?: string;
@@ -638,7 +706,7 @@ export class DocumentStore {
             const [existing] = await tx
                 .select()
                 .from(cmsDocuments)
-                .where(identity(input.kind, input.key, input.site))
+                .where(identity(input.kind, input.key, input.site, input.locale))
                 .for('update');
             const id = existing?.id ?? randomUUID();
             const latest = existing === undefined ? 0 : await this.latestVersionIn(tx, id);
@@ -669,6 +737,7 @@ export class DocumentStore {
                     id,
                     kind: input.kind,
                     site: input.site ?? SITE,
+                    locale: input.locale ?? SOURCE_LOCALE,
                     key: input.key,
                     draft: input.draft,
                     migrationVersion: draftStep,
@@ -731,12 +800,12 @@ export class DocumentStore {
     /**
      * Points `published` at the current draft and its version.
      */
-    async publish(kind: DocumentKind, key: string, author: string, site = SITE): Promise<DocumentRow | undefined> {
+    async publish(kind: DocumentKind, key: string, author: string, site = SITE, locale = SOURCE_LOCALE): Promise<DocumentRow | undefined> {
         return this.db.transaction(async (tx) => {
             const [existing] = await tx
                 .select()
                 .from(cmsDocuments)
-                .where(identity(kind, key, site))
+                .where(identity(kind, key, site, locale))
                 .for('update');
             if (existing === undefined || existing.draft === null) return undefined;
             const latest = await this.latestVersionIn(tx, existing.id);
@@ -767,12 +836,18 @@ export class DocumentStore {
      * publishing again brings it back. Answers `undefined` when nothing was
      * published.
      */
-    async unpublish(kind: DocumentKind, key: string, author: string, site = SITE): Promise<DocumentRow | undefined> {
+    async unpublish(
+        kind: DocumentKind,
+        key: string,
+        author: string,
+        site = SITE,
+        locale = SOURCE_LOCALE
+    ): Promise<DocumentRow | undefined> {
         return this.db.transaction(async (tx) => {
             const [existing] = await tx
                 .select()
                 .from(cmsDocuments)
-                .where(identity(kind, key, site))
+                .where(identity(kind, key, site, locale))
                 .for('update');
             if (existing === undefined || existing.published === null) return undefined;
             const now = new Date();
@@ -919,6 +994,7 @@ export class DocumentStore {
         const conditions = [
             eq(cmsDocuments.kind, input.kind),
             eq(cmsDocuments.site, input.site ?? SITE),
+            eq(cmsDocuments.locale, SOURCE_LOCALE),
             sql`${cmsDocuments.key} like ${likePrefix(input.keyPrefix)}`,
             input.copy === 'published'
                 ? sql`${cmsDocuments.published} is not null`
@@ -991,6 +1067,7 @@ export class DocumentStore {
         const conditions = [
             eq(cmsDocuments.kind, input.kind),
             eq(cmsDocuments.site, input.site ?? SITE),
+            eq(cmsDocuments.locale, SOURCE_LOCALE),
             sql`${cmsDocuments.key} like ${likePrefix(input.keyPrefix)}`,
             ...(groups.length === 0
                 ? []
@@ -1060,16 +1137,14 @@ export class DocumentStore {
     }
 
     /**
-     * Removes a document with its versions and references.
-     */
-    /**
-     * Moves a document to another key, its versions and refs with it.
+     * Moves a document to another key, its translations, versions and refs
+     * with it.
      */
     async rekey(kind: DocumentKind, from: string, to: string, site = SITE): Promise<boolean> {
         const moved = await this.db
             .update(cmsDocuments)
             .set({ key: to })
-            .where(identity(kind, from, site))
+            .where(and(eq(cmsDocuments.kind, kind), eq(cmsDocuments.site, site), eq(cmsDocuments.key, from)))
             .returning({ id: cmsDocuments.id });
         return moved.length > 0;
     }
@@ -1086,20 +1161,26 @@ export class DocumentStore {
             .where(eq(cmsReviews.documentId, documentId));
     }
 
+    /**
+     * Removes a document with its translations, versions and references.
+     */
     async delete(kind: DocumentKind, key: string, site = SITE): Promise<boolean> {
         return this.db.transaction(async (tx) => {
-            const [existing] = await tx
+            const found = await tx
                 .select()
                 .from(cmsDocuments)
-                .where(identity(kind, key, site))
+                .where(and(eq(cmsDocuments.kind, kind), eq(cmsDocuments.site, site), eq(cmsDocuments.key, key)))
                 .for('update');
-            if (existing === undefined) return false;
-            await tx.delete(cmsRefs).where(eq(cmsRefs.documentId, existing.id));
-            await tx.delete(cmsVersions).where(eq(cmsVersions.documentId, existing.id));
-            const reviews = tx.select({ id: cmsReviews.id }).from(cmsReviews).where(eq(cmsReviews.documentId, existing.id));
-            await tx.delete(cmsReviewComments).where(inArray(cmsReviewComments.reviewId, reviews));
-            await tx.delete(cmsReviews).where(eq(cmsReviews.documentId, existing.id));
-            await tx.delete(cmsDocuments).where(eq(cmsDocuments.id, existing.id));
+            if (!found.some((row) => row.locale === SOURCE_LOCALE)) return false;
+            for (const existing of found) {
+                await tx.delete(cmsRefs).where(eq(cmsRefs.documentId, existing.id));
+                await tx.delete(cmsVersions).where(eq(cmsVersions.documentId, existing.id));
+                const reviews = tx.select({ id: cmsReviews.id }).from(cmsReviews).where(eq(cmsReviews.documentId, existing.id));
+                await tx.delete(cmsReviewComments).where(inArray(cmsReviewComments.reviewId, reviews));
+                await tx.delete(cmsReviews).where(eq(cmsReviews.documentId, existing.id));
+                if (existing.locale !== SOURCE_LOCALE) await tx.delete(cmsTranslations).where(eq(cmsTranslations.documentId, existing.id));
+                await tx.delete(cmsDocuments).where(eq(cmsDocuments.id, existing.id));
+            }
             return true;
         });
     }
