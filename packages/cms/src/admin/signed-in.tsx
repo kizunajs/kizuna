@@ -72,7 +72,7 @@ export function SignedIn({
                     <ChevronsUpDown {...ICON} className="k-sidebar__account-chevron" />
                 </Menu.Trigger>
                 <Menu.Portal>
-                    <Menu.Positioner side="top" align="start" sideOffset={6} className="k-positioner">
+                    <Menu.Positioner side="top" align="start" sideOffset={8} className="k-positioner">
                         <Menu.Popup className="k-popup k-menu k-account-menu">
                             <div className="k-account-menu__head">
                                 <span className="k-account-menu__name">{person.name}</span>
