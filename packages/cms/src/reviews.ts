@@ -160,6 +160,11 @@ const reviewRoles = (cms: CmsService): readonly string[] => {
     return roles === undefined ? [] : typeof roles === 'string' ? [roles] : roles;
 };
 
+/**
+ * The role someone holds where a document is stored, by its ref.
+ */
+export type RoleOn = (ref: string) => string | readonly string[] | undefined;
+
 const hasRole = (role: string | readonly string[] | undefined, roles: readonly string[]): boolean =>
     role !== undefined && (typeof role === 'string' ? [role] : role).some((candidate) => roles.includes(candidate));
 
@@ -264,7 +269,7 @@ export const decideReviews = async (
         decision: 'approve' | 'requestChanges';
         note: string | null;
         by: string;
-        role: string | readonly string[] | undefined;
+        roleOn: RoleOn;
     }
 ): Promise<ReviewState[]> => {
     const people = await peopleOf(cms);
@@ -274,7 +279,7 @@ export const decideReviews = async (
         const review = reviews.find((candidate) => candidate.id === id);
         if (review === undefined) throw new CmsHttpError(404, { detail: `No review '${id}'.` });
         if (review.status !== 'open') throw new CmsHttpError(409, { detail: `The review of '${review.ref}' was already answered.` });
-        if (!review.reviewers.includes(input.by) && !hasRole(input.role, reviewRoles(cms))) {
+        if (!review.reviewers.includes(input.by) && !hasRole(input.roleOn(review.ref), reviewRoles(cms))) {
             throw new CmsHttpError(403, { detail: `You were not asked to review '${review.ref}'.` });
         }
         const state = await cms.draftState(refOrThrow(review.ref));
@@ -406,8 +411,8 @@ export const reopenReviews = async (cms: CmsService, input: { ids: readonly stri
  * Whether someone takes part in a review: they asked for it, were asked,
  * answered it, or hold a role under `reviews.roles`.
  */
-const takesPart = (cms: CmsService, review: ReviewRow, by: string, role: string | readonly string[] | undefined): boolean =>
-    review.requestedBy === by || review.reviewers.includes(by) || review.decidedBy === by || hasRole(role, reviewRoles(cms));
+const takesPart = (cms: CmsService, review: ReviewRow, by: string, roleOn: RoleOn): boolean =>
+    review.requestedBy === by || review.reviewers.includes(by) || review.decidedBy === by || hasRole(roleOn(review.ref), reviewRoles(cms));
 
 /**
  * Comments on one field of a review's draft, for the person who asked to see
@@ -415,11 +420,11 @@ const takesPart = (cms: CmsService, review: ReviewRow, by: string, role: string 
  */
 export const commentOnReview = async (
     cms: CmsService,
-    input: { review: string; path: string; text: string; by: string; role: string | readonly string[] | undefined }
+    input: { review: string; path: string; text: string; by: string; roleOn: RoleOn }
 ): Promise<ReviewState> => {
     const [review] = await cms.store.reviews([input.review]);
     if (review === undefined) throw new CmsHttpError(404, { detail: `No review '${input.review}'.` });
-    if (!takesPart(cms, review, input.by, input.role)) {
+    if (!takesPart(cms, review, input.by, input.roleOn)) {
         throw new CmsHttpError(403, { detail: `You were not asked to review '${review.ref}'.` });
     }
     const { state } = await currentReview(cms, review);
@@ -440,15 +445,12 @@ export const commentOnReview = async (
 /**
  * Marks a comment dealt with. Resolving one twice changes nothing.
  */
-export const resolveComment = async (
-    cms: CmsService,
-    input: { id: string; by: string; role: string | readonly string[] | undefined }
-): Promise<ReviewState> => {
+export const resolveComment = async (cms: CmsService, input: { id: string; by: string; roleOn: RoleOn }): Promise<ReviewState> => {
     const comment = await cms.store.reviewComment(input.id);
     if (comment === undefined) throw new CmsHttpError(404, { detail: `No comment '${input.id}'.` });
     const [review] = await cms.store.reviews([comment.reviewId]);
     if (review === undefined) throw new CmsHttpError(404, { detail: `No comment '${input.id}'.` });
-    if (!takesPart(cms, review, input.by, input.role)) {
+    if (!takesPart(cms, review, input.by, input.roleOn)) {
         throw new CmsHttpError(403, { detail: `You were not asked to review '${review.ref}'.` });
     }
     const state = await cms.draftState(refOrThrow(review.ref));
@@ -490,7 +492,8 @@ export const versionReviewsOf = async (
  */
 export const waitingReviews = async (
     cms: CmsService,
-    reviewer: string | undefined
+    reviewer: string | undefined,
+    sees: (ref: string) => boolean = () => true
 ): Promise<Array<ReviewState & { ref: string; label: string; path: string | null }>> => {
     const people = await peopleOf(cms);
     const open = await cms.store.openReviews();
@@ -498,7 +501,7 @@ export const waitingReviews = async (
     for (const review of open) latest.set(review.documentId, review);
     const waiting = [];
     for (const review of latest.values()) {
-        if (reviewer !== undefined && !review.reviewers.includes(reviewer)) continue;
+        if ((reviewer !== undefined && !review.reviewers.includes(reviewer)) || !sees(review.ref)) continue;
         const ref = parseRef(review.ref);
         if (ref === undefined) continue;
         const state = await cms.draftState(ref).catch(() => undefined);

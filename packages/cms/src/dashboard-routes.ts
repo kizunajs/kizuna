@@ -237,7 +237,9 @@ export const dashboardRoute = (input: DashboardRouteInput) =>
                     if (widget.type === 'reviews') {
                         return {
                             type: 'reviews',
-                            reviews: await waitingReviews(cms, cms.author(args.auth?.[cms.identity])),
+                            reviews: await waitingReviews(cms, cms.author(args.auth?.[cms.identity]), (ref) =>
+                                cms.access(args.auth).seesRef(ref)
+                            ),
                         };
                     }
                     return {

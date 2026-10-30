@@ -106,6 +106,15 @@ export interface CmsAuthOptions {
      */
     roles?: string | readonly string[];
     /**
+     * The role, or roles, an editor holds on each site, from the identity's
+     * context. Their own role covers the shared content, and `admin` there
+     * is an admin over every site.
+     *
+     * @example
+     * sites: (editor) => editor.sites,
+     */
+    sites?: (editor: Record<string, any>) => Partial<Record<string, string | readonly string[]>> | undefined;
+    /**
      * How a version names its author, from the identity's context. Without
      * it, the context's `userId`, `id`, `email` or `name`.
      */
@@ -517,6 +526,7 @@ export const CmsPluginOptionsSchema = z
         auth: z.object({
             identity: z.string().min(1),
             roles: z.union([z.string(), z.array(z.string())]).optional(),
+            sites: z.custom<CmsAuthOptions['sites']>(isFunction).optional(),
             author: z.custom<CmsAuthOptions['author']>(isFunction).optional(),
             people: z
                 .object({
@@ -603,6 +613,10 @@ export const CmsPluginOptionsSchema = z
     .refine((options) => options.pages === undefined || options.sites === undefined, {
         error: 'takes `pages` for one app, or `sites` for several, not both',
         path: ['sites'],
+    })
+    .refine((options) => options.auth.sites === undefined || options.sites !== undefined, {
+        error: 'gives editors roles on sites, but cms() declares no sites. Declare them with declareSites()',
+        path: ['auth', 'sites'],
     })
     .refine((options) => options.auth.signIn === undefined || options.signInPath === undefined, {
         error: "takes `auth.signIn` for the admin's own sign-in screen, or `signInPath` for a page of your app, not both",

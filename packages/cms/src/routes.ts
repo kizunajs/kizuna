@@ -77,6 +77,7 @@ import type { Person } from './options.js';
 import { collectionActionRoutes, itemActions } from './action-routes.js';
 import { listViewsRoute, viewRoutes } from './view-routes.js';
 import { dashboardRoute } from './dashboard-routes.js';
+import type { EditorAccess } from './site-access.js';
 
 interface Args {
     params: Record<string, string>;
@@ -207,6 +208,17 @@ const draftChanges = async (cms: CmsService, ref: DocumentRef, caller: ReturnTyp
         ...(await reviewFields(cms, state)),
         canPublishPastReview: mayPublishPastReview(cms, caller.role),
     };
+};
+
+/**
+ * Refuses to publish, unpublish or delete shared content for an editor who
+ * is no admin over every site, since every site shows it.
+ */
+const assertPublishes = (cms: CmsService, access: EditorAccess, ref: DocumentRef): void => {
+    if (access.publishesShared || cms.target(ref).site !== DEFAULT_SITE) return;
+    throw new CmsHttpError(403, {
+        detail: `'${formatRef(ref)}' is shared, and every site shows it, so an admin over every site publishes it. Ask one to review it.`,
+    });
 };
 
 /**
@@ -383,391 +395,401 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         url: cms.imageUrl(record.id),
     });
 
-    const editingRoutes = (scope: Scope) => ({
-        getDraft: route({
-            method: 'GET',
-            path: `${editingBase}${scope.prefix}/draft`,
-            auth: editor,
-            summary: `Read the draft of ${scope.noun}`,
-            tool: {
-                ui: documentView,
-            },
-            pathParams: scope.params,
-            responses: {
-                200: {
-                    body: DraftPageSchema,
-                    headers: DraftHeadersSchema,
-                    cache: 'no-store',
+    const editingRoutes = (scope: Scope) => {
+        const refOf = (cms: CmsService, args: Args): DocumentRef => cms.access(args.auth).assertSeesRef(scope.refOf(args.params));
+        return {
+            getDraft: route({
+                method: 'GET',
+                path: `${editingBase}${scope.prefix}/draft`,
+                auth: editor,
+                summary: `Read the draft of ${scope.noun}`,
+                tool: {
+                    ui: documentView,
                 },
-                404: ProblemDetailsSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => {
-                const state = await cms.draftState(scope.refOf(args.params));
-                return {
-                    status: 200,
-                    body: draftBody(state),
-                    headers: {
-                        etag: state.etag,
+                pathParams: scope.params,
+                responses: {
+                    200: {
+                        body: DraftPageSchema,
+                        headers: DraftHeadersSchema,
+                        cache: 'no-store',
                     },
-                };
-            }) as never
-        ),
-
-        updateDraft: route({
-            method: 'PATCH',
-            path: `${editingBase}${scope.prefix}/draft`,
-            auth: editor,
-            summary: `Change fields on the draft of ${scope.noun}`,
-            description:
-                'Changes are keyed by field path and merged into the draft, which is then checked against the whole schema. Describe the document first to learn the paths, the schemas and which fields you may write. Nothing goes live until it is published.',
-            tool:
-                scope.approveWrites === true
-                    ? {
-                          needsApproval: true,
-                      }
-                    : true,
-            pathParams: scope.params,
-            headers: UpdateDraftHeadersSchema,
-            body: UpdateDraftBodySchema,
-            responses: {
-                200: {
-                    body: DraftPageSchema,
-                    headers: DraftHeadersSchema,
-                    cache: 'no-store',
+                    404: ProblemDetailsSchema,
                 },
-                404: ProblemDetailsSchema,
-                409: ProblemDetailsSchema,
-                422: ValidationErrorSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => {
-                const body = args.body as z.output<typeof UpdateDraftBodySchema>;
-                const state = await cms.update({
-                    ref: scope.refOf(args.params),
-                    changes: body.changes,
-                    caller: cms.caller(args.auth),
-                    author: authorOf(cms, args),
-                    summary: body.summary,
-                    ifMatch: args.headers['if-match'],
-                    autosave: body.autosave,
-                });
-                return {
-                    status: 200,
-                    body: draftBody(state),
-                    headers: {
-                        etag: state.etag,
-                    },
-                };
-            }) as never
-        ),
+            }).handler(
+                guarded(async (cms, args) => {
+                    const state = await cms.draftState(refOf(cms, args));
+                    return {
+                        status: 200,
+                        body: draftBody(state),
+                        headers: {
+                            etag: state.etag,
+                        },
+                    };
+                }) as never
+            ),
 
-        missingFields: route({
-            method: 'GET',
-            path: `${editingBase}${scope.prefix}/missing`,
-            auth: editor,
-            summary: `List the fields the draft of ${scope.noun} still needs before it can publish`,
-            tool: true,
-            pathParams: scope.params,
-            responses: {
-                200: MissingFieldsSchema,
-                404: ProblemDetailsSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => {
-                const ref = scope.refOf(args.params);
-                const state = await cms.draftState(ref);
-                return {
-                    status: 200,
-                    body: {
-                        name: nameOf(ref),
-                        complete: state.complete,
-                        missing: state.missing,
-                        prompt: promptFor(ref),
+            updateDraft: route({
+                method: 'PATCH',
+                path: `${editingBase}${scope.prefix}/draft`,
+                auth: editor,
+                summary: `Change fields on the draft of ${scope.noun}`,
+                description:
+                    'Changes are keyed by field path and merged into the draft, which is then checked against the whole schema. Describe the document first to learn the paths, the schemas and which fields you may write. Nothing goes live until it is published.',
+                tool:
+                    scope.approveWrites === true
+                        ? {
+                              needsApproval: true,
+                          }
+                        : true,
+                pathParams: scope.params,
+                headers: UpdateDraftHeadersSchema,
+                body: UpdateDraftBodySchema,
+                responses: {
+                    200: {
+                        body: DraftPageSchema,
+                        headers: DraftHeadersSchema,
+                        cache: 'no-store',
                     },
-                };
-            }) as never
-        ),
-
-        getPublished: route({
-            method: 'GET',
-            path: `${editingBase}${scope.prefix}/published`,
-            auth: editor,
-            summary: `Read the published content of ${scope.noun} as stored, for copying it elsewhere`,
-            pathParams: scope.params,
-            responses: {
-                200: {
-                    body: StoredContentSchema,
-                    cache: 'no-store',
+                    404: ProblemDetailsSchema,
+                    409: ProblemDetailsSchema,
+                    422: ValidationErrorSchema,
                 },
-                404: ProblemDetailsSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => {
-                const ref = scope.refOf(args.params);
-                const stored = await cms.publishedAsStored(ref);
-                if (stored === undefined) throw new CmsHttpError(404, { detail: `'${formatRef(ref)}' is not published.` });
-                return {
-                    status: 200,
-                    body: {
-                        ref: formatRef(ref),
-                        version: stored.version,
-                        updatedAt: stored.updatedAt.toISOString(),
-                        content: stored.content,
-                    },
-                };
-            }) as never
-        ),
+            }).handler(
+                guarded(async (cms, args) => {
+                    const body = args.body as z.output<typeof UpdateDraftBodySchema>;
+                    const ref = refOf(cms, args);
+                    const state = await cms.update({
+                        ref,
+                        changes: body.changes,
+                        caller: cms.access(args.auth).callerFor(ref),
+                        author: authorOf(cms, args),
+                        summary: body.summary,
+                        ifMatch: args.headers['if-match'],
+                        autosave: body.autosave,
+                    });
+                    return {
+                        status: 200,
+                        body: draftBody(state),
+                        headers: {
+                            etag: state.etag,
+                        },
+                    };
+                }) as never
+            ),
 
-        history: route({
-            method: 'GET',
-            path: `${editingBase}${scope.prefix}/versions`,
-            auth: editor,
-            summary: `List the versions of ${scope.noun}, newest first`,
-            tool: true,
-            pathParams: scope.params,
-            responses: {
-                200: VersionListSchema,
-                404: ProblemDetailsSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => {
-                const ref = scope.refOf(args.params);
-                const versions = await cms.history(ref);
-                const reviews = await versionReviewsOf(cms, ref);
-                return {
-                    status: 200,
-                    body: {
-                        name: nameOf(ref),
-                        versions: versions.map((version) => ({
-                            ...version,
-                            review: reviews.get(version.version) ?? null,
-                        })),
-                    },
-                };
-            }) as never
-        ),
-
-        getVersion: route({
-            method: 'GET',
-            path: `${editingBase}${scope.prefix}/versions/:version`,
-            auth: editor,
-            summary: `Read one earlier version of ${scope.noun}`,
-            description: 'The content as it was saved in that version, to compare with the draft or decide what to restore.',
-            tool: true,
-            pathParams: scope.params.extend({
-                version: z.coerce.number().int().min(1),
-            }),
-            responses: {
-                200: VersionContentSchema,
-                404: ProblemDetailsSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => {
-                const ref = scope.refOf(args.params);
-                const version = Number(args.params['version']);
-                const found = await cms.versionContent(ref, version);
-                return {
-                    status: 200,
-                    body: {
-                        ref: formatRef(ref),
-                        version,
-                        summary: found.summary,
-                        createdAt: found.createdAt.toISOString(),
-                        createdBy: found.createdBy,
-                        content: found.content,
-                    },
-                };
-            }) as never
-        ),
-
-        changes: route({
-            method: 'GET',
-            path: `${editingBase}${scope.prefix}/changes`,
-            auth: editor,
-            summary: `List what the draft of ${scope.noun} changes from what is published`,
-            description:
-                'Each changed field with what visitors see now and what publishing makes them see. Read it before publishing, so the person knows what goes live.',
-            tool: true,
-            pathParams: scope.params,
-            responses: {
-                200: {
-                    body: DraftChangesSchema,
-                    cache: 'no-store',
+            missingFields: route({
+                method: 'GET',
+                path: `${editingBase}${scope.prefix}/missing`,
+                auth: editor,
+                summary: `List the fields the draft of ${scope.noun} still needs before it can publish`,
+                tool: true,
+                pathParams: scope.params,
+                responses: {
+                    200: MissingFieldsSchema,
+                    404: ProblemDetailsSchema,
                 },
-                404: ProblemDetailsSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => {
-                const ref = scope.refOf(args.params);
-                return {
+            }).handler(
+                guarded(async (cms, args) => {
+                    const ref = refOf(cms, args);
+                    const state = await cms.draftState(ref);
+                    return {
+                        status: 200,
+                        body: {
+                            name: nameOf(ref),
+                            complete: state.complete,
+                            missing: state.missing,
+                            prompt: promptFor(ref),
+                        },
+                    };
+                }) as never
+            ),
+
+            getPublished: route({
+                method: 'GET',
+                path: `${editingBase}${scope.prefix}/published`,
+                auth: editor,
+                summary: `Read the published content of ${scope.noun} as stored, for copying it elsewhere`,
+                pathParams: scope.params,
+                responses: {
+                    200: {
+                        body: StoredContentSchema,
+                        cache: 'no-store',
+                    },
+                    404: ProblemDetailsSchema,
+                },
+            }).handler(
+                guarded(async (cms, args) => {
+                    const ref = refOf(cms, args);
+                    const stored = await cms.publishedAsStored(ref);
+                    if (stored === undefined) throw new CmsHttpError(404, { detail: `'${formatRef(ref)}' is not published.` });
+                    return {
+                        status: 200,
+                        body: {
+                            ref: formatRef(ref),
+                            version: stored.version,
+                            updatedAt: stored.updatedAt.toISOString(),
+                            content: stored.content,
+                        },
+                    };
+                }) as never
+            ),
+
+            history: route({
+                method: 'GET',
+                path: `${editingBase}${scope.prefix}/versions`,
+                auth: editor,
+                summary: `List the versions of ${scope.noun}, newest first`,
+                tool: true,
+                pathParams: scope.params,
+                responses: {
+                    200: VersionListSchema,
+                    404: ProblemDetailsSchema,
+                },
+            }).handler(
+                guarded(async (cms, args) => {
+                    const ref = refOf(cms, args);
+                    const versions = await cms.history(ref);
+                    const reviews = await versionReviewsOf(cms, ref);
+                    return {
+                        status: 200,
+                        body: {
+                            name: nameOf(ref),
+                            versions: versions.map((version) => ({
+                                ...version,
+                                review: reviews.get(version.version) ?? null,
+                            })),
+                        },
+                    };
+                }) as never
+            ),
+
+            getVersion: route({
+                method: 'GET',
+                path: `${editingBase}${scope.prefix}/versions/:version`,
+                auth: editor,
+                summary: `Read one earlier version of ${scope.noun}`,
+                description: 'The content as it was saved in that version, to compare with the draft or decide what to restore.',
+                tool: true,
+                pathParams: scope.params.extend({
+                    version: z.coerce.number().int().min(1),
+                }),
+                responses: {
+                    200: VersionContentSchema,
+                    404: ProblemDetailsSchema,
+                },
+            }).handler(
+                guarded(async (cms, args) => {
+                    const ref = refOf(cms, args);
+                    const version = Number(args.params['version']);
+                    const found = await cms.versionContent(ref, version);
+                    return {
+                        status: 200,
+                        body: {
+                            ref: formatRef(ref),
+                            version,
+                            summary: found.summary,
+                            createdAt: found.createdAt.toISOString(),
+                            createdBy: found.createdBy,
+                            content: found.content,
+                        },
+                    };
+                }) as never
+            ),
+
+            changes: route({
+                method: 'GET',
+                path: `${editingBase}${scope.prefix}/changes`,
+                auth: editor,
+                summary: `List what the draft of ${scope.noun} changes from what is published`,
+                description:
+                    'Each changed field with what visitors see now and what publishing makes them see. Read it before publishing, so the person knows what goes live.',
+                tool: true,
+                pathParams: scope.params,
+                responses: {
+                    200: {
+                        body: DraftChangesSchema,
+                        cache: 'no-store',
+                    },
+                    404: ProblemDetailsSchema,
+                },
+            }).handler(
+                guarded(async (cms, args) => {
+                    const ref = refOf(cms, args);
+                    return {
+                        status: 200,
+                        body: await draftChanges(cms, ref, cms.access(args.auth).callerFor(ref)),
+                    };
+                }) as never
+            ),
+
+            revert: route({
+                method: 'POST',
+                path: `${editingBase}${scope.prefix}/revert`,
+                auth: editor,
+                summary: `Set fields of the draft of ${scope.noun} back to what is published`,
+                description: 'Undoes the draft changes to the fields named, from the changes list. Nothing is published by this.',
+                tool:
+                    scope.approveWrites === true
+                        ? {
+                              needsApproval: true,
+                          }
+                        : true,
+                pathParams: scope.params,
+                body: RevertBodySchema,
+                responses: {
+                    200: DraftPageSchema,
+                    404: ProblemDetailsSchema,
+                    422: ValidationErrorSchema,
+                },
+            }).handler(
+                guarded(async (cms, args) => {
+                    const ref = refOf(cms, args);
+                    const paths = (args.body as z.output<typeof RevertBodySchema>).paths;
+                    const published = (await cms.publishedAsStored(ref))?.content;
+                    const changes = Object.fromEntries(paths.map((path) => [path, getAtPath(published, path)]));
+                    const state = await cms.update({
+                        ref,
+                        changes,
+                        caller: cms.access(args.auth).callerFor(ref),
+                        author: authorOf(cms, args),
+                        summary: paths.length === 1 ? `Reverted ${paths[0]}` : `Reverted ${paths.length} changes`,
+                    });
+                    return {
+                        status: 200,
+                        body: draftBody(state),
+                    };
+                }) as never
+            ),
+
+            publish: route({
+                method: 'POST',
+                path: `${editingBase}${scope.prefix}/publish`,
+                auth: editor,
+                summary: `Publish the draft of ${scope.noun}`,
+                description:
+                    'Makes the current draft what every visitor sees. The person confirms before this runs: in a host that cannot ask, such as Claude, they press Publish in the editor instead. Someone with a role under `reviews.roles` may pass `force` to publish before the review is approved.',
+                tool: {
+                    needsApproval: true,
+                    destructiveHint: false,
+                    idempotentHint: true,
+                },
+                pathParams: scope.params,
+                body: PublishBodySchema,
+                responses: {
+                    200: DraftPageSchema,
+                    404: ProblemDetailsSchema,
+                    409: ProblemDetailsSchema,
+                },
+            }).handler(
+                guarded(async (cms, args) => {
+                    const ref = refOf(cms, args);
+                    const body = args.body as z.output<typeof PublishBodySchema>;
+                    const access = cms.access(args.auth);
+                    assertPublishes(cms, access, ref);
+                    const state = await cms.draftState(ref);
+                    const past = await assertReviewed(cms, state, {
+                        force: body?.force === true,
+                        role: access.callerFor(ref).role,
+                    });
+                    const published = await cms.publish(ref, authorOf(cms, args));
+                    if (past !== undefined) await recordPublishedPast(cms, state, past, authorOf(cms, args));
+                    return {
+                        status: 200,
+                        body: draftBody(published),
+                    };
+                }) as never
+            ),
+
+            unpublish: route({
+                method: 'POST',
+                path: `${editingBase}${scope.prefix}/unpublish`,
+                auth: editor,
+                summary: `Unpublish ${scope.noun}`,
+                description:
+                    'Withdraws the published copy, so visitors stop seeing it and the site drops it. The draft and every version stay, and publishing again brings it back. The person confirms before this runs.',
+                tool: {
+                    needsApproval: true,
+                    destructiveHint: true,
+                    idempotentHint: true,
+                },
+                pathParams: scope.params,
+                body: UnpublishBodySchema,
+                responses: {
+                    200: DraftPageSchema,
+                    404: ProblemDetailsSchema,
+                    409: ProblemDetailsSchema,
+                },
+            }).handler(
+                guarded(async (cms, args) => {
+                    const ref = refOf(cms, args);
+                    assertPublishes(cms, cms.access(args.auth), ref);
+                    return {
+                        status: 200,
+                        body: draftBody(await cms.unpublish(ref, authorOf(cms, args))),
+                    };
+                }) as never
+            ),
+
+            setOwner: route({
+                method: 'PUT',
+                path: `${editingBase}${scope.prefix}/owner`,
+                auth: editor,
+                summary: `Name the person who looks after ${scope.noun}`,
+                description: 'The owner is suggested first when someone asks for a review. Pass null for nobody.',
+                tool: true,
+                pathParams: scope.params,
+                body: OwnerBodySchema,
+                responses: {
+                    204: z.void(),
+                    404: ProblemDetailsSchema,
+                    409: ProblemDetailsSchema,
+                    422: ProblemDetailsSchema,
+                },
+            }).handler(
+                guarded(async (cms, args) => {
+                    await setOwner(cms, refOf(cms, args), (args.body as z.output<typeof OwnerBodySchema>).owner);
+                    return {
+                        status: 204,
+                    };
+                }) as never
+            ),
+
+            rollback: route({
+                method: 'POST',
+                path: `${editingBase}${scope.prefix}/rollback`,
+                auth: editor,
+                summary: `Restore an earlier version of ${scope.noun} as a new draft`,
+                description: 'Nothing is published by this. The restored content becomes the draft, which is published separately.',
+                tool:
+                    scope.approveWrites === true
+                        ? {
+                              needsApproval: true,
+                              destructiveHint: false,
+                          }
+                        : {
+                              destructiveHint: false,
+                          },
+                pathParams: scope.params,
+                body: RollbackBodySchema,
+                responses: {
+                    200: DraftPageSchema,
+                    404: ProblemDetailsSchema,
+                    409: ProblemDetailsSchema,
+                },
+            }).handler(
+                guarded(async (cms, args) => ({
                     status: 200,
-                    body: await draftChanges(cms, ref, cms.caller(args.auth)),
-                };
-            }) as never
-        ),
-
-        revert: route({
-            method: 'POST',
-            path: `${editingBase}${scope.prefix}/revert`,
-            auth: editor,
-            summary: `Set fields of the draft of ${scope.noun} back to what is published`,
-            description: 'Undoes the draft changes to the fields named, from the changes list. Nothing is published by this.',
-            tool:
-                scope.approveWrites === true
-                    ? {
-                          needsApproval: true,
-                      }
-                    : true,
-            pathParams: scope.params,
-            body: RevertBodySchema,
-            responses: {
-                200: DraftPageSchema,
-                404: ProblemDetailsSchema,
-                422: ValidationErrorSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => {
-                const ref = scope.refOf(args.params);
-                const paths = (args.body as z.output<typeof RevertBodySchema>).paths;
-                const published = (await cms.publishedAsStored(ref))?.content;
-                const changes = Object.fromEntries(paths.map((path) => [path, getAtPath(published, path)]));
-                const state = await cms.update({
-                    ref,
-                    changes,
-                    caller: cms.caller(args.auth),
-                    author: authorOf(cms, args),
-                    summary: paths.length === 1 ? `Reverted ${paths[0]}` : `Reverted ${paths.length} changes`,
-                });
-                return {
-                    status: 200,
-                    body: draftBody(state),
-                };
-            }) as never
-        ),
-
-        publish: route({
-            method: 'POST',
-            path: `${editingBase}${scope.prefix}/publish`,
-            auth: editor,
-            summary: `Publish the draft of ${scope.noun}`,
-            description:
-                'Makes the current draft what every visitor sees. The person confirms before this runs: in a host that cannot ask, such as Claude, they press Publish in the editor instead. Someone with a role under `reviews.roles` may pass `force` to publish before the review is approved.',
-            tool: {
-                needsApproval: true,
-                destructiveHint: false,
-                idempotentHint: true,
-            },
-            pathParams: scope.params,
-            body: PublishBodySchema,
-            responses: {
-                200: DraftPageSchema,
-                404: ProblemDetailsSchema,
-                409: ProblemDetailsSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => {
-                const ref = scope.refOf(args.params);
-                const body = args.body as z.output<typeof PublishBodySchema>;
-                const state = await cms.draftState(ref);
-                const past = await assertReviewed(cms, state, {
-                    force: body?.force === true,
-                    role: cms.caller(args.auth).role,
-                });
-                const published = await cms.publish(ref, authorOf(cms, args));
-                if (past !== undefined) await recordPublishedPast(cms, state, past, authorOf(cms, args));
-                return {
-                    status: 200,
-                    body: draftBody(published),
-                };
-            }) as never
-        ),
-
-        unpublish: route({
-            method: 'POST',
-            path: `${editingBase}${scope.prefix}/unpublish`,
-            auth: editor,
-            summary: `Unpublish ${scope.noun}`,
-            description:
-                'Withdraws the published copy, so visitors stop seeing it and the site drops it. The draft and every version stay, and publishing again brings it back. The person confirms before this runs.',
-            tool: {
-                needsApproval: true,
-                destructiveHint: true,
-                idempotentHint: true,
-            },
-            pathParams: scope.params,
-            body: UnpublishBodySchema,
-            responses: {
-                200: DraftPageSchema,
-                404: ProblemDetailsSchema,
-                409: ProblemDetailsSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => ({
-                status: 200,
-                body: draftBody(await cms.unpublish(scope.refOf(args.params), authorOf(cms, args))),
-            })) as never
-        ),
-
-        setOwner: route({
-            method: 'PUT',
-            path: `${editingBase}${scope.prefix}/owner`,
-            auth: editor,
-            summary: `Name the person who looks after ${scope.noun}`,
-            description: 'The owner is suggested first when someone asks for a review. Pass null for nobody.',
-            tool: true,
-            pathParams: scope.params,
-            body: OwnerBodySchema,
-            responses: {
-                204: z.void(),
-                404: ProblemDetailsSchema,
-                409: ProblemDetailsSchema,
-                422: ProblemDetailsSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => {
-                await setOwner(cms, scope.refOf(args.params), (args.body as z.output<typeof OwnerBodySchema>).owner);
-                return {
-                    status: 204,
-                };
-            }) as never
-        ),
-
-        rollback: route({
-            method: 'POST',
-            path: `${editingBase}${scope.prefix}/rollback`,
-            auth: editor,
-            summary: `Restore an earlier version of ${scope.noun} as a new draft`,
-            description: 'Nothing is published by this. The restored content becomes the draft, which is published separately.',
-            tool:
-                scope.approveWrites === true
-                    ? {
-                          needsApproval: true,
-                          destructiveHint: false,
-                      }
-                    : {
-                          destructiveHint: false,
-                      },
-            pathParams: scope.params,
-            body: RollbackBodySchema,
-            responses: {
-                200: DraftPageSchema,
-                404: ProblemDetailsSchema,
-                409: ProblemDetailsSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => ({
-                status: 200,
-                body: draftBody(
-                    await cms.rollback(
-                        scope.refOf(args.params),
-                        (args.body as z.output<typeof RollbackBodySchema>).version,
-                        authorOf(cms, args)
-                    )
-                ),
-            })) as never
-        ),
-    });
+                    body: draftBody(
+                        await cms.rollback(
+                            refOf(cms, args),
+                            (args.body as z.output<typeof RollbackBodySchema>).version,
+                            authorOf(cms, args)
+                        )
+                    ),
+                })) as never
+            ),
+        };
+    };
 
     const publicCache = {
         etag: true,
@@ -1149,6 +1171,15 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         siteOf: (params) => params['site']!,
     };
 
+    /**
+     * The site a route's params name, refused when the editor may not open it.
+     */
+    const siteOf = (cms: CmsService, args: Args, at: SiteAt): string => {
+        const site = at.siteOf(args.params);
+        cms.access(args.auth).assertSees(site);
+        return site;
+    };
+
     const itemRoutes = (at: SiteAt) => ({
         list: route({
             method: 'GET',
@@ -1182,7 +1213,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             guarded(async (cms, args) => ({
                 status: 200,
                 body: {
-                    collections: await cms.collectionSummaries(at.siteOf(args.params)),
+                    collections: await cms.collectionSummaries(siteOf(cms, args, at)),
                 },
             })) as never
         ),
@@ -1276,7 +1307,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                                   offset,
                               }),
                     },
-                    at.siteOf(args.params)
+                    siteOf(cms, args, at)
                 );
                 return {
                     status: 200,
@@ -1308,9 +1339,9 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     await cms.createItem(
                         args.params['name']!,
                         (args.body as z.output<typeof CreateItemBodySchema>)?.values ?? {},
-                        cms.caller(args.auth),
+                        cms.access(args.auth).callerOn(siteOf(cms, args, at)),
                         authorOf(cms, args),
-                        at.siteOf(args.params)
+                        siteOf(cms, args, at)
                     )
                 ),
             })) as never
@@ -1335,7 +1366,9 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             },
         }).handler(
             guarded(async (cms, args) => {
-                await cms.deleteItem(args.params['name']!, args.params['id']!, at.siteOf(args.params));
+                const site = siteOf(cms, args, at);
+                assertPublishes(cms, cms.access(args.auth), cms.listing(args.params['name']!, site).refOf(args.params['id']!));
+                await cms.deleteItem(args.params['name']!, args.params['id']!, site);
                 return {
                     status: 204,
                     body: undefined,
@@ -1427,6 +1460,18 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         })) as never
     );
 
+    /**
+     * Refuses reviews of documents on a site the editor may not open, as if
+     * there were none, and hands back their access.
+     */
+    const seenReviews = async (cms: CmsService, args: Args, ids: readonly string[]): Promise<EditorAccess> => {
+        const access = cms.access(args.auth);
+        for (const review of await cms.store.reviews(ids)) {
+            if (!access.seesRef(review.ref)) throw new CmsHttpError(404, { detail: `No review '${review.id}'.` });
+        }
+        return access;
+    };
+
     const listReviews = route({
         method: 'GET',
         path: `${editingBase}/reviews`,
@@ -1450,7 +1495,9 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             return {
                 status: 200,
                 body: {
-                    reviews: await waitingReviews(cms, query.for === 'anyone' ? undefined : authorOf(cms, args)),
+                    reviews: await waitingReviews(cms, query.for === 'anyone' ? undefined : authorOf(cms, args), (ref) =>
+                        cms.access(args.auth).seesRef(ref)
+                    ),
                 },
             };
         }) as never
@@ -1475,6 +1522,11 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     }).handler(
         guarded(async (cms, args) => {
             const body = args.body as z.output<typeof RequestReviewBodySchema>;
+            const access = cms.access(args.auth);
+            for (const ref of body.refs) {
+                const parsed = parseRef(ref);
+                if (parsed !== undefined) access.assertSeesRef(parsed);
+            }
             return {
                 status: 201,
                 body: {
@@ -1510,6 +1562,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     }).handler(
         guarded(async (cms, args) => {
             const body = args.body as z.output<typeof DecideReviewBodySchema>;
+            const access = await seenReviews(cms, args, body.ids);
             return {
                 status: 200,
                 body: {
@@ -1518,7 +1571,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         decision: body.decision,
                         note: body.note ?? null,
                         by: authorOf(cms, args),
-                        role: cms.caller(args.auth).role,
+                        roleOn: (ref) => access.callerFor(ref).role,
                     }),
                 },
             };
@@ -1546,6 +1599,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     }).handler(
         guarded(async (cms, args) => {
             const body = args.body as z.output<typeof ReviewIdsBodySchema>;
+            await seenReviews(cms, args, body.ids);
             return {
                 status: 200,
                 body: {
@@ -1579,6 +1633,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     }).handler(
         guarded(async (cms, args) => {
             const body = args.body as z.output<typeof ReviewIdsBodySchema>;
+            await seenReviews(cms, args, body.ids);
             return {
                 status: 200,
                 body: {
@@ -1610,6 +1665,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     }).handler(
         guarded(async (cms, args) => {
             const body = args.body as z.output<typeof CommentBodySchema>;
+            const access = await seenReviews(cms, args, [body.review]);
             return {
                 status: 201,
                 body: await commentOnReview(cms, {
@@ -1617,7 +1673,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     path: body.path,
                     text: body.text,
                     by: authorOf(cms, args),
-                    role: cms.caller(args.auth).role,
+                    roleOn: (ref) => access.callerFor(ref).role,
                 }),
             };
         }) as never
@@ -1643,14 +1699,19 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             409: ProblemDetailsSchema,
         },
     }).handler(
-        guarded(async (cms, args) => ({
-            status: 200,
-            body: await resolveComment(cms, {
-                id: args.params['id']!,
-                by: authorOf(cms, args),
-                role: cms.caller(args.auth).role,
-            }),
-        })) as never
+        guarded(async (cms, args) => {
+            const access = cms.access(args.auth);
+            const comment = await cms.store.reviewComment(args.params['id']!);
+            if (comment !== undefined) await seenReviews(cms, args, [comment.reviewId]);
+            return {
+                status: 200,
+                body: await resolveComment(cms, {
+                    id: args.params['id']!,
+                    by: authorOf(cms, args),
+                    roleOn: (ref) => access.callerFor(ref).role,
+                }),
+            };
+        }) as never
     );
 
     const describe = route({
@@ -1676,6 +1737,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     }).handler(
         guarded(async (cms, args) => {
             const query = (args.query ?? {}) as { url?: string; ref?: string; site?: string };
+            const access = cms.access(args.auth);
             let ref: DocumentRef | undefined;
             if (query.ref !== undefined) {
                 ref = parseRef(query.ref);
@@ -1687,14 +1749,17 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 } catch {
                     throw new CmsHttpError(404, { detail: `'${query.url}' is not a URL or a path.` });
                 }
+                access.assertSees(query.site);
                 ref = await cms.pageAt(path, query.site);
                 if (ref === undefined) throw new CmsHttpError(404, { detail: `No page is served at '${path}'.` });
             } else {
                 throw new CmsHttpError(400, { detail: 'Pass a url or a ref.' });
             }
+            access.assertSeesRef(ref);
+            const caller = access.callerFor(ref);
             const state = await cms.draftState(ref);
             const draft = state.row?.draft ?? state.row?.published ?? null;
-            const usedOn = await cms.usedOn(ref);
+            const usedOn = await cms.usedOn(ref, (site) => access.sees(site));
             return {
                 status: 200,
                 body: {
@@ -1713,13 +1778,13 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     version: state.version,
                     complete: state.complete,
                     missing: state.missing,
-                    fields: cms.describe(ref, draft, cms.caller(args.auth), await sharedContentOf(cms, state)),
+                    fields: cms.describe(ref, draft, caller, await sharedContentOf(cms, state)),
                     layout: cms.describeLayout(ref),
                     draft,
                     ...(await reviewFields(cms, state)),
                     ...(ref.type === 'item' && state.target.shared === undefined
                         ? {
-                              actions: await itemActions(cms, cms.collection(ref.collection, ref.site), ref, cms.caller(args.auth)),
+                              actions: await itemActions(cms, cms.collection(ref.collection, ref.site), ref, caller),
                           }
                         : {}),
                 },
@@ -1742,12 +1807,15 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             }),
         },
     }).handler(
-        guarded(async (cms) => ({
-            status: 200,
-            body: {
-                pages: await cms.summaries(),
-            },
-        })) as never
+        guarded(async (cms, args) => {
+            const access = cms.access(args.auth);
+            return {
+                status: 200,
+                body: {
+                    pages: (await cms.summaries()).filter((page) => access.sees(page.site)),
+                },
+            };
+        }) as never
     );
 
     const globalsList = (at: SiteAt) =>
@@ -1786,7 +1854,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             guarded(async (cms, args) => ({
                 status: 200,
                 body: {
-                    globals: await cms.globalSummaries(at.siteOf(args.params)),
+                    globals: await cms.globalSummaries(siteOf(cms, args, at)),
                 },
             })) as never
         );
@@ -1810,7 +1878,9 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             body: {
                 brand: args.params['brand']!,
                 id: args.params['id']!,
-                pages: await cms.whereUsed(args.params['brand']!, args.params['id']!),
+                pages: (await cms.whereUsed(args.params['brand']!, args.params['id']!)).filter((page) =>
+                    cms.access(args.auth).sees(page.site)
+                ),
             },
         })) as never
     );
@@ -1824,6 +1894,38 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                       site: MediaSiteQuery,
                   }),
               };
+
+    /**
+     * A media item the editor may open: shared, or of a site they open.
+     */
+    const seenMedia = async (cms: CmsService, args: Args, id: string) => {
+        const record = await cms.media.get(id);
+        if (record === undefined || !cms.access(args.auth).sees(record.site)) {
+            throw new CmsHttpError(404, { detail: `No media item '${id}'.` });
+        }
+        return record;
+    };
+
+    /**
+     * The library a media route works in, refused when it is a site the
+     * editor may not open.
+     */
+    const seenLibrary = (cms: CmsService, args: Args): string | undefined => {
+        const site = cms.mediaSiteOf(mediaSiteOf(args));
+        cms.access(args.auth).assertSees(site);
+        return site;
+    };
+
+    /**
+     * Refuses a change to a shared image from an editor who is no admin over
+     * every site, since every site shows it.
+     */
+    const assertChangesMedia = (cms: CmsService, args: Args, record: { id: string; site?: string }): void => {
+        if (record.site !== undefined || cms.access(args.auth).publishesShared) return;
+        throw new CmsHttpError(403, {
+            detail: `The image '${record.id}' is shared, and every site shows it, so an admin over every site changes it.`,
+        });
+    };
 
     const listMedia = route({
         method: 'GET',
@@ -1839,7 +1941,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         },
     }).handler(
         guarded(async (cms, args) => {
-            const site = cms.mediaSiteOf(mediaSiteOf(args));
+            const site = seenLibrary(cms, args);
             const uses = await cms.mediaUses();
             return {
                 status: 200,
@@ -1873,12 +1975,13 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     }).handler(
         guarded(async (cms, args) => {
             const id = args.params['id']!;
-            if ((await cms.media.get(id)) === undefined) throw new CmsHttpError(404, { detail: `No media item '${id}'.` });
+            await seenMedia(cms, args, id);
+            const access = cms.access(args.auth);
             return {
                 status: 200,
                 body: {
                     id,
-                    uses: (await cms.mediaUses()).get(id) ?? [],
+                    uses: ((await cms.mediaUses()).get(id) ?? []).filter((use) => access.seesRef(use.ref)),
                 },
             };
         }) as never
@@ -1905,9 +2008,9 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     }).handler(
         guarded(async (cms, args) => {
             const id = args.params['id']!;
-            const record = await cms.media.get(id);
-            if (record === undefined) throw new CmsHttpError(404, { detail: `No media item '${id}'.` });
-            cms.assertOwnMedia(record, cms.mediaSiteOf(mediaSiteOf(args)));
+            const record = await seenMedia(cms, args, id);
+            cms.assertOwnMedia(record, seenLibrary(cms, args));
+            assertChangesMedia(cms, args, record);
             const uses = (await cms.mediaUses()).get(id) ?? [];
             if (!(await cms.media.delete(id))) throw new CmsHttpError(404, { detail: `No media item '${id}'.` });
             await cms.revalidateMedia(uses);
@@ -1933,8 +2036,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         },
     }).handler(
         guarded(async (cms, args) => {
-            const record = await cms.media.get(args.params['id']!);
-            if (record === undefined) throw new CmsHttpError(404, { detail: `No media item '${args.params['id']}'.` });
+            const record = await seenMedia(cms, args, args.params['id']!);
             return {
                 status: 200,
                 body: withUrl(cms, record),
@@ -1960,8 +2062,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         },
     }).handler(
         guarded(async (cms, args) => {
-            const record = await cms.media.get(args.params['id']!);
-            const bytes = record === undefined ? undefined : await cms.media.bytes(record);
+            const record = await seenMedia(cms, args, args.params['id']!);
+            const bytes = await cms.media.bytes(record);
             if (bytes === undefined) throw new CmsHttpError(404, { detail: `No media item '${args.params['id']}'.` });
             return {
                 status: 200,
@@ -2029,9 +2131,9 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         },
     }).handler(
         guarded(async (cms, args) => {
-            const current = await cms.media.get(args.params['id']!);
-            if (current === undefined) throw new CmsHttpError(404, { detail: `No media item '${args.params['id']}'.` });
-            cms.assertOwnMedia(current, cms.mediaSiteOf(mediaSiteOf(args)));
+            const current = await seenMedia(cms, args, args.params['id']!);
+            cms.assertOwnMedia(current, seenLibrary(cms, args));
+            assertChangesMedia(cms, args, current);
             const record = await cms.media.update(
                 args.params['id']!,
                 args.body as z.output<typeof UpdateMediaBodySchema>,
@@ -2060,7 +2162,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         },
     }).handler(
         guarded(async (cms, args) => {
-            cms.mediaSiteOf(mediaSiteOf(args));
+            seenLibrary(cms, args);
             return {
                 status: 201,
                 body: await cms.media.createUpload(args.body as z.output<typeof CreateUploadBodySchema>),
@@ -2084,11 +2186,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         },
     }).handler(
         guarded(async (cms, args) => {
-            const record = await cms.media.completeUpload(
-                args.params['uploadId']!,
-                authorOf(cms, args),
-                cms.mediaSiteOf(mediaSiteOf(args))
-            );
+            const record = await cms.media.completeUpload(args.params['uploadId']!, authorOf(cms, args), seenLibrary(cms, args));
             return {
                 status: 201,
                 body: withUrl(cms, record),
@@ -2127,12 +2225,20 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             502: ProblemDetailsSchema,
         },
     }).handler(
-        guarded(async (cms, args) => ({
-            status: 200,
-            body: {
-                items: await cms.searchItems(args.params['brand']!, searchInput(args)),
-            },
-        })) as never
+        guarded(async (cms, args) => {
+            const owned = cms.listingFor(args.params['brand']!);
+            if (owned !== undefined && !cms.access(args.auth).sees(owned.site)) {
+                throw new CmsHttpError(404, {
+                    detail: `No collection or relationship holds ids of the brand '${args.params['brand']}'. Define a relationship for it with defineRelationship().`,
+                });
+            }
+            return {
+                status: 200,
+                body: {
+                    items: await cms.searchItems(args.params['brand']!, searchInput(args)),
+                },
+            };
+        }) as never
     );
 
     const createPreview = route({

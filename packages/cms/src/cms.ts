@@ -31,6 +31,7 @@ import { memoryMediaStorage, type MediaStorage } from './media/storage.js';
 import { s3MediaStorage } from './media/s3.js';
 import { mediaIdsOf, mediaUsesOf, resolveContent } from './media/resolve.js';
 import { pathRefusal, type Caller } from './rules.js';
+import { EditorAccess } from './site-access.js';
 import {
     DocumentStore,
     VersionConflictError,
@@ -881,6 +882,35 @@ export class CmsService {
             role: context.role,
             permissions: context.permissions,
         };
+    }
+
+    /**
+     * Where an editor may go and their role there. Without `auth.sites`,
+     * every editor opens every site with their own role.
+     */
+    access(auth: Record<string, unknown> | undefined): EditorAccess {
+        const shared = this.caller(auth);
+        const names = this.siteNames();
+        const sitesOf = this.options.auth.sites;
+        const held = shared.role === undefined ? [] : typeof shared.role === 'string' ? [shared.role] : shared.role;
+        if (sitesOf === undefined || held.includes('admin')) {
+            return new EditorAccess(shared, Object.fromEntries(names.map((name) => [name, shared])), true);
+        }
+        const given = sitesOf((auth?.[this.identity] ?? {}) as Record<string, unknown>) ?? {};
+        const roles = this.identityRoles();
+        const sites: Record<string, Caller> = {};
+        for (const name of names) {
+            const role = given[name];
+            const list = (role === undefined ? [] : typeof role === 'string' ? [role] : role).filter((candidate) =>
+                roles === undefined ? true : roles.names.includes(candidate)
+            );
+            if (list.length === 0) continue;
+            sites[name] = {
+                role: list.length === 1 ? list[0] : list,
+                permissions: roles?.permissions === undefined ? [] : roles.of(list),
+            };
+        }
+        return new EditorAccess(shared, sites, false);
     }
 
     statusOf(row: DocumentRow | undefined, version: number): PageStatus {
@@ -1998,7 +2028,10 @@ export class CmsService {
      * Where else a document appears, for the warning shown before a shared
      * global or item is changed.
      */
-    async usedOn(ref: DocumentRef): Promise<{ everywhere: boolean; pages: Array<{ name: string; path: string }> }> {
+    async usedOn(
+        ref: DocumentRef,
+        sees: (site: string) => boolean = () => true
+    ): Promise<{ everywhere: boolean; pages: Array<{ name: string; path: string }> }> {
         if (ref.type === 'global') {
             return {
                 everywhere: true,
@@ -2014,10 +2047,12 @@ export class CmsService {
         }
         return {
             everywhere: false,
-            pages: (await this.whereUsed(brand, ref.id)).map((used) => ({
-                name: used.name,
-                path: used.path,
-            })),
+            pages: (await this.whereUsed(brand, ref.id))
+                .filter((used) => sees(used.site))
+                .map((used) => ({
+                    name: used.name,
+                    path: used.path,
+                })),
         };
     }
 

@@ -106,7 +106,8 @@ export const adminConfigFor = (
     api: PluginApi,
     base: '' | `/${string}`,
     role: string | null = null,
-    chatToken: string | null = null
+    chatToken: string | null = null,
+    sees: (site: string) => boolean = () => true
 ): AdminConfig => ({
     siteName: options.name,
     siteUrl: originOf(options.preview?.url),
@@ -125,7 +126,7 @@ export const adminConfigFor = (
     ),
     lists: listOptionsOf(options.collections ?? []),
     chat: chatOf(api, options.apiPath ?? '/api', chatToken),
-    sites: adminSitesOf(options),
+    sites: adminSitesOf(options).filter((site) => sees(site.key)),
 });
 
 /**
@@ -143,7 +144,6 @@ export const siteIconOf = (icon: string, url: string): string | null => {
  * Every declared site, as the admin's switcher lists them.
  */
 const adminSitesOf = (options: ResolvedCmsOptions): AdminSite[] =>
-    // TODO(sites): list only the sites the signed-in editor may open, once `auth.sites` on cms() says which.
     Object.entries(options.sites?.entries ?? {}).map(([key, entry]) => {
         const values = options.sites!.values[key]!;
         return {
@@ -300,6 +300,16 @@ const adminRoute = (service: CmsService, options: ResolvedCmsOptions, api: Plugi
             );
         }
         const { signedIn, allowed } = await editorOf(service, options, api, args);
+        const access = service.access({
+            [options.auth.identity]: signedIn,
+        });
+        if (allowed && site !== undefined && !access.sees(site)) {
+            return rawResponse(
+                new Response(null, {
+                    status: 404,
+                })
+            );
+        }
         if (!allowed) {
             const location = signInLocationOf(options, base, askedFor(adminPathOf(options, base), args.params, args.query));
             if (location === undefined) {
@@ -324,7 +334,11 @@ const adminRoute = (service: CmsService, options: ResolvedCmsOptions, api: Plugi
             })) ?? null;
         const page = withStylesheet(
             (await readBuilt('admin.html')).replace(CONFIG_PLACEHOLDER, () =>
-                embedded(adminConfigFor(options, api, base, editingRoleOf(signedIn?.['role'], service.roles), chatToken))
+                embedded(
+                    adminConfigFor(options, api, base, editingRoleOf(signedIn?.['role'], service.roles), chatToken, (key) =>
+                        access.sees(key)
+                    )
+                )
             ),
             options.adminCss
         );

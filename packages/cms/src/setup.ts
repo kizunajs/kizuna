@@ -152,6 +152,11 @@ const validate = (service: CmsService, options: ResolvedCmsOptions, api: PluginA
             if (!declared.includes(role)) throw new Error(`cms() accepts the role '${role}', which ${label} does not declare.`);
         }
     }
+    if (options.auth.sites !== undefined && !declared.includes('admin')) {
+        throw new Error(
+            `cms() gives editors roles on sites, and an admin over every site holds the role 'admin', which ${label} does not declare.`
+        );
+    }
     const brandSchemas = new Map<string, string>();
     const siteEntries = Object.entries(options.sites?.entries ?? {});
     const ownCollections = [...new Set(siteEntries.flatMap(([, entry]) => entry.collections ?? []))];
