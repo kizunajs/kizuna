@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 import { defineConfig } from './define-config.js';
 import { definePlugin, route } from './plugin.js';
-import { defineClient, defineGenerator, walkApi } from './generator.js';
+import { defineClient, defineGenerator, isInGroups, listedRoutes, walkApi } from './generator.js';
 
 const k = new Kizuna();
 
@@ -119,6 +119,53 @@ describe('walkApi', () => {
         expect(visited).toEqual(['Address', 'User', 'users.getUser']);
     });
 
+    it('walks only the routes in the groups, and the models they use', () => {
+        const visited: string[] = [];
+        walkApi(
+            api,
+            {
+                processModel: ({ name }) => visited.push(name),
+                processRoute: ({ routeKey }) => visited.push(routeKey),
+                finalize: () => undefined,
+            },
+            {
+                groups: ['users'],
+            }
+        );
+
+        expect(visited).toEqual(['Address', 'User', 'users.getUser']);
+    });
+
+    it("keeps a plugin's routes by its slug", () => {
+        const visited: string[] = [];
+        walkApi(
+            api,
+            {
+                processRoute: ({ routeKey }) => visited.push(routeKey),
+                finalize: () => undefined,
+            },
+            {
+                groups: ['webhooks'],
+            }
+        );
+
+        expect(visited).toEqual(['webhooks.receiveDelivery']);
+    });
+
+    it('throws on a group no route sits in', () => {
+        expect(() =>
+            walkApi(
+                api,
+                {
+                    finalize: () => undefined,
+                },
+                {
+                    groups: ['usres'],
+                }
+            )
+        ).toThrow("[kizuna] No route's key starts with 'usres'.");
+    });
+
     it('finds a model reached only through a described copy', () => {
         const AuthorSchema = Kizuna.model({
             title: 'Author',
@@ -166,6 +213,72 @@ const routeListClient = defineClient({
     },
 });
 
+describe('isInGroups', () => {
+    it('matches whole segments of the dotted key', () => {
+        expect(isInGroups('content.sites.uk.pages.frontPage', ['content.sites.uk'])).toBe(true);
+        expect(isInGroups('content.sites.uk', ['content.sites.uk'])).toBe(true);
+        expect(isInGroups('content.sites.ukraine.pages.frontPage', ['content.sites.uk'])).toBe(false);
+        expect(isInGroups('editing.pages.frontPage', ['content', 'invalidate'])).toBe(false);
+    });
+
+    it('holds every route without groups', () => {
+        expect(isInGroups('editing.pages.frontPage', undefined)).toBe(true);
+    });
+});
+
+describe('listedRoutes', () => {
+    const { api: storeApi } = defineConfig({
+        routes: [
+            {
+                users: k.routes({
+                    getUser: k.route({
+                        method: 'GET',
+                        path: '/users/:id',
+                        responses: {
+                            200: UserSchema,
+                        },
+                    }),
+                }),
+                orders: {
+                    listOrders: k.route({
+                        method: 'GET',
+                        path: '/orders',
+                        responses: {
+                            200: z.array(z.string()),
+                        },
+                    }),
+                    refunds: {
+                        listRefunds: k.route({
+                            method: 'GET',
+                            path: '/orders/refunds',
+                            responses: {
+                                200: z.array(z.string()),
+                            },
+                        }),
+                    },
+                },
+            },
+        ],
+    });
+
+    it('keeps the tree of the routes in the groups', () => {
+        const tree = listedRoutes(storeApi, {
+            groups: ['orders.refunds'],
+        });
+
+        expect(Object.keys(tree)).toEqual(['orders']);
+        expect(Object.keys(tree.orders as object)).toEqual(['refunds']);
+    });
+
+    it('throws on a group no route sits in', () => {
+        expect(() =>
+            listedRoutes(storeApi, {
+                groups: ['order'],
+            })
+        ).toThrow("No route's key starts with 'order'.");
+    });
+});
+
 describe('defineClient', () => {
     it('renders the file from the walk, skipping hidden routes', () => {
         const client = routeListClient({
@@ -184,6 +297,50 @@ describe('defineClient', () => {
         });
 
         expect(client.render(api)).toBe('* users.getUser');
+    });
+
+    it('renders only the routes in its groups', () => {
+        const client = routeListClient({
+            output: './routes.txt',
+            groups: ['users'],
+        });
+
+        expect(client.render(api)).toBe('- users.getUser');
+    });
+
+    it('hands the groups to the generate callback', () => {
+        const seen: Array<readonly string[] | undefined> = [];
+        const groupsClient = defineClient({
+            target: 'text',
+            generate: ({ groups }) => {
+                seen.push(groups);
+                return {
+                    finalize: () => '',
+                };
+            },
+        });
+
+        groupsClient({
+            output: './routes.txt',
+            groups: ['users'],
+        }).render(api);
+
+        expect(seen).toEqual([['users']]);
+    });
+
+    it('throws naming the client when groups is not a list of dotted keys', () => {
+        expect(() =>
+            routeListClient({
+                output: './routes.txt',
+                groups: [],
+            })
+        ).toThrow(/\[kizuna\] Client 'text' has invalid options: groups/);
+        expect(() =>
+            routeListClient({
+                output: './routes.txt',
+                groups: ['users.'],
+            })
+        ).toThrow(/groups/);
     });
 
     it('throws naming the client and the field when the options are invalid', () => {
@@ -213,6 +370,15 @@ describe('defineGenerator', () => {
                 output: './routes.txt',
             }).render(api)
         ).toBe('GET /users/:id\nGET /health hidden\nPOST /webhooks/delivery hidden');
+    });
+
+    it('sees only the routes in its groups, hidden ones included', () => {
+        expect(
+            manifest({
+                output: './routes.txt',
+                groups: ['health', 'webhooks'],
+            }).render(api)
+        ).toBe('GET /health hidden\nPOST /webhooks/delivery hidden');
     });
 
     it('is installed through a plugin, and defineConfig returns it', () => {

@@ -36,11 +36,22 @@ export type FetchClientTargetOptions = z.input<typeof FetchClientOptionsSchema> 
  * fetchClient({
  *     output: './packages/api-client/src/generated.ts',
  * });
+ *
+ * @example
+ * // Only the routes under `users`, for a package of its own
+ * fetchClient({
+ *     output: './packages/users-client/src/index.ts',
+ *     groups: ['users'],
+ * });
  */
 export const fetchClient = defineClient({
     target: 'fetch',
     options: FetchClientOptionsSchema,
-    generate: ({ options, api }) => ({
-        finalize: () => generateFetchClient(api, options),
+    generate: ({ options, api, groups }) => ({
+        finalize: () =>
+            generateFetchClient(api, {
+                ...options,
+                groups,
+            }),
     }),
 });

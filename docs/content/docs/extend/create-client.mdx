@@ -65,6 +65,8 @@ clients: [
 
 Kizuna skips [hidden](/docs/routes#hidden-routes) routes, plugin routes included, so one never reaches your `processRoute`.
 
+`groups` comes with every client too. An app that passes `groups: ['users']` gets a client of the routes under `users`, and your walk only sees those routes and their models. `generate` receives the list as `groups`, for a client that reads `api.routes` itself and passes it on to `listedRoutes`.
+
 ## The walk
 
 ### `processModel`

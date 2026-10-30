@@ -69,6 +69,13 @@ export interface KotlinConfig {
      * @default false
      */
     unknownEnumCase?: boolean;
+    /**
+     * Generate only the routes in these groups, and the models they use. Each
+     * is a dotted route key prefix, such as `'users'`.
+     *
+     * @default every route
+     */
+    groups?: readonly string[];
 }
 
 const BODY_FLATTEN_MAX_FIELDS = 6;
@@ -2283,4 +2290,5 @@ export const kotlinClientWalk = (api: ApiDefinition, config: KotlinConfig): Gene
 export const generateKotlinClient = (api: ApiDefinition, config: KotlinConfig): string =>
     walkApi(api, kotlinClientWalk(api, config), {
         skipHidden: true,
+        groups: config.groups,
     });

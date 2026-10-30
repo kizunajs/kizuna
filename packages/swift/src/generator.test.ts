@@ -4,6 +4,7 @@ import { Kizuna, type ApiDefinition } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import { definePlugin, route } from 'kizunajs/plugin';
 import { generateSwiftClient } from './generator.js';
+import { swiftClient } from './client-target.js';
 
 interface Config {
     groups: typeof kGroups;
@@ -2698,5 +2699,67 @@ describe('Swift generator: dotted model names', () => {
                 baseConfig
             )
         ).toThrow('@kizunajs/swift: "Shipping.Parcel" nests under "Shipping", which is already a type. Rename one of them.');
+    });
+});
+
+describe('swiftClient: groups', () => {
+    const groupsK = new Kizuna();
+    const ArticleSchema = Kizuna.model({
+        title: 'GroupsArticle',
+        schema: z.object({
+            title: z.string(),
+        }),
+    });
+    const DraftSchema = Kizuna.model({
+        title: 'GroupsDraft',
+        schema: z.object({
+            notes: z.string(),
+        }),
+    });
+    const { api } = defineConfig({
+        routes: [
+            {
+                content: {
+                    getArticle: groupsK.route({
+                        method: 'GET',
+                        path: '/content/articles/:id',
+                        responses: {
+                            200: ArticleSchema,
+                        },
+                    }),
+                },
+                editing: {
+                    getDraft: groupsK.route({
+                        method: 'GET',
+                        path: '/editing/drafts/:id',
+                        responses: {
+                            200: DraftSchema,
+                        },
+                    }),
+                },
+            },
+        ],
+    });
+
+    it('holds only the routes in its groups, and the models they use', () => {
+        const output = swiftClient({
+            output: './API.swift',
+            groups: ['content'],
+        }).render(api);
+
+        expect(output).toContain('getArticle');
+        expect(output).toContain('GroupsArticle');
+        expect(output).not.toContain('getDraft');
+        expect(output).not.toContain('GroupsDraft');
+    });
+
+    it('takes groups when called directly', () => {
+        const output = generateSwiftClient(api, {
+            namespaceName: 'API',
+            groups: ['editing'],
+        });
+
+        expect(output).toContain('getDraft');
+        expect(output).not.toContain('getArticle');
     });
 });

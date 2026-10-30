@@ -65,6 +65,13 @@ export interface SwiftConfig {
      * @default false
      */
     unknownEnumCase?: boolean;
+    /**
+     * Generate only the routes in these groups, and the models they use. Each
+     * is a dotted route key prefix, such as `'users'`.
+     *
+     * @default every route
+     */
+    groups?: readonly string[];
 }
 
 interface BodyDescriptor {
@@ -2748,4 +2755,5 @@ export const swiftClientWalk = (api: ApiDefinition, options: SwiftConfig): Gener
 export const generateSwiftClient = (api: ApiDefinition, options: SwiftConfig): string =>
     walkApi(api, swiftClientWalk(api, options), {
         skipHidden: true,
+        groups: options.groups,
     });

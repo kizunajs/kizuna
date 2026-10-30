@@ -4,6 +4,7 @@ import { Kizuna } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import { definePlugin, route } from 'kizunajs/plugin';
 import { generateFetchClient } from './generator.js';
+import { fetchClient } from './client-target.js';
 import { apiContract } from './api.fixture.js';
 
 const k = new Kizuna();
@@ -473,5 +474,78 @@ describe('a dotted model name', () => {
         expect(() => generateFetchClient(contract)).toThrow(
             '@kizunajs/fetch: "Shipping.Parcel" nests under "Shipping", which is already a type. Rename one of them.'
         );
+    });
+});
+
+describe('fetchClient: groups', () => {
+    const ArticleSchema = Kizuna.model({
+        title: 'Article',
+        schema: z.object({
+            title: z.string(),
+        }),
+    });
+    const DraftSchema = Kizuna.model({
+        title: 'Draft',
+        schema: z.object({
+            title: z.string(),
+            notes: z.string(),
+        }),
+    });
+    const { api } = defineConfig({
+        routes: [
+            {
+                content: {
+                    articles: {
+                        getArticle: k.route({
+                            method: 'GET',
+                            path: '/content/articles/:id',
+                            responses: {
+                                200: ArticleSchema,
+                            },
+                        }),
+                    },
+                },
+                editing: {
+                    getDraft: k.route({
+                        method: 'GET',
+                        path: '/editing/drafts/:id',
+                        responses: {
+                            200: DraftSchema,
+                        },
+                    }),
+                },
+            },
+        ],
+    });
+
+    it('holds only the routes in its groups, and the models they use', () => {
+        const output = fetchClient({
+            output: './client.ts',
+            groups: ['content'],
+        }).render(api);
+
+        expect(output).toContain('getArticle');
+        expect(output).toContain('export type Article =');
+        expect(output).not.toContain('getDraft');
+        expect(output).not.toContain('Draft');
+    });
+
+    it('takes a nested key path', () => {
+        const output = fetchClient({
+            output: './client.ts',
+            groups: ['content.articles'],
+        }).render(api);
+
+        expect(output).toContain('getArticle');
+        expect(output).not.toContain('getDraft');
+    });
+
+    it('throws on a group no route sits in', () => {
+        expect(() =>
+            fetchClient({
+                output: './client.ts',
+                groups: ['contents'],
+            }).render(api)
+        ).toThrow("No route's key starts with 'contents'.");
     });
 });

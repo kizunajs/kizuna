@@ -198,10 +198,14 @@ const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Rec
     return result;
 };
 
-const buildComponentSchemas = (): Record<string, unknown> | undefined => {
+/**
+ * The models as components, or only the named ones when `only` is given.
+ */
+const buildComponentSchemas = (only: ReadonlySet<string> | undefined): Record<string, unknown> | undefined => {
     const discriminators = new Map<string, { propertyName: string; mapping?: Record<string, string> }>();
     const modelRegistry = z.registry<z.core.GlobalMeta>();
     for (const [id, schema] of globalRegistrySchemas().entries()) {
+        if (only !== undefined && !only.has(id)) continue;
         modelRegistry.add(schema as z.ZodType, readMeta(schema) as z.core.GlobalMeta);
         const def = readDiscriminatedUnion(schema);
         if (def) {
@@ -248,8 +252,13 @@ const deriveHeadOperation = (getOperation: OpenApiOperation): OpenApiOperation =
 
 const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWalk<OpenApiRenderer> => {
     const paths: Record<string, Record<string, OpenApiOperation>> = {};
+    // A document of some groups holds only the models their routes use.
+    const models = options.groups === undefined ? undefined : new Set<string>();
 
     return {
+        processModel({ name }) {
+            models?.add(name);
+        },
         processRoute({ routeKey, route, routeGroups, deprecated, hidden }) {
             if (hidden && options.includeHidden !== true) return;
             const openApiPath = convertPath(route.path);
@@ -536,7 +545,7 @@ const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWa
             if (options.servers) document.servers = options.servers;
             if (options.externalDocs) document.externalDocs = options.externalDocs;
 
-            const componentSchemas = buildComponentSchemas();
+            const componentSchemas = buildComponentSchemas(models);
             const securitySchemes = buildSecuritySchemes(api);
             if (componentSchemas || securitySchemes) {
                 document.components = {
@@ -638,14 +647,16 @@ const buildGroupTags = (api: ApiDefinition): ReadonlyMap<string, readonly string
 };
 
 /**
- * One tag per top-level group.
+ * One tag per top-level group, or per one an operation carries when `used`
+ * is given.
  */
-const tagsFromApi = (api: ApiDefinition): OpenApiTag[] => {
+const tagsFromApi = (api: ApiDefinition, used: ReadonlySet<string> | undefined): OpenApiTag[] => {
     const groups = api.groups?.groups;
     if (!groups) return [];
     const tags: OpenApiTag[] = [];
     for (const group of groups.values()) {
         if (group.lineage.length > 1) continue;
+        if (used !== undefined && !used.has(group.title)) continue;
         const entry: OpenApiTag = {
             name: group.title,
         };
@@ -655,6 +666,12 @@ const tagsFromApi = (api: ApiDefinition): OpenApiTag[] => {
     }
     return tags;
 };
+
+/**
+ * Every tag an operation in the document carries.
+ */
+const usedTags = (document: OpenApiDocument): Set<string> =>
+    new Set(Object.values(document.paths).flatMap((operations) => Object.values(operations).flatMap((operation) => operation.tags ?? [])));
 
 /**
  * So a build step does not restate the options and drift from what is served.
@@ -678,11 +695,16 @@ export function renderOpenApi(api: ApiDefinition, options: GenerateOpenApiOption
                 groupTags: buildGroupTags(api),
             },
             api
-        )
+        ),
+        {
+            skipHidden: options.includeHidden !== true,
+            groups: options.groups,
+        }
     );
-    const tags = tagsFromApi(api);
+    const document = renderer('json') as OpenApiDocument;
+    const tags = tagsFromApi(api, options.groups === undefined ? undefined : usedTags(document));
     if (tags.length > 0) {
-        (renderer('json') as OpenApiDocument).tags = tags;
+        document.tags = tags;
     }
     return renderer;
 }

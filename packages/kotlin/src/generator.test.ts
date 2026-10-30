@@ -4,6 +4,7 @@ import { Kizuna, type ApiDefinition } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import { definePlugin, route } from 'kizunajs/plugin';
 import { generateKotlinClient } from './generator.js';
+import { kotlinClient } from './client-target.js';
 
 const k = new Kizuna();
 
@@ -2686,5 +2687,67 @@ describe('Kotlin generator: dotted model names', () => {
                 baseConfig
             )
         ).toThrow('@kizunajs/kotlin: "Shipping.Parcel" nests under "Shipping", which is already a type. Rename one of them.');
+    });
+});
+
+describe('kotlinClient: groups', () => {
+    const groupsK = new Kizuna();
+    const ArticleSchema = Kizuna.model({
+        title: 'GroupsArticle',
+        schema: z.object({
+            title: z.string(),
+        }),
+    });
+    const DraftSchema = Kizuna.model({
+        title: 'GroupsDraft',
+        schema: z.object({
+            notes: z.string(),
+        }),
+    });
+    const { api } = defineConfig({
+        routes: [
+            {
+                content: {
+                    getArticle: groupsK.route({
+                        method: 'GET',
+                        path: '/content/articles/:id',
+                        responses: {
+                            200: ArticleSchema,
+                        },
+                    }),
+                },
+                editing: {
+                    getDraft: groupsK.route({
+                        method: 'GET',
+                        path: '/editing/drafts/:id',
+                        responses: {
+                            200: DraftSchema,
+                        },
+                    }),
+                },
+            },
+        ],
+    });
+
+    it('holds only the routes in its groups, and the models they use', () => {
+        const output = kotlinClient({
+            output: './API.kotlin',
+            groups: ['content'],
+        }).render(api);
+
+        expect(output).toContain('getArticle');
+        expect(output).toContain('GroupsArticle');
+        expect(output).not.toContain('getDraft');
+        expect(output).not.toContain('GroupsDraft');
+    });
+
+    it('takes groups when called directly', () => {
+        const output = generateKotlinClient(api, {
+            namespaceName: 'API',
+            groups: ['editing'],
+        });
+
+        expect(output).toContain('getDraft');
+        expect(output).not.toContain('getArticle');
     });
 });

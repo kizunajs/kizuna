@@ -46,6 +46,11 @@ export interface FetchClientOptions {
      * behind, and so a reader knows where the API is declared.
      */
     source?: string;
+    /**
+     * Generate only the routes in these groups, each a dotted key prefix such
+     * as `'users'`.
+     */
+    groups?: readonly string[];
 }
 
 const indent = (text: string, depth = 1): string =>
@@ -389,9 +394,16 @@ const emitModels = (entries: Array<NamespaceEntry<NamedType>>, collector: TypeCo
     });
 
 export const generateFetchClient = (contract: ApiDefinition, options: FetchClientOptions = {}): string => {
-    const { namespace: namespaceName = 'API', regenerateCommand = 'kizuna generate', source } = options;
+    const { namespace: namespaceName = 'API', regenerateCommand = 'kizuna generate', source, groups } = options;
     const collector = new TypeCollector();
-    const tree = emitTree(listedRoutes(contract), '', collector, namespaceName);
+    const tree = emitTree(
+        listedRoutes(contract, {
+            groups,
+        }),
+        '',
+        collector,
+        namespaceName
+    );
     const requestContext = emitRequestContext(contract, collector);
 
     const named = collector.all();

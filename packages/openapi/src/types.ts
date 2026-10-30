@@ -124,6 +124,14 @@ export const GenerateOpenApiOptionsSchema = z.object({
      * @default false
      */
     includeHidden: z.boolean().optional(),
+    /**
+     * Document only the routes in these groups, and the models they use. Each
+     * is a dotted route key prefix: `'content'` keeps every route under
+     * `content`, and `'content.sites.uk'` keeps one site's.
+     *
+     * @default every route
+     */
+    groups: z.array(z.string().min(1)).min(1).optional(),
     operationMapper: z
         .custom<(operation: OpenApiOperation, route: RouteDefinition, operationId: string) => OpenApiOperation>(
             (value) => typeof value === 'function',

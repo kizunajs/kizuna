@@ -100,6 +100,8 @@ plugins: [
 
 A generator sees every served route and decides what to include. The OpenAPI document leaves hidden routes out unless it's told otherwise.
 
+A generator also takes `groups` beside `output`, and its walk then sees only the routes under those dotted keys. A plugin's routes sit under its slug, so `groups: ['gateway']` keeps the gateway plugin's own.
+
 ## Deprecation
 
 Route deprecation arrives on the context. Fields declare theirs in Zod metadata, read with `readDeprecation`:

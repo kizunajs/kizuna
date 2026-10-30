@@ -144,30 +144,84 @@ const servedRoutes = (
     ),
 ];
 
-const withoutHidden = (routes: Routes): Routes => {
+/**
+ * Whether a route's dotted key sits in one of the groups, each a dotted key
+ * prefix such as `content` or `content.sites.uk`. A prefix matches whole
+ * segments, so `content` holds `content.pages.frontPage` and not
+ * `contentTypes.list`. Without groups, every route is in.
+ *
+ * @example
+ * isInGroups('content.sites.uk.pages.frontPage', ['content.sites.uk']); // true
+ */
+export const isInGroups = (routeKey: string, groups: readonly string[] | undefined): boolean =>
+    groups === undefined || groups.some((group) => routeKey === group || routeKey.startsWith(`${group}.`));
+
+/**
+ * Throw on groups that are not a list of dotted keys, naming who was given
+ * them.
+ */
+const assertGroupsOption = (groups: unknown, name: string): void => {
+    if (groups === undefined) return;
+    const valid =
+        Array.isArray(groups) &&
+        groups.length > 0 &&
+        groups.every((group) => typeof group === 'string' && group.split('.').every((segment) => segment.length > 0));
+    if (!valid) {
+        throw new Error(`[kizuna] ${name} has invalid options: groups is a non-empty list of dotted route keys, like ['content']`);
+    }
+};
+
+/**
+ * Throw on a group no served route sits in, so a misspelt prefix fails the
+ * generate instead of writing an empty client.
+ */
+const assertGroupsMatch = (routeKeys: readonly string[], groups: readonly string[] | undefined): void => {
+    for (const group of groups ?? []) {
+        if (routeKeys.some((routeKey) => isInGroups(routeKey, [group]))) continue;
+        throw new Error(
+            `[kizuna] No route's key starts with '${group}'. Each entry in \`groups\` is a dotted route key prefix, like 'content'.`
+        );
+    }
+};
+
+const listRoutes = (routes: Routes, prefix: string, groups: readonly string[] | undefined): Routes => {
     const listed: Record<string | symbol, unknown> = {};
     // `Object.entries` skips the group symbol.
     for (const symbol of Object.getOwnPropertySymbols(routes)) {
         listed[symbol] = (routes as Record<symbol, unknown>)[symbol];
     }
     for (const [key, value] of Object.entries(routes)) {
+        const routeKey = prefix === '' ? key : `${prefix}.${key}`;
         if (isRouteDefinition(value)) {
-            if ((value as RouteDefinition).hidden !== true) listed[key] = value;
+            if ((value as RouteDefinition).hidden !== true && isInGroups(routeKey, groups)) listed[key] = value;
             continue;
         }
         if (value && typeof value === 'object') {
-            const group = withoutHidden(value as Routes);
+            const group = listRoutes(value as Routes, routeKey, groups);
             if (Object.keys(group).length > 0) listed[key] = group;
         }
     }
     return listed as Routes;
 };
 
+export interface ListedRoutesOptions {
+    /**
+     * Keep only the routes in these groups. See {@link isInGroups}.
+     */
+    groups?: readonly string[];
+}
+
 /**
  * The route tree the generated clients hold: the app's routes, less every
- * `hidden` one.
+ * `hidden` one, and less every route outside `groups` when it is given.
  */
-export const listedRoutes = (contract: ApiDefinition): Routes => withoutHidden(contract.routes);
+export const listedRoutes = (contract: ApiDefinition, options: ListedRoutesOptions = {}): Routes => {
+    assertGroupsMatch(
+        servedRoutes(contract).map(({ routeKey }) => routeKey),
+        options.groups
+    );
+    return listRoutes(contract.routes, '', options.groups);
+};
 
 /**
  * A named model the api uses.
@@ -217,6 +271,13 @@ export interface WalkApiOptions {
      * @default false
      */
     skipHidden?: boolean;
+    /**
+     * Walk only the routes in these groups, and the models they use. Each is
+     * a dotted key prefix, such as `content` or `content.sites.uk`. A
+     * plugin's routes sit under its slug, so `mcp` names the MCP plugin's.
+     * A group no route sits in throws.
+     */
+    groups?: readonly string[];
 }
 
 const isSchema = (value: unknown): value is z.core.$ZodType =>
@@ -290,7 +351,14 @@ const deprecationMessageOf = (route: RouteDefinition): string | undefined =>
  * });
  */
 export const walkApi = <Output>(api: ApiDefinition, walk: GeneratorWalk<Output>, options: WalkApiOptions = {}): Output => {
-    const entries = servedRoutes(api).filter(({ route }) => options.skipHidden !== true || route.hidden !== true);
+    const served = servedRoutes(api);
+    assertGroupsMatch(
+        served.map(({ routeKey }) => routeKey),
+        options.groups
+    );
+    const entries = served.filter(
+        ({ routeKey, route }) => (options.skipHidden !== true || route.hidden !== true) && isInGroups(routeKey, options.groups)
+    );
     if (walk.processModel !== undefined) {
         for (const model of modelsOf(entries)) walk.processModel(model);
     }
@@ -324,6 +392,12 @@ export interface GenerateContext<Options> {
      * The api being generated from.
      */
     api: ApiDefinition;
+    /**
+     * The groups the app passed, or `undefined` for every route. The walk
+     * already keeps to them. A client reading `api.routes` itself passes them
+     * to {@link listedRoutes}.
+     */
+    groups: readonly string[] | undefined;
 }
 
 /**
@@ -334,6 +408,15 @@ export interface GeneratedFileOptions {
      * Path the file is written to, resolved against the config's directory.
      */
     output: string;
+    /**
+     * Generate only the routes in these groups, each a dotted key prefix.
+     * `'content'` keeps every route under `content`, and
+     * `'content.sites.uk'` keeps one site's. A group no route sits in throws.
+     *
+     * @example
+     * groups: ['content.sites.uk', 'content.globals'],
+     */
+    groups?: readonly string[];
 }
 
 const parseOptions = <Schema extends z.ZodType | undefined>(
@@ -394,8 +477,10 @@ export const defineClient =
         definition: ClientDefinition<Schema>
     ): ((options: OptionsInput<Schema> & GeneratedFileOptions) => GeneratedFile) =>
     (input) => {
-        const { output, ...rest } = input as GeneratedFileOptions & Record<string, unknown>;
-        const options = parseOptions<Schema>(definition.options, rest, `Client '${definition.target}'`);
+        const { output, groups, ...rest } = input as GeneratedFileOptions & Record<string, unknown>;
+        const name = `Client '${definition.target}'`;
+        assertGroupsOption(groups, name);
+        const options = parseOptions<Schema>(definition.options, rest, name);
         return {
             target: definition.target,
             output,
@@ -405,9 +490,11 @@ export const defineClient =
                     definition.generate({
                         options,
                         api,
+                        groups,
                     }),
                     {
                         skipHidden: true,
+                        groups,
                     }
                 ),
         };
@@ -449,8 +536,10 @@ export const defineGenerator =
         definition: GeneratorDefinition<Schema>
     ): ((options: OptionsInput<Schema> & GeneratedFileOptions) => GeneratedFile) =>
     (input) => {
-        const { output, ...rest } = input as GeneratedFileOptions & Record<string, unknown>;
-        const options = parseOptions<Schema>(definition.options, rest, `The generator for '${output}'`);
+        const { output, groups, ...rest } = input as GeneratedFileOptions & Record<string, unknown>;
+        const name = `The generator for '${output}'`;
+        assertGroupsOption(groups, name);
+        const options = parseOptions<Schema>(definition.options, rest, name);
         return {
             output,
             render: (api) =>
@@ -459,7 +548,11 @@ export const defineGenerator =
                     definition.generate({
                         options,
                         api,
-                    })
+                        groups,
+                    }),
+                    {
+                        groups,
+                    }
                 ),
         };
     };

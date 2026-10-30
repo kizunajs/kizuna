@@ -2858,3 +2858,122 @@ describe('a dotted model name', () => {
         });
     });
 });
+
+interface GroupsConfig {
+    groups: typeof groups;
+}
+
+const groupsK = new Kizuna<GroupsConfig>();
+
+const groups = groupsK.groups({
+    content: 'Content',
+    editing: 'Editing',
+});
+
+describe('renderOpenApi: groups', () => {
+    const ArticleSchema = Kizuna.model({
+        title: 'GroupsArticle',
+        schema: z.object({
+            title: z.string(),
+        }),
+    });
+    const DraftSchema = Kizuna.model({
+        title: 'GroupsDraft',
+        schema: z.object({
+            notes: z.string(),
+        }),
+    });
+    const { api } = defineConfig({
+        groups,
+        routes: [
+            groupsK.routes.content({
+                getArticle: groupsK.route({
+                    method: 'GET',
+                    path: '/content/articles/:id',
+                    responses: {
+                        200: ArticleSchema,
+                    },
+                }),
+            }),
+            groupsK.routes.editing({
+                getDraft: groupsK.route({
+                    method: 'GET',
+                    path: '/editing/drafts/:id',
+                    responses: {
+                        200: DraftSchema,
+                    },
+                }),
+            }),
+        ],
+    });
+    const info = {
+        title: 'Test',
+        version: '1.0.0',
+    };
+
+    it('documents only the routes in the groups, their models and their tags', () => {
+        const document = renderOpenApi(api, {
+            info,
+            groups: ['content'],
+        })('json');
+
+        expect(Object.keys(document.paths)).toEqual(['/content/articles/{id}']);
+        expect(Object.keys(document.components?.schemas ?? {})).toEqual(['GroupsArticle']);
+        expect(document.tags?.map((tag) => tag.name)).toEqual(['Content']);
+    });
+
+    it('documents every route and model without groups', () => {
+        const document = renderOpenApi(api, {
+            info,
+        })('json');
+
+        expect(Object.keys(document.paths)).toEqual(['/content/articles/{id}', '/editing/drafts/{id}']);
+        expect(Object.keys(document.components?.schemas ?? {})).toEqual(expect.arrayContaining(['GroupsArticle', 'GroupsDraft']));
+        expect(document.tags?.map((tag) => tag.name)).toEqual(['Content', 'Editing']);
+    });
+
+    it('writes the generated document from the plugin options', () => {
+        const { api: pluginApi, generators } = defineConfig({
+            groups,
+            routes: [
+                groupsK.routes.editing({
+                    getDraft: groupsK.route({
+                        method: 'GET',
+                        path: '/editing/drafts/:id',
+                        responses: {
+                            200: DraftSchema,
+                        },
+                    }),
+                }),
+                groupsK.routes.content({
+                    getArticle: groupsK.route({
+                        method: 'GET',
+                        path: '/content/articles/:id',
+                        responses: {
+                            200: ArticleSchema,
+                        },
+                    }),
+                }),
+            ],
+            plugins: [
+                openApiPlugin({
+                    info,
+                    output: './openapi.json',
+                    groups: ['editing'],
+                }),
+            ],
+        });
+
+        const document = JSON.parse(generators[0]!.render(pluginApi)) as { paths: Record<string, unknown> };
+        expect(Object.keys(document.paths)).toEqual(['/editing/drafts/{id}']);
+    });
+
+    it('throws on a group no route sits in', () => {
+        expect(() =>
+            renderOpenApi(api, {
+                info,
+                groups: ['contents'],
+            })
+        ).toThrow("No route's key starts with 'contents'.");
+    });
+});
