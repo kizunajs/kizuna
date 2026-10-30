@@ -237,8 +237,9 @@ content: cms({
 A `stat` or `chart` in `overview` receives `sites`, every site, in place of one. A sum across sites is yours to write, since only your code knows how pounds and kroner add up:
 
 ```ts title="src/dashboard.ts"
-export async function salesAcrossShops({ sites, period }: OverviewContext<typeof sites>) {
-    const totals = await Promise.all(sites.map((site) => kronerBetween(site.key, period.from, period.to)));
+export async function salesAcrossShops(context: OverviewContext<typeof sites>) {
+    const { period } = context;
+    const totals = await Promise.all(context.sites.map((site) => kronerBetween(site.key, period.from, period.to)));
     return formatKroner(totals.reduce((sum, total) => sum + total, 0));
 }
 ```
@@ -257,6 +258,6 @@ The overview has widgets of its own, from what the CMS records:
 
 Without `overview`, the overview shows `reviews`, `refreshes` and `reach`.
 
-Nobody else sees the overview, so an editor on one site never sees another site's numbers. An editor who opens `/admin` gets the shared content's `reviews` and `collections`, without stats or charts, since those count for one site.
+Nobody else sees the overview, so an editor on one site never sees another site's numbers. An editor of some sites who opens `/admin` lands on their first site's dashboard. An editor with no site of their own gets the shared content's `reviews` and `collections` there, without stats or charts, since those count for one site.
 
 The `editors` widget names each person's site role from `sites` on what [`people.list`](/docs/cms/editing/reviews#people) returns, like `{ uk: 'editor' }`.

@@ -115,6 +115,10 @@ The identity `k.jobs` names carries its own guard, so nothing else is wired here
 
 </Steps>
 
+## Jobs from the CMS
+
+A [CMS with several sites](/docs/cms/sites#running-the-refreshes) adds a job of its own beside yours, `content.refreshSite`, which refreshes each site and partner after a publish. A config that has it names `jobRunner` even when it declares no jobs. `mode: 'in-process'` runs it with nothing else. With `mode: 'http'`, the endpoints need an identity and the CMS's job declares none, so jobs of your own name it, and that identity guards `content.refreshSite` too.
+
 ## Schedules
 
 A five-field cron expression, read as UTC, or an object to read it in a time zone:

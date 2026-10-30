@@ -273,16 +273,21 @@ const refreshed = [
         site: 'Hagen Norge',
         ok: false,
     },
+    {
+        site: 'Travel agency',
+        ok: true,
+    },
 ];
 
 /**
- * After publishing a shared item, each site that shows it is refreshed.
+ * After publishing a shared item, each site and partner that shows it is
+ * refreshed.
  */
 export function FanOut() {
     return (
         <Editor className={editor.dialog}>
             <p className={editor.dialogTitle}>Published Privacy Policy</p>
-            <p className={styles.muted}>Refreshed 2 of 3 sites. Hagen Norge did not answer, retrying.</p>
+            <p className={styles.muted}>Refreshed 2 of 3 sites and 1 partner. Hagen Norge did not answer, retrying.</p>
             <div className={styles.sites}>
                 {refreshed.map((entry) => (
                     <div key={entry.site} className={clsx(styles.site, !entry.ok && styles.waiting)}>

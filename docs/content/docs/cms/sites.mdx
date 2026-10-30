@@ -160,15 +160,31 @@ auth: {
 
 Inside a site, the [one-site rules](/docs/cms/editing/permissions#on-one-site) apply as they are. Shared content reaches every site, so an admin over every site publishes it. A site's editor never sees another site, in the admin, the API or MCP. [Who can do what](/docs/cms/editing/permissions#with-several-sites) shows each editor's screen.
 
+## Images
+
+Each site has images of its own beside a shared library. Shared content holds shared images, and a site's content holds its own and the shared ones. Every editor may upload to the shared library, and changing or deleting a shared image takes an admin over every site, since every site shows it.
+
 ## Publishing
 
 Before a shared document publishes, the editor shows where it appears on each site: the pages whose content holds it, and the pages that listed it when they last rendered.
 
-The list names partners under their label too. Publishing then refreshes every site and partner that shows the document. Each one gets a job of its own, calling its `invalidate` with `{ brand, id }`, and refreshes the pages that hold the id. A declared site's `invalidate` is at its `url` and `apiPath`, as in `https://hagen.example.co.uk/api/invalidate`, and the call carries a header signed with `KIZUNA_CMS_PREVIEW_SECRET`, which every app already shares. The editor shows how it went:
+The list names partners under their label too. Publishing then refreshes every site and partner that shows the document, and unpublishing and deleting do the same. Each one gets a job of its own, which calls its `invalidate` with what changed:
+
+| Body            | Refreshes                                |
+| --------------- | ---------------------------------------- |
+| `{ brand, id }` | The item, and the pages that hold its id |
+| `{ global }`    | A global, like `{ global: 'settings' }`  |
+| `{ page }`      | A page, like `{ page: 'frontPage' }`     |
+
+A declared site's `invalidate` is at its `url`, `apiPath` and `path`, as in `https://hagen.example.co.uk/api/invalidate`. The call carries a `kizuna-cms-signature` header, an HMAC of the body made with `KIZUNA_CMS_PREVIEW_SECRET`, which every app already shares, and valid for five minutes. Anything else calling `invalidate` uses the credential `auth.invalidate` names.
+
+Each publish records one row per site and partner, with its status and attempts: `queued` waits for its turn, `answered` refreshed, `retrying` did not answer and is tried again, and `failed` will not be. The editor reads them from `GET /editing/refreshes?ref=`, which lists the latest publish's refreshes, and shows how it went:
 
 <EditorFigure kind="fan-out" />
 
-The calls are [jobs](/docs/jobs), so a config with sites names a `jobRunner`, and your transport does the retrying. Unpublishing and deleting send the same call.
+### Running the refreshes
+
+A config with sites gets the CMS's own job, `content.refreshSite`, beside your [jobs](/docs/jobs), so it names a `jobRunner`. With `mode: 'in-process'`, the job runs on its own. With `mode: 'http'`, the job endpoints need an identity, and the CMS's job declares none, so your own jobs name it. A [transport](/docs/jobs#transports) retries a site or partner that does not answer, up to five attempts. Without one, a refresh that fails is not tried again.
 
 ## Partners
 
@@ -196,7 +212,7 @@ content: cms({
 
 `reads: ['uk']` is the UK's view and the shared content: the offices with the UK's phone numbers, and the UK's events.
 
-Content routes are public until `auth.read` names an identity. Then every content route, media included, requires that identity, and each partner's `reads` limits what its token may read. A read of Norway answers `403`, naming the permission it lacks, `content.sites.norway:read`.
+Content routes are public until `auth.read` names an identity. Then every content route, media included, requires that identity, and each partner's `reads` limits what its token may read. A read of Norway answers `403`, naming the permission it lacks, `content.sites.norway:read`. A token whose guard returns no `partner` reads every site, which suits your own apps.
 
 ### How it signs in
 
@@ -233,7 +249,7 @@ A partner that runs Kizuna CMS itself holds your ids through a [relationship](/d
 
 ### How it hears a publish
 
-When a document it reads publishes, the CMS calls the partner's `invalidate` with `{ brand, id }` and the bearer token the partner gave you. The body carries no content, so the partner reads the document again through its client, and a document that was unpublished or deleted answers `404`. A partner hears only what it reads, so a change to Norway never reaches the travel agency. The editor counts partners beside sites, so publishing a shared office reads "Refreshed 3 sites and 1 partner".
+When a document it reads publishes, the CMS calls the partner's `invalidate` with the same bodies a site gets, `{ brand, id }`, `{ global }` or `{ page }`, and the bearer token the partner gave you. The body carries no content, so the partner reads the document again through its client, and a document that was unpublished or deleted answers `404`. A partner hears only what it reads, so a change to Norway never reaches the travel agency. The editor counts partners beside sites, so publishing a shared office reads "Refreshed 2 of 3 sites and 1 partner. Hagen Norge did not answer, retrying." while Norway is down.
 
 ## Sites created by admins
 

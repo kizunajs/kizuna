@@ -5,11 +5,11 @@ description: 'The content routes, a client for readers, publishing one as a pack
 
 The CMS routes come in three groups:
 
-| Group        | Called by                                 | What it holds                                 |
-| ------------ | ----------------------------------------- | --------------------------------------------- |
-| `content`    | Anyone, or the identity `auth.read` names | Published pages, globals, items and images    |
-| `editing`    | Editors and their agents                  | Drafts, publishing, versions, reviews, search |
-| `invalidate` | Your app                                  | Refreshing pages that hold an id that changed |
+| Group        | Called by                                 | What it holds                                     |
+| ------------ | ----------------------------------------- | ------------------------------------------------- |
+| `content`    | Anyone, or the identity `auth.read` names | Published pages, globals, items and images        |
+| `editing`    | Editors and their agents                  | Drafts, publishing, versions, reviews, search     |
+| `invalidate` | Your app, and your other deployments      | Refreshing an id, a global or a page that changed |
 
 `GET /api/content/collections/employees` is the REST API, and every collection also serves `.../options`. Content routes are public, and `auth.read` on `cms()` makes every one of them, media included, require the identity it names.
 
@@ -49,7 +49,7 @@ fetchIds({
 
 ## Partners reading
 
-A partner reads with that client and a token from OAuth client credentials, signing in as the identity `auth.read` names. It may read the sites its `reads` names and the shared content, and a read of another site answers `403`, naming the permission it lacks, like `content.sites.norway:read`. A read with a token answers with `Cache-Control: private`. [Partners](/docs/cms/sites#partners) shows the config, the sign-in and how a partner hears a publish.
+A partner reads with that client and a token from OAuth client credentials, signing in as the identity `auth.read` names. It may read the sites its `reads` names and the shared content, and a read of another site answers `403`, naming the permission it lacks, like `content.sites.norway:read`. A token whose guard returns no `partner` reads every site. A read with a token answers with `Cache-Control: private`. [Partners](/docs/cms/sites#partners) shows the config, the sign-in and how a partner hears a publish.
 
 ## Content in the app API
 
@@ -74,7 +74,15 @@ Set `media.publicPath` to a full URL so image URLs are absolute.
 
 ## Talking to the app
 
-When your app changes a product, it calls `invalidate` with the brand's name and the id, `{ brand: 'ProductId', id }`, through the CMS client, as the identity `auth.invalidate` names. Every page that shows the product refreshes.
+When your app changes a product, it calls `invalidate` through the CMS client, with the credential `auth.invalidate` names. The body says what changed:
+
+| Body                         | Refreshes                                  |
+| ---------------------------- | ------------------------------------------ |
+| `{ brand: 'ProductId', id }` | The item, and every page that holds its id |
+| `{ global: 'settings' }`     | A global                                   |
+| `{ page: 'frontPage' }`      | A page                                     |
+
+With [sites](/docs/cms/sites#publishing), the CMS calls the same route on each of your deployments after a publish, signed with the `kizuna-cms-signature` header in place of that credential.
 
 ## A config of its own
 
