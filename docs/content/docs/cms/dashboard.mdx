@@ -46,7 +46,7 @@ Each review waiting names who asked for it and when. Until there is a number to 
 
 ## Numbers from your code
 
-A `stat` or `chart` gets its numbers from your function, which runs on your server when the dashboard opens. Revenue can come from Stripe and orders from your own database, since the CMS never needs to hold them. Each function receives `editor`, `plugins` and `period`.
+A `stat` or `chart` gets its numbers from your function, which runs on your server when the dashboard opens. Revenue can come from Stripe and orders from your own database, since the CMS never needs to hold them. Each function receives `editor`, `plugins`, `period` and, with [sites](#several-sites), `site`.
 
 ### The period
 
@@ -158,3 +158,105 @@ export async function salesPerDay({ period }: DashboardContext) {
 `auth` on a widget keeps it to some editors, written the way a [route's `auth`](/docs/access-control) is: `roles`, or `requires` for permissions. In the config above, editors never see revenue. The server checks it, so a widget's function never runs for someone who may not see it.
 
 The built-in widgets follow the editor's own [access](/docs/cms/editing/access): `collections` lists only what they may open, and `reviews` only what they were asked to look at.
+
+## Several sites
+
+With [sites](/docs/cms/sites) declared, each site has its own dashboard at its address in the admin, like `/admin/uk`. The `dashboard` list runs for the site open, and every stat and chart function receives that `site`: its key and the fields `declareSites()` gave it. Pass the sites to `DashboardContext` to type them:
+
+```ts title="src/dashboard.ts"
+export async function visits({ site, period }: DashboardContext<typeof sites>) {
+    const total = await countVisits(site.key, period.from, period.to);
+    const before = await countVisits(site.key, period.previous.from, period.previous.to);
+    return {
+        value: total,
+        change: (total - before) / before,
+    };
+}
+```
+
+`sites` on a stat or a chart shows it on some sites alone, the way it does on a field:
+
+```ts title="kizuna.config.ts"
+{
+    type: 'stat',
+    label: 'Workshop bookings',
+    value: workshopBookings,
+    sites: [
+        'uk',
+    ],
+},
+```
+
+On a site's dashboard, `reviews` lists what waits on you there, and `collections` lists the site's own collections before the shared ones.
+
+### The overview
+
+An admin over every site opens `/admin` on the overview, which compares the sites. List its widgets under `overview` on `cms()`:
+
+```ts title="kizuna.config.ts"
+content: cms({
+    sites,
+    dashboard,
+    overview: [
+        {
+            type: 'stat',
+            label: 'Sales across shops',
+            value: salesAcrossShops,
+        },
+        {
+            type: 'sites',
+            stats: [
+                {
+                    label: 'Visits',
+                    value: visits,
+                },
+                {
+                    label: 'Sales',
+                    value: sales,
+                    sites: [
+                        'uk',
+                        'norway',
+                    ],
+                },
+            ],
+            chart: {
+                label: 'Visits per day',
+                data: visitsPerDay,
+            },
+        },
+        {
+            type: 'reviews',
+        },
+        {
+            type: 'reach',
+        },
+    ],
+}),
+```
+
+A `stat` or `chart` in `overview` receives `sites`, every site, in place of one. A sum across sites is yours to write, since only your code knows how pounds and kroner add up:
+
+```ts title="src/dashboard.ts"
+export async function salesAcrossShops({ sites, period }: OverviewContext<typeof sites>) {
+    const totals = await Promise.all(sites.map((site) => kronerBetween(site.key, period.from, period.to)));
+    return formatKroner(totals.reduce((sum, total) => sum + total, 0));
+}
+```
+
+The `sites` widget draws a column per site. It runs the site dashboard's own functions once per site, so each number is written once. The first stat is drawn large over the chart, and the chart is drawn on one scale for every site. Under them, each column shows its reviews waiting, its last publish and its last refresh.
+
+The overview has widgets of its own, from what the CMS records:
+
+| `type`      | Shows                                                                                        |
+| ----------- | -------------------------------------------------------------------------------------------- |
+| `sites`     | The sites side by side, from the `stats` and the `chart` it names                            |
+| `reviews`   | Every review waiting, the shared ones first, then each site's                                |
+| `refreshes` | Each site's and partner's last refresh after a publish, and how many answered                |
+| `reach`     | Shared items by how many pages show them, on how many sites, with unpublished changes marked |
+| `editors`   | Each editor's changes this period, with their role and when they were last active            |
+
+Without `overview`, the overview shows `reviews`, `refreshes` and `reach`.
+
+Nobody else sees the overview, so an editor on one site never sees another site's numbers. An editor who opens `/admin` gets the shared content's `reviews` and `collections`, without stats or charts, since those count for one site.
+
+The `editors` widget names each person's site role from `sites` on what [`people.list`](/docs/cms/editing/reviews#people) returns, like `{ uk: 'editor' }`.

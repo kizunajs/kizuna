@@ -4,6 +4,7 @@ import { DEFAULT_SITE } from './options.js';
 import { formatRef, type DocumentRef } from './refs.js';
 import { documentLabel, peopleOf } from './reviews.js';
 import { cmsDocuments, cmsRefs, cmsVersions } from './storage/schema.js';
+import type { RefreshRecord } from './storage/store.js';
 import type { DashboardPeriod } from './dashboard.js';
 
 /**
@@ -17,39 +18,9 @@ const REACH_SHOWN = 6;
 const EDITORS_SHOWN = 8;
 
 /**
- * One refresh of a site or a partner after a publish, as the refresh jobs
- * record it.
+ * Every refresh that ran since `from`, oldest first.
  */
-export interface RefreshRecord {
-    /**
-     * The site's key or the partner's name.
-     */
-    target: string;
-    status: 'answered' | 'failed' | 'retrying';
-    attempts: number;
-    /**
-     * When it answered, or was last tried.
-     */
-    at: Date;
-}
-
-/**
- * Where the refresh jobs' answers are read from.
- */
-interface RefreshSource {
-    refreshesSince: (from: Date) => Promise<readonly RefreshRecord[]>;
-}
-
-/**
- * Every refresh since `from`, oldest first, or none while the store keeps no
- * refreshes.
- */
-export const refreshesSince = async (cms: CmsService, from: Date): Promise<RefreshRecord[]> => {
-    const source = cms.store as unknown as Partial<RefreshSource>;
-    if (typeof source.refreshesSince !== 'function') return [];
-    const records = await source.refreshesSince(from);
-    return [...records].sort((first, second) => first.at.getTime() - second.at.getTime());
-};
+export const refreshesSince = (cms: CmsService, from: Date): Promise<RefreshRecord[]> => cms.store.refreshesSince(from);
 
 /**
  * Each target's latest refresh, and how many of its refreshes answered.

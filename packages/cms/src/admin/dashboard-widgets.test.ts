@@ -6,10 +6,15 @@ import {
     isNewOf,
     periodOfSearch,
     rangeOf,
+    refreshWordsOf,
+    reviewGroupsOf,
+    roleOf,
     runsOf,
+    sharedScaleOf,
     tileColumnsOf,
     type DashboardCollection,
     type DashboardWidgetBody,
+    type SiteColumn,
 } from './dashboard-widgets.js';
 
 const revenue: DashboardWidgetBody = {
@@ -268,5 +273,116 @@ describe('isNewOf', () => {
                 },
             ])
         ).toBe(false);
+    });
+});
+
+const uk = {
+    key: 'uk',
+    label: 'Hagen UK',
+    icon: null,
+};
+
+const norway = {
+    key: 'norway',
+    label: 'Hagen Norge',
+    icon: null,
+};
+
+describe('the overview', () => {
+    it('gives the sites widget a row of its own', () => {
+        const sites: DashboardWidgetBody = {
+            type: 'sites',
+            chart: null,
+            sites: [],
+        };
+        expect(runsOf([revenue, sites, ordersPerDay]).map((run) => run.kind)).toEqual(['stats', 'sites', 'panels']);
+    });
+
+    it('groups the reviews by site, the shared ones first, leaving out a site nothing waits on', () => {
+        const groups = reviewGroupsOf(
+            [
+                {
+                    ref: 'page:uk:frontPage',
+                    label: 'Front page',
+                },
+                {
+                    ref: 'item:offices:london',
+                    label: 'Hagen London',
+                },
+            ],
+            [uk, norway]
+        );
+        expect(groups.map((group) => [group.site?.key, group.reviews.map((review) => review.label)])).toEqual([
+            [undefined, ['Hagen London']],
+            ['uk', ['Front page']],
+        ]);
+    });
+
+    it("names an editor's role over every site, on a site, or their own", () => {
+        expect(
+            roleOf({
+                roles: ['admin'],
+                sites: [],
+            })
+        ).toBe('Admin over every site');
+        expect(
+            roleOf({
+                roles: ['editor'],
+                sites: [
+                    {
+                        label: 'Hagen UK',
+                        roles: ['editor'],
+                    },
+                ],
+            })
+        ).toBe('Editor on Hagen UK');
+        expect(
+            roleOf({
+                roles: ['editor'],
+                sites: [],
+            })
+        ).toBe('Editor');
+    });
+
+    it('says whether a refresh answered, and which try a failing one is on', () => {
+        const at = new Date(2026, 9, 30, 9, 42).toISOString();
+        expect(
+            refreshWordsOf({
+                status: 'answered',
+                at,
+                attempts: 1,
+            })
+        ).toEqual({
+            text: 'Answered at 09:42',
+            wrong: false,
+        });
+        expect(
+            refreshWordsOf({
+                status: 'retrying',
+                at,
+                attempts: 3,
+            })
+        ).toEqual({
+            text: 'Did not answer',
+            detail: 'Retrying, 3rd try at 09:42',
+            wrong: true,
+        });
+    });
+
+    it("puts every site's chart on one scale", () => {
+        const column = (key: string, values: number[]): SiteColumn => ({
+            ...uk,
+            key,
+            url: 'https://hagen.example.co.uk',
+            stats: [],
+            chart: values.map((value) => ({
+                label: 'Mon',
+                value,
+            })),
+            waiting: 0,
+            lastPublish: null,
+            lastRefresh: null,
+        });
+        expect(sharedScaleOf([column('uk', [400, 600]), column('norway', [300])])).toEqual([400, 600, 300]);
     });
 });

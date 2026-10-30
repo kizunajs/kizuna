@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronRight, CircleAlert, Plus } from 'lucide-react';
+import { ChevronRight, CircleAlert, CircleCheck, Plus } from 'lucide-react';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
 import { Hint } from '../view/hint.js';
@@ -14,21 +14,38 @@ import {
     PERIODS,
     periodOfSearch,
     rangeOf,
+    refreshWordsOf,
+    reviewGroupsOf,
+    roleOf,
     runsOf,
+    sharedScaleOf,
     tileColumnsOf,
     type ChartWidgetBody,
     type DashboardPeriod,
+    type DashboardSiteName,
     type PeriodKey,
     type CollectionsWidgetBody,
+    type DashboardCollection,
     type DashboardWidgetBody,
+    type EditorsWidgetBody,
+    type PanelWidgetBody,
+    type ReachWidgetBody,
+    type RefreshesWidgetBody,
+    type RefreshState,
     type ReviewsWidgetBody,
+    type SiteColumn,
+    type SitesWidgetBody,
     type StatWidgetBody,
+    type WaitingReview,
 } from './dashboard-widgets.js';
 import { createItem } from './list.js';
-import { hrefOf, replaceQuery, screenOf, useAddress, type CollectionSummary } from './navigation.js';
+import { hrefOf, replaceQuery, screenOf, SHARED_GROUP, useAddress, type CollectionSummary } from './navigation.js';
 import { PageHeader } from './page-header.js';
 import { Loading, problemOf } from './parts.js';
 import { SelectMenu } from '../view/select-menu.js';
+import { Avatar } from '../view/people.js';
+import { SiteIcon } from './site-switcher.js';
+import { relativeTimeOf } from './time.js';
 
 export type { WaitingReview } from './dashboard-widgets.js';
 
@@ -52,18 +69,23 @@ const kindOf = (ref: string, collections: readonly CollectionSummary[]): string 
  * A number with its label, how far it moved since the period before, and a
  * line of detail under it.
  */
+function ChangeBadge({ change }: { change: number | undefined }) {
+    if (change === undefined) return null;
+    const shown = changeOf(change);
+    return (
+        <span className={`k-change k-change--${shown.direction}`}>
+            <span aria-hidden="true">{shown.text}</span>
+            <span className="k-visually-hidden">{shown.spoken}</span>
+        </span>
+    );
+}
+
 function StatTile({ widget }: { widget: StatWidgetBody }) {
-    const change = widget.change === undefined ? undefined : changeOf(widget.change);
     return (
         <div className="k-stat">
             <span className="k-stat__head">
                 <span className="k-stat__label">{widget.label}</span>
-                {change === undefined ? null : (
-                    <span className={`k-change k-change--${change.direction}`}>
-                        <span aria-hidden="true">{change.text}</span>
-                        <span className="k-visually-hidden">{change.spoken}</span>
-                    </span>
-                )}
+                <ChangeBadge change={widget.change} />
             </span>
             <strong className="k-stat__value">{widget.value}</strong>
             {widget.detail === undefined ? null : <span className="k-stat__detail">{widget.detail}</span>}
@@ -91,9 +113,51 @@ function ChartCard({ widget }: { widget: ChartWidgetBody }) {
     );
 }
 
-function ReviewsCard({ widget, collections }: { widget: ReviewsWidgetBody; collections: readonly CollectionSummary[] }) {
+function ReviewRow({ review, collections }: { review: WaitingReview; collections: readonly CollectionSummary[] }) {
+    const asked = askedOf(review);
     return (
-        <section className="k-waiting" aria-labelledby="k-admin-waiting">
+        <li>
+            <a
+                className="k-waiting__row"
+                href={hrefOf({
+                    kind: 'document',
+                    ref: review.ref,
+                })}>
+                <span className="k-ellipsis">{review.label}</span>
+                <span className="k-help k-ellipsis">
+                    {asked === undefined ? kindOf(review.ref, collections) : `${kindOf(review.ref, collections)} · ${asked}`}
+                </span>
+            </a>
+        </li>
+    );
+}
+
+/**
+ * A site's icon from a widget, or the shared content's for `undefined`.
+ */
+function WidgetSiteIcon({ site }: { site: DashboardSiteName | undefined }) {
+    return (
+        <SiteIcon
+            site={
+                site === undefined
+                    ? undefined
+                    : {
+                          ...site,
+                          pages: [],
+                          globals: [],
+                          collections: [],
+                      }
+            }
+        />
+    );
+}
+
+function ReviewsCard({ widget, collections }: { widget: ReviewsWidgetBody; collections: readonly CollectionSummary[] }) {
+    const groups = widget.sites === undefined ? undefined : reviewGroupsOf(widget.reviews, widget.sites);
+    return (
+        <section
+            className={groups === undefined ? 'k-waiting k-waiting--reviews' : 'k-waiting k-waiting--reviews k-waiting--grouped'}
+            aria-labelledby="k-admin-waiting">
             <div className="k-waiting__head">
                 <h2 id="k-admin-waiting" className="k-waiting__title">
                     Waiting for your review
@@ -102,25 +166,180 @@ function ReviewsCard({ widget, collections }: { widget: ReviewsWidgetBody; colle
             </div>
             {widget.reviews.length === 0 ? (
                 <p className="k-help">Nobody is waiting on you.</p>
-            ) : (
+            ) : groups === undefined ? (
                 <ul className="k-waiting__list">
-                    {widget.reviews.map((review) => {
-                        const asked = askedOf(review);
-                        return (
-                            <li key={review.ref}>
+                    {widget.reviews.map((review) => (
+                        <ReviewRow key={review.ref} review={review} collections={collections} />
+                    ))}
+                </ul>
+            ) : (
+                groups.map((group) => (
+                    <div key={group.site?.key ?? ''} className="k-waiting__group">
+                        <h3 className="k-group-head">
+                            <WidgetSiteIcon site={group.site} />
+                            <span className="k-heading">{group.site?.label ?? SHARED_GROUP}</span>
+                        </h3>
+                        <ul className="k-waiting__list">
+                            {group.reviews.map((review) => (
+                                <ReviewRow key={review.ref} review={review} collections={collections} />
+                            ))}
+                        </ul>
+                    </div>
+                ))
+            )}
+        </section>
+    );
+}
+
+function RefreshFact({ refresh }: { refresh: RefreshState | null }) {
+    if (refresh === null) return <span className="k-help">No refreshes yet</span>;
+    const words = refreshWordsOf(refresh);
+    const Icon = words.wrong ? CircleAlert : CircleCheck;
+    return (
+        <>
+            <span className={words.wrong ? 'k-signal k-signal--wrong' : 'k-signal'}>
+                <Icon {...ICON} size={14} aria-hidden="true" />
+                {words.text}
+            </span>
+            {words.detail === undefined ? null : <span className="k-help">{words.detail}</span>}
+        </>
+    );
+}
+
+const hostOf = (url: string): string => {
+    try {
+        return new URL(url).host;
+    } catch {
+        return url;
+    }
+};
+
+function SiteColumnView({ site, chart, domain }: { site: SiteColumn; chart: SitesWidgetBody['chart']; domain: readonly number[] }) {
+    const [lead, ...rest] = site.stats;
+    return (
+        <div className="k-site">
+            <h3 className="k-site__name">
+                <WidgetSiteIcon site={site} />
+                <span className="k-site__label k-ellipsis">{site.label}</span>
+                <span className="k-site__url k-ellipsis">{hostOf(site.url)}</span>
+            </h3>
+            {lead === undefined ? null : (
+                <div className="k-site__figure">
+                    <span className="k-stat__head">
+                        <span className="k-stat__label">{lead.label}</span>
+                        <ChangeBadge change={lead.change} />
+                    </span>
+                    <strong className="k-stat__value">{lead.value ?? 'Not counted'}</strong>
+                </div>
+            )}
+            {chart === null || site.chart === null ? null : site.chart.length === 0 ? (
+                <p className="k-help">No numbers yet.</p>
+            ) : (
+                <Chart label={`${chart.label}, ${site.label}`} style={chart.style} data={site.chart} domain={domain} height={140} />
+            )}
+            <dl className="k-facts">
+                {rest.map((stat) => (
+                    <div key={stat.label} className="k-facts__row">
+                        <dt>{stat.label}</dt>
+                        <dd>
+                            {stat.value === undefined ? (
+                                <span className="k-help">Not counted</span>
+                            ) : (
+                                <span className="k-signal">
+                                    {stat.value}
+                                    <ChangeBadge change={stat.change} />
+                                </span>
+                            )}
+                        </dd>
+                    </div>
+                ))}
+                <div className="k-facts__row">
+                    <dt>Waiting</dt>
+                    <dd>{site.waiting === 0 ? 'No reviews' : site.waiting === 1 ? '1 review' : `${WHOLE.format(site.waiting)} reviews`}</dd>
+                </div>
+                <div className="k-facts__row">
+                    <dt>Last publish</dt>
+                    <dd>
+                        {site.lastPublish === null ? (
+                            <span className="k-help">Nothing published yet</span>
+                        ) : (
+                            <>
                                 <a
-                                    className="k-waiting__row"
+                                    className="k-ellipsis k-facts__link"
                                     href={hrefOf({
                                         kind: 'document',
-                                        ref: review.ref,
+                                        ref: site.lastPublish.ref,
                                     })}>
-                                    <span className="k-ellipsis">{review.label}</span>
-                                    <span className="k-help k-ellipsis">
-                                        {asked === undefined
-                                            ? kindOf(review.ref, collections)
-                                            : `${kindOf(review.ref, collections)} · ${asked}`}
-                                    </span>
+                                    {site.lastPublish.label}
                                 </a>
+                                <span className="k-help">
+                                    {site.lastPublish.by === null
+                                        ? relativeTimeOf(site.lastPublish.at)
+                                        : `${site.lastPublish.by}, ${relativeTimeOf(site.lastPublish.at)}`}
+                                </span>
+                            </>
+                        )}
+                    </dd>
+                </div>
+                <div className="k-facts__row">
+                    <dt>Last refresh</dt>
+                    <dd>
+                        <RefreshFact refresh={site.lastRefresh} />
+                    </dd>
+                </div>
+            </dl>
+        </div>
+    );
+}
+
+/**
+ * The sites side by side, each chart on the scale every column shares.
+ */
+function SitesCard({ widget }: { widget: SitesWidgetBody }) {
+    const domain = sharedScaleOf(widget.sites);
+    return (
+        <section className="k-sites" aria-labelledby="k-admin-sites">
+            <h2 id="k-admin-sites" className="k-chart__title">
+                Sites
+            </h2>
+            <div className="k-sites__grid" data-count={Math.min(widget.sites.length, 3)}>
+                {widget.sites.map((site) => (
+                    <SiteColumnView key={site.key} site={site} chart={widget.chart} domain={domain} />
+                ))}
+            </div>
+        </section>
+    );
+}
+
+function RefreshesCard({ widget }: { widget: RefreshesWidgetBody }) {
+    return (
+        <section className="k-waiting" aria-labelledby="k-admin-refreshes">
+            <h2 id="k-admin-refreshes" className="k-waiting__title">
+                Refreshes
+            </h2>
+            {widget.targets.length === 0 ? (
+                <p className="k-help">No refreshes yet.</p>
+            ) : (
+                <ul className="k-refresh__list">
+                    {widget.targets.map((target) => {
+                        const words = target.last === null ? undefined : refreshWordsOf(target.last);
+                        const Icon = words?.wrong === true ? CircleAlert : CircleCheck;
+                        return (
+                            <li
+                                key={target.key}
+                                className={words?.wrong === true ? 'k-refresh__row k-refresh__row--wrong' : 'k-refresh__row'}>
+                                <Icon {...ICON} aria-hidden="true" />
+                                <span className="k-refresh__who">
+                                    <span className="k-ellipsis">{target.label}</span>
+                                    <span className="k-help">{target.kind === 'site' ? 'Site' : 'Partner'}</span>
+                                </span>
+                                <span className="k-refresh__when">
+                                    {words === undefined ? null : <span>{words.text}</span>}
+                                    {words?.detail === undefined ? null : <span className="k-help">{words.detail}</span>}
+                                    <span className="k-help">
+                                        {target.answered} of {target.total} this period
+                                    </span>
+                                </span>
                             </li>
                         );
                     })}
@@ -128,6 +347,137 @@ function ReviewsCard({ widget, collections }: { widget: ReviewsWidgetBody; colle
             )}
         </section>
     );
+}
+
+/**
+ * A bar from the row's own value, as a share of the largest.
+ */
+function RankBar({ value, most }: { value: number; most: number }) {
+    return (
+        <span className="k-ranked__track" aria-hidden="true">
+            <span
+                className="k-ranked__bar"
+                style={{
+                    width: `${most === 0 ? 0 : (value / most) * 100}%`,
+                }}
+            />
+        </span>
+    );
+}
+
+function ReachCard({ widget }: { widget: ReachWidgetBody }) {
+    const most = Math.max(0, ...widget.items.map((item) => item.pages));
+    return (
+        <section className="k-waiting k-reach" aria-labelledby="k-admin-reach">
+            <h2 id="k-admin-reach" className="k-waiting__title">
+                Shared content by reach
+            </h2>
+            {widget.items.length === 0 ? (
+                <p className="k-help">No page shows shared content yet.</p>
+            ) : (
+                <>
+                    <div className="k-columns-head" aria-hidden="true">
+                        <span />
+                        <span className="k-columns-head__span">Pages</span>
+                        <span>Sites</span>
+                    </div>
+                    <ul className="k-ranked">
+                        {widget.items.map((item) => (
+                            <li key={item.ref}>
+                                <a
+                                    className="k-ranked__row"
+                                    href={hrefOf({
+                                        kind: 'document',
+                                        ref: item.ref,
+                                    })}>
+                                    <span className="k-ranked__name">
+                                        <span className="k-ellipsis">{item.label}</span>
+                                        <span className="k-help k-ellipsis">
+                                            {item.changed ? `${item.kind} · Unpublished changes` : item.kind}
+                                        </span>
+                                    </span>
+                                    <RankBar value={item.pages} most={most} />
+                                    <span className="k-ranked__value">
+                                        {WHOLE.format(item.pages)}
+                                        <span className="k-visually-hidden"> pages</span>
+                                    </span>
+                                    <span className="k-ranked__sites">
+                                        {item.sites} of {widget.sites}
+                                        <span className="k-visually-hidden"> sites</span>
+                                    </span>
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            )}
+        </section>
+    );
+}
+
+function EditorsCard({ widget }: { widget: EditorsWidgetBody }) {
+    const most = Math.max(0, ...widget.editors.map((editor) => editor.changes));
+    return (
+        <section className="k-waiting k-editors" aria-labelledby="k-admin-editors">
+            <span className="k-chart__heading">
+                <h2 id="k-admin-editors" className="k-waiting__title">
+                    Editors
+                </h2>
+                <span className="k-chart__description">
+                    {widget.changes === 1 ? '1 change' : `${WHOLE.format(widget.changes)} changes`} this period,{' '}
+                    {WHOLE.format(widget.published)} published
+                </span>
+            </span>
+            {widget.editors.length === 0 ? (
+                <p className="k-help">Nobody changed anything this period.</p>
+            ) : (
+                <>
+                    <div className="k-columns-head" aria-hidden="true">
+                        <span />
+                        <span />
+                        <span className="k-columns-head__span">Changes</span>
+                        <span>Last active</span>
+                    </div>
+                    <ul className="k-ranked">
+                        {widget.editors.map((editor) => (
+                            <li key={editor.id} className="k-ranked__row">
+                                <Avatar
+                                    person={{
+                                        id: editor.id,
+                                        name: editor.name,
+                                        ...(editor.image === undefined
+                                            ? {}
+                                            : {
+                                                  image: editor.image,
+                                              }),
+                                    }}
+                                    size={26}
+                                />
+                                <span className="k-ranked__name">
+                                    <span className="k-ellipsis">{editor.name}</span>
+                                    <span className="k-help k-ellipsis">{roleOf(editor)}</span>
+                                </span>
+                                <RankBar value={editor.changes} most={most} />
+                                <span className="k-ranked__value">
+                                    {WHOLE.format(editor.changes)}
+                                    <span className="k-visually-hidden"> changes</span>
+                                </span>
+                                <span className="k-ranked__when">{relativeTimeOf(editor.lastActive)}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            )}
+        </section>
+    );
+}
+
+function Panel({ widget, collections }: { widget: PanelWidgetBody; collections: readonly CollectionSummary[] }) {
+    if (widget.type === 'chart') return <ChartCard widget={widget} />;
+    if (widget.type === 'reviews') return <ReviewsCard widget={widget} collections={collections} />;
+    if (widget.type === 'refreshes') return <RefreshesCard widget={widget} />;
+    if (widget.type === 'reach') return <ReachCard widget={widget} />;
+    return <EditorsCard widget={widget} />;
 }
 
 /**
@@ -145,48 +495,88 @@ function CollectionCards({
 }) {
     const collections = groupsOf(widget.collections).flatMap((group) => group.collections);
     if (collections.length === 0) return <p className="k-help">There are no collections for you to open.</p>;
+    const own = collections.filter((collection) => collection.site !== undefined && collection.site !== null);
+    const sections =
+        own.length === 0
+            ? [
+                  {
+                      heading: 'Collections',
+                      collections,
+                  },
+              ]
+            : [
+                  {
+                      heading: own[0]!.site!.label,
+                      collections: own,
+                  },
+                  {
+                      heading: SHARED_GROUP,
+                      collections: collections.filter((collection) => !own.includes(collection)),
+                  },
+              ];
     return (
-        <section className="k-collections" aria-labelledby="k-admin-collections">
-            <h2 id="k-admin-collections" className="k-heading">
-                Collections
-            </h2>
-            <div className="k-collections__grid">
-                {collections.map((collection) => (
-                    <div key={`${collection.kind}:${collection.name}`} className="k-card">
-                        <a
-                            className="k-card__link"
-                            href={hrefOf({
-                                kind: collection.kind,
-                                name: collection.name,
-                            })}>
-                            <span className="k-card__text">
-                                <span className="k-card__name k-ellipsis">{collection.label}</span>
-                                <span className="k-card__count">
-                                    {collection.count === null
-                                        ? 'View'
-                                        : `${WHOLE.format(collection.count)} ${collection.label.toLowerCase()}`}
-                                </span>
-                            </span>
-                            {collection.kind === 'collection' ? null : (
-                                <ChevronRight {...ICON} className="k-card__chevron" aria-hidden="true" />
-                            )}
-                        </a>
-                        {collection.kind === 'collection' ? (
-                            <Hint label={`Add to ${collection.label}`}>
-                                <button
-                                    type="button"
-                                    className="k-icon-button k-card__add"
-                                    aria-label={`Add to ${collection.label}`}
-                                    disabled={creating !== undefined}
-                                    onClick={() => onCreate(collection.name)}>
-                                    <Plus {...ICON} />
-                                </button>
-                            </Hint>
-                        ) : null}
-                    </div>
+        <>
+            {sections
+                .filter((section) => section.collections.length > 0)
+                .map((section) => (
+                    <section key={section.heading} className="k-collections" aria-label={section.heading}>
+                        <h2 className="k-heading">{section.heading}</h2>
+                        <div className="k-collections__grid">
+                            {section.collections.map((collection) => (
+                                <CollectionCard
+                                    key={`${collection.kind}:${collection.name}`}
+                                    collection={collection}
+                                    creating={creating}
+                                    onCreate={onCreate}
+                                />
+                            ))}
+                        </div>
+                    </section>
                 ))}
-            </div>
-        </section>
+        </>
+    );
+}
+
+function CollectionCard({
+    collection,
+    creating,
+    onCreate,
+}: {
+    collection: DashboardCollection;
+    creating: string | undefined;
+    onCreate: (name: string) => void;
+}) {
+    // A site's own collection is added to from its list, which knows the site.
+    const addable = collection.kind === 'collection' && (collection.site === undefined || collection.site === null);
+    return (
+        <div className="k-card">
+            <a
+                className="k-card__link"
+                href={hrefOf({
+                    kind: collection.kind,
+                    name: collection.name,
+                })}>
+                <span className="k-card__text">
+                    <span className="k-card__name k-ellipsis">{collection.label}</span>
+                    <span className="k-card__count">
+                        {collection.count === null ? 'View' : `${WHOLE.format(collection.count)} ${collection.label.toLowerCase()}`}
+                    </span>
+                </span>
+                {addable ? null : <ChevronRight {...ICON} className="k-card__chevron" aria-hidden="true" />}
+            </a>
+            {addable ? (
+                <Hint label={`Add to ${collection.label}`}>
+                    <button
+                        type="button"
+                        className="k-icon-button k-card__add"
+                        aria-label={`Add to ${collection.label}`}
+                        disabled={creating !== undefined}
+                        onClick={() => onCreate(collection.name)}>
+                        <Plus {...ICON} />
+                    </button>
+                </Hint>
+            ) : null}
+        </div>
     );
 }
 
@@ -321,16 +711,13 @@ export function Dashboard({
             if (run.kind === 'panels') {
                 return (
                     <div key={index} className="k-dashboard__panels">
-                        {run.widgets.map((widget, position) =>
-                            widget.type === 'chart' ? (
-                                <ChartCard key={position} widget={widget} />
-                            ) : (
-                                <ReviewsCard key={position} widget={widget} collections={collections ?? []} />
-                            )
-                        )}
+                        {run.widgets.map((widget, position) => (
+                            <Panel key={position} widget={widget} collections={collections ?? []} />
+                        ))}
                     </div>
                 );
             }
+            if (run.kind === 'sites') return <SitesCard key={index} widget={run.widget} />;
             return (
                 <div key={index} className="k-dashboard__groups">
                     {problem === undefined ? null : (

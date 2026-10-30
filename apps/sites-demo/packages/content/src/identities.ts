@@ -15,7 +15,10 @@ const EditorRoleSchema = z.enum(['editor', 'admin']);
  */
 export const EditorSitesSchema = z.record(z.string(), EditorRoleSchema);
 
-const readSites = (stored: unknown): z.output<typeof EditorSitesSchema> => {
+/**
+ * The roles stored on a user, by site.
+ */
+export const readSites = (stored: unknown): z.output<typeof EditorSitesSchema> => {
     try {
         const parsed = EditorSitesSchema.safeParse(JSON.parse(String(stored)));
         return parsed.success ? parsed.data : {};

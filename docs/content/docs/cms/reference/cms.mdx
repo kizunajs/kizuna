@@ -18,6 +18,7 @@ content: cms({
     relationships,
     views,
     dashboard,
+    overview,
     auth,
     reviews,
     media,
@@ -50,7 +51,8 @@ content: cms({
 | `collections`   | `defineCollection` results, the shared content every site reads                                                                                                        |
 | `relationships` | `defineRelationship` results                                                                                                                                           |
 | `views`         | `defineView` results: data the CMS shows but does not store                                                                                                            |
-| `dashboard`     | The admin's first page: `stat`, `chart`, `reviews` and `collections` widgets                                                                                           |
+| `dashboard`     | The admin's first page: `stat`, `chart`, `reviews` and `collections` widgets, run for the site open                                                                    |
+| `overview`      | The sites compared, for an admin over every site: `stat`, `chart`, `sites`, `reviews`, `refreshes`, `reach`, `editors` and `collections` widgets                       |
 | `auth`          | `identity`, `roles`, `sites`, `read`, `publish`, `people`, `invalidate`, `signIn`, `signOut`, `chatToken`. `read` names the identity every content route then requires |
 | `reviews`       | `roles` that may approve, `onReviewRequested`                                                                                                                          |
 | `media`         | S3 settings or a `storage`, `publicPath`, `maxBytes`                                                                                                                   |

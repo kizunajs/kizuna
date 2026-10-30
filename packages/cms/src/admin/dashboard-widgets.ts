@@ -1,4 +1,5 @@
 import type { ChartBar } from './chart-geometry.js';
+import { parseRef } from '../refs.js';
 import { CONTENT_GROUP } from './navigation.js';
 import { relativeTimeOf } from './time.js';
 
@@ -146,9 +147,22 @@ export interface ChartWidgetBody {
     data: ChartBar[];
 }
 
+/**
+ * A site as a dashboard widget names it.
+ */
+export interface DashboardSiteName {
+    key: string;
+    label: string;
+    icon: string | null;
+}
+
 export interface ReviewsWidgetBody {
     type: 'reviews';
     reviews: WaitingReview[];
+    /**
+     * On the overview, every site, which the reviews are grouped by.
+     */
+    sites?: DashboardSiteName[];
 }
 
 export interface DashboardCollection {
@@ -157,6 +171,14 @@ export interface DashboardCollection {
     label: string;
     group: string | null;
     count: number | null;
+    /**
+     * The site a collection of its own belongs to, or `null` for a shared
+     * one, on a site's dashboard.
+     */
+    site?: {
+        key: string;
+        label: string;
+    } | null;
 }
 
 export interface CollectionsWidgetBody {
@@ -165,9 +187,105 @@ export interface CollectionsWidgetBody {
 }
 
 /**
+ * A site's latest refresh after a publish.
+ */
+export interface RefreshState {
+    status: 'answered' | 'failed' | 'retrying';
+    at: string;
+    attempts: number;
+}
+
+export interface SiteColumn extends DashboardSiteName {
+    url: string;
+    stats: Array<{
+        label: string;
+        /**
+         * Absent on a site the stat leaves out.
+         */
+        value?: string;
+        detail?: string;
+        change?: number;
+    }>;
+    chart: ChartBar[] | null;
+    waiting: number;
+    lastPublish: {
+        ref: string;
+        label: string;
+        by: string | null;
+        at: string;
+    } | null;
+    lastRefresh: RefreshState | null;
+}
+
+export interface SitesWidgetBody {
+    type: 'sites';
+    chart: {
+        label: string;
+        style: 'bar' | 'line';
+    } | null;
+    sites: SiteColumn[];
+}
+
+export interface RefreshesWidgetBody {
+    type: 'refreshes';
+    targets: Array<{
+        key: string;
+        label: string;
+        kind: 'site' | 'partner';
+        last: RefreshState | null;
+        answered: number;
+        total: number;
+    }>;
+}
+
+export interface ReachWidgetBody {
+    type: 'reach';
+    sites: number;
+    items: Array<{
+        ref: string;
+        label: string;
+        kind: string;
+        pages: number;
+        sites: number;
+        changed: boolean;
+    }>;
+}
+
+export interface EditorsWidgetBody {
+    type: 'editors';
+    changes: number;
+    published: number;
+    editors: Array<{
+        id: string;
+        name: string;
+        image?: string;
+        roles: string[];
+        sites: Array<{
+            label: string;
+            roles: string[];
+        }>;
+        changes: number;
+        lastActive: string;
+    }>;
+}
+
+/**
  * One widget as `GET /editing/dashboard` sends it.
  */
-export type DashboardWidgetBody = StatWidgetBody | ChartWidgetBody | ReviewsWidgetBody | CollectionsWidgetBody;
+export type DashboardWidgetBody =
+    | StatWidgetBody
+    | ChartWidgetBody
+    | ReviewsWidgetBody
+    | CollectionsWidgetBody
+    | SitesWidgetBody
+    | RefreshesWidgetBody
+    | ReachWidgetBody
+    | EditorsWidgetBody;
+
+/**
+ * A widget drawn as a panel, two to a row.
+ */
+export type PanelWidgetBody = ChartWidgetBody | ReviewsWidgetBody | RefreshesWidgetBody | ReachWidgetBody | EditorsWidgetBody;
 
 /**
  * Widgets that sit together on the dashboard: stats in a row of tiles,
@@ -180,11 +298,15 @@ export type WidgetRun =
       }
     | {
           kind: 'panels';
-          widgets: (ChartWidgetBody | ReviewsWidgetBody)[];
+          widgets: PanelWidgetBody[];
       }
     | {
           kind: 'collections';
           widget: CollectionsWidgetBody;
+      }
+    | {
+          kind: 'sites';
+          widget: SitesWidgetBody;
       };
 
 /**
@@ -198,6 +320,11 @@ export const runsOf = (widgets: readonly DashboardWidgetBody[]): WidgetRun[] => 
         if (widget.type === 'collections') {
             runs.push({
                 kind: 'collections',
+                widget,
+            });
+        } else if (widget.type === 'sites') {
+            runs.push({
+                kind: 'sites',
                 widget,
             });
         } else if (widget.type === 'stat') {
@@ -274,7 +401,10 @@ export const changeOf = (change: number): { text: string; spoken: string; direct
  * no review waiting. It then welcomes the editor and leaves out the period.
  */
 export const isNewOf = (widgets: readonly DashboardWidgetBody[]): boolean =>
-    widgets.every((widget) => widget.type === 'collections' || (widget.type === 'reviews' && widget.reviews.length === 0));
+    widgets.every(
+        (widget) =>
+            widget.type === 'collections' || (widget.type === 'reviews' && widget.reviews.length === 0 && widget.sites === undefined)
+    );
 
 /**
  * The most columns the dashboard's grid has.
@@ -291,3 +421,78 @@ export const tileColumnsOf = (tiles: number): number => {
     if (tiles <= MOST_COLUMNS) return tiles;
     return Math.ceil(tiles / Math.ceil(tiles / MOST_COLUMNS));
 };
+
+/**
+ * The reviews under the site each belongs to: the shared ones first, then
+ * each site in order, leaving out a site nothing waits on.
+ */
+export const reviewGroupsOf = (
+    reviews: readonly WaitingReview[],
+    sites: readonly DashboardSiteName[]
+): Array<{ site: DashboardSiteName | undefined; reviews: WaitingReview[] }> => {
+    const siteOf = (ref: string): string | undefined => parseRef(ref)?.site;
+    return [
+        {
+            site: undefined,
+            reviews: reviews.filter((review) => siteOf(review.ref) === undefined),
+        },
+        ...sites.map((site) => ({
+            site,
+            reviews: reviews.filter((review) => siteOf(review.ref) === site.key),
+        })),
+    ].filter((group) => group.reviews.length > 0);
+};
+
+const capitalized = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
+
+/**
+ * An editor's role as the editors widget names it: "Admin over every site",
+ * "Editor on Hagen UK", or their own role.
+ */
+export const roleOf = (editor: { roles: readonly string[]; sites: ReadonlyArray<{ label: string; roles: readonly string[] }> }): string => {
+    if (editor.roles.includes('admin')) return 'Admin over every site';
+    if (editor.sites.length > 0) {
+        return editor.sites.map((site) => `${site.roles.map(capitalized).join(' and ')} on ${site.label}`).join(', ');
+    }
+    return editor.roles.map(capitalized).join(' and ');
+};
+
+const ORDINALS = new Intl.PluralRules('en-GB', {
+    type: 'ordinal',
+});
+
+const SUFFIXES: Record<string, string> = {
+    one: 'st',
+    two: 'nd',
+    few: 'rd',
+    other: 'th',
+};
+
+/**
+ * A refresh as the dashboard says it: "Answered at 09:42", or "Did not
+ * answer" with the try it is on.
+ */
+export const refreshWordsOf = (refresh: RefreshState): { text: string; detail?: string; wrong: boolean } => {
+    const clock = CLOCK.format(new Date(refresh.at));
+    if (refresh.status === 'answered') {
+        return {
+            text: `Answered at ${clock}`,
+            wrong: false,
+        };
+    }
+    const tried = `${refresh.attempts}${SUFFIXES[ORDINALS.select(refresh.attempts)] ?? 'th'} try at ${clock}`;
+    return {
+        text: 'Did not answer',
+        detail: refresh.status === 'retrying' ? `Retrying, ${tried}` : `Gave up after the ${tried}`,
+        wrong: true,
+    };
+};
+
+/**
+ * Every value the sites' charts draw, so each column's axis covers the
+ * others' and the charts share one scale.
+ */
+export const sharedScaleOf = (sites: readonly SiteColumn[]): number[] =>
+    sites.flatMap((site) =>
+        (site.chart ?? []).flatMap((point) => [point.value, ...(point.previous === undefined ? [] : [point.previous])])
+    );

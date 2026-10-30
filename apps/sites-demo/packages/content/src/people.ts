@@ -2,6 +2,7 @@ import { inArray } from 'drizzle-orm';
 import type { Person } from '@kizunajs/cms';
 import { db } from './db';
 import { user } from './auth/schema';
+import { readSites } from './identities';
 
 /**
  * Everyone who may edit, read from better-auth's users. The id is the email,
@@ -17,6 +18,7 @@ export const editors = async (): Promise<Person[]> => {
         name: row.name,
         email: row.email,
         roles: [row.role],
+        sites: readSites(row.sites),
         ...(row.image === null
             ? {}
             : {

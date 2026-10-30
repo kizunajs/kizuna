@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { z } from 'zod';
@@ -15,7 +15,8 @@ import { declareSites, SiteSchema } from './site.js';
 import { DocumentStore } from './storage/store.js';
 import type { CmsExports } from './setup.js';
 import type { DashboardContext, OverviewContext } from './dashboard.js';
-import type { RefreshRecord } from './dashboard-data.js';
+import type { RefreshRecord } from './storage/store.js';
+import { heldJobs } from './held-jobs.fixture.js';
 
 const k = new Kizuna();
 const roles = Kizuna.roles(['editor', 'admin']);
@@ -142,6 +143,7 @@ const pglite = new PGlite();
 const db = drizzle(pglite);
 const config = defineConfig({
     adapter: expressAdapter(),
+    jobRunner: heldJobs,
     auth: {
         identities: {
             editor,
@@ -286,7 +288,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
     await pglite.exec(
-        'delete from cms_review_comments; delete from cms_reviews; delete from cms_refs; delete from cms_versions; delete from cms_documents;'
+        'delete from cms_refreshes; delete from cms_review_comments; delete from cms_reviews; delete from cms_refs; delete from cms_versions; delete from cms_documents;'
     );
     visitCalls.length = 0;
 });
@@ -551,12 +553,12 @@ describe('the overview', () => {
         ]);
     });
 
-    it('has no refreshes until the store records some', async () => {
+    it('has no refreshes until one ran', async () => {
         const refreshes = (await dashboardOf(grace)).find((widget) => widget.type === 'refreshes')!;
         expect(refreshes.targets).toEqual([]);
     });
 
-    it("names each site's and partner's last refresh, once the store records them", async () => {
+    it("names each site's and partner's last refresh", async () => {
         const now = Date.now();
         const records: RefreshRecord[] = [
             {
@@ -584,8 +586,9 @@ describe('the overview', () => {
                 at: new Date(now - 60_000),
             },
         ];
-        const store = service.store as unknown as { refreshesSince?: (from: Date) => Promise<RefreshRecord[]> };
-        store.refreshesSince = async (from) => records.filter((record) => record.at >= from);
+        const ran = vi
+            .spyOn(service.store, 'refreshesSince')
+            .mockImplementation(async (from) => records.filter((record) => record.at >= from));
         try {
             const widgets = await dashboardOf(grace);
             expect(widgets.find((widget) => widget.type === 'refreshes')!.targets).toEqual([
@@ -633,7 +636,7 @@ describe('the overview', () => {
                 attempts: 3,
             });
         } finally {
-            delete store.refreshesSince;
+            ran.mockRestore();
         }
     });
 });
@@ -642,6 +645,9 @@ describe('declaring dashboards with sites', () => {
     const assemble = (options: Pick<Parameters<typeof cms>[0], 'dashboard' | 'overview' | 'sites'>) =>
         defineConfig({
             adapter: expressAdapter(),
+            jobRunner: {
+                mode: 'in-process',
+            },
             auth: {
                 identities: {
                     editor,

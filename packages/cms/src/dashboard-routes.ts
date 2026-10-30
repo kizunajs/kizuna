@@ -13,7 +13,8 @@ import { WaitingReviewsSchema } from './wire.js';
 import { parseRef } from './refs.js';
 import { siteIconOf } from './admin/route.js';
 import { DEFAULT_SITE } from './options.js';
-import { editorsOf, lastPublishes, reachOf, refreshesSince, refreshSummaries, type RefreshRecord } from './dashboard-data.js';
+import { editorsOf, lastPublishes, reachOf, refreshesSince, refreshSummaries } from './dashboard-data.js';
+import type { RefreshRecord } from './storage/store.js';
 import {
     DashboardPeriodKeySchema,
     DEFAULT_DASHBOARD,

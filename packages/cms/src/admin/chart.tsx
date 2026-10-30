@@ -87,19 +87,36 @@ export function Legend({ style }: { style: 'bar' | 'line' }) {
  * its label, value and the value before, and a screen reader gets the summary
  * and a table.
  */
-export function Chart({ label, style, data }: { label: string; style: 'bar' | 'line'; data: readonly ChartBar[] }) {
+export function Chart({
+    label,
+    style,
+    data,
+    domain = [],
+    height = HEIGHT,
+}: {
+    label: string;
+    style: 'bar' | 'line';
+    data: readonly ChartBar[];
+    /**
+     * Values the axis covers besides the chart's own, so charts side by side
+     * share one scale.
+     */
+    domain?: readonly number[];
+    height?: number;
+}) {
     const frame = useRef<HTMLDivElement>(null);
     const width = useWidth(frame, 560);
     const [active, setActive] = useState<number | undefined>();
 
     const compares = data.some((point) => point.previous !== undefined);
     const scale = scaleOf([
+        ...domain,
         ...data.map((point) => point.value),
         ...data.flatMap((point) => (point.previous === undefined ? [] : [point.previous])),
     ]);
     const tickLabels = scale.ticks.map((tick) => COMPACT.format(tick));
     const left = Math.max(AXIS_WIDTH, Math.max(...tickLabels.map((tickLabel) => tickLabel.length)) * TICK_CHARACTER + TICK_GAP * 2);
-    const bottom = HEIGHT - AXIS_SPACE;
+    const bottom = height - AXIS_SPACE;
     const plot = {
         left,
         right: width,
@@ -150,7 +167,7 @@ export function Chart({ label, style, data }: { label: string; style: 'bar' | 'l
                 <svg
                     className="k-chart__plot"
                     width={width}
-                    height={HEIGHT}
+                    height={height}
                     role="img"
                     aria-label={chartSummary(label, data, (value) => WHOLE.format(value), style === 'line' ? 'point' : 'bar')}
                     tabIndex={0}

@@ -11,6 +11,7 @@ import { db } from './src/db';
 import { editors } from './src/people';
 import { localMediaStorage } from './src/media-storage';
 import { auth } from './src/auth';
+import { dashboard, overview } from './src/dashboard';
 
 /**
  * The site this deployment shows. The setup script names none, and reads as the group.
@@ -32,12 +33,17 @@ export default defineConfig({
             editor,
         },
     },
+    jobRunner: {
+        mode: 'in-process',
+    },
     content: cms({
         name: 'Hagen',
         db,
         collections: [Employees, Offices],
         globals: [PrivacyPolicy],
         sites,
+        dashboard,
+        overview,
         site: () => process.env.KIZUNA_SITE,
         auth: {
             identity: 'editor',
