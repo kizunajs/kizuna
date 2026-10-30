@@ -1,4 +1,7 @@
 export { Header, type HeaderLink } from './Header';
-export { Footer } from './Footer';
+export { Footer, type FooterLink } from './Footer';
+export { PageIntro } from './PageIntro';
+export { Prose } from './Prose';
 export { OfficeCard, type Office } from './OfficeCard';
+export { OfficeList } from './OfficeList';
 export { EventList, type Event } from './EventList';

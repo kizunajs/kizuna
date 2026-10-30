@@ -33,7 +33,7 @@ export const sites = declareSites(Site, {
         url: process.env.KIZUNA_NORWAY_URL ?? 'http://norway.localhost:3042',
         icon: '/icons/norway.svg',
         pages: countryPages,
-        // TODO(sites): `locales: ['nb']`, once declareSites() takes a literal list. Today `const` reads it as a readonly tuple, which fails SiteSchema's `string[]` and widens every site's pages.
+        locales: ['nb', 'en'],
         companyName: 'Hagen Norge AS',
     },
 });

@@ -1,0 +1,27 @@
+.footer {
+    background-color: var(--forest);
+    color: var(--forest-ink);
+    font-size: 0.9375rem;
+}
+
+.inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px 40px;
+    width: var(--page);
+    margin-inline: auto;
+    padding-block: 56px 64px;
+}
+
+.company {
+    font-family: var(--serif);
+    font-size: var(--display-s);
+}
+
+.links {
+    display: flex;
+    gap: 28px;
+    color: var(--forest-muted);
+}

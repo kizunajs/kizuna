@@ -1,3 +1,5 @@
+import styles from './EventList.module.css';
+
 export interface Event {
     id: string;
     title: string;
@@ -11,6 +13,7 @@ const dateFormat = new Intl.DateTimeFormat('en-GB', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
+    timeZone: 'UTC',
 });
 
 /**
@@ -18,15 +21,18 @@ const dateFormat = new Intl.DateTimeFormat('en-GB', {
  */
 export function EventList({ events }: { events: Event[] }) {
     return (
-        <ol>
+        <ol className={styles.list}>
             {events.map((event) => (
-                <li key={event.id}>
-                    <h2>{event.title}</h2>
-                    <p>
-                        {dateFormat.format(new Date(event.date))}, {event.time}
-                        {event.price === undefined ? null : `, ${event.price}`}
+                <li key={event.id} className={styles.event}>
+                    <p className={styles.when}>
+                        <span className={styles.day}>{dateFormat.format(new Date(event.date))}</span>
+                        <span>{event.time}</span>
+                        {event.price === undefined ? null : <span>{event.price}</span>}
                     </p>
-                    <p>{event.summary}</p>
+                    <div className={styles.body}>
+                        <h2 className={styles.title}>{event.title}</h2>
+                        <p className={styles.summary}>{event.summary}</p>
+                    </div>
                 </li>
             ))}
         </ol>

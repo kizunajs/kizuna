@@ -1,4 +1,6 @@
 import kizuna from '@kizunajs-demo/sites-content/config';
+import { PageIntro } from '@kizunajs-demo/sites-ui';
+import styles from './page.module.css';
 
 export const metadata = {
     title: 'People',
@@ -15,21 +17,25 @@ export default async function TeamPage() {
     });
     return (
         <main>
-            <h1>The people at Hagen</h1>
-            {offices.map((office) => (
-                <section key={office.id}>
-                    <h2>{office.name}</h2>
-                    <ul>
-                        {employees
-                            .filter((employee) => employee.office === office.id)
-                            .map((employee) => (
-                                <li key={employee.id}>
-                                    <strong>{employee.name}</strong>, {employee.role}
-                                </li>
-                            ))}
-                    </ul>
-                </section>
-            ))}
+            <PageIntro eyebrow="People" heading="The people at Hagen" text="Six of us across three shops, sharing one plant care desk." />
+            <div className={styles.offices}>
+                {offices.map((office) => (
+                    <section key={office.id} className={styles.office}>
+                        <h2 className={styles.city}>{office.city}</h2>
+                        <ul className={styles.people}>
+                            {employees
+                                .filter((employee) => employee.office === office.id)
+                                .map((employee) => (
+                                    <li key={employee.id} className={styles.person}>
+                                        <h3 className={styles.name}>{employee.name}</h3>
+                                        <p className={styles.role}>{employee.role}</p>
+                                        {employee.bio === undefined ? null : <p className={styles.bio}>{employee.bio}</p>}
+                                    </li>
+                                ))}
+                        </ul>
+                    </section>
+                ))}
+            </div>
         </main>
     );
 }

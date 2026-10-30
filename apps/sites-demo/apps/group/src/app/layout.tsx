@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { KizunaPreview } from '@kizunajs/cms/next';
 import kizuna from '@kizunajs-demo/sites-content/config';
+import { sites } from '@kizunajs-demo/sites-content';
 import { Footer, Header } from '@kizunajs-demo/sites-ui';
+import '@kizunajs-demo/sites-ui/globals.css';
 
 export async function generateMetadata(): Promise<Metadata> {
     const site = await kizuna.content.site.get();
@@ -40,7 +42,23 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     ]}
                 />
                 {children}
-                <Footer companyName={site.companyName} />
+                <Footer
+                    companyName={site.companyName}
+                    links={[
+                        {
+                            label: sites.values.uk.label,
+                            href: sites.values.uk.url,
+                        },
+                        {
+                            label: sites.values.norway.label,
+                            href: sites.values.norway.url,
+                        },
+                        {
+                            label: 'Privacy policy',
+                            href: '/privacy',
+                        },
+                    ]}
+                />
                 <KizunaPreview content={kizuna.content} />
             </body>
         </html>

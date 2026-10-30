@@ -1,22 +1,28 @@
+import styles from './OfficeCard.module.css';
+
 export interface Office {
     name: string;
+    city: string;
     address: string;
     phone: string;
     openingHours?: string | undefined;
 }
 
 /**
- * One shop: where it is, and how to reach it.
+ * One shop: its city, where it is, and how to reach it.
  */
 export function OfficeCard({ office }: { office: Office }) {
     return (
-        <section>
-            <h2>{office.name}</h2>
-            <p>{office.address}</p>
-            <p>
-                <a href={`tel:${office.phone.replace(/\s/g, '')}`}>{office.phone}</a>
-            </p>
-            {office.openingHours === undefined ? null : <p>{office.openingHours}</p>}
+        <section className={styles.office}>
+            <p className={styles.city}>{office.city}</p>
+            <h2 className={styles.name}>{office.name}</h2>
+            <div className={styles.details}>
+                <p>{office.address}</p>
+                {office.openingHours === undefined ? null : <p>{office.openingHours}</p>}
+                <a className={styles.phone} href={`tel:${office.phone.replace(/\s/g, '')}`}>
+                    {office.phone}
+                </a>
+            </div>
         </section>
     );
 }

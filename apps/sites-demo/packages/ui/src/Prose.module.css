@@ -1,0 +1,6 @@
+.prose {
+    display: grid;
+    gap: 20px;
+    max-width: var(--narrow);
+    font-size: 1.0625rem;
+}

@@ -1,13 +1,16 @@
 import kizuna from '@kizunajs-demo/sites-content/config';
+import { PageIntro, Prose } from '@kizunajs-demo/sites-ui';
+
+export const metadata = {
+    title: 'About',
+};
 
 export default async function AboutPage() {
     const page = await kizuna.content.of(['group']).pages.aboutPage.get();
     return (
         <main>
-            <h1>{page.heading}</h1>
-            {page.body.split(/\n\s*\n/).map((paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
-            ))}
+            <PageIntro eyebrow="About" heading={page.heading} />
+            <Prose text={page.body} />
         </main>
     );
 }

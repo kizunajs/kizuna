@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import kizuna from '@kizunajs-demo/sites-content/config';
-import { EventList } from '@kizunajs-demo/sites-ui';
+import { EventList, PageIntro } from '@kizunajs-demo/sites-ui';
 
 export const metadata = {
     title: 'Events',
@@ -16,8 +16,7 @@ export default async function EventsPage() {
     });
     return (
         <main>
-            <h1>{page.heading}</h1>
-            {page.intro === undefined ? null : <p>{page.intro}</p>}
+            <PageIntro eyebrow="Events" heading={page.heading} text={page.intro} />
             <EventList events={events} />
         </main>
     );

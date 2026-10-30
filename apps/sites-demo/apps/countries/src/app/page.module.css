@@ -1,0 +1,18 @@
+.sections {
+    display: grid;
+    gap: var(--section);
+}
+
+.section {
+    display: grid;
+    gap: 48px;
+}
+
+.heading {
+    font-size: var(--display-m);
+}
+
+.more {
+    justify-self: start;
+    font-weight: 600;
+}

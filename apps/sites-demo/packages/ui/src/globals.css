@@ -1,0 +1,131 @@
+/*
+ * The tokens and resets every Hagen site shares. Each component styles itself
+ * in a module beside it. Nothing sits in a box: whitespace, the type scale and
+ * full-width green bands make the structure.
+ */
+@font-face {
+    font-family: 'Plus Jakarta Sans';
+    src: url('./fonts/plus-jakarta-sans-latin.woff2') format('woff2');
+    font-weight: 200 800;
+    font-display: swap;
+}
+
+:root {
+    --paper: #f7f8f6;
+    --ink: #13201a;
+    --ink-muted: #4a5750;
+    --ink-faint: #858f89;
+
+    --forest: #1c3a2a;
+    --forest-ink: #eef3ec;
+    --forest-muted: #a6bea9;
+    --sage: #c5d5c1;
+
+    --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    --sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+
+    --display-l: clamp(2.5rem, 5.4vw, 4.75rem);
+    --display-m: clamp(1.875rem, 3.3vw, 3rem);
+    --display-s: clamp(1.25rem, 1.7vw, 1.625rem);
+
+    --max: 1180px;
+    --narrow: 680px;
+    --gutter: 40px;
+    --page: min(100% - 2 * var(--gutter), var(--max));
+    --section: 128px;
+
+    color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --paper: #171818;
+        --ink: #eceeeb;
+        --ink-muted: #a4aaa6;
+        --ink-faint: #6e7471;
+
+        --forest: #1f412f;
+        --forest-ink: #edf3eb;
+        --forest-muted: #9cb7a0;
+        --sage: #9fb69c;
+
+        color-scheme: dark;
+    }
+}
+
+@media (max-width: 767px) {
+    :root {
+        --gutter: 16px;
+        --section: 88px;
+    }
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    margin: 0;
+    background-color: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+main {
+    flex: 1;
+    width: var(--page);
+    margin-inline: auto;
+    padding-block: 72px var(--section);
+}
+
+img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+
+a {
+    color: inherit;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+}
+
+:where(h1, h2, h3) {
+    margin: 0;
+    font-family: var(--serif);
+    font-weight: 400;
+    line-height: 1.06;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+}
+
+:where(p) {
+    margin: 0;
+}
+
+:where(p, li) {
+    text-wrap: pretty;
+}
+
+:where(ul, ol) {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+}

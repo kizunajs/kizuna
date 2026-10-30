@@ -1,0 +1,46 @@
+.offices {
+    display: grid;
+    gap: 88px;
+}
+
+.office {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 9fr);
+    gap: 24px var(--gutter);
+}
+
+.city {
+    font-size: var(--display-m);
+}
+
+.people {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 40px var(--gutter);
+}
+
+.person {
+    display: grid;
+    align-content: start;
+    gap: 6px;
+}
+
+.name {
+    font-size: var(--display-s);
+}
+
+.role {
+    color: var(--ink-faint);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.bio {
+    color: var(--ink-muted);
+}
+
+@media (max-width: 767px) {
+    .office {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
