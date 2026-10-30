@@ -125,6 +125,7 @@
     "@portabletext/editor": "^8.2.3",
     "@portabletext/react": "^8.0.1",
     "@portabletext/types": "^4.0.2",
+    "@tanstack/charts": "^1.1.0",
     "@vercel/stega": "^1.1.0",
     "lucide-react": "^1.14.0",
     "sharp": "^0.35.5"
