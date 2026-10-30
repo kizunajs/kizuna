@@ -403,6 +403,14 @@ export namespace API {
              * The current draft value.
              */
             value?: unknown;
+            /**
+             * Whose value this is, when the CMS serves several sites: 'Shared', or the label of the site that sets it.
+             */
+            belongsTo?: string;
+            /**
+             * The shared value, which the site shows while it sets none of its own.
+             */
+            sharedValue?: unknown;
         };
 
         export type FieldCondition = {
@@ -463,6 +471,10 @@ export namespace API {
             };
             uploadedAt: string;
             uploadedBy: string;
+            /**
+             * The site the image belongs to. Left out for a shared image, which any site may show.
+             */
+            site?: string;
         };
 
         export type MediaList = {
@@ -500,6 +512,10 @@ export namespace API {
             };
             uploadedAt: string;
             uploadedBy: string;
+            /**
+             * The site the image belongs to. Left out for a shared image, which any site may show.
+             */
+            site?: string;
             /**
              * How many pages, globals and items hold it, published or in a draft.
              */
@@ -2452,7 +2468,8 @@ export namespace API {
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
-            | { status: 403; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
     }
 
     export namespace EditingMediaGet {
@@ -2509,7 +2526,7 @@ export namespace API {
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
-            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
@@ -2524,7 +2541,7 @@ export namespace API {
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
-            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
     }
 
@@ -2537,6 +2554,7 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
             | { status: 422; body: ValidationError; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
@@ -2552,6 +2570,7 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
             | { status: 422; body: ValidationError; headers: Record<string, string> };
     }
 
@@ -3832,6 +3851,8 @@ export interface Client {
             /**
              * List uploaded media, with how many pages hold each image
              *
+             * With `site`, that site's own images beside the shared ones, each own image naming its site.
+             *
              * @example
              * const result = await client.editing.media.list();
              */
@@ -4868,6 +4889,7 @@ const routes: GeneratedRoutes = {
                     200: {},
                     401: {},
                     403: {},
+                    404: {},
                 },
             },
             get: {
@@ -4928,6 +4950,7 @@ const routes: GeneratedRoutes = {
                     201: {},
                     401: {},
                     403: {},
+                    404: {},
                     422: {},
                     400: {},
                 },
@@ -4939,6 +4962,7 @@ const routes: GeneratedRoutes = {
                     201: {},
                     401: {},
                     403: {},
+                    404: {},
                     422: {},
                 },
             },

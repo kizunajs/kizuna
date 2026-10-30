@@ -2162,6 +2162,14 @@ routes:
                     optional: true
                     schema:
                       kind: unknown
+                  belongsTo:
+                    optional: true
+                    schema:
+                      kind: string
+                  sharedValue:
+                    optional: true
+                    schema:
+                      kind: unknown
           layout:
             optional: false
             schema:
@@ -8927,6 +8935,7 @@ routes:
       - 200
       - 401
       - 403
+      - 404
     deprecated: false
     responses:
       "200":
@@ -8992,6 +9001,10 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                  site:
+                    optional: true
+                    schema:
+                      kind: string
                   uses:
                     optional: false
                     schema:
@@ -9020,6 +9033,25 @@ routes:
             schema:
               kind: string
       "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
         kind: object
         fields:
           type:
@@ -9109,6 +9141,10 @@ routes:
               kind: string
           uploadedBy:
             optional: false
+            schema:
+              kind: string
+          site:
+            optional: true
             schema:
               kind: string
       "401":
@@ -9445,6 +9481,10 @@ routes:
             optional: false
             schema:
               kind: string
+          site:
+            optional: true
+            schema:
+              kind: string
       "401":
         kind: object
         fields:
@@ -9465,24 +9505,7 @@ routes:
             schema:
               kind: string
       "403":
-        kind: object
-        fields:
-          type:
-            optional: false
-            schema:
-              kind: string
-          title:
-            optional: false
-            schema:
-              kind: string
-          status:
-            optional: false
-            schema:
-              kind: number
-          detail:
-            optional: false
-            schema:
-              kind: string
+        kind: union
       "404":
         kind: object
         fields:
@@ -9541,24 +9564,7 @@ routes:
             schema:
               kind: string
       "403":
-        kind: object
-        fields:
-          type:
-            optional: false
-            schema:
-              kind: string
-          title:
-            optional: false
-            schema:
-              kind: string
-          status:
-            optional: false
-            schema:
-              kind: number
-          detail:
-            optional: false
-            schema:
-              kind: string
+        kind: union
       "404":
         kind: object
         fields:
@@ -9585,6 +9591,7 @@ routes:
       - 201
       - 401
       - 403
+      - 404
       - 422
     deprecated: false
     body:
@@ -9660,6 +9667,25 @@ routes:
             optional: false
             schema:
               kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "422":
         kind: object
         fields:
@@ -9707,6 +9733,7 @@ routes:
       - 201
       - 401
       - 403
+      - 404
       - 422
     deprecated: false
     params:
@@ -9773,6 +9800,10 @@ routes:
             optional: false
             schema:
               kind: string
+          site:
+            optional: true
+            schema:
+              kind: string
       "401":
         kind: object
         fields:
@@ -9793,6 +9824,25 @@ routes:
             schema:
               kind: string
       "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
         kind: object
         fields:
           type:
@@ -10393,6 +10443,14 @@ routes:
                     optional: true
                     schema:
                       kind: unknown
+                  belongsTo:
+                    optional: true
+                    schema:
+                      kind: string
+                  sharedValue:
+                    optional: true
+                    schema:
+                      kind: unknown
           layout:
             optional: false
             schema:
@@ -10705,6 +10763,14 @@ routes:
                     schema:
                       kind: record
                   value:
+                    optional: true
+                    schema:
+                      kind: unknown
+                  belongsTo:
+                    optional: true
+                    schema:
+                      kind: string
+                  sharedValue:
                     optional: true
                     schema:
                       kind: unknown
@@ -11073,6 +11139,14 @@ routes:
                     schema:
                       kind: record
                   value:
+                    optional: true
+                    schema:
+                      kind: unknown
+                  belongsTo:
+                    optional: true
+                    schema:
+                      kind: string
+                  sharedValue:
                     optional: true
                     schema:
                       kind: unknown
