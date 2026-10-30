@@ -44,6 +44,26 @@ const documentsOf = (options: CmsPluginOptions): ContentDocument[] => [
             migration: latestMigration(definition),
         })
     ),
+    ...Object.entries(options.sites?.entries ?? {}).flatMap(([site, entry]) => [
+        ...(entry.globals ?? []).map(
+            (definition): ContentDocument => ({
+                ref: `global:${site}:${definition.name}`,
+                kind: 'global',
+                name: definition.name,
+                schema: definition.schema,
+                migration: latestMigration(definition),
+            })
+        ),
+        ...(entry.collections ?? []).map(
+            (definition): ContentDocument => ({
+                ref: `collection:${site}:${definition.name}`,
+                kind: 'collection',
+                name: definition.name,
+                schema: definition.schema,
+                migration: latestMigration(definition),
+            })
+        ),
+    ]),
 ];
 
 /**

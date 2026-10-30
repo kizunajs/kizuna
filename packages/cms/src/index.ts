@@ -79,7 +79,16 @@ export { type ConditionValue, type FieldCondition } from './condition.js';
 export { isImageSchema, type ImageRef, type ResolvedImage } from './image.js';
 export { type Output, type Resolved } from './output.js';
 export { cms } from './provider.js';
-export { SiteSchema, declareSites, isDeclaredSites, type DeclaredSites, type SiteContent, type SiteValues } from './site.js';
+export {
+    SiteSchema,
+    declareSites,
+    isDeclaredSites,
+    type DeclaredSites,
+    type SiteContent,
+    type SiteEntriesOf,
+    type SiteFieldsOf,
+    type SiteValues,
+} from './site.js';
 export { type CmsExports, type CmsSetup } from './setup.js';
 export { type CmsRoutes } from './routes.js';
 export {
@@ -94,6 +103,9 @@ export {
     type CmsContent,
     type CmsReader,
     type CmsSiteReader,
+    type CmsSiteView,
+    type CmsSiteViews,
+    type CmsSitesContent,
     type CmsPages,
     type CmsGlobals,
     type CmsCollections,

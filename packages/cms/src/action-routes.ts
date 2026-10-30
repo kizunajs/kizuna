@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { DocumentRef } from './refs.js';
 import type { RouteAuth } from 'kizunajs';
 import { route } from 'kizunajs/plugin';
 import { ProblemDetailsSchema } from 'kizunajs/schemas';
@@ -110,16 +111,12 @@ export const handlerContext = (cms: CmsService, args: EditingArgs) => {
 export const itemActions = async (
     cms: CmsService,
     collection: Collection,
-    id: string,
+    ref: DocumentRef,
     caller: Caller
 ): Promise<z.output<typeof AvailableActionSchema>[]> => {
     const actions = resolveActions(collection.actions);
     if (actions.length === 0) return [];
-    const published = await cms.published({
-        type: 'item',
-        collection: collection.name,
-        id,
-    });
+    const published = await cms.published(ref);
     return availableActions(actions, published?.content, caller);
 };
 

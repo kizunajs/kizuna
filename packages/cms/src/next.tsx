@@ -74,7 +74,7 @@ export function RichText(props: RichTextProps) {
 
 export interface KizunaPreviewProps {
     /**
-     * `kizuna.content`, or one of its `sites` when several apps share the CMS.
+     * `kizuna.content`, or a view `kizuna.content.of()` returns.
      */
     content: unknown;
 }

@@ -117,9 +117,11 @@ export const pageCacheTag = (name: string, site = DEFAULT_SITE): string =>
 export const documentCacheTag = (ref: DocumentRef): string => `kizuna-cms:${formatRef(ref)}`;
 
 /**
- * The cache tag every list of a collection carries.
+ * The cache tag every list of a collection carries, a site's own collection
+ * under its site.
  */
-export const collectionCacheTag = (name: string): string => `kizuna-cms:collection:${name}`;
+export const collectionCacheTag = (name: string, site = DEFAULT_SITE): string =>
+    site === DEFAULT_SITE ? `kizuna-cms:collection:${name}` : `kizuna-cms:collection:${site}:${name}`;
 
 /**
  * The draft's entity tag: its version and when it was last saved, so a save
@@ -248,7 +250,8 @@ export interface Target {
     ref: DocumentRef;
     kind: Exclude<DocumentKind, 'media'>;
     /**
-     * The site a page belongs to; the default site for everything else.
+     * The site a page or a site's own document belongs to; the default site
+     * for shared content.
      */
     site: string;
     key: string;
@@ -316,6 +319,11 @@ export const previewPathOf = (
  */
 export interface Listing {
     name: string;
+    /**
+     * The site its items are stored under: the default site for a shared
+     * collection, the site for a site's own.
+     */
+    site: string;
     keyPrefix: string;
     definition: Collection;
     /**
@@ -404,8 +412,22 @@ export class CmsService {
      * Every site's pages, keyed by site name.
      */
     readonly sites: Record<string, PageMap>;
+    /**
+     * The shared globals.
+     */
     readonly globals: Record<string, Global>;
+    /**
+     * The shared collections.
+     */
     readonly collections: Record<string, Collection>;
+    /**
+     * Each site's own globals, keyed by site and then by name.
+     */
+    readonly siteGlobals: Record<string, Record<string, Global>>;
+    /**
+     * Each site's own collections, keyed by site and then by name.
+     */
+    readonly siteCollections: Record<string, Record<string, Collection>>;
     readonly identity: string;
     readonly roles: readonly string[] | undefined;
     readonly basePath: '' | `/${string}`;
@@ -428,6 +450,19 @@ export class CmsService {
         this.pages = this.sites[DEFAULT_SITE] ?? {};
         this.globals = Object.fromEntries((options.globals ?? []).map((definition) => [definition.name, definition]));
         this.collections = Object.fromEntries((options.collections ?? []).map((definition) => [definition.name, definition]));
+        const siteEntries = Object.entries(options.sites?.entries ?? {});
+        this.siteGlobals = Object.fromEntries(
+            siteEntries.map(([site, entry]) => [
+                site,
+                Object.fromEntries((entry.globals ?? []).map((definition) => [definition.name, definition])),
+            ])
+        );
+        this.siteCollections = Object.fromEntries(
+            siteEntries.map(([site, entry]) => [
+                site,
+                Object.fromEntries((entry.collections ?? []).map((definition) => [definition.name, definition])),
+            ])
+        );
         this.identity = options.auth.identity;
         this.roles =
             options.auth.roles === undefined
@@ -460,18 +495,35 @@ export class CmsService {
         return Object.values(this.sites[site] ?? {}).find((entry) => entry.path === path && !servesCollection(entry.page));
     }
 
-    collection(name: string): Collection {
-        const found = this.collections[name];
-        if (found === undefined) throw new CmsHttpError(404, { detail: `There is no collection named '${name}'.` });
+    /**
+     * A shared collection, or with a site, that site's own.
+     */
+    collection(name: string, site = DEFAULT_SITE): Collection {
+        const found = site === DEFAULT_SITE ? this.collections[name] : this.siteCollections[site]?.[name];
+        if (found === undefined) {
+            throw new CmsHttpError(404, {
+                detail:
+                    site === DEFAULT_SITE
+                        ? `There is no collection named '${name}'.`
+                        : `The ${site} site has no collection of its own named '${name}'.`,
+            });
+        }
         return found;
     }
 
-    listing(name: string): Listing {
-        const definition = this.collection(name);
-        const routes = Object.entries(this.sites).flatMap(([site, pages]) => routesOf(definition.name, pages, site));
+    /**
+     * A shared collection resolved, or with a site, that site's own.
+     */
+    listing(name: string, site = DEFAULT_SITE): Listing {
+        const definition = this.collection(name, site);
+        const routes =
+            site === DEFAULT_SITE
+                ? Object.entries(this.sites).flatMap(([pagesSite, pages]) => routesOf(definition.name, pages, pagesSite))
+                : routesOf(definition.name, this.sites[site] ?? {}, site);
         const pathFields = [...new Set(routes.flatMap((route) => route.params))];
         return {
             name: definition.name,
+            site,
             keyPrefix: `${definition.name}/`,
             definition,
             indexes: [...new Set([...pathFields, ...(definition.indexes ?? [])])],
@@ -482,16 +534,46 @@ export class CmsService {
                 type: 'item',
                 collection: definition.name,
                 id,
+                ...(site === DEFAULT_SITE
+                    ? {}
+                    : {
+                          site,
+                      }),
             }),
         };
     }
 
+    /**
+     * The collection a site's page shows: the site's own when it has one by
+     * that name, the shared one otherwise.
+     */
+    servedListing(name: string, site: string): Listing {
+        return this.listing(name, this.siteCollections[site]?.[name] === undefined ? DEFAULT_SITE : site);
+    }
+
+    /**
+     * Every shared collection, and every site's own.
+     */
     listings(): Listing[] {
-        return Object.keys(this.collections).map((name) => this.listing(name));
+        return [
+            ...Object.keys(this.collections).map((name) => this.listing(name)),
+            ...Object.entries(this.siteCollections).flatMap(([site, collections]) =>
+                Object.keys(collections).map((name) => this.listing(name, site))
+            ),
+        ];
     }
 
     listingOf(ref: DocumentRef): Listing | undefined {
-        return ref.type === 'item' ? this.listing(ref.collection) : undefined;
+        return ref.type === 'item' ? this.listing(ref.collection, ref.site) : undefined;
+    }
+
+    /**
+     * The listing items stored under a site and a collection belong to, if
+     * the config still declares it.
+     */
+    private storedListing(collection: string, site: string): Listing | undefined {
+        const declared = site === DEFAULT_SITE ? this.collections[collection] : this.siteCollections[site]?.[collection];
+        return declared === undefined ? undefined : this.listing(collection, site);
     }
 
     addressOf(target: Target, content: Record<string, unknown> | null | undefined): string | undefined {
@@ -502,11 +584,17 @@ export class CmsService {
      * The id of the item whose address fields hold these values, read from
      * the draft or the published copy.
      */
-    async findItem(collection: string, params: Record<string, string>, copy: 'draft' | 'published'): Promise<string | undefined> {
-        const listing = this.listing(collection);
+    async findItem(
+        collection: string,
+        params: Record<string, string>,
+        copy: 'draft' | 'published',
+        site = DEFAULT_SITE
+    ): Promise<string | undefined> {
+        const listing = this.listing(collection, site);
         const result = await this.store.query({
             kind: 'item',
             keyPrefix: listing.keyPrefix,
+            site: listing.site,
             copy,
             where: Object.entries(params).map(([field, value]) => ({
                 field,
@@ -540,15 +628,11 @@ export class CmsService {
             if (!servesCollection(entry.page)) continue;
             const params = matchPath(entry.path, path);
             if (params === undefined) continue;
-            const collection = entry.page.collection.name;
-            const id = (await this.findItem(collection, params, 'draft')) ?? (await this.findItem(collection, params, 'published'));
-            if (id !== undefined) {
-                return {
-                    type: 'item',
-                    collection,
-                    id,
-                };
-            }
+            const listing = this.servedListing(entry.page.collection.name, site);
+            const id =
+                (await this.findItem(listing.name, params, 'draft', listing.site)) ??
+                (await this.findItem(listing.name, params, 'published', listing.site));
+            if (id !== undefined) return listing.refOf(id);
         }
         return undefined;
     }
@@ -576,21 +660,29 @@ export class CmsService {
             };
         }
         if (ref.type === 'global') {
-            const found = this.globals[ref.name];
-            if (found === undefined) throw new CmsHttpError(404, { detail: `There is no global named '${ref.name}'.` });
+            const site = ref.site ?? DEFAULT_SITE;
+            const found = site === DEFAULT_SITE ? this.globals[ref.name] : this.siteGlobals[site]?.[ref.name];
+            if (found === undefined) {
+                throw new CmsHttpError(404, {
+                    detail:
+                        site === DEFAULT_SITE
+                            ? `There is no global named '${ref.name}'.`
+                            : `The ${site} site has no global of its own named '${ref.name}'.`,
+                });
+            }
             return {
                 ref,
                 kind: 'global',
-                site: DEFAULT_SITE,
+                site,
                 key: ref.name,
                 definition: found,
             };
         }
-        const listing = this.listing(ref.collection);
+        const listing = this.listing(ref.collection, ref.site);
         return {
             ref,
             kind: 'item',
-            site: DEFAULT_SITE,
+            site: listing.site,
             key: `${listing.keyPrefix}${ref.id}`,
             definition: listing.definition,
             ...(listing.routes[0] === undefined
@@ -826,8 +918,8 @@ export class CmsService {
                     });
                     continue;
                 }
-                const listing = this.listing(entry.page.collection.name);
-                for (const row of await this.store.list('item')) {
+                const listing = this.servedListing(entry.page.collection.name, site);
+                for (const row of await this.store.list('item', listing.site)) {
                     if (!row.key.startsWith(listing.keyPrefix)) continue;
                     shown.push({
                         name,
@@ -937,12 +1029,14 @@ export class CmsService {
             direction?: 'asc' | 'desc';
             limit?: number;
             cursor?: string;
-        }
+        },
+        site = DEFAULT_SITE
     ): Promise<{ items: Array<Record<string, unknown>>; next: string | undefined }> {
-        const listing = this.listing(name);
+        const listing = this.listing(name, site);
         const result = await this.store.query({
             kind: 'item',
             keyPrefix: listing.keyPrefix,
+            site: listing.site,
             copy: query.draft ? 'draft' : 'published',
             where: Object.entries(query.where ?? {}).map(([field, value]) => ({
                 ...this.indexOf(listing, field),
@@ -993,7 +1087,7 @@ export class CmsService {
      * Every collection, with what editors call it and how many items it holds.
      */
     async collectionSummaries(): Promise<Array<{ name: string; label: string; count: number }>> {
-        const rows = await this.store.list('item');
+        const rows = await this.store.list('item', DEFAULT_SITE);
         return Object.values(this.collections).map((definition) => {
             const listing = this.listing(definition.name);
             return {
@@ -1012,8 +1106,8 @@ export class CmsService {
     /**
      * Every item of a collection as editors list it, by title.
      */
-    async editorItems(name: string): Promise<EditorItem[]> {
-        return (await this.editorList(name, {})).items;
+    async editorItems(name: string, site = DEFAULT_SITE): Promise<EditorItem[]> {
+        return (await this.editorList(name, {}, site)).items;
     }
 
     /**
@@ -1030,8 +1124,8 @@ export class CmsService {
      * each with its status and, when a page shows it, its address, and how
      * many match in all.
      */
-    async editorList(name: string, query: ItemListQuery): Promise<{ items: EditorItem[]; total: number }> {
-        const listing = this.listing(name);
+    async editorList(name: string, query: ItemListQuery, site = DEFAULT_SITE): Promise<{ items: EditorItem[]; total: number }> {
+        const listing = this.listing(name, site);
         const definition = listing.definition;
         const labelField = labelFieldOf(definition);
         const columns = this.listColumnsOf(listing);
@@ -1048,6 +1142,7 @@ export class CmsService {
         const result = await this.store.editingQuery({
             kind: 'item',
             keyPrefix: listing.keyPrefix,
+            site: listing.site,
             groups,
             ...(query.search === undefined || query.search.trim() === ''
                 ? {}
@@ -1165,7 +1260,7 @@ export class CmsService {
         const list = readDef(unwrapOptionalWrappers(schema).inner).type === 'array';
         if (nested) {
             const brand = brandOf(schema);
-            const held = brand === undefined ? undefined : this.listingFor(brand);
+            const held = brand === undefined ? undefined : this.listingFor(brand, listing.site);
             if (held?.definition.tree === undefined) {
                 throw new CmsHttpError(400, {
                     detail: `The ${condition.field} field holds no ids of a collection with a tree, so nothing sits under '${condition.value}'.`,
@@ -1206,7 +1301,7 @@ export class CmsService {
         const labelField = labelFieldOf(listing.definition);
         const parents = new Map<string, string | undefined>();
         const items: Array<{ id: string; label: string }> = [];
-        for (const stored of await this.store.list('item')) {
+        for (const stored of await this.store.list('item', listing.site)) {
             if (!stored.key.startsWith(listing.keyPrefix)) continue;
             const id = stored.key.slice(listing.keyPrefix.length);
             const row = this.migrated(this.target(listing.refOf(id)), stored)!;
@@ -1287,7 +1382,7 @@ export class CmsService {
             const placements = owned.definition.tree === undefined ? undefined : await this.treePlacements(owned);
             const labelField = labelFieldOf(owned.definition);
             for (const id of ids) {
-                const stored = await this.store.get('item', `${owned.keyPrefix}${id}`);
+                const stored = await this.store.get('item', `${owned.keyPrefix}${id}`, owned.site);
                 if (stored === undefined) continue;
                 const row = this.migrated(this.target(owned.refOf(id)), stored)!;
                 named.set(id, placements?.get(id)?.treeLabel ?? itemLabelOf(row.draft ?? row.published ?? {}, labelField));
@@ -1312,8 +1407,14 @@ export class CmsService {
     /**
      * A new item of a collection, as a draft with the values given.
      */
-    async createItem(name: string, values: Record<string, unknown>, caller: Caller, author: string): Promise<DraftState> {
-        const listing = this.listing(name);
+    async createItem(
+        name: string,
+        values: Record<string, unknown>,
+        caller: Caller,
+        author: string,
+        site = DEFAULT_SITE
+    ): Promise<DraftState> {
+        const listing = this.listing(name, site);
         const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
         const id = Array.from(randomBytes(12), (byte) => alphabet[byte % alphabet.length]).join('');
         const ref = listing.refOf(id);
@@ -1321,6 +1422,7 @@ export class CmsService {
             await this.store.saveDraft({
                 kind: 'item',
                 key: this.target(ref).key,
+                site: listing.site,
                 draft: {},
                 author,
                 summary: 'Created',
@@ -1341,11 +1443,11 @@ export class CmsService {
         });
     }
 
-    async deleteItem(name: string, id: string): Promise<void> {
-        const listing = this.listing(name);
+    async deleteItem(name: string, id: string, site = DEFAULT_SITE): Promise<void> {
+        const listing = this.listing(name, site);
         const ref = listing.refOf(id);
         const target = this.target(ref);
-        if (!(await this.store.delete('item', target.key))) {
+        if (!(await this.store.delete('item', target.key, target.site))) {
             throw new CmsHttpError(404, { detail: `There is no item '${id}' in '${listing.name}'.` });
         }
         await this.revalidateDocument(ref);
@@ -1375,8 +1477,9 @@ export class CmsService {
      * The collection whose ids carry a brand, so a reference to one of its
      * items needs no relationship.
      */
-    listingFor(brand: string): Listing | undefined {
-        return this.listings().find((candidate) => candidate.brand === brand);
+    listingFor(brand: string, site = DEFAULT_SITE): Listing | undefined {
+        const found = this.listings().filter((candidate) => candidate.brand === brand);
+        return found.find((candidate) => candidate.site === site) ?? found[0];
     }
 
     /**
@@ -1446,7 +1549,7 @@ export class CmsService {
     ): Promise<Array<RelationshipOption & { parent?: string | null; treeLabel?: string }>> {
         const owned = this.listingFor(brand);
         if (owned !== undefined) {
-            const items = await this.editorItems(owned.name);
+            const items = await this.editorItems(owned.name, owned.site);
             const term = (input.query ?? '').toLowerCase();
             return items
                 .filter((item) =>
@@ -1775,6 +1878,7 @@ export class CmsService {
                 const found = await this.store.query({
                     kind: 'item',
                     keyPrefix: listing.keyPrefix,
+                    site: listing.site,
                     copy,
                     where: route.params.map((field, index) => ({
                         field,
@@ -1919,9 +2023,9 @@ export class CmsService {
             }
             // An item holding the id shows it on every page that serves the item.
             if (row.kind !== 'item') continue;
-            const collection = row.key.slice(0, row.key.indexOf('/'));
-            if (this.collections[collection] === undefined) continue;
-            for (const route of this.listing(collection).routes) {
+            const listing = this.storedListing(row.key.slice(0, row.key.indexOf('/')), row.site);
+            if (listing === undefined) continue;
+            for (const route of listing.routes) {
                 used.push({
                     name: route.page,
                     site: route.site,
@@ -2017,17 +2121,24 @@ export class CmsService {
             });
         }
         for (const row of await this.store.list('global')) {
-            if (this.globals[row.key] === undefined) continue;
+            const declared = row.site === DEFAULT_SITE ? this.globals[row.key] : this.siteGlobals[row.site]?.[row.key];
+            if (declared === undefined) continue;
             found.push({
                 target: this.target({
                     type: 'global',
                     name: row.key,
+                    ...(row.site === DEFAULT_SITE
+                        ? {}
+                        : {
+                              site: row.site,
+                          }),
                 }),
                 row,
             });
         }
+        const listings = this.listings();
         for (const row of await this.store.list('item')) {
-            const listing = this.listings().find((candidate) => row.key.startsWith(candidate.keyPrefix));
+            const listing = listings.find((candidate) => candidate.site === row.site && row.key.startsWith(candidate.keyPrefix));
             if (listing === undefined) continue;
             found.push({
                 target: this.target(listing.refOf(row.key.slice(listing.keyPrefix.length))),
@@ -2172,7 +2283,7 @@ export class CmsService {
      */
     async revalidateDocument(ref: DocumentRef): Promise<void> {
         const tags = ref.type === 'page' ? [pageCacheTag(ref.name, ref.site)] : [documentCacheTag(ref)];
-        if (ref.type === 'item') tags.push(collectionCacheTag(ref.collection));
+        if (ref.type === 'item') tags.push(collectionCacheTag(ref.collection, ref.site));
         const brand = this.listingOf(ref)?.brand;
         if (brand !== undefined && ref.type === 'item') {
             tags.push(...(await this.whereUsed(brand, ref.id)).map((used) => pageCacheTag(used.name, used.site)));

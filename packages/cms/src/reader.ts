@@ -2,7 +2,7 @@ import type { ContentRuntime } from 'kizunajs/plugin';
 import { DEFAULT_SITE, type PageMap } from './options.js';
 import type { DeclaredSites, SiteEntriesOf, SiteFieldsOf } from './site.js';
 import type { Output } from './output.js';
-import { CmsHttpError, collectionCacheTag, documentCacheTag, pageCacheTag, type CmsService } from './cms.js';
+import { CmsHttpError, collectionCacheTag, documentCacheTag, pageCacheTag, type CmsService, type Listing } from './cms.js';
 import { servesCollection } from './page.js';
 import type { ParamsOf } from './dynamic.js';
 import type { Collection, ContentDefinition, Global } from './definitions.js';
@@ -28,7 +28,7 @@ export interface ReaderSource {
  */
 export const sourceOf = (reader: unknown): ReaderSource => {
     const source = (reader as Record<symbol, ReaderSource | undefined> | undefined)?.[READER];
-    if (source === undefined) throw new Error('Pass `kizuna.content`, or one of its `sites`, from a config with `content: cms(...)`.');
+    if (source === undefined) throw new Error('Pass `kizuna.content`, or a view `of()` returns, from a config with `content: cms(...)`.');
     return source;
 };
 
@@ -145,10 +145,6 @@ export interface CmsReader<Pages extends PageMap, Globals = readonly [], Collect
 }
 
 /**
- * What `kizuna.content` holds: the default site's reader, and one per named
- * site when several apps share the CMS.
- */
-/**
  * The site this deployment shows, as `kizuna.content.site` reads it.
  */
 export interface CmsSiteReader<Site, Key extends string> {
@@ -161,22 +157,72 @@ export interface CmsSiteReader<Site, Key extends string> {
     get(): Promise<Site & { key: Key }>;
 }
 
-export type CmsContent<Pages extends PageMap, Globals, Collections, Sites extends DeclaredSites<any, any> | undefined> = CmsReader<
+type ElementOf<List> = List extends readonly (infer Each)[] ? Each : never;
+
+type OwnOf<Entry, Key extends 'globals' | 'collections'> = Entry extends { readonly [Name in Key]?: infer List } ? ElementOf<List> : never;
+
+type PagesOf<Entry> = Entry extends { readonly pages?: infer Pages extends PageMap } ? Pages : {};
+
+/**
+ * One site's content, as `kizuna.content.of()` narrows to: its pages, the
+ * shared globals and collections beside its own, and its name as `site`.
+ */
+export interface CmsSiteView<Key extends string, Pages extends PageMap, Globals, Collections> extends CmsReader<
     Pages,
     Globals,
     Collections
-> & {
-    site: [Sites] extends [undefined] ? never : CmsSiteReader<SiteFieldsOf<Sites>, keyof SiteEntriesOf<Sites> & string>;
-    sites: [Sites] extends [undefined]
-        ? {}
-        : {
-              [Site in keyof SiteEntriesOf<Sites>]: CmsReader<
-                  SiteEntriesOf<Sites>[Site] extends { pages: infer Pages extends PageMap } ? Pages : {},
-                  Globals,
-                  Collections
-              >;
-          };
+> {
+    /**
+     * The site's name, to narrow a view of several sites on.
+     */
+    site: Key;
+}
+
+/**
+ * Every declared site's view, keyed by site.
+ */
+export type CmsSiteViews<Sites, Globals, Collections> = {
+    [Key in keyof SiteEntriesOf<Sites> & string]: CmsSiteView<
+        Key,
+        PagesOf<SiteEntriesOf<Sites>[Key]>,
+        readonly (ElementOf<Globals> | OwnOf<SiteEntriesOf<Sites>[Key], 'globals'>)[],
+        readonly (ElementOf<Collections> | OwnOf<SiteEntriesOf<Sites>[Key], 'collections'>)[]
+    >;
 };
+
+/**
+ * What `kizuna.content` holds when the CMS serves several sites: the view of
+ * the site this deployment shows, typed as any declared site's, so only
+ * what every site has is reachable without `of()`.
+ */
+export interface CmsSitesContent<Sites, Globals, Collections> {
+    pages: CmsSiteViews<Sites, Globals, Collections>[keyof SiteEntriesOf<Sites> & string]['pages'];
+    globals: CmsSiteViews<Sites, Globals, Collections>[keyof SiteEntriesOf<Sites> & string]['globals'];
+    collections: CmsSiteViews<Sites, Globals, Collections>[keyof SiteEntriesOf<Sites> & string]['collections'];
+    site: CmsSiteReader<SiteFieldsOf<Sites>, keyof SiteEntriesOf<Sites> & string>;
+    /**
+     * The view of the site this deployment shows, for an app that serves the
+     * sites named. Narrow it on `site` to reach what only one of them has.
+     *
+     * @example
+     * const content = kizuna.content.of(['uk', 'norway']);
+     * if (content.site === 'uk') await content.collections.events.list();
+     */
+    of<const Keys extends readonly (keyof SiteEntriesOf<Sites> & string)[]>(
+        keys: Keys
+    ): CmsSiteViews<Sites, Globals, Collections>[Keys[number]];
+}
+
+/**
+ * What `kizuna.content` holds: the pages, globals and collections of a
+ * single-site project, or with several sites, the view of the one this
+ * deployment shows.
+ */
+export type CmsContent<Pages extends PageMap, Globals, Collections, Sites extends DeclaredSites<any, any> | undefined> = [Sites] extends [
+    undefined,
+]
+    ? CmsReader<Pages, Globals, Collections>
+    : CmsSitesContent<Sites, Globals, Collections>;
 
 /**
  * Route params as stored: a framework can hand a segment over still encoded.
@@ -283,30 +329,36 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
             };
             continue;
         }
-        const collection = entry.page.collection.name;
-        const listing = service.listing(collection);
-        const item = (id: string): DocumentRef => listing.refOf(id);
+        const listing = service.servedListing(entry.page.collection.name, site);
         const readPublished = cached(
             async (params: string) => {
-                const id = await service.findItem(collection, JSON.parse(params) as Record<string, string>, 'published');
-                return id === undefined ? null : ((await service.published(item(id)))?.content ?? null);
+                const id = await service.findItem(listing.name, JSON.parse(params) as Record<string, string>, 'published', listing.site);
+                return id === undefined ? null : ((await service.published(listing.refOf(id)))?.content ?? null);
             },
-            keyOf(listing.definition, 'published', `page:${name}`),
-            [collectionCacheTag(collection)]
+            keyOf(
+                listing.definition,
+                'published',
+                formatRef({
+                    type: 'page',
+                    name,
+                    site,
+                })
+            ),
+            [collectionCacheTag(listing.name, listing.site)]
         );
         const readAt = async (params: Record<string, string>): Promise<Record<string, unknown> | undefined> => {
             if (!(await showsDrafts())) return (await readPublished(JSON.stringify(params))) ?? undefined;
-            const drafted = await service.findItem(collection, params, 'draft');
+            const drafted = await service.findItem(listing.name, params, 'draft', listing.site);
             if (drafted !== undefined) {
-                const draft = await service.draft(item(drafted));
+                const draft = await service.draft(listing.refOf(drafted));
                 if (draft !== undefined)
-                    return encodeSourcePaths(listing.definition, draft.content, formatRef(item(drafted)), listing.pathFields);
+                    return encodeSourcePaths(listing.definition, draft.content, formatRef(listing.refOf(drafted)), listing.pathFields);
             }
-            const live = await service.findItem(collection, params, 'published');
-            const published = live === undefined ? undefined : await service.published(item(live));
+            const live = await service.findItem(listing.name, params, 'published', listing.site);
+            const published = live === undefined ? undefined : await service.published(listing.refOf(live));
             return published === undefined || live === undefined
                 ? undefined
-                : encodeSourcePaths(listing.definition, published.content, formatRef(item(live)), listing.pathFields);
+                : encodeSourcePaths(listing.definition, published.content, formatRef(listing.refOf(live)), listing.pathFields);
         };
         pages[name] = {
             get: async (params: Record<string, string>) => (await readAt(decodeParams(params))) ?? (await missing(entry.path)),
@@ -314,16 +366,26 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
     }
 
     const globals: Record<string, unknown> = {};
-    for (const name of Object.keys(service.globals)) {
-        const read = reader(
-            {
+    const globalRefs: DocumentRef[] = [
+        ...Object.keys(service.globals).map(
+            (name): DocumentRef => ({
                 type: 'global',
                 name,
-            },
-            true
-        );
-        globals[name] = {
-            get: async () => (await read()) ?? (await missing(`The ${name} global`)),
+            })
+        ),
+        ...Object.keys(service.siteGlobals[site] ?? {}).map(
+            (name): DocumentRef => ({
+                type: 'global',
+                name,
+                site,
+            })
+        ),
+    ];
+    for (const ref of globalRefs) {
+        if (ref.type !== 'global') continue;
+        const read = reader(ref, true);
+        globals[ref.name] = {
+            get: async () => (await read()) ?? (await missing(`The ${ref.name} global`)),
         };
     }
 
@@ -331,24 +393,31 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
      * A collection's `list()`: published and cached outside draft mode,
      * drafts included and marked in it.
      */
-    const listOf = (collection: string) => {
-        const listing = service.listing(collection);
+    const listOf = (listing: Listing) => {
         const listPublished = cached(
             async (input: string) =>
-                service.listItems(collection, {
-                    draft: false,
-                    ...(JSON.parse(input) as ListInput<unknown>),
-                }),
-            keyOf(listing.definition, 'list', collection),
-            [collectionCacheTag(collection)]
+                service.listItems(
+                    listing.name,
+                    {
+                        draft: false,
+                        ...(JSON.parse(input) as ListInput<unknown>),
+                    },
+                    listing.site
+                ),
+            keyOf(listing.definition, 'list', listing.site === DEFAULT_SITE ? listing.name : `${listing.site}:${listing.name}`),
+            [collectionCacheTag(listing.name, listing.site)]
         );
         return async (input: ListInput<unknown> = {}) => {
             if (!(await showsDrafts())) return listPublished(JSON.stringify(input));
-            const result = await service.listItems(collection, {
-                draft: true,
-                ...input,
-                where: input.where as Record<string, unknown> | undefined,
-            });
+            const result = await service.listItems(
+                listing.name,
+                {
+                    draft: true,
+                    ...input,
+                    where: input.where as Record<string, unknown> | undefined,
+                },
+                listing.site
+            );
             return {
                 items: result.items.map((content) =>
                     encodeSourcePaths(listing.definition, content, formatRef(listing.refOf(String(content['id']))), listing.pathFields)
@@ -359,19 +428,17 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
     };
 
     const collections: Record<string, unknown> = {};
-    for (const name of Object.keys(service.collections)) {
+    const listings = [
+        ...Object.keys(service.collections).map((name) => service.listing(name)),
+        ...Object.keys(service.siteCollections[site] ?? {}).map((name) => service.listing(name, site)),
+    ];
+    for (const listing of listings) {
+        const name = listing.name;
         const items = new Map<string, () => Promise<Record<string, unknown> | undefined>>();
         const item = (id: string) => {
             let read = items.get(id);
             if (read === undefined) {
-                read = reader(
-                    {
-                        type: 'item',
-                        collection: name,
-                        id,
-                    },
-                    true
-                );
+                read = reader(listing.refOf(id), true);
                 items.set(id, read);
             }
             return read();
@@ -382,12 +449,17 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
                 const found = await Promise.all(input.ids.map((id) => item(id)));
                 return found.filter((content) => content !== undefined);
             },
-            list: listOf(name),
+            list: listOf(listing),
         };
     }
 
     return Object.defineProperty(
         {
+            ...(site === DEFAULT_SITE
+                ? {}
+                : {
+                      site,
+                  }),
             pages,
             globals,
             collections,
@@ -404,22 +476,44 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
 };
 
 /**
- * What `kizuna.content` reads: the default site's pages beside the shared
- * globals and collections, and every named site under `sites`.
+ * What `kizuna.content` reads: a single-site project's pages beside the
+ * globals and collections, or with several sites, the view of the site
+ * `site` names, read again on every access.
  */
-export const createReader = (
-    service: CmsService,
-    runtime: ContentRuntime | undefined
-): CmsContent<PageMap, readonly Global[], readonly Collection[], DeclaredSites> => {
+export const createReader = (service: CmsService, runtime: ContentRuntime | undefined): unknown => {
     service.runtime = runtime;
-    const sites: Record<string, CmsReader<PageMap>> = {};
-    for (const site of Object.keys(service.sites)) {
-        if (site !== DEFAULT_SITE) sites[site] = siteReader(service, site);
-    }
-    return Object.assign(siteReader(service, DEFAULT_SITE), {
-        sites,
+    const names = service.siteNames();
+    if (names.length === 0) return siteReader(service, DEFAULT_SITE);
+    const views = Object.fromEntries(names.map((name) => [name, siteReader(service, name)]));
+    const current = (): CmsReader<PageMap> => views[service.currentSite()]!;
+    const content = {
+        get pages() {
+            return current().pages;
+        },
+        get globals() {
+            return current().globals;
+        },
+        get collections() {
+            return current().collections;
+        },
         site: {
             get: async () => service.siteInfo(service.currentSite()),
         },
-    }) as never;
+        of: (keys: readonly string[]) => {
+            const site = service.currentSite();
+            if (!keys.includes(site)) {
+                throw new Error(`This app shows ${keys.join(', ')}, but \`site\` on cms() names ${site}.`);
+            }
+            return views[site];
+        },
+    };
+    return Object.defineProperty(content, READER, {
+        get: (): ReaderSource => ({
+            service,
+            get site() {
+                return service.currentSite();
+            },
+        }),
+        enumerable: false,
+    });
 };

@@ -24,7 +24,8 @@ export interface DocumentRow {
     id: string;
     kind: DocumentKind;
     /**
-     * The site a page belongs to; `default` for everything else.
+     * The site a page or a site's own document belongs to; `default` for
+     * shared content.
      */
     site: string;
     key: string;
@@ -99,6 +100,10 @@ export interface ListQuery {
     kind: DocumentKind;
     keyPrefix: string;
     /**
+     * The site the documents are stored under, `default` for shared content.
+     */
+    site?: string;
+    /**
      * `published` lists published documents only; `draft` lists every document
      * by its draft where it has one.
      */
@@ -132,6 +137,10 @@ export type EditingCondition =
 export interface EditingQuery {
     kind: DocumentKind;
     keyPrefix: string;
+    /**
+     * The site the documents are stored under, `default` for shared content.
+     */
+    site?: string;
     /**
      * Sets of conditions, the documents meeting every condition of any one
      * set kept. No sets keeps every document.
@@ -283,8 +292,15 @@ export class DocumentStore {
         return row === undefined ? undefined : toRow(row);
     }
 
-    async list(kind: DocumentKind): Promise<DocumentRow[]> {
-        const rows = await this.db.select().from(cmsDocuments).where(eq(cmsDocuments.kind, kind)).orderBy(asc(cmsDocuments.key));
+    /**
+     * Every document of a kind, on one site when `site` is given.
+     */
+    async list(kind: DocumentKind, site?: string): Promise<DocumentRow[]> {
+        const rows = await this.db
+            .select()
+            .from(cmsDocuments)
+            .where(site === undefined ? eq(cmsDocuments.kind, kind) : and(eq(cmsDocuments.kind, kind), eq(cmsDocuments.site, site)))
+            .orderBy(asc(cmsDocuments.key));
         return rows.map(toRow);
     }
 
@@ -780,6 +796,7 @@ export class DocumentStore {
         const direction = input.direction ?? (input.orderBy === undefined || typeof input.orderBy === 'string' ? 'desc' : 'asc');
         const conditions = [
             eq(cmsDocuments.kind, input.kind),
+            eq(cmsDocuments.site, input.site ?? SITE),
             sql`${cmsDocuments.key} like ${likePrefix(input.keyPrefix)}`,
             input.copy === 'published'
                 ? sql`${cmsDocuments.published} is not null`
@@ -851,6 +868,7 @@ export class DocumentStore {
         const groups = input.groups.filter((group) => group.length > 0);
         const conditions = [
             eq(cmsDocuments.kind, input.kind),
+            eq(cmsDocuments.site, input.site ?? SITE),
             sql`${cmsDocuments.key} like ${likePrefix(input.keyPrefix)}`,
             ...(groups.length === 0
                 ? []

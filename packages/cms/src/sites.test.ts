@@ -196,10 +196,9 @@ describe('several sites sharing one CMS', () => {
         await publish('campaign', {
             offer: 'Twenty percent off bulbs',
         });
-        const page = await config.content.sites.campaign.pages.frontPage.get();
+        const page = await config.content.of(['campaign']).pages.frontPage.get();
         expectTypeOf(page.offer).toEqualTypeOf<string>();
         expect(stripPaths(page.offer)).toBe('Twenty percent off bulbs');
-        expect(Object.keys(config.content.sites)).toEqual(['web', 'campaign']);
     });
 
     it('takes pages for one site or sites for several, not both', () => {
@@ -393,6 +392,7 @@ describe('two sites sharing one pages module', () => {
                     pages: countryPages,
                 },
             }),
+            site: () => showing.site,
             auth: {
                 identity: 'editor',
             },
@@ -422,7 +422,8 @@ describe('two sites sharing one pages module', () => {
         expect((await request(countries).get('/content/sites/norway/pages/frontPage')).body.content).toEqual({
             heading: 'Planter til hvert rom',
         });
-        const norway = await shared.content.sites.norway.pages.frontPage.get();
+        showing.site = 'norway';
+        const norway = await shared.content.pages.frontPage.get();
         expectTypeOf(norway.heading).toEqualTypeOf<string>();
         expect(stripPaths(norway.heading)).toBe('Planter til hvert rom');
     });

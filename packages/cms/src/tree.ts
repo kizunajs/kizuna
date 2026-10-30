@@ -55,7 +55,7 @@ export const loadParents = async (
     const field = listing.definition.tree;
     const parents = new Map<string, string | undefined>();
     if (field === undefined) return parents;
-    for (const stored of await service.store.list('item')) {
+    for (const stored of await service.store.list('item', listing.site)) {
         if (!stored.key.startsWith(listing.keyPrefix)) continue;
         const id = stored.key.slice(listing.keyPrefix.length);
         const row = service.migrated(service.target(listing.refOf(id)), stored)!;

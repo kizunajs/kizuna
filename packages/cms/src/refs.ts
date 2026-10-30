@@ -14,46 +14,70 @@ export type DocumentRef =
     | {
           type: 'global';
           name: string;
+          /**
+           * The site a global of its own belongs to. Left out for a shared
+           * global.
+           */
+          site?: string;
       }
     | {
           type: 'item';
           collection: string;
           id: string;
+          /**
+           * The site an item of its own collection belongs to. Left out for
+           * an item of a shared collection.
+           */
+          site?: string;
       };
 
 /**
  * A reference as one string, the way source paths and tools carry it:
- * `page:frontPage`, `page:campaign:frontPage` on a site of its own,
- * `global:site`, `item:articles:k3j9x2`.
+ * `page:frontPage`, `global:footer`, `item:articles:k3j9x2`, and with the
+ * site first for a site's own, `page:uk:frontPage`, `global:uk:settings` or
+ * `item:uk:events:k3j9x2`.
  */
 export const formatRef = (ref: DocumentRef): string => {
-    if (ref.type === 'item') return `item:${ref.collection}:${ref.id}`;
-    if (ref.type === 'page' && ref.site !== undefined && ref.site !== 'default') return `page:${ref.site}:${ref.name}`;
-    return `${ref.type}:${ref.name}`;
+    const site = ref.site === undefined || ref.site === 'default' ? '' : `${ref.site}:`;
+    if (ref.type === 'item') return `item:${site}${ref.collection}:${ref.id}`;
+    return `${ref.type}:${site}${ref.name}`;
 };
 
 export const parseRef = (value: string): DocumentRef | undefined => {
-    const [type, first, second, ...rest] = value.split(':');
-    if (rest.length > 0 || first === undefined || first === '') return undefined;
-    if ((type === 'page' || type === 'global') && second === undefined) {
-        return {
-            type,
-            name: first,
-        };
+    const [type, ...parts] = value.split(':');
+    if (parts.some((part) => part === '')) return undefined;
+    if (type === 'page' || type === 'global') {
+        if (parts.length === 1) {
+            return {
+                type,
+                name: parts[0]!,
+            };
+        }
+        if (parts.length === 2) {
+            return {
+                type,
+                site: parts[0]!,
+                name: parts[1]!,
+            };
+        }
+        return undefined;
     }
-    if (type === 'page' && second !== undefined && second !== '') {
-        return {
-            type,
-            site: first,
-            name: second,
-        };
-    }
-    if (type === 'item' && second !== undefined && second !== '') {
-        return {
-            type,
-            collection: first,
-            id: second,
-        };
+    if (type === 'item') {
+        if (parts.length === 2) {
+            return {
+                type,
+                collection: parts[0]!,
+                id: parts[1]!,
+            };
+        }
+        if (parts.length === 3) {
+            return {
+                type,
+                site: parts[0]!,
+                collection: parts[1]!,
+                id: parts[2]!,
+            };
+        }
     }
     return undefined;
 };

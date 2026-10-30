@@ -1529,7 +1529,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     ...(await reviewFields(cms, state)),
                     ...(ref.type === 'item'
                         ? {
-                              actions: await itemActions(cms, cms.collection(ref.collection), ref.id, cms.caller(args.auth)),
+                              actions: await itemActions(cms, cms.collection(ref.collection, ref.site), ref, cms.caller(args.auth)),
                           }
                         : {}),
                 },
