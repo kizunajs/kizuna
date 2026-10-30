@@ -42,7 +42,7 @@ export default defineConfig({
         auth: {
             identity: 'editor',
             roles: ['editor', 'admin'],
-            // TODO(sites): `sites: (editor) => editor.sites`, so Una, Sam, Nils and Kari see their own site.
+            sites: (editor) => editor.sites,
             signIn: ({ email, password, headers }) =>
                 auth.api.signInEmail({
                     body: {
