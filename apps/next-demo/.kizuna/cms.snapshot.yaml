@@ -1966,6 +1966,21 @@ routes:
                           optional: false
                           schema:
                             kind: string
+                partners:
+                  optional: false
+                  schema:
+                    kind: array
+                    element:
+                      kind: object
+                      fields:
+                        key:
+                          optional: false
+                          schema:
+                            kind: string
+                        label:
+                          optional: false
+                          schema:
+                            kind: string
           status:
             optional: false
             schema:
@@ -14245,18 +14260,10 @@ routes:
       - 200
       - 401
       - 403
+      - 404
     deprecated: false
     body:
-      kind: object
-      fields:
-        relationship:
-          optional: false
-          schema:
-            kind: string
-        id:
-          optional: false
-          schema:
-            kind: string
+      kind: union
     responses:
       "200":
         kind: object
@@ -14287,6 +14294,25 @@ routes:
             schema:
               kind: string
       "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
         kind: object
         fields:
           type:

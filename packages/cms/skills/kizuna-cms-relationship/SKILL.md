@@ -15,7 +15,7 @@ A page holds ids of things that live elsewhere, and fetches whatever it shows of
 4. For the app's own API, `options` calls a route that selects only the id, label and image, and passes `headers` on, so the route sees the editor and its own `auth` decides. For another service, it calls that service with the app's own key and leaves `headers` alone.
 5. List it on `cms({ relationships: [Products] })`.
 6. In the page's `content.ts`, hold ids with `z.array(Products.id).max(6)`. In `page.tsx`, fetch the items through the app's client or the service, keeping the stored order with `inStoredOrder`.
-7. When an item changes, call `cmsClient.invalidate({ body: { relationship: 'products', id } })` from the route or webhook that changed it. Every page holding that id refreshes, and no other.
+7. When an item changes, call `cmsClient.invalidate({ body: { brand: 'ProductId', id } })` from the route or webhook that changed it, naming the brand of the relationship's id. Every page holding that id refreshes, and no other.
 
 ## Template
 
@@ -74,6 +74,6 @@ listProductOptions: k
 
 - Store ids, never copies of the item. The CMS never fetches the items for a page.
 - The options route reads only what the picker shows.
-- A relationship's `name` is camelCase and unique; `invalidate` names it.
+- A relationship's `name` is camelCase and unique. `invalidate` names its id's brand.
 - A collection's own ids need no relationship, since the CMS lists its items itself.
 - `kizuna cms push` checks every held id against the target's picker list and lists the missing ones.

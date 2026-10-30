@@ -197,6 +197,13 @@ export namespace API {
                     name: string;
                     path: string;
                 }>;
+                /**
+                 * The partners that read it, which a publish refreshes too.
+                 */
+                partners: Array<{
+                    key: string;
+                    label: string;
+                }>;
             };
             status: "empty" | "draft" | "published" | "changed";
             version: number;
@@ -3081,13 +3088,23 @@ export namespace API {
     export namespace Invalidate {
         export type Body = {
             /**
-             * The name of the relationship, like products.
+             * The brand of the id, like 'ProductId'.
              */
-            relationship: string;
+            brand: string;
             /**
              * The id of the one that changed.
              */
             id: string;
+        } | {
+            /**
+             * The global that changed, like 'header'.
+             */
+            global: string;
+        } | {
+            /**
+             * The page that changed, like 'frontPage'.
+             */
+            page: string;
         };
 
         export type Result =
@@ -3096,6 +3113,7 @@ export namespace API {
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: Record<string, string> }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 }
@@ -4447,14 +4465,14 @@ export interface Client {
         };
     };
     /**
-     * Refresh every page that shows one item of a relationship
+     * Refresh every page that shows an id, a global or a page
      *
-     * For the app API: call it when a product, a person or anything else pages hold by id changes, so the pages showing it render fresh. Answers with the pages it refreshed.
+     * For the app API: `{ brand, id }` refreshes the pages holding an id that changed, like a product, `{ global }` a global and `{ page }` a page. Answers with the pages it refreshed.
      *
      * @example
      * const result = await client.invalidate({
      *     body: {
-     *         relationship: 'string',
+     *         brand: 'string',
      *         id: '1',
      *     },
      * });
@@ -5359,6 +5377,7 @@ const routes: GeneratedRoutes = {
             200: {},
             401: {},
             403: {},
+            404: {},
             400: {},
         },
     },

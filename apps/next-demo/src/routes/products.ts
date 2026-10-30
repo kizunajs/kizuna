@@ -167,7 +167,7 @@ export const products = k.routes.products({
             catalogue.set(params.id, updated);
             await cmsClient.invalidate({
                 body: {
-                    relationship: 'products',
+                    brand: 'ProductId',
                     id: params.id,
                 },
             });
