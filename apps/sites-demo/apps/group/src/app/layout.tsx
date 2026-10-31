@@ -58,6 +58,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                             href: sites.values.norway.url,
                         },
                         {
+                            label: 'Careers',
+                            href: '/careers',
+                        },
+                        {
                             label: 'Privacy policy',
                             href: '/privacy',
                         },

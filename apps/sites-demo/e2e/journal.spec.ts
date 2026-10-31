@@ -15,16 +15,31 @@ const showsOn = (page: Page) =>
 test.describe('the journal', () => {
     test('lists on each site only the articles shown there, newest first', async ({ page }) => {
         await page.goto(`${urls.uk}/journal`);
-        await expect(titles(page)).toHaveText(['Winter care for houseplants', 'Columbia Road flower market']);
+        await expect(titles(page)).toHaveText([
+            'How we pack plants for winter delivery',
+            'Winter care for houseplants',
+            'Five plants for a dark flat',
+            'We open in Brighton',
+            'Columbia Road flower market',
+        ]);
         await page.goto(`${urls.norway}/journal`);
-        await expect(titles(page)).toHaveText(['Juletrær i Oslo', 'Vinterstell av stueplanter']);
+        await expect(titles(page)).toHaveText([
+            'Juletrær i Oslo',
+            'Bregneuke i Oslo og Bergen',
+            'Slik pakker vi planter for vinterlevering',
+            'Vinterstell av stueplanter',
+        ]);
     });
 
     test('lists every article on the group, since each shows there', async ({ page }) => {
         await page.goto(`${urls.group}/journal`);
         await expect(titles(page)).toHaveText([
             'Juletrær i Oslo',
+            'Fern week in Oslo and Bergen',
+            'How we pack plants for winter delivery',
             'Winter care for houseplants',
+            'Five plants for a dark flat',
+            'We open in Brighton',
             'Columbia Road flower market',
             'Visiting the growers we buy from',
         ]);

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { croppedImage, definePage, definePages } from '@kizunajs/cms';
+import { ImageSchema } from '@kizunajs/cms/schemas';
 
 const frontPage = definePage({
     name: 'frontPage',
@@ -39,8 +40,37 @@ const eventsPage = definePage({
 });
 
 /**
+ * A page of text on one of the two sites: a heading, an intro, paragraphs,
+ * and a photo beside them.
+ */
+const textPage = <const Name extends string, const Sites extends readonly string[]>(page: { name: Name; label: string; sites: Sites }) =>
+    definePage({
+        ...page,
+        fields: [
+            {
+                name: 'heading',
+                schema: z.string().min(1).max(80),
+            },
+            {
+                name: 'intro',
+                schema: z.string().min(1).max(400),
+            },
+            {
+                name: 'body',
+                schema: z.string().min(1).max(4000).describe('Paragraphs, with a blank line between each.'),
+            },
+            {
+                name: 'image',
+                schema: ImageSchema.optional(),
+                position: 'sidebar',
+            },
+        ],
+    });
+
+/**
  * The pages of the countries app, which the UK and Norway both deploy. Each
- * site keeps its own copy of every page.
+ * site keeps its own copy of every page, and a page that names `sites` exists
+ * on those alone, at an address in their language.
  */
 export const pages = definePages({
     frontPage: {
@@ -50,5 +80,93 @@ export const pages = definePages({
     eventsPage: {
         path: '/events',
         page: eventsPage,
+    },
+    visitPage: {
+        path: '/visit',
+        page: textPage({
+            name: 'visitPage',
+            label: 'Visit the shop',
+            sites: ['uk'],
+        }),
+    },
+    plantCarePage: {
+        path: '/plant-care',
+        page: textPage({
+            name: 'plantCarePage',
+            label: 'Plant care',
+            sites: ['uk'],
+        }),
+    },
+    plantDoctorPage: {
+        path: '/plant-care/plant-doctor',
+        page: textPage({
+            name: 'plantDoctorPage',
+            label: 'Plant doctor',
+            sites: ['uk'],
+        }),
+    },
+    deliveryPage: {
+        path: '/delivery',
+        page: textPage({
+            name: 'deliveryPage',
+            label: 'Delivery',
+            sites: ['uk'],
+        }),
+    },
+    shopsPage: {
+        path: '/butikker',
+        page: textPage({
+            name: 'shopsPage',
+            label: 'Butikker',
+            sites: ['norway'],
+        }),
+    },
+    osloShopPage: {
+        path: '/butikker/oslo',
+        page: textPage({
+            name: 'osloShopPage',
+            label: 'Oslo',
+            sites: ['norway'],
+        }),
+    },
+    bergenShopPage: {
+        path: '/butikker/bergen',
+        page: textPage({
+            name: 'bergenShopPage',
+            label: 'Bergen',
+            sites: ['norway'],
+        }),
+    },
+    trondheimShopPage: {
+        path: '/butikker/trondheim',
+        page: textPage({
+            name: 'trondheimShopPage',
+            label: 'Trondheim',
+            sites: ['norway'],
+        }),
+    },
+    aboutPage: {
+        path: '/om-oss',
+        page: textPage({
+            name: 'aboutPage',
+            label: 'Om oss',
+            sites: ['norway'],
+        }),
+    },
+    historyPage: {
+        path: '/om-oss/historie',
+        page: textPage({
+            name: 'historyPage',
+            label: 'Historie',
+            sites: ['norway'],
+        }),
+    },
+    customerServicePage: {
+        path: '/kundeservice',
+        page: textPage({
+            name: 'customerServicePage',
+            label: 'Kundeservice',
+            sites: ['norway'],
+        }),
     },
 });

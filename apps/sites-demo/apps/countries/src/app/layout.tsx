@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { KizunaPreview } from '@kizunajs/cms/next';
 import kizuna from '@kizunajs-demo/sites-content/config';
 import { sites } from '@kizunajs-demo/sites-content';
-import { Footer, Header, type HeaderLink } from '@kizunajs-demo/sites-ui';
+import { Footer, Header, type FooterLink, type HeaderLink } from '@kizunajs-demo/sites-ui';
 import '@kizunajs-demo/sites-ui/globals.css';
 import { wordsOf } from '../lib/words';
 import { localeOf } from '../lib/locale';
@@ -41,7 +41,38 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             label: said.events,
             href: pathIn(locale, '/events'),
         });
+        links.push({
+            label: said.care,
+            href: pathIn(locale, '/plant-care'),
+        });
+    } else {
+        links.push({
+            label: said.about,
+            href: pathIn(locale, '/om-oss'),
+        });
     }
+    const footerLinks: FooterLink[] =
+        content.site === 'uk'
+            ? [
+                  {
+                      label: said.visit,
+                      href: pathIn(locale, '/visit'),
+                  },
+                  {
+                      label: said.help,
+                      href: pathIn(locale, '/delivery'),
+                  },
+              ]
+            : [
+                  {
+                      label: said.shopPages,
+                      href: pathIn(locale, '/butikker'),
+                  },
+                  {
+                      label: said.help,
+                      href: pathIn(locale, '/kundeservice'),
+                  },
+              ];
     return (
         <html lang={locale}>
             <body>
@@ -50,6 +81,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <Footer
                     companyName={site.companyName}
                     links={[
+                        ...footerLinks,
                         {
                             label: said.group,
                             href: sites.values.group.url,

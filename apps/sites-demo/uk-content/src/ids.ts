@@ -9,4 +9,5 @@ import { z } from 'zod';
 export const ArticleId = Kizuna.brand('ArticleId', z.string());
 export const EmployeeId = Kizuna.brand('EmployeeId', z.string());
 export const EventId = Kizuna.brand('EventId', z.string());
+export const NewsletterId = Kizuna.brand('NewsletterId', z.string());
 export const OfficeId = Kizuna.brand('OfficeId', z.string());

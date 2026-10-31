@@ -15,6 +15,11 @@ export const words = {
         privacy: 'Privacy policy',
         lastUpdated: 'Last updated',
         group: 'Hagen Group',
+        about: '',
+        shopPages: '',
+        help: 'Delivery',
+        care: 'Plant care',
+        visit: 'Visit the shop',
     },
     norway: {
         shops: 'Butikker',
@@ -28,6 +33,11 @@ export const words = {
         privacy: 'Personvern',
         lastUpdated: 'Sist oppdatert',
         group: 'Hagen Group',
+        about: 'Om oss',
+        shopPages: 'Butikkene',
+        help: 'Kundeservice',
+        care: '',
+        visit: '',
     },
     'norway:en': {
         shops: 'Shops',
@@ -41,6 +51,11 @@ export const words = {
         privacy: 'Privacy policy',
         lastUpdated: 'Last updated',
         group: 'Hagen Group',
+        about: 'About us',
+        shopPages: 'The shops',
+        help: 'Customer service',
+        care: '',
+        visit: '',
     },
 };
 

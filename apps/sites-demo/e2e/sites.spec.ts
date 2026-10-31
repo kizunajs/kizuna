@@ -13,7 +13,7 @@ test.describe('each site', () => {
                 url: urls.group,
                 label: 'Hagen Group',
                 icon: '/icons/group.svg',
-                heading: 'Three plant shops, one family',
+                heading: 'Six plant shops, one family',
                 company: 'Hagen Group AS',
             },
             {
@@ -149,7 +149,13 @@ test.describe("the UK's events", () => {
             page.getByRole('heading', {
                 level: 2,
             })
-        ).toHaveText(['Repotting without the mess', 'Houseplants through the winter', 'Wreath evening']);
+        ).toHaveText([
+            'Bulbs in pots for spring',
+            'Repotting without the mess',
+            'Houseplants through the winter',
+            'Wreath evening',
+            'Christmas market in the shop',
+        ]);
     });
 
     test('are not on Norway', async ({ page }) => {

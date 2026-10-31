@@ -5,6 +5,7 @@
  */
 import type { nextAdapter } from '@kizunajs/next';
 import type { mcpPlugin } from '@kizunajs/mcp';
+import type { resendPlugin } from '@kizunajs/resend';
 import type { editor } from './identities';
 import type { partner } from './partners';
 
@@ -16,5 +17,5 @@ export interface Config {
             partner: typeof partner;
         };
     };
-    plugins: [ReturnType<typeof mcpPlugin>];
+    plugins: [ReturnType<typeof mcpPlugin>, ReturnType<typeof resendPlugin>];
 }

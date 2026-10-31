@@ -31,6 +31,11 @@ export namespace API {
     export type EventId = string & KizunaBrand<"EventId">;
 
     /**
+     * A branded `string`. Responses hand one back, and `toNewsletterId` makes one from a plain value.
+     */
+    export type NewsletterId = string & KizunaBrand<"NewsletterId">;
+
+    /**
      * A branded `string`. Responses hand one back, and `toOfficeId` makes one from a plain value.
      */
     export type OfficeId = string & KizunaBrand<"OfficeId">;
@@ -75,6 +80,13 @@ export namespace API {
                 content: {
                     heading: string;
                     intro: string;
+                    hero?: {
+                        id: string;
+                        url: string;
+                        alt: string;
+                        width: number;
+                        height: number;
+                    };
                 };
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
@@ -100,6 +112,150 @@ export namespace API {
                 content: {
                     heading: string;
                     intro?: string;
+                };
+            }; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace ContentSitesUkPagesVisitPage {
+        export type Query = {
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
+        };
+
+        export type Result =
+            | { status: 200; body: {
+                version: number;
+                updatedAt: string;
+                content: {
+                    heading: string;
+                    intro: string;
+                    /**
+                     * Paragraphs, with a blank line between each.
+                     */
+                    body: string;
+                    image?: {
+                        id: string;
+                        url: string;
+                        alt: string;
+                        width: number;
+                        height: number;
+                    };
+                };
+            }; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace ContentSitesUkPagesPlantCarePage {
+        export type Query = {
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
+        };
+
+        export type Result =
+            | { status: 200; body: {
+                version: number;
+                updatedAt: string;
+                content: {
+                    heading: string;
+                    intro: string;
+                    /**
+                     * Paragraphs, with a blank line between each.
+                     */
+                    body: string;
+                    image?: {
+                        id: string;
+                        url: string;
+                        alt: string;
+                        width: number;
+                        height: number;
+                    };
+                };
+            }; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace ContentSitesUkPagesPlantDoctorPage {
+        export type Query = {
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
+        };
+
+        export type Result =
+            | { status: 200; body: {
+                version: number;
+                updatedAt: string;
+                content: {
+                    heading: string;
+                    intro: string;
+                    /**
+                     * Paragraphs, with a blank line between each.
+                     */
+                    body: string;
+                    image?: {
+                        id: string;
+                        url: string;
+                        alt: string;
+                        width: number;
+                        height: number;
+                    };
+                };
+            }; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace ContentSitesUkPagesDeliveryPage {
+        export type Query = {
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
+        };
+
+        export type Result =
+            | { status: 200; body: {
+                version: number;
+                updatedAt: string;
+                content: {
+                    heading: string;
+                    intro: string;
+                    /**
+                     * Paragraphs, with a blank line between each.
+                     */
+                    body: string;
+                    image?: {
+                        id: string;
+                        url: string;
+                        alt: string;
+                        width: number;
+                        height: number;
+                    };
                 };
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
@@ -142,9 +298,8 @@ export namespace API {
     export namespace ContentSitesUkCollectionsEmployeesList {
         export type Query = {
             office?: OfficeId;
-            order?: number;
             name?: string;
-            orderBy?: "office" | "order" | "name" | "publishedAt" | "updatedAt";
+            orderBy?: "office" | "name" | "publishedAt" | "updatedAt" | "order";
             direction?: "asc" | "desc";
             limit?: number;
             /**
@@ -168,7 +323,6 @@ export namespace API {
                     bio?: string;
                     email?: string;
                     office: OfficeId;
-                    order: number;
                     id: EmployeeId;
                 }>;
                 next: string | null;
@@ -202,7 +356,6 @@ export namespace API {
                 bio?: string;
                 email?: string;
                 office: OfficeId;
-                order: number;
                 id: EmployeeId;
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
@@ -215,9 +368,8 @@ export namespace API {
 
     export namespace ContentSitesUkCollectionsOfficesList {
         export type Query = {
-            order?: number;
             name?: string;
-            orderBy?: "order" | "name" | "publishedAt" | "updatedAt";
+            orderBy?: "name" | "publishedAt" | "updatedAt" | "order";
             direction?: "asc" | "desc";
             limit?: number;
             /**
@@ -245,7 +397,6 @@ export namespace API {
                         width: number;
                         height: number;
                     };
-                    order: number;
                     id: OfficeId;
                 }>;
                 next: string | null;
@@ -283,7 +434,6 @@ export namespace API {
                     width: number;
                     height: number;
                 };
-                order: number;
                 id: OfficeId;
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
@@ -349,6 +499,125 @@ export namespace API {
                 date: string;
                 showsOn: Array<string>;
                 id: ArticleId;
+            }; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace ContentSitesUkCollectionsNewslettersList {
+        export type Query = {
+            orderBy?: "publishedAt" | "updatedAt";
+            direction?: "asc" | "desc";
+            limit?: number;
+            /**
+             * The `next` of the previous page.
+             */
+            cursor?: string;
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
+        };
+
+        export type Result =
+            | { status: 200; body: {
+                items: Array<{
+                    subject: string;
+                    preheader?: string;
+                    body: Array<{
+                        _type: "block";
+                        _key: string;
+                        style: "normal" | "h2" | "h3" | "h4" | "blockquote";
+                        listItem?: "bullet" | "number";
+                        level?: number;
+                        markDefs: Array<{
+                            _type: "link";
+                            _key: string;
+                            /**
+                             * An https or http URL, mailto:, tel:, a path on this site like /blog, or an #anchor.
+                             */
+                            href: string;
+                        }>;
+                        children: Array<{
+                            _type: "span";
+                            _key: string;
+                            text: string;
+                            marks: Array<string>;
+                        }>;
+                    } | {
+                        _type: "image";
+                        _key: string;
+                        image: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                    }>;
+                    id: NewsletterId;
+                }>;
+                next: string | null;
+            }; headers: Record<string, string> }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace ContentSitesUkCollectionsNewslettersGet {
+        export type Params = {
+            id: string;
+        };
+
+        export type Query = {
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
+        };
+
+        export type Result =
+            | { status: 200; body: {
+                subject: string;
+                preheader?: string;
+                body: Array<{
+                    _type: "block";
+                    _key: string;
+                    style: "normal" | "h2" | "h3" | "h4" | "blockquote";
+                    listItem?: "bullet" | "number";
+                    level?: number;
+                    markDefs: Array<{
+                        _type: "link";
+                        _key: string;
+                        /**
+                         * An https or http URL, mailto:, tel:, a path on this site like /blog, or an #anchor.
+                         */
+                        href: string;
+                    }>;
+                    children: Array<{
+                        _type: "span";
+                        _key: string;
+                        text: string;
+                        marks: Array<string>;
+                    }>;
+                } | {
+                    _type: "image";
+                    _key: string;
+                    image: {
+                        id: string;
+                        url: string;
+                        alt: string;
+                        width: number;
+                        height: number;
+                    };
+                }>;
+                id: NewsletterId;
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
@@ -472,6 +741,50 @@ export interface Client {
                         headers?: Record<string, string>;
                         fetchOptions?: RequestInit;
                     }, API.ContentSitesUkPagesEventsPage.Result>;
+                    /**
+                     * Read the published content of /visit on the uk site
+                     *
+                     * @example
+                     * const result = await client.content.sites.uk.pages.visitPage();
+                     */
+                    visitPage: ClientMethod<'GET', false, {
+                        query?: API.ContentSitesUkPagesVisitPage.Query;
+                        headers?: Record<string, string>;
+                        fetchOptions?: RequestInit;
+                    }, API.ContentSitesUkPagesVisitPage.Result>;
+                    /**
+                     * Read the published content of /plant-care on the uk site
+                     *
+                     * @example
+                     * const result = await client.content.sites.uk.pages.plantCarePage();
+                     */
+                    plantCarePage: ClientMethod<'GET', false, {
+                        query?: API.ContentSitesUkPagesPlantCarePage.Query;
+                        headers?: Record<string, string>;
+                        fetchOptions?: RequestInit;
+                    }, API.ContentSitesUkPagesPlantCarePage.Result>;
+                    /**
+                     * Read the published content of /plant-care/plant-doctor on the uk site
+                     *
+                     * @example
+                     * const result = await client.content.sites.uk.pages.plantDoctorPage();
+                     */
+                    plantDoctorPage: ClientMethod<'GET', false, {
+                        query?: API.ContentSitesUkPagesPlantDoctorPage.Query;
+                        headers?: Record<string, string>;
+                        fetchOptions?: RequestInit;
+                    }, API.ContentSitesUkPagesPlantDoctorPage.Result>;
+                    /**
+                     * Read the published content of /delivery on the uk site
+                     *
+                     * @example
+                     * const result = await client.content.sites.uk.pages.deliveryPage();
+                     */
+                    deliveryPage: ClientMethod<'GET', false, {
+                        query?: API.ContentSitesUkPagesDeliveryPage.Query;
+                        headers?: Record<string, string>;
+                        fetchOptions?: RequestInit;
+                    }, API.ContentSitesUkPagesDeliveryPage.Result>;
                 };
                 globals: {
                     /**
@@ -574,6 +887,35 @@ export interface Client {
                             fetchOptions?: RequestInit;
                         }, API.ContentSitesUkCollectionsArticlesGet.Result>;
                     };
+                    newsletters: {
+                        /**
+                         * List the published newsletters
+                         *
+                         * @example
+                         * const result = await client.content.sites.uk.collections.newsletters.list();
+                         */
+                        list: ClientMethod<'GET', false, {
+                            query?: API.ContentSitesUkCollectionsNewslettersList.Query;
+                            headers?: Record<string, string>;
+                            fetchOptions?: RequestInit;
+                        }, API.ContentSitesUkCollectionsNewslettersList.Result>;
+                        /**
+                         * Read one published item of newsletters
+                         *
+                         * @example
+                         * const result = await client.content.sites.uk.collections.newsletters.get({
+                         *     params: {
+                         *         id: '1',
+                         *     },
+                         * });
+                         */
+                        get: ClientMethod<'GET', false, {
+                            params: API.ContentSitesUkCollectionsNewslettersGet.Params;
+                            query?: API.ContentSitesUkCollectionsNewslettersGet.Query;
+                            headers?: Record<string, string>;
+                            fetchOptions?: RequestInit;
+                        }, API.ContentSitesUkCollectionsNewslettersGet.Result>;
+                    };
                     events: {
                         /**
                          * List the published events
@@ -628,6 +970,50 @@ const routes: GeneratedRoutes = {
                     eventsPage: {
                         method: 'GET',
                         path: '/content/sites/uk/pages/eventsPage',
+                        responses: {
+                            200: {},
+                            401: {},
+                            403: {},
+                            404: {},
+                            400: {},
+                        },
+                    },
+                    visitPage: {
+                        method: 'GET',
+                        path: '/content/sites/uk/pages/visitPage',
+                        responses: {
+                            200: {},
+                            401: {},
+                            403: {},
+                            404: {},
+                            400: {},
+                        },
+                    },
+                    plantCarePage: {
+                        method: 'GET',
+                        path: '/content/sites/uk/pages/plantCarePage',
+                        responses: {
+                            200: {},
+                            401: {},
+                            403: {},
+                            404: {},
+                            400: {},
+                        },
+                    },
+                    plantDoctorPage: {
+                        method: 'GET',
+                        path: '/content/sites/uk/pages/plantDoctorPage',
+                        responses: {
+                            200: {},
+                            401: {},
+                            403: {},
+                            404: {},
+                            400: {},
+                        },
+                    },
+                    deliveryPage: {
+                        method: 'GET',
+                        path: '/content/sites/uk/pages/deliveryPage',
                         responses: {
                             200: {},
                             401: {},
@@ -720,6 +1106,29 @@ const routes: GeneratedRoutes = {
                             },
                         },
                     },
+                    newsletters: {
+                        list: {
+                            method: 'GET',
+                            path: '/content/sites/uk/collections/newsletters',
+                            responses: {
+                                200: {},
+                                400: {},
+                                401: {},
+                                403: {},
+                            },
+                        },
+                        get: {
+                            method: 'GET',
+                            path: '/content/sites/uk/collections/newsletters/:id',
+                            responses: {
+                                200: {},
+                                401: {},
+                                403: {},
+                                404: {},
+                                400: {},
+                            },
+                        },
+                    },
                     events: {
                         list: {
                             method: 'GET',
@@ -772,6 +1181,14 @@ export const toEmployeeId = (value: string): API.EmployeeId => value as API.Empl
  * const id = toArticleId('1');
  */
 export const toArticleId = (value: string): API.ArticleId => value as API.ArticleId;
+
+/**
+ * Brands a value from outside the API, like a URL segment, as `API.NewsletterId`. A value from a response is branded already.
+ *
+ * @example
+ * const id = toNewsletterId('1');
+ */
+export const toNewsletterId = (value: string): API.NewsletterId => value as API.NewsletterId;
 
 /**
  * Brands a value from outside the API, like a URL segment, as `API.EventId`. A value from a response is branded already.

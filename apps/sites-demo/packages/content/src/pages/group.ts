@@ -32,6 +32,28 @@ const aboutPage = definePage({
 });
 
 /**
+ * A page of text: a heading, an intro and paragraphs.
+ */
+const textPage = <const Name extends string>(page: { name: Name; label: string }) =>
+    definePage({
+        ...page,
+        fields: [
+            {
+                name: 'heading',
+                schema: z.string().min(1).max(80),
+            },
+            {
+                name: 'intro',
+                schema: z.string().min(1).max(400),
+            },
+            {
+                name: 'body',
+                schema: z.string().min(1).max(4000).describe('Paragraphs, with a blank line between each.'),
+            },
+        ],
+    });
+
+/**
  * The group site's pages, which the group app renders.
  */
 export const pages = definePages({
@@ -42,5 +64,26 @@ export const pages = definePages({
     aboutPage: {
         path: '/about',
         page: aboutPage,
+    },
+    historyPage: {
+        path: '/about/history',
+        page: textPage({
+            name: 'historyPage',
+            label: 'History',
+        }),
+    },
+    sustainabilityPage: {
+        path: '/about/sustainability',
+        page: textPage({
+            name: 'sustainabilityPage',
+            label: 'Sustainability',
+        }),
+    },
+    careersPage: {
+        path: '/careers',
+        page: textPage({
+            name: 'careersPage',
+            label: 'Careers',
+        }),
     },
 });

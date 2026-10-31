@@ -253,6 +253,12 @@ export const orders = ({ site, period }: Context): StatValue => {
  */
 const WORKSHOPS = [
     {
+        title: 'Bulbs in pots for spring',
+        date: Date.UTC(2026, 10, 7),
+        seats: 14,
+        demand: 0.85,
+    },
+    {
         title: 'Repotting without the mess',
         date: Date.UTC(2026, 10, 14),
         seats: 12,

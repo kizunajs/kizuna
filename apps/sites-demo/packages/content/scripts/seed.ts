@@ -1,306 +1,124 @@
+import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { formatRef, type CmsService, type DocumentRef } from '@kizunajs/cms';
+import {
+    ada,
+    articles,
+    christmasNewsletter,
+    christmasOpeningHours,
+    employees,
+    events,
+    kari,
+    mia,
+    newsletters,
+    nils,
+    norwayHistoryDraft,
+    norwayWinterFrontPage,
+    offices,
+    officesInNorwegian,
+    officesOnTheUk,
+    pages,
+    photos,
+    privacyPolicy,
+    privacyPolicyInNorwegian,
+    sam,
+    trondheimOpening,
+    una,
+    type Edit,
+    type SeededPage,
+    type Written,
+} from './seed-content';
 
-const AUTHOR = 'seed';
 const PHOTOS = join(process.cwd(), 'seed/photos');
 
-const offices = [
-    {
-        name: 'Hagen London',
-        city: 'London',
-        address: '14 Columbia Road, London E2 7RG',
-        phone: '+47 22 41 08 00',
-    },
-    {
-        name: 'Hagen Oslo',
-        city: 'Oslo',
-        address: 'Markveien 38, 0554 Oslo',
-        phone: '+47 22 41 08 00',
-    },
-    {
-        name: 'Hagen Bergen',
-        city: 'Bergen',
-        address: 'Vaskerelven 8, 5014 Bergen',
-        phone: '+47 55 30 21 40',
-    },
-];
+const RealDate = Date;
 
 /**
- * What the UK sets of its own on the London shop: the number its customers
- * call, and the opening hours only the UK lists.
+ * How far Oslo's clock is ahead of UTC at a moment, in milliseconds.
  */
-const londonOnTheUk = {
-    phone: '+44 20 7946 0321',
-    openingHours: 'Tuesday to Sunday, 9 to 17',
+const osloOffset = (moment: number): number => {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Europe/Oslo',
+        hourCycle: 'h23',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+    }).formatToParts(new RealDate(moment));
+    const part = (type: Intl.DateTimeFormatPartTypes): number => Number(parts.find((candidate) => candidate.type === type)?.value);
+    const wall = RealDate.UTC(part('year'), part('month') - 1, part('day'), part('hour'), part('minute'));
+    return wall - (moment - (moment % 60_000));
 };
 
 /**
- * Photos from Unsplash, free to use under the Unsplash License, the same ones
- * the single-site demo uses. The Oslo shop's photo is shared, the wreath
- * evening's belongs to the UK's own library, and the hero of Hagen Norge's
- * front page to Norway's, in its Kampanjer folder.
+ * Oslo's `hour` on the day `days` from today, or before it when negative.
  */
-const photos = {
-    oslo: {
-        file: 'fern-fronds.jpg',
-        alt: 'Close up of fern fronds unfurled in the shade',
-    },
-    wreathEvening: {
-        file: 'forest-trunks.jpg',
-        alt: 'Tall spruce trunks above a green understorey',
-    },
-    norwayHero: {
-        file: 'forest-path.jpg',
-        alt: 'En sti gjennom granskogen',
-    },
-};
-
-const employees = [
-    {
-        office: 'Hagen Oslo',
-        values: {
-            name: 'Ingrid Solberg',
-            role: 'Founder and buyer',
-            bio: 'Ingrid opened the first Hagen on Grünerløkka in 2019, and still chooses every plant the three shops sell.',
-            email: 'ingrid@hagen.example.com',
-        },
-    },
-    {
-        office: 'Hagen Oslo',
-        values: {
-            name: 'Sara Lindqvist',
-            role: 'Shop gardener',
-            bio: 'Sara runs the Oslo shop floor and the courtyard beds behind it.',
-        },
-    },
-    {
-        office: 'Hagen London',
-        values: {
-            name: 'Martin Hale',
-            role: 'Head of plant care',
-            bio: 'Martin answers the plant care desk for all three shops, and runs the London workshops.',
-            email: 'martin@hagen.example.co.uk',
-        },
-    },
-    {
-        office: 'Hagen London',
-        values: {
-            name: 'Eleanor Price',
-            role: 'Shop manager',
-            bio: 'Eleanor opened the Columbia Road shop in 2024, a few doors from the Sunday flower market.',
-            email: 'eleanor@hagen.example.co.uk',
-        },
-    },
-    {
-        office: 'Hagen Bergen',
-        values: {
-            name: 'Erlend Vik',
-            role: 'Shop manager',
-            bio: 'Erlend knows which plants forgive Bergen rain on the walk home, and which do not.',
-            email: 'erlend@hagen.example.no',
-        },
-    },
-    {
-        office: 'Hagen Bergen',
-        values: {
-            name: 'Sigrid Haugen',
-            role: 'Plant doctor',
-            bio: 'Sigrid makes house calls across Bergen for plants too big to carry in.',
-        },
-    },
-];
-
-const events = [
-    {
-        title: 'Repotting without the mess',
-        summary: 'Bring a plant that has outgrown its pot. Martin shows how to move it on, and you leave with it repotted.',
-        date: '2026-11-14',
-        time: '10:00 to 12:00',
-        price: '£25',
-    },
-    {
-        title: 'Houseplants through the winter',
-        summary: 'Light, water and heating: an hour on keeping houseplants well from November to March, with questions after.',
-        date: '2026-11-28',
-        time: '18:30 to 19:30',
-        price: 'Free',
-    },
-    {
-        title: 'Wreath evening',
-        summary: 'Make a wreath of spruce, eucalyptus and dried hydrangea to take home. Everything is provided, mulled apple included.',
-        date: '2026-12-10',
-        time: '18:00 to 20:30',
-        price: '£45',
-    },
-];
-
-/**
- * The journal, with the sites each article shows on. Every article shows on
- * the group's site, which lists them all.
- */
-const articles = [
-    {
-        title: 'Winter care for houseplants',
-        summary: 'Less water, more light and no radiators: how to see a houseplant through the dark months.',
-        body: `Most houseplants rest from November to February. Water when the top few centimetres of soil are dry, not on a schedule, and stop feeding until the days grow longer.
-
-Move them as close to the window as they will go, and away from radiators, which dry the air and the leaves. A tray of wet gravel under the pot helps ferns and calatheas through the heating season.`,
-        date: '2026-10-20',
-        showsOn: ['uk', 'norway', 'group'],
-    },
-    {
-        title: 'Columbia Road flower market',
-        summary: 'Our London shop sits a few doors from the Sunday market. When to go, and what to bring home.',
-        body: `The market runs every Sunday from eight until early afternoon. Come early for the pick of the stalls, or late for the bargains as the traders pack up.
-
-Bring a bag with a flat bottom for pots, and drop in at the shop for a care card for whatever you found.`,
-        date: '2026-09-14',
-        showsOn: ['uk', 'group'],
-    },
-    {
-        title: 'Juletrær i Oslo',
-        summary: 'From the first Sunday of Advent we sell Christmas trees from Hedmarken in the courtyard on Grünerløkka.',
-        body: `We fetch the trees from the grower the same week we sell them, so they keep their needles until New Year. Choose between Norway spruce, Serbian spruce and Nordmann fir.
-
-We wrap the tree in netting and deliver it to your door in Oslo for 150 kroner.`,
-        date: '2026-11-01',
-        showsOn: ['norway', 'group'],
-    },
-    {
-        title: 'Visiting the growers we buy from',
-        summary: 'Every spring the buyers from all three shops visit the nurseries that grow our plants.',
-        body: `We buy from a handful of growers in Norway, the Netherlands and Kent, and we visit each of them every season. We see how the plants are raised, and we choose next year's together.
-
-It is why every Hagen plant comes with a care card written by the people who grew it.`,
-        date: '2026-04-28',
-        showsOn: ['group'],
-    },
-];
-
-/**
- * The articles Hagen Norge shows, in Norwegian, by their English title.
- */
-const articlesInNorwegian: Record<string, Record<string, unknown>> = {
-    'Winter care for houseplants': {
-        title: 'Vinterstell av stueplanter',
-        summary: 'Mindre vann, mer lys og ingen ovner: slik kommer stueplantene gjennom de mørke månedene.',
-        body: `De fleste stueplanter hviler fra november til februar. Vann når de øverste centimeterne av jorda er tørre, ikke etter timeplan, og vent med gjødsel til dagene blir lengre.
-
-Flytt dem så nær vinduet de tåler, og bort fra ovnene, som tørker lufta og bladene. Et fat med våt grus under potta hjelper bregner og kalateaer gjennom fyringssesongen.`,
-    },
-    'Juletrær i Oslo': {
-        title: 'Juletrær i Oslo',
-        summary: 'Fra første søndag i advent selger vi juletrær fra Hedmarken i bakgården på Grünerløkka.',
-        body: `Vi henter trærne hos gartneren samme uke som vi selger dem, så de holder nålene til nyttår. Velg mellom vanlig gran, serbisk gran og edelgran.
-
-Vi pakker treet i nett og leverer det på døren i Oslo for 150 kroner.`,
-    },
-};
-
-const privacyPolicy = {
-    heading: 'Privacy policy',
-    updatedOn: '2026-10-01',
-    body: `Hagen Group AS and its shops in the UK and Norway keep only what we need to answer you, deliver your order and run our workshops.
-
-When you buy from us we keep your name, address and order for as long as the law asks us to keep receipts. When you write to us we keep the conversation for a year, so the plant care desk can see what we said last time.
-
-We never sell what we know about you, and we share it only with the couriers who bring your plants and the payment provider who takes your card.
-
-Write to privacy@hagen.example.com to see what we hold about you, or to ask us to delete it.`,
+const inOslo = (days: number, hour: number, minute = 0): Date => {
+    const today = new RealDate(RealDate.now() + osloOffset(RealDate.now()));
+    const wall = RealDate.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + days, hour, minute);
+    return new RealDate(wall - osloOffset(wall));
 };
 
 /**
- * The privacy policy in Norwegian, which Hagen Norge shows at its root.
+ * A moment `days` ago, during the working day. `step` moves it on by hours,
+ * so what happens after something on the same day comes after it.
  */
-const privacyPolicyInNorwegian = {
-    heading: 'Personvern',
-    body: `Hagen Group AS og butikkene i Storbritannia og Norge tar bare vare på det vi trenger for å svare deg, levere bestillingen din og holde kursene våre.
+const daysAgo = (days: number, step = 0): Date => inOslo(-days, 9 + ((days * 5) % 6) + step, (days * 17) % 60);
 
-Når du handler hos oss, tar vi vare på navn, adresse og bestilling så lenge loven krever at vi oppbevarer kvitteringer. Når du skriver til oss, tar vi vare på samtalen i ett år, så planteklinikken ser hva vi svarte sist.
+/**
+ * The date `days` from today, or before it when negative, as a field stores it.
+ */
+const dateIn = (days: number): string => inOslo(days, 12).toISOString().slice(0, 10);
 
-Vi selger aldri det vi vet om deg, og vi deler det bare med budene som bringer plantene og betalingstjenesten som tar imot kortet ditt.
-
-Skriv til privacy@hagen.example.com for å se hva vi har om deg, eller for å be oss slette det.`,
+/**
+ * The next 14 November, the day Trondheim opens, at eight in the morning.
+ */
+const trondheimOpens = (): Date => {
+    for (let days = 1; days <= 366; days += 1) {
+        const day = inOslo(days, 8);
+        if (dateIn(days).endsWith('-11-14')) return day;
+    }
+    throw new Error('No 14 November in the coming year.');
 };
 
 /**
- * Each shop in Norwegian: its city, and the alt text of its photo.
+ * The next Tuesday at least three days away, at seven, when the newsletter
+ * goes out.
  */
-const officesInNorwegian: Record<string, Record<string, unknown>> = {
-    'Hagen London': {
-        city: 'London',
-    },
-    'Hagen Oslo': {
-        city: 'Oslo',
-        photo: 'Nærbilde av bregneblader som har foldet seg ut i skyggen',
-    },
-    'Hagen Bergen': {
-        city: 'Bergen',
-    },
+const nextNewsletterDay = (): Date => {
+    for (let days = 3; days <= 9; days += 1) {
+        if (new RealDate(`${dateIn(days)}T12:00:00Z`).getUTCDay() === 2) return inOslo(days, 7);
+    }
+    throw new Error('No Tuesday in the coming week.');
 };
 
 /**
- * Hagen Norge's front page in English, which it serves under `/en`.
+ * Runs `write` as if the clock read `moment`, so a document's history shows
+ * the day each editor made their change. The seed writes one thing at a
+ * time, so nothing else runs while the clock is moved.
  */
-const norwayFrontPageInEnglish = {
-    heading: 'Plants that stay with you',
-    intro: 'Houseplants, ferns and trees from growers we know, in Oslo and Bergen. Delivered the next day in both cities.',
+const asOf = async <T>(moment: Date, write: () => Promise<T>): Promise<T> => {
+    const offset = moment.getTime() - RealDate.now();
+    globalThis.Date = new Proxy(RealDate, {
+        construct: (target, args) => (args.length === 0 ? new target(target.now() + offset) : Reflect.construct(target, args)),
+        get: (target, property, receiver) => (property === 'now' ? () => target.now() + offset : Reflect.get(target, property, receiver)),
+    });
+    try {
+        return await write();
+    } finally {
+        globalThis.Date = RealDate;
+    }
 };
 
 /**
- * Each site's pages, under the site they belong to.
- */
-const pages: Array<{ site: string; name: string; values: Record<string, unknown> }> = [
-    {
-        site: 'group',
-        name: 'frontPage',
-        values: {
-            heading: 'Three plant shops, one family',
-            intro: 'Hagen started on Grünerløkka in Oslo in 2019. Today we run shops in Oslo, Bergen and London, buying from the same growers and sharing one plant care desk.',
-        },
-    },
-    {
-        site: 'group',
-        name: 'aboutPage',
-        values: {
-            heading: 'About Hagen Group',
-            body: `Hagen Group AS owns the Hagen shops in Norway and the UK. Each country runs its own shops and its own website, and the group looks after buying, plant care and the people behind them.
-
-We buy from a handful of growers we visit every season, and every plant leaves with a care card. If it struggles anyway, the plant care desk answers the same day, whichever shop you bought it from.`,
-        },
-    },
-    {
-        site: 'uk',
-        name: 'frontPage',
-        values: {
-            heading: 'Plants that stay with you, on Columbia Road',
-            intro: 'Houseplants, ferns and trees from growers we know, a few doors from the Sunday flower market. Workshops most weekends.',
-        },
-    },
-    {
-        site: 'uk',
-        name: 'eventsPage',
-        values: {
-            heading: 'Workshops at the London shop',
-            intro: 'Small groups, an hour or two, and you take home what you make.',
-        },
-    },
-    {
-        site: 'norway',
-        name: 'frontPage',
-        values: {
-            heading: 'Planter som blir hos deg',
-            intro: 'Stueplanter, bregner og trær fra gartnere vi kjenner, i Oslo og Bergen. Levert neste dag i begge byene.',
-        },
-    },
-];
-
-/**
- * Fills in what the demo database is missing: the offices, the people, the
- * journal, the privacy policy, the UK's events and every site's pages.
- * Content already there is left alone, so an editor's changes survive a
- * restart.
+ * Fills in what the demo database is missing: Hagen's shops and people, the
+ * journal, the UK's workshops, every site's pages, the newsletter and the
+ * media library, each with the history of who wrote it. It also leaves work
+ * in progress: drafts waiting for review, schedules, a release and
+ * translations behind their source. A document already there is left alone,
+ * so an editor's changes survive a restart.
  */
 export const seedContent = async (service: CmsService): Promise<void> => {
     const caller = service.caller({
@@ -309,65 +127,115 @@ export const seedContent = async (service: CmsService): Promise<void> => {
         },
     });
 
-    // The apps' caches live in their own servers, so publishing goes to the store without invalidating anything.
-    const publish = async (ref: DocumentRef): Promise<void> => {
-        const state = await service.draftState(ref);
-        if (!state.complete) throw new Error(`The seed for ${formatRef(ref)} is missing ${state.missing.join(', ')}.`);
-        await service.store.publish(state.target.kind, state.target.key, AUTHOR, state.target.site, state.target.locale);
-    };
+    const exists = async (ref: DocumentRef): Promise<boolean> => (await service.document(ref)).row !== undefined;
 
-    const fill = async (ref: DocumentRef, values: Record<string, unknown>): Promise<void> => {
-        if ((await service.document(ref)).row !== undefined) return;
-        await service.update({
-            ref,
-            changes: values,
-            caller,
-            author: AUTHOR,
-            summary: 'Seeded',
+    const save = (ref: DocumentRef, changes: Record<string, unknown>, by: string, at: Date, summary?: string) =>
+        asOf(at, () =>
+            service.update({
+                ref,
+                changes,
+                caller,
+                author: by,
+                ...(summary === undefined
+                    ? {}
+                    : {
+                          summary,
+                      }),
+            })
+        );
+
+    // The apps' caches live in their own servers, so publishing goes to the store without invalidating anything.
+    const publish = (ref: DocumentRef, by: string, at: Date) =>
+        asOf(at, async () => {
+            const state = await service.draftState(ref);
+            if (!state.complete) throw new Error(`The seed for ${formatRef(ref)} is missing ${state.missing.join(', ')}.`);
+            await service.store.publish(state.target.kind, state.target.key, by, state.target.site, state.target.locale);
         });
-        await publish(ref);
+
+    /**
+     * Writes a new document's history: its first draft, its publishing, and
+     * each later edit.
+     */
+    const tell = async (ref: DocumentRef, values: Record<string, unknown>, written: Written, edits: readonly Edit[] = []) => {
+        await save(ref, values, written.by, daysAgo(written.daysAgo));
+        if (written.published !== undefined) await publish(ref, written.published.by, daysAgo(written.published.daysAgo, 1));
+        for (const edit of edits) {
+            await save(ref, edit.changes, edit.by, daysAgo(edit.daysAgo), edit.summary);
+            if (edit.publish === true) await publish(ref, edit.by, daysAgo(edit.daysAgo, 1));
+        }
         console.log(`[demo] seeded ${formatRef(ref)}`);
     };
 
-    if ((await service.editorItems('offices')).length === 0) {
-        for (const office of offices) {
-            const created = await service.createItem('offices', office, caller, AUTHOR);
-            await publish(created.target.ref);
-        }
-        console.log(`[demo] seeded ${offices.length} offices`);
-    }
-
-    const officeItems = await service.editorItems('offices');
-    const officeId = (name: string): string => {
-        const found = officeItems.find((office) => office.label === name);
-        if (found === undefined) throw new Error(`The seed has no office '${name}'.`);
-        return found.id;
+    /**
+     * Whether a document has a version saved with `summary`, which is how
+     * the seed knows it told a story already.
+     */
+    const hasVersion = async (ref: DocumentRef, summary: string): Promise<boolean> => {
+        const { row } = await service.document(ref);
+        return row !== undefined && (await service.store.versions(row.id)).some((version) => version.summary === summary);
     };
 
-    await fill(
-        {
-            type: 'item',
-            collection: 'offices',
-            id: officeId('Hagen London'),
-            site: 'uk',
-        },
-        londonOnTheUk
-    );
+    // Media
 
     /**
-     * Stores a photo in the shared library, or in a site's own when `site`
-     * names one.
+     * A folder of a library, made when it is missing. `site` names a site's
+     * library, and without it the shared one.
      */
-    const upload = async (photo: { file: string; alt: string }, site?: string, folder?: string): Promise<{ id: string; alt: string }> => {
-        const bytes = new Uint8Array(await readFile(join(PHOTOS, photo.file)));
-        const record = await service.media.storeBytes(bytes, photo.file, AUTHOR, undefined, site, folder);
-        if (record.alt === '') {
-            await service.media.update(
-                record.id,
+    const folderNamed = async (
+        input: { name: string; site?: string; parent?: string },
+        by: string,
+        at: Date
+    ): Promise<{ id: string; made: boolean }> => {
+        const found = (await service.media.folders(input.site)).find(
+            (folder) => folder.site === input.site && folder.name === input.name && folder.parent === input.parent
+        );
+        if (found !== undefined) {
+            return {
+                id: found.id,
+                made: false,
+            };
+        }
+        const made = await asOf(at, () =>
+            service.media.createFolder(
                 {
-                    alt: photo.alt,
+                    name: input.name,
+                    ...(input.parent === undefined
+                        ? {}
+                        : {
+                              parent: input.parent,
+                          }),
                 },
-                AUTHOR
+                input.site,
+                by
+            )
+        );
+        return {
+            id: made.id,
+            made: true,
+        };
+    };
+
+    /**
+     * Stores a photo in a library, once: the same file uploaded again to the
+     * same library is the same image.
+     */
+    const upload = async (
+        photo: { file: string; alt: string },
+        by: string,
+        at: Date,
+        place: { site?: string; folder?: string } = {}
+    ): Promise<{ id: string; alt: string }> => {
+        const bytes = new Uint8Array(await readFile(join(PHOTOS, photo.file)));
+        const record = await asOf(at, () => service.media.storeBytes(bytes, photo.file, by, undefined, place.site, place.folder));
+        if (record.alt === '') {
+            await asOf(at, () =>
+                service.media.update(
+                    record.id,
+                    {
+                        alt: photo.alt,
+                    },
+                    by
+                )
             );
         }
         return {
@@ -376,191 +244,786 @@ export const seedContent = async (service: CmsService): Promise<void> => {
         };
     };
 
-    /**
-     * Gives a published document an image it has none of yet.
-     */
-    const addImage = async (
-        ref: DocumentRef,
-        field: string,
-        photo: { file: string; alt: string },
-        site?: string,
-        folder?: string
-    ): Promise<void> => {
-        const { row } = await service.document(ref);
-        if (row === undefined || row.published?.[field] !== undefined) return;
-        await service.update({
-            ref,
-            changes: {
-                [field]: await upload(photo, site, folder),
-            },
-            caller,
-            author: AUTHOR,
-            summary: 'Seeded',
-        });
-        await publish(ref);
-        console.log(`[demo] seeded the ${field} of ${formatRef(ref)}`);
+    const shops = await folderNamed(
+        {
+            name: 'Shops',
+        },
+        ada,
+        daysAgo(20)
+    );
+    const journal = await folderNamed(
+        {
+            name: 'Journal',
+        },
+        ada,
+        daysAgo(20, 1)
+    );
+    const campaigns = await folderNamed(
+        {
+            name: 'Campaigns',
+        },
+        ada,
+        daysAgo(20, 2)
+    );
+    await folderNamed(
+        {
+            name: 'Christmas 2026',
+            parent: campaigns.id,
+        },
+        ada,
+        daysAgo(20, 2)
+    );
+    const norwayCampaigns = await folderNamed(
+        {
+            name: 'Kampanjer',
+            site: 'norway',
+        },
+        nils,
+        daysAgo(61)
+    );
+    const norwayChristmas = await folderNamed(
+        {
+            name: 'Jul 2026',
+            site: 'norway',
+            parent: norwayCampaigns.id,
+        },
+        nils,
+        daysAgo(18)
+    );
+    const norwayShops = await folderNamed(
+        {
+            name: 'Butikkene',
+            site: 'norway',
+        },
+        kari,
+        daysAgo(36)
+    );
+    const workshops = await folderNamed(
+        {
+            name: 'Workshops',
+            site: 'uk',
+        },
+        una,
+        daysAgo(30)
+    );
+    const folderIds: Record<string, string> = {
+        Kampanjer: norwayCampaigns.id,
+        Butikkene: norwayShops.id,
     };
 
-    await addImage(
-        {
-            type: 'item',
-            collection: 'offices',
-            id: officeId('Hagen Oslo'),
-        },
-        'photo',
-        photos.oslo
-    );
+    // Shops
 
-    if ((await service.editorItems('employees')).length === 0) {
-        for (const employee of employees) {
-            const created = await service.createItem(
-                'employees',
-                {
-                    ...employee.values,
-                    office: officeId(employee.office),
-                },
-                caller,
-                AUTHOR
-            );
-            await publish(created.target.ref);
+    const officeLabels = async (): Promise<Array<{ id: string; label: string; status: string }>> =>
+        (await service.editorItems('offices')).map((item) => ({
+            id: item.id,
+            label: item.label,
+            status: item.status,
+        }));
+    const officeRef = (id: string, extra: { site?: string; locale?: string } = {}): DocumentRef => ({
+        type: 'item',
+        collection: 'offices',
+        id,
+        ...extra,
+    });
+
+    for (const office of offices) {
+        if ((await officeLabels()).some((item) => item.label === office.values['name'])) continue;
+        const at = daysAgo(office.written.daysAgo);
+        const values = {
+            ...office.values,
+            ...(office.photo === undefined
+                ? {}
+                : {
+                      photo: await upload(photos[office.photo], office.written.by, at),
+                  }),
+        };
+        const created = await asOf(at, () => service.createItem('offices', values, caller, office.written.by));
+        if (office.written.published !== undefined) {
+            await publish(created.target.ref, office.written.published.by, daysAgo(office.written.published.daysAgo, 1));
         }
-        console.log(`[demo] seeded ${employees.length} employees`);
+        console.log(`[demo] seeded the office ${String(office.values['name'])}`);
     }
 
-    if ((await service.editorItems('events', 'uk')).length === 0) {
-        for (const event of events) {
-            const created = await service.createItem(
-                'events',
-                {
-                    ...event,
-                    office: officeId('Hagen London'),
-                },
-                caller,
-                AUTHOR,
-                'uk'
-            );
-            await publish(created.target.ref);
-        }
-        console.log(`[demo] seeded ${events.length} UK events`);
-    }
+    const officeId = async (name: string): Promise<string> => {
+        const found = (await officeLabels()).find((office) => office.label === name);
+        if (found === undefined) throw new Error(`The seed has no office '${name}'.`);
+        return found.id;
+    };
+    const publishedDaysAgo = (name: string): number =>
+        offices.find((office) => office.values['name'] === name)?.written.published?.daysAgo ?? 30;
 
-    const wreathEvening = (await service.editorItems('events', 'uk')).find((event) => event.label === 'Wreath evening');
-    if (wreathEvening !== undefined) {
-        await addImage(
-            {
-                type: 'item',
-                collection: 'events',
-                id: wreathEvening.id,
-                site: 'uk',
+    for (const [name, values] of Object.entries(officesOnTheUk)) {
+        const ref = officeRef(await officeId(name), {
+            site: 'uk',
+        });
+        if (await exists(ref)) continue;
+        await tell(ref, values, {
+            by: una,
+            daysAgo: publishedDaysAgo(name),
+            published: {
+                by: una,
+                daysAgo: publishedDaysAgo(name),
             },
-            'image',
-            photos.wreathEvening,
-            'uk'
-        );
+        });
     }
 
-    if ((await service.editorItems('articles')).length === 0) {
-        for (const article of articles) {
-            const created = await service.createItem('articles', article, caller, AUTHOR);
-            await publish(created.target.ref);
-        }
-        console.log(`[demo] seeded ${articles.length} articles`);
-    }
-
-    await fill(
-        {
-            type: 'global',
-            name: 'privacyPolicy',
-        },
-        privacyPolicy
-    );
-
-    for (const page of pages) {
-        await fill(
-            {
-                type: 'page',
-                name: page.name,
-                site: page.site,
-            },
-            page.values
-        );
-    }
-
-    await fill(
-        {
-            type: 'global',
-            name: 'privacyPolicy',
-            locale: 'nb',
-        },
-        privacyPolicyInNorwegian
-    );
-    const articleItems = await service.editorItems('articles');
-    for (const [title, values] of Object.entries(articlesInNorwegian)) {
-        const found = articleItems.find((article) => article.label === title);
-        if (found === undefined) continue;
-        await fill(
-            {
-                type: 'item',
-                collection: 'articles',
-                id: found.id,
-                locale: 'nb',
-            },
-            values
-        );
-    }
     for (const [name, values] of Object.entries(officesInNorwegian)) {
-        await fill(
-            {
-                type: 'item',
-                collection: 'offices',
-                id: officeId(name),
-                locale: 'nb',
+        const ref = officeRef(await officeId(name), {
+            locale: 'nb',
+        });
+        if (await exists(ref)) continue;
+        await tell(ref, values, {
+            by: kari,
+            daysAgo: publishedDaysAgo(name) - 1,
+            published: {
+                by: nils,
+                daysAgo: publishedDaysAgo(name) - 1,
             },
-            values
-        );
+        });
     }
-    await fill(
-        {
-            type: 'page',
-            name: 'frontPage',
-            site: 'norway',
-            locale: 'en',
-        },
-        norwayFrontPageInEnglish
-    );
-};
 
-    // Hagen Norge's library keeps its photos in folders of its own.
-    const folderNamed = async (name: string, parent?: string): Promise<string> => {
-        const found = (await service.media.folders('norway')).find(
-            (folder) => folder.site === 'norway' && folder.name === name && folder.parent === parent
+    // People
+
+    for (const employee of employees) {
+        if ((await service.editorItems('employees')).some((item) => item.label === employee.values['name'])) continue;
+        const values = {
+            ...employee.values,
+            office: await officeId(employee.office),
+        };
+        const created = await asOf(daysAgo(employee.written.daysAgo), () =>
+            service.createItem('employees', values, caller, employee.written.by)
         );
-        if (found !== undefined) return found.id;
-        const made = await service.media.createFolder(
-            {
-                name,
-                ...(parent === undefined
+        if (employee.written.published !== undefined) {
+            await publish(created.target.ref, employee.written.published.by, daysAgo(employee.written.published.daysAgo, 1));
+        }
+    }
+
+    /**
+     * Puts a collection's items in the seed's order, for a database seeded
+     * before items had places. Once anyone has moved an item, their order
+     * stands.
+     */
+    const arrange = async (collection: string, labels: readonly string[]): Promise<void> => {
+        const items = await service.editorItems(collection);
+        const current = items.map((item) => item.label).filter((label) => labels.includes(label));
+        const wanted = labels.filter((label) => current.includes(label));
+        if (current.every((label, index) => label === wanted[index])) return;
+        for (const item of items) {
+            if (await hasVersion(officeRef(item.id), 'Moved')) return;
+            if (
+                await hasVersion(
+                    {
+                        type: 'item',
+                        collection,
+                        id: item.id,
+                    },
+                    'Moved'
+                )
+            )
+                return;
+        }
+        for (const label of wanted) {
+            const item = items.find((candidate) => candidate.label === label)!;
+            const ref: DocumentRef = {
+                type: 'item',
+                collection,
+                id: item.id,
+            };
+            await asOf(daysAgo(2), () =>
+                service.placeItem({
+                    name: collection,
+                    id: item.id,
+                    place: {
+                        at: 'last',
+                    },
+                    caller,
+                    author: ada,
+                })
+            );
+            if (item.status === 'published') await publish(ref, ada, daysAgo(2, 1));
+        }
+        console.log(`[demo] put the ${collection} in order`);
+    };
+    await arrange(
+        'offices',
+        offices.map((office) => String(office.values['name']))
+    );
+    await arrange(
+        'employees',
+        employees.map((employee) => String(employee.values['name']))
+    );
+
+    // The journal
+
+    for (const article of articles) {
+        const title = article.values['title'];
+        if ((await service.editorItems('articles')).some((item) => item.label === title)) continue;
+        const created = await asOf(daysAgo(article.written.daysAgo), () =>
+            service.createItem(
+                'articles',
+                {
+                    ...article.values,
+                    date: dateIn(-article.dated),
+                },
+                caller,
+                article.written.by
+            )
+        );
+        const ref = created.target.ref;
+        const published = article.written.published;
+        if (published !== undefined) await publish(ref, published.by, daysAgo(published.daysAgo, 1));
+        if (article.inNorwegian !== undefined && published !== undefined && ref.type === 'item') {
+            await tell(
+                {
+                    ...ref,
+                    locale: 'nb',
+                },
+                article.inNorwegian,
+                {
+                    by: kari,
+                    daysAgo: published.daysAgo,
+                    published: {
+                        by: nils,
+                        daysAgo: published.daysAgo,
+                    },
+                }
+            );
+        }
+        // Fern week ends in a week, so Nils takes it down then.
+        if (title === 'Fern week in Oslo and Bergen' && created.row !== undefined) {
+            await asOf(daysAgo(2, 2), () =>
+                service.schedules.schedule({
+                    ref: formatRef(ref),
+                    documentId: created.row!.id,
+                    action: 'unpublish',
+                    at: inOslo(7, 22),
+                    force: false,
+                    createdBy: nils,
+                })
+            );
+        }
+        console.log(`[demo] seeded the article ${String(title)}`);
+    }
+
+    // The UK's workshops
+
+    for (const event of events) {
+        if ((await service.editorItems('events', 'uk')).some((item) => item.label === event.values['title'])) continue;
+        const at = daysAgo(event.written.daysAgo);
+        const image =
+            event.values['title'] === 'Wreath evening'
+                ? {
+                      image: await upload(photos.wreathEvening, event.written.by, at, {
+                          site: 'uk',
+                          folder: workshops.id,
+                      }),
+                  }
+                : {};
+        const values = {
+            ...event.values,
+            ...image,
+            date: dateIn(event.inDays),
+            office: await officeId('Hagen London'),
+        };
+        const created = await asOf(at, () => service.createItem('events', values, caller, event.written.by, 'uk'));
+        if (event.written.published !== undefined) {
+            await publish(created.target.ref, event.written.published.by, daysAgo(event.written.published.daysAgo, 1));
+        }
+    }
+
+    // The privacy policy
+
+    const privacy: DocumentRef = {
+        type: 'global',
+        name: 'privacyPolicy',
+    };
+    if (!(await exists(privacy))) {
+        await tell(privacy, privacyPolicy, {
+            by: ada,
+            daysAgo: 30,
+            published: {
+                by: ada,
+                daysAgo: 30,
+            },
+        });
+    }
+    const privacyInNorwegian: DocumentRef = {
+        ...privacy,
+        locale: 'nb',
+    };
+    if (!(await exists(privacyInNorwegian))) {
+        await tell(privacyInNorwegian, privacyPolicyInNorwegian, {
+            by: nils,
+            daysAgo: 29,
+            published: {
+                by: nils,
+                daysAgo: 29,
+            },
+        });
+    }
+
+    // Every site's pages
+
+    const pageRef = (page: { site: string; name: string }, locale?: string): DocumentRef => ({
+        type: 'page',
+        name: page.name,
+        site: page.site,
+        ...(locale === undefined
+            ? {}
+            : {
+                  locale,
+              }),
+    });
+
+    /**
+     * The image a page shows, stored in the library it names.
+     */
+    const imageOf = async (page: SeededPage): Promise<Record<string, unknown>> => {
+        if (page.image === undefined) return {};
+        const folder = page.image.folder === undefined ? undefined : folderIds[page.image.folder];
+        return {
+            [page.image.field]: await upload(photos[page.image.photo], page.written.by, daysAgo(page.written.daysAgo), {
+                ...(page.image.library === undefined
                     ? {}
                     : {
-                          parent,
+                          site: page.image.library,
                       }),
-            },
-            'norway',
-            AUTHOR
-        );
-        return made.id;
+                ...(folder === undefined
+                    ? {}
+                    : {
+                          folder,
+                      }),
+            }),
+        };
     };
-    const campaigns = await folderNamed('Kampanjer');
-    await folderNamed('Jul 2026', campaigns);
-    await folderNamed('Butikkene');
-    await addImage(
-        {
-            type: 'page',
-            name: 'frontPage',
+
+    const made = new Set<string>();
+    for (const page of pages) {
+        const ref = pageRef(page);
+        if (!(await exists(ref))) {
+            await tell(
+                ref,
+                {
+                    ...page.values,
+                    ...(await imageOf(page)),
+                },
+                page.written
+            );
+            made.add(`${page.site}:${page.name}`);
+        }
+        if (page.translation !== undefined) {
+            const translated = pageRef(page, page.translation.locale);
+            if (!(await exists(translated))) await tell(translated, page.translation.values, page.translation.written);
+        }
+        // After the translation, so a change to the source shows on it.
+        if (made.has(`${page.site}:${page.name}`)) {
+            for (const edit of page.edits ?? []) {
+                await save(ref, edit.changes, edit.by, daysAgo(edit.daysAgo), edit.summary);
+                if (edit.publish === true) await publish(ref, edit.by, daysAgo(edit.daysAgo, 1));
+            }
+        }
+    }
+
+    // A database seeded before the hero gets it now.
+    const norwayFront = pageRef({
+        site: 'norway',
+        name: 'frontPage',
+    });
+    const front = await service.document(norwayFront);
+    if (front.row !== undefined && front.row.published?.['hero'] === undefined && front.row.draft?.['hero'] === undefined) {
+        await save(
+            norwayFront,
+            {
+                hero: await upload(photos.norwayHero, nils, daysAgo(25), {
+                    site: 'norway',
+                    folder: norwayCampaigns.id,
+                }),
+            },
+            nils,
+            daysAgo(25),
+            'Nytt toppbilde'
+        );
+        await publish(norwayFront, nils, daysAgo(25, 1));
+    }
+
+    // The shared photos nothing shows yet, and the tidying that put the shop photos in a folder.
+    if (shops.made) {
+        await upload(photos.growers, ada, daysAgo(21));
+        await upload(photos.spring, ada, daysAgo(21, 1));
+        const shared = await service.media.inLibrary();
+        const named = (file: string) => shared.filter((record) => record.filename === file).map((record) => record.id);
+        await asOf(daysAgo(14), () =>
+            service.media.move(
+                [photos.osloShop.file, photos.majorstuenShop.file, photos.stavangerShop.file].flatMap(named),
+                {
+                    folder: shops.id,
+                },
+                ada
+            )
+        );
+        await asOf(daysAgo(14, 1), () =>
+            service.media.move(
+                [photos.growers.file, photos.spring.file].flatMap(named),
+                {
+                    folder: journal.id,
+                },
+                ada
+            )
+        );
+        console.log('[demo] tidied the shared library into folders');
+    }
+
+    // Reviews
+
+    /**
+     * Asks `reviewers` to review a document's draft as it stands.
+     */
+    const askForReview = (ref: DocumentRef, input: { by: string; reviewers: string[]; note: string; at: Date }) =>
+        asOf(input.at, async () => {
+            const state = await service.draftState(ref);
+            if (state.row === undefined) throw new Error(`The seed asks for a review of ${formatRef(ref)}, which has no draft.`);
+            const [review] = await service.store.addReviews([
+                {
+                    requestId: randomUUID(),
+                    ref: formatRef(state.target.ref),
+                    documentId: state.row.id,
+                    version: state.version,
+                    reviewers: input.reviewers,
+                    requestedBy: input.by,
+                    note: input.note,
+                    createdAt: new Date(),
+                },
+            ]);
+            return {
+                review: review!,
+                version: state.version,
+            };
+        });
+
+    // Hagen Norge's winter front page, which waits for Nils.
+    const winter = 'Vintertekst og julebilde';
+    const frontState = await service.draftState(norwayFront);
+    if (frontState.status === 'published' && !(await hasVersion(norwayFront, winter))) {
+        await save(
+            norwayFront,
+            {
+                ...norwayWinterFrontPage.changes,
+                hero: await upload(photos.norwayChristmas, mia, daysAgo(1), {
+                    site: 'norway',
+                    folder: norwayChristmas.id,
+                }),
+            },
+            mia,
+            daysAgo(1),
+            winter
+        );
+        await askForReview(norwayFront, {
+            by: mia,
+            reviewers: [nils],
+            note: norwayWinterFrontPage.note,
+            at: daysAgo(1, 1),
+        });
+        console.log('[demo] asked Nils to review the winter front page');
+    }
+
+    // Kari's history of Hagen Norge, which Nils sent back.
+    const history = pageRef({
+        site: 'norway',
+        name: 'historyPage',
+    });
+    if (made.has('norway:historyPage')) {
+        await save(history, norwayHistoryDraft.changes, kari, daysAgo(3), 'Lengre historie');
+        const { review } = await askForReview(history, {
+            by: kari,
+            reviewers: [nils],
+            note: norwayHistoryDraft.requestNote,
+            at: daysAgo(3, 1),
+        });
+        await asOf(daysAgo(2), async () => {
+            await service.store.addReviewComment({
+                reviewId: review.id,
+                path: 'body',
+                text: norwayHistoryDraft.comment,
+                createdBy: nils,
+                createdAt: new Date(),
+            });
+            await service.store.decideReview(review.id, {
+                status: 'changes',
+                by: nils,
+                note: norwayHistoryDraft.decisionNote,
+                version: review.version,
+            });
+        });
+        console.log('[demo] sent the history page back to Kari');
+    }
+
+    // The plant doctor's new price, which Una approved and nobody has published yet.
+    const plantDoctor = pageRef({
+        site: 'uk',
+        name: 'plantDoctorPage',
+    });
+    if (made.has('uk:plantDoctorPage')) {
+        await save(
+            plantDoctor,
+            {
+                body: `From December a first visit costs £40 within E1 to E9 and takes about forty minutes. We look at the light, the pot and the soil, and leave a written plan for the next three months.
+
+Book a visit at the shop or by writing to care@hagen.example.co.uk. Visits run on Tuesday and Wednesday mornings.`,
+            },
+            sam,
+            daysAgo(2),
+            'New price from December'
+        );
+        const { review } = await askForReview(plantDoctor, {
+            by: sam,
+            reviewers: [una],
+            note: 'The new price for house calls. Can it go live before the newsletter?',
+            at: daysAgo(2, 1),
+        });
+        await asOf(daysAgo(1, 3), () =>
+            service.store.decideReview(review.id, {
+                status: 'approved',
+                by: una,
+                note: null,
+                version: review.version,
+            })
+        );
+    }
+
+    // Schedules
+
+    /**
+     * Schedules a document to publish or unpublish on its own at `at`.
+     */
+    const schedule = (ref: DocumentRef, input: { action: 'publish' | 'unpublish'; at: Date; by: string; when: Date }) =>
+        asOf(input.when, async () => {
+            const state = await service.draftState(ref);
+            await service.schedules.schedule({
+                ref: formatRef(state.target.ref),
+                documentId: state.row!.id,
+                action: input.action,
+                at: input.at,
+                force: false,
+                createdBy: input.by,
+            });
+        });
+
+    // December opening hours on Hagen Norge, live tomorrow morning.
+    const customerService = pageRef({
+        site: 'norway',
+        name: 'customerServicePage',
+    });
+    if (made.has('norway:customerServicePage')) {
+        await save(customerService, christmasOpeningHours, kari, daysAgo(2), 'Åpningstider i desember');
+        await schedule(customerService, {
+            action: 'publish',
+            at: inOslo(1, 9),
+            by: nils,
+            when: daysAgo(1, 2),
+        });
+        console.log('[demo] scheduled the December opening hours for tomorrow');
+    }
+
+    // The UK's last order dates, in two and a half weeks.
+    const delivery = pageRef({
+        site: 'uk',
+        name: 'deliveryPage',
+    });
+    if (made.has('uk:deliveryPage')) {
+        await save(
+            delivery,
+            {
+                intro: 'Next day in London by cargo bike, two to three days anywhere else. Order by 20 December for Christmas.',
+            },
+            una,
+            daysAgo(1),
+            'Christmas order dates'
+        );
+        await schedule(delivery, {
+            action: 'publish',
+            at: inOslo(18, 8),
+            by: una,
+            when: daysAgo(1, 1),
+        });
+    }
+
+    // The newsletter: two issues sent, and the Christmas issue waiting for Mia.
+
+    for (const issue of newsletters) {
+        if ((await service.editorItems('newsletters')).some((item) => item.label === issue.values.subject)) continue;
+        const created = await asOf(daysAgo(issue.written.daysAgo), () =>
+            service.createItem('newsletters', newsletterValues(issue.values), caller, issue.written.by)
+        );
+        const ref = created.target.ref;
+        const { review, version } = await askForReview(ref, {
+            by: issue.written.by,
+            reviewers: [issue.approvedBy],
+            note: 'Ready for a read.',
+            at: daysAgo(issue.written.daysAgo, 1),
+        });
+        await asOf(daysAgo(issue.approvedDaysAgo), async () => {
+            const state = await service.draftState(ref);
+            await service.store.approveAndPublish(
+                state.target.kind,
+                state.target.key,
+                {
+                    review: review.id,
+                    by: issue.approvedBy,
+                    version,
+                },
+                state.target.site,
+                state.target.locale
+            );
+        });
+        console.log(`[demo] seeded the newsletter ${issue.values.subject}`);
+    }
+
+    if (!(await service.editorItems('newsletters')).some((item) => item.label === christmasNewsletter.values.subject)) {
+        const created = await asOf(daysAgo(2), () =>
+            service.createItem('newsletters', newsletterValues(christmasNewsletter.values), caller, kari)
+        );
+        const ref = created.target.ref;
+        await askForReview(ref, {
+            by: kari,
+            reviewers: [mia],
+            note: christmasNewsletter.note,
+            at: daysAgo(1, 1),
+        });
+        await schedule(ref, {
+            action: 'publish',
+            at: nextNewsletterDay(),
+            by: ada,
+            when: daysAgo(1, 2),
+        });
+        console.log('[demo] scheduled the Christmas newsletter, waiting for Mia');
+    }
+
+    // The Trondheim opening: drafts on Hagen Norge, in the shared content and on the group, published together.
+
+    const trondheimPage = pageRef({
+        site: 'norway',
+        name: 'trondheimShopPage',
+    });
+    if (!(await exists(trondheimPage))) {
+        await tell(trondheimPage, trondheimOpening.shopPage, {
+            by: nils,
+            daysAgo: 6,
+        });
+        const members: DocumentRef[] = [trondheimPage];
+        const shopsPage = pageRef({
             site: 'norway',
-        },
-        'hero',
-        photos.norwayHero,
-        'norway',
-        campaigns
-    );
+            name: 'shopsPage',
+        });
+        if ((await service.draftState(shopsPage)).status === 'published') {
+            await save(shopsPage, trondheimOpening.shopsPage, kari, daysAgo(5), 'Trondheim i ingressen');
+            members.push(shopsPage);
+        }
+        const groupFront = pageRef({
+            site: 'group',
+            name: 'frontPage',
+        });
+        if ((await service.draftState(groupFront)).status === 'published') {
+            await save(groupFront, trondheimOpening.groupFrontPage, ada, daysAgo(3), 'Seven shops');
+            members.push(groupFront);
+        }
+        for (const name of ['Hagen Trondheim']) {
+            members.push(officeRef(await officeId(name)));
+        }
+        for (const item of await service.editorItems('employees')) {
+            if (item.label === 'Kristian Moe' || item.label === 'Hanna Lie') {
+                members.push({
+                    type: 'item',
+                    collection: 'employees',
+                    id: item.id,
+                });
+            }
+        }
+        const release = await asOf(daysAgo(3, 1), () => service.schedules.createRelease('Trondheim opening', ada));
+        for (const ref of members) {
+            const state = await service.draftState(ref);
+            if (state.row === undefined || state.status === 'published') continue;
+            await asOf(daysAgo(3, 1), () =>
+                service.schedules.schedule({
+                    ref: formatRef(state.target.ref),
+                    documentId: state.row!.id,
+                    action: 'publish',
+                    at: null,
+                    force: false,
+                    createdBy: ada,
+                    releaseId: release.id,
+                })
+            );
+        }
+        await asOf(daysAgo(2, 3), () => service.schedules.timeRelease(release.id, trondheimOpens(), ada, false));
+        console.log('[demo] made the Trondheim opening release');
+    }
+};
+
+/**
+ * An issue's values with its body as rich text.
+ */
+const newsletterValues = (values: { subject: string; preheader: string; body: string }): Record<string, unknown> => ({
+    subject: values.subject,
+    preheader: values.preheader,
+    body: richText(values.body),
+});
+
+/**
+ * A few words of plain markup as rich text: blank lines between blocks, `## `
+ * for a heading, `- ` for a list item, and `[text](/path)` for a link.
+ */
+const richText = (source: string) => {
+    const key = (): string => randomUUID().replace(/-/g, '').slice(0, 12);
+    const block = (line: string, style: string, listItem?: 'bullet') => {
+        const markDefs: Array<{ _type: 'link'; _key: string; href: string }> = [];
+        const children = line
+            .split(/(\[[^\]]+\]\([^)]+\))/)
+            .filter((text) => text !== '')
+            .map((text) => {
+                const link = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(text);
+                if (link === null) {
+                    return {
+                        _type: 'span',
+                        _key: key(),
+                        text,
+                        marks: [],
+                    };
+                }
+                const mark = key();
+                markDefs.push({
+                    _type: 'link',
+                    _key: mark,
+                    href: link[2]!,
+                });
+                return {
+                    _type: 'span',
+                    _key: key(),
+                    text: link[1]!,
+                    marks: [mark],
+                };
+            });
+        return {
+            _type: 'block',
+            _key: key(),
+            style,
+            markDefs,
+            children,
+            ...(listItem === undefined
+                ? {}
+                : {
+                      listItem,
+                      level: 1,
+                  }),
+        };
+    };
+    return source
+        .split(/\n\s*\n/)
+        .map((chunk) => chunk.trim())
+        .filter((chunk) => chunk !== '')
+        .flatMap((chunk) => {
+            const lines = chunk.split('\n');
+            if (lines.every((line) => line.startsWith('- '))) return lines.map((line) => block(line.slice(2), 'normal', 'bullet'));
+            if (chunk.startsWith('## ')) return [block(chunk.slice(3), 'h2')];
+            return [block(chunk, 'normal')];
+        });
+};
