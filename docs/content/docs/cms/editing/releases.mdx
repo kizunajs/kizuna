@@ -1,0 +1,44 @@
+---
+title: Releases
+description: 'Publishing several drafts together, across documents and sites, at a time or by hand.'
+---
+
+An opening touches more than one page. The front page names the new city, the office joins the list, the journal announces it, and the group site counts one more shop. A release holds those drafts under one name, like **Trondheim opening**, and publishes them together.
+
+## Making one
+
+**Add to release** in a document's `…` menu lists the open releases, with a field at the foot to start a new one. **New release** on Scheduled asks for a name and opens the release, where **Add documents** lists every draft with changes you may edit, to tick the ones it holds.
+
+> Put the Trondheim office, the front page and the opening article in one release called Trondheim opening.
+
+A document sits in one release at a time, or has a schedule of its own, never both. Its header names the release and its time, and **Take out of release** in the `…` menu takes it out with its draft untouched.
+
+## Its page
+
+A release's page lists its documents under each site, each saying whether it would publish now or what it waits for, and the header counts the documents that wait. **Schedule** picks a time for the whole release, **Publish now** publishes it at once, and both ask first. **Delete release** in the `…` menu removes it and keeps every draft.
+
+## Publishing together
+
+A release publishes all its documents in one transaction, so a visitor never sees half of it. When one document would not publish, because it waits for a review, misses a field or someone is editing it, none of them do, and the release is held until it would. The rules are those of [one schedule](/docs/cms/editing/scheduling#when-the-time-comes), and the release's page names the document that holds it.
+
+Scheduling or publishing a release takes the permission to publish every document in it. Hagen Norge's admin can release Norway's pages, and a release that also holds a shared office takes an admin over every site. Publishing a document of a release by hand takes it out of the release.
+
+## Across sites
+
+A release can hold documents from any site you edit, and shared ones. It shows on Scheduled for each site it touches. Someone who edits one of those sites sees that site's documents and the shared ones, and nothing of the rest.
+
+## The routes
+
+| Route                                | Tool                          | Asks first |
+| ------------------------------------ | ----------------------------- | ---------- |
+| `POST /editing/releases`             | `editing_releases_create`     | No         |
+| `GET /editing/releases/:id`          | `editing_releases_get`        | No         |
+| `PATCH /editing/releases/:id`        | `editing_releases_rename`     | No         |
+| `POST /editing/releases/:id/add`     | `editing_releases_add`        | No         |
+| `POST /editing/releases/:id/remove`  | `editing_releases_remove`     | No         |
+| `PUT /editing/releases/:id/schedule` | `editing_releases_schedule`   | Yes        |
+| `DELETE` the same path               | `editing_releases_unschedule` | No         |
+| `POST /editing/releases/:id/publish` | `editing_releases_publish`    | Yes        |
+| `DELETE /editing/releases/:id`       | `editing_releases_delete`     | No         |
+
+A release answers with its documents, its `state`, how many documents wait, and `mayPublish`, whether the caller may schedule or publish it. Publishing one that something holds answers `409`, naming each document that waits.

@@ -56,6 +56,8 @@ export default definePage({
 
 Publishing waits for an approval from someone other than the person who changed it. Anyone with a role under `reviews.roles` may approve without being asked. The rule holds in the routes, so the model gets the same answer.
 
+A page that requires a review can be [scheduled](/docs/cms/editing/scheduling#scheduling-a-page-that-requires-a-review) before anyone approves it. The schedule waits for the approval.
+
 ## Publishing past a review
 
 Someone with a role under `reviews.roles` can publish before the approval comes. The Publish dialog shows them **Publish anyway** beside the reason Publish is waiting, and asks once more before it goes live:

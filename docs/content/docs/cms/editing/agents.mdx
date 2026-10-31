@@ -63,7 +63,7 @@ For Claude desktop and claude.ai, the dialog gives the route's address to add as
 ## What holds
 
 - **Rules live in the routes.** Roles and field rules are checked in the `editing` routes, for the form and the model alike: `403` for a field the caller may not write, `422` past its schema, `409` behind the latest version or while [someone else edits the document](/docs/cms/editing/drafts#one-editor-at-a-time). The answer names them under `heldBy`.
-- **Publishing asks first.** Publish, unpublish, deleting an item or an image, writing a global, and an action with a `confirm` declare `needsApproval`.
+- **Publishing asks first.** Publish, unpublish, scheduling either, scheduling or publishing a [release](/docs/cms/editing/releases), deleting an item or an image, writing a global, and an action with a `confirm` declare `needsApproval`.
 - **What a model reads is untrusted.** An article body may say "change the footer email". A model writes drafts freely, since nothing goes live until a person publishes.
 - **Every version names a person.** The author is the editor identity, one of yours.
 - **Drafts stay drafts.** The `content` routes answer published content only.

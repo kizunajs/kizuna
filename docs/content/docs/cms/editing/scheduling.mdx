@@ -1,0 +1,120 @@
+---
+title: Scheduling
+description: 'Publishing or unpublishing a document at a time you pick, and what happens when that time comes.'
+---
+
+Some changes are ready before they should go live: a price change for 1 December, an opening on 14 November, a seasonal article that comes down after Christmas. Schedule the publish, and the CMS does it when the time comes.
+
+## Picking a time
+
+The Publish dialog lists the changes and asks **When**: **Now**, or **Later** with a date and a time. Later turns Publish into **Schedule**. Times are picked and shown in your browser's time zone, with the zone named beside them, and stored in UTC.
+
+The header then reads **Publishes 14 Nov 2026, 09:00 CET**, with who set it. Publish opens the dialog on that time, to move it or to publish now. **Cancel schedule** in the `…` menu takes it back, and the draft stays a draft.
+
+> Publish the Trondheim front page at 09:00 on 14 November.
+
+A model schedules an unpublish the same way, with `action: 'unpublish'`, and the header reads **Unpublishes** with its time.
+
+## Until the time comes
+
+The draft stays a draft. Anyone who may edit it keeps editing, and the schedule publishes the draft as it stands when the time comes. **Publish** by hand publishes it at once and ends the schedule, and so does unpublishing it.
+
+## When the time comes
+
+The CMS checks what a press of Publish checks. When the draft is complete, any required review is approved, and nobody is in the middle of editing it, it goes live. Its cache tags revalidate and every site that shows it refreshes, as after any publish.
+
+When one of those fails, the schedule is held. The header reads **Held since 14 Nov 2026, 09:00 CET**, Scheduled says what it waits for, as in **Held: waiting for Nils Aas to approve** or **Held: waiting for intro**, and it publishes on the first minute after that clears.
+
+## Scheduling a page that requires a review
+
+A [required review](/docs/cms/editing/reviews#requiring-a-review) is never skipped. Schedule the page and ask for the review in either order. Until someone approves it, the header reads **Publishes 14 Nov 2026, 09:00 CET once Nils Aas approves**.
+
+Approving lets the schedule run, and changes nothing else. When the time has already passed, the page goes live on the first minute after the approval.
+
+A save after the approval outdates it, as it does today, so the schedule waits for a new one. Someone with a role under `reviews.roles` can schedule past the review with `force: true`, as with [Publish anyway](/docs/cms/editing/reviews#publishing-past-a-review), and the review records it.
+
+## Scheduled
+
+Each site has **Scheduled** in its sidebar, after Waiting, and a CMS with one site has it under Content. It lists what is set to change on the site, soonest first under each day: the site's own pages and items, the shared documents it shows, and the [releases](/docs/cms/editing/releases) that hold any of them.
+
+Each row says when, what, whether it publishes or unpublishes, and who set it. A row that would not run if its time came now says what it waits for, and one whose time passed with nothing stopping it reads **Late**, which means the job has not run.
+
+> What goes live on Hagen Norge this week?
+
+## How it runs
+
+The CMS keeps its schedules in its own tables, `cms_schedules` and `cms_releases`, which `kizuna cms migrate` writes beside the others. It declares a job under `content`, `content.publishScheduled`, which runs every minute and publishes whatever is due. So a config with `content` names [`jobRunner`](/docs/jobs#setting-it-up):
+
+<Tabs items={['In process', 'Over HTTP']}>
+
+<Tab value="In process">
+
+`startJobs` runs the job every minute, with no transport:
+
+```ts title="kizuna.config.ts"
+jobRunner: {
+    mode: 'in-process',
+},
+```
+
+```ts title="src/index.ts"
+kizuna.api.mount(app);
+startJobs(kizuna.api);
+```
+
+In Next.js, call it from `instrumentation.ts`:
+
+```ts title="src/instrumentation.ts"
+export async function register(): Promise<void> {
+    if (process.env.NEXT_RUNTIME !== 'nodejs') return;
+    const [{ startJobs }, { default: kizuna }] = await Promise.all([import('kizunajs/jobs'), import('@kizuna-config')]);
+    startJobs(kizuna.api);
+}
+```
+
+A restart loses nothing, since the next minute reads what is due from the tables. Each run claims a schedule before it publishes, so two instances never publish one twice.
+
+</Tab>
+
+<Tab value="Over HTTP">
+
+Platform cron calls `/jobs/dispatch`, and the job runs on each call. It runs as the identity `jobs` names on `cms()`, or the one your own jobs name:
+
+```ts title="kizuna.config.ts"
+jobRunner: {
+    mode: 'http',
+},
+content: cms({
+    jobs: {
+        identity: 'scheduler',
+    },
+}),
+```
+
+```json title="vercel.json"
+{
+    "crons": [
+        {
+            "path": "/jobs/dispatch",
+            "schedule": "* * * * *"
+        }
+    ]
+}
+```
+
+A schedule publishes on the first call after its time, so a platform that calls once an hour publishes up to an hour late.
+
+</Tab>
+
+</Tabs>
+
+## The routes
+
+| Route                                           | Tool                                  |
+| ----------------------------------------------- | ------------------------------------- |
+| `PUT /editing/sites/:site/pages/:name/schedule` | `editing_sites_pages_schedule`        |
+| `DELETE` the same path                          | `editing_sites_pages_cancel_schedule` |
+| `GET /editing/schedules`                        | `editing_schedules_list`              |
+| `GET /editing/schedules/drafts`                 | `editing_schedules_drafts`            |
+
+Pages, globals and items each have `schedule` and `cancel_schedule` beside `publish`. Scheduling takes `{ action, at, force }`, with `at` as an ISO time and its offset, asks the person first as publishing does, and answers `422` for a time that has passed. `GET /editing/schedules` takes `site` and answers what the caller may open, each with its `state` and what it waits for. A document's draft and `editing_describe` carry `schedule`: its time, its release, and who set it.

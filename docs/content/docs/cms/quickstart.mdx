@@ -80,6 +80,9 @@ export default defineConfig({
             editor,
         },
     },
+    jobRunner: {
+        mode: 'in-process',
+    },
     content: cms({
         db,
         pages,
@@ -95,7 +98,7 @@ export default defineConfig({
 });
 ```
 
-`editor` is the [identity](/docs/authentication) your editors sign in as, checked by your own sign-in. `mcpPlugin()` serves the [MCP](/docs/mcp) endpoint editors connect their chat to, and `preview.url` is where the site is, so the editor can show its draft. Mount the config once, and it serves everything the CMS needs, from the content to the images to draft mode:
+`editor` is the [identity](/docs/authentication) your editors sign in as, checked by your own sign-in. `jobRunner` says how the job that publishes [scheduled](/docs/cms/editing/scheduling#how-it-runs) drafts runs. `mcpPlugin()` serves the [MCP](/docs/mcp) endpoint editors connect their chat to, and `preview.url` is where the site is, so the editor can show its draft. Mount the config once, and it serves everything the CMS needs, from the content to the images to draft mode:
 
 ```ts title="src/app/api/[...kizuna]/route.ts"
 import kizuna from '@kizuna-config';

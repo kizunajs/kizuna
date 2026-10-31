@@ -165,6 +165,8 @@ Each site has its screens under its key, at `/admin/<site>/...`:
 | The UK's front page            | `/admin/uk/pages/frontPage`            |
 | The UK's events                | `/admin/uk/collections/events`         |
 | The UK's images                | `/admin/uk/media`                      |
+| The UK's scheduled             | `/admin/uk/scheduled`                  |
+| A release, from the UK         | `/admin/uk/releases/rel_8f2k3j9x2a1b`  |
 | A shared office                | `/admin/collections/offices/k3j9x2`    |
 | The UK's values on that office | `/admin/uk/collections/offices/k3j9x2` |
 
@@ -255,9 +257,11 @@ Restoring a version that held a deleted image leaves that field empty.
 
 ## Editing
 
-A document opens with its title large and its actions on the right: **Save draft**, **Publish**, and a `…` menu. Someone asked to review it also gets **Review**, which puts what is live beside the draft, field by field, with the request's note and each reviewer's answer, as in [Reviews](/docs/cms/editing/reviews). Under the title a line says where it stands, and when it last changed and who saved it. The menu holds **Ask for review**, which sends it to someone to look at first as in [Reviews](/docs/cms/editing/reviews), **Unpublish** once it is live, whose message offers **Undo** to publish it again when the draft held no changes, and for an item **Duplicate**, the collection's own [actions](/docs/cms/collections#actions) and **Delete**.
+A document opens with its title large and its actions on the right: **Save draft**, **Publish**, and a `…` menu. Someone asked to review it also gets **Review**, which puts what is live beside the draft, field by field, with the request's note and each reviewer's answer, as in [Reviews](/docs/cms/editing/reviews). Under the title a line says where it stands, and when it last changed and who saved it. The menu holds **Ask for review**, which sends it to someone to look at first as in [Reviews](/docs/cms/editing/reviews), **Cancel schedule** while it is [scheduled](/docs/cms/editing/scheduling), **Add to release** while its draft has changes, as in [Releases](/docs/cms/editing/releases), **Unpublish** once it is live, whose message offers **Undo** to publish it again when the draft held no changes, and for an item **Duplicate**, the collection's own [actions](/docs/cms/collections#actions) and **Delete**.
 
-The draft saves a moment after you stop typing, and the header says when it last did. **Save draft** saves at once, and **Publish** lists every change and asks you to confirm. While a required field is empty, Publish waits and says which field it waits for, like "Fill in Department before publishing". A click on that line takes you to the field, which says it is needed.
+One person edits a document at a time. While someone else does, the fields are read only and the status reads "Kari is editing" beside their face, until they leave it or stop for two minutes. See [Drafts and versions](/docs/cms/editing/drafts#one-editor-at-a-time).
+
+The draft saves a moment after you stop typing, and the header says when it last did. **Save draft** saves at once, and **Publish** lists every change and asks you to confirm, now or at a time you pick, as in [Scheduling](/docs/cms/editing/scheduling). While a required field is empty, Publish waits and says which field it waits for, like "Fill in Department before publishing". A click on that line takes you to the field, which says it is needed.
 
 When a save does not reach the CMS, **Save draft** reads **Not saved**, with why beside it, and **Offline** shows while the browser has no connection. Your changes stay on the screen. **Retry now** sends them again, and the draft saves on its own once you are back online. Publish waits until it has.
 

@@ -8,6 +8,7 @@ description: 'How drafts are saved, versioned, protected from overwriting, rolle
 - A save that sends `null` for an optional field empties it. A field whose schema accepts `null` stores `null`.
 - Two people cannot overwrite each other, since one person edits a document at a time. A client that sends the draft's `ETag` as `If-Match` is also refused with `409` when the draft moved on since it read it.
 - Rollback restores an earlier version as a new draft, which you publish separately.
+- A draft can publish or unpublish at a time you pick, on its own or with a [release](/docs/cms/editing/releases). See [Scheduling](/docs/cms/editing/scheduling).
 
 ## One editor at a time
 
@@ -19,7 +20,7 @@ An agent works as the person it acts for, so a model that Mia connected holds a 
 
 `heldBy` on every draft answer and on `editing_describe` says who holds it now, so a model can see it before writing. `editing_release_hold` lets it go once a model is done. A scheduled publish waits while someone holds the document, and goes out once they are done.
 
-Holds are kept in memory and passed between server instances with the draft notices, over Postgres `LISTEN` and `NOTIFY`. A driver that cannot listen, like Neon over HTTP, keeps each hold within the instance that took it.
+The hold is stored on the document and checked in the same transaction as the save, so it holds across server instances and on a platform that starts a fresh one per request. It needs the `held_by`, `held_since` and `held_until` columns that `kizuna cms migrate` adds to `cms_documents`.
 
 ## Unpublishing
 
