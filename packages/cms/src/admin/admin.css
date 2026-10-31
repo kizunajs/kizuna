@@ -4667,6 +4667,43 @@
         overflow-wrap: anywhere;
         white-space: pre-wrap;
     }
+    }
+
+    .k-comment[data-resolved] {
+        color: var(--k-muted);
+    }
+
+    .k-comment__head,
+    .k-review-note__head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 8px;
+        min-width: 0;
+        font-size: 13px;
+    }
+
+    .k-comment__who,
+    .k-review-note__who {
+        font-weight: 500;
+    }
+
+    .k-comment__when,
+    .k-review-note__when {
+        font-size: 12.5px;
+        color: var(--k-muted);
+    }
+
+    .k-comment__text,
+    .k-comment__actions,
+    .k-comment__resolved,
+    .k-review-note > :not(.k-avatar, .k-review-note__head) {
+        grid-column: 2;
+    }
+
+    .k-comment__text,
+    .k-review-note__text {
+        margin: 0;
 
     .k-comment__actions {
         display: flex;
@@ -4881,7 +4918,7 @@
     }
 
     /* Field tabs lead the main column flush under the header, so the note keeps its own space above them. */
-    .k-document .k-form__main > .k-sent-back:first-child {
+    .k-document .k-form__main:has(> .k-form__fields > .k-tabs:first-child) > .k-sent-back:first-child {
         padding-top: 28px;
     }
 
@@ -4993,43 +5030,6 @@
         padding: 20px 24px 24px;
     }
 
-    }
-
-    .k-comment[data-resolved] {
-        color: var(--k-muted);
-    }
-
-    .k-comment__head,
-    .k-review-note__head {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: baseline;
-        gap: 8px;
-        min-width: 0;
-        font-size: 13px;
-    }
-
-    .k-comment__who,
-    .k-review-note__who {
-        font-weight: 500;
-    }
-
-    .k-comment__when,
-    .k-review-note__when {
-        font-size: 12.5px;
-        color: var(--k-muted);
-    }
-
-    .k-comment__text,
-    .k-comment__actions,
-    .k-comment__resolved,
-    .k-review-note > :not(.k-avatar, .k-review-note__head) {
-        grid-column: 2;
-    }
-
-    .k-comment__text,
-    .k-review-note__text {
-        margin: 0;
     .k-ask__group {
         display: flex;
         flex-direction: column;
