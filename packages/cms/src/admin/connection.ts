@@ -99,7 +99,12 @@ export const connectOverHttp = (options: { apiPath: string; routes: Record<strin
 /**
  * The media routes a site's screens list and upload through.
  */
-const SITE_MEDIA_TOOLS = ['editing_media_list', 'editing_media_create_upload'];
+const SITE_MEDIA_TOOLS = [
+    'editing_media_list',
+    'editing_media_create_upload',
+    'editing_media_complete_upload',
+    'editing_media_create_folder',
+];
 
 // TODO(sites): the `site` query the CMS's media routes are expected to take.
 /**

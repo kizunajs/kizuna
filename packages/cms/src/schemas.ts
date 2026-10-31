@@ -1,4 +1,14 @@
-export { ImageSchema, CropSchema, FocalPointSchema, type ImageRef, type ResolvedImage } from './image.js';
+export {
+    ImageSchema,
+    CropSchema,
+    FocalPointSchema,
+    croppedImage,
+    type AspectRatio,
+    type CroppedImageRef,
+    type ImageRef,
+    type ResolvedCrop,
+    type ResolvedImage,
+} from './image.js';
 export {
     RichTextSchema,
     RichTextBlockSchema,

@@ -23,6 +23,27 @@ export interface MediaItem {
      * The site the image belongs to, or none for a shared image.
      */
     site?: string;
+    /**
+     * The folder of its library it sits in, or none at the top level.
+     */
+    folder?: string;
+}
+
+/**
+ * A folder of one library, as the library lists it.
+ */
+export interface MediaFolderItem {
+    id: string;
+    name: string;
+    parent?: string;
+    /**
+     * The site whose library holds it, or none in the shared library.
+     */
+    site?: string;
+    /**
+     * How many images it holds itself.
+     */
+    images: number;
 }
 
 /**
@@ -30,7 +51,12 @@ export interface MediaItem {
  */
 export interface MediaUse {
     ref: string;
+    /**
+     * The site the document belongs to, or none for shared content.
+     */
+    site?: string;
     label: string | null;
+    locales: string[];
     fieldPaths: string[];
     published: boolean;
 }
@@ -59,9 +85,9 @@ export const bytesOf = (bytes: number): string => {
 };
 
 /**
- * How a tile says where an image is used: "Unused", "Used on 1 page".
+ * How a tile says where an image is used: "Unused", "Used in 1 place".
  */
-export const usageOf = (uses: number): string => (uses === 0 ? 'Unused' : `Used on ${uses} ${uses === 1 ? 'page' : 'pages'}`);
+export const usageOf = (uses: number): string => (uses === 0 ? 'Unused' : `Used in ${uses} ${uses === 1 ? 'place' : 'places'}`);
 
 /**
  * The orders the library sorts by, the newest upload first by default.
@@ -165,9 +191,113 @@ export const focalPointAt = (
 };
 
 /**
- * What Delete asks, saying how many pages lose the image.
+ * What Delete asks of an image nothing holds.
  */
-export const deleteQuestionOf = (filename: string, uses: number): string =>
-    uses === 0
-        ? `Delete ${filename}? Nothing uses it.`
-        : `Delete ${filename}? ${uses === 1 ? '1 page uses' : `${uses} pages use`} it and will lose the image.`;
+export const deleteQuestionOf = (filename: string): string => `Delete ${filename}? Nothing uses it.`;
+
+/**
+ * The title of the dialog that lists what holds an image, when it cannot be
+ * deleted or moved.
+ */
+export const heldTitleOf = (filename: string, uses: number, outside?: string): string =>
+    outside === undefined ? `${filename} is ${usageOf(uses).toLowerCase()}` : `${filename} is used outside ${outside}`;
+
+/**
+ * The folders directly inside `parent` of one library, or at its top level
+ * without one, by name.
+ */
+export const foldersAt = (folders: readonly MediaFolderItem[], parent: string | undefined, site: string | undefined): MediaFolderItem[] =>
+    folders.filter((folder) => folder.site === site && folder.parent === parent).sort((left, right) => left.name.localeCompare(right.name));
+
+/**
+ * The folders from the top level down to `id`, for the path bar.
+ */
+export const folderTrail = (folders: readonly MediaFolderItem[], id: string | undefined): MediaFolderItem[] => {
+    const trail: MediaFolderItem[] = [];
+    for (let step = folders.find((folder) => folder.id === id); step !== undefined && !trail.includes(step); ) {
+        trail.unshift(step);
+        const parent: string | undefined = step.parent;
+        step = folders.find((folder) => folder.id === parent);
+    }
+    return trail;
+};
+
+/**
+ * The line under a folder's name: what it holds.
+ */
+export const folderDetailOf = (folder: MediaFolderItem, folders: readonly MediaFolderItem[]): string => {
+    const inner = folders.filter((candidate) => candidate.parent === folder.id).length;
+    const parts = [
+        ...(inner === 0 ? [] : [`${inner} ${inner === 1 ? 'folder' : 'folders'}`]),
+        ...(folder.images === 0 ? [] : [`${folder.images} ${folder.images === 1 ? 'image' : 'images'}`]),
+    ];
+    return parts.length === 0 ? 'Empty' : parts.join(', ');
+};
+
+/**
+ * The images a library shows in one folder, or at its top level. A search,
+ * or Unused, looks in every folder instead, so `everywhere` keeps them all.
+ */
+export const imagesAt = (
+    items: readonly MediaItem[],
+    place: { site: string | undefined; folder: string | undefined; everywhere: boolean }
+): MediaItem[] => (place.everywhere ? [...items] : items.filter((item) => item.site === place.site && item.folder === place.folder));
+
+/**
+ * Uses grouped under the site they belong to, in the order the sites are
+ * declared, with shared content last.
+ */
+export const usesBySite = (
+    uses: readonly MediaUse[],
+    siteOrder: readonly string[]
+): Array<{ site: string | undefined; uses: MediaUse[] }> => {
+    const groups = new Map<string | undefined, MediaUse[]>();
+    for (const use of uses) groups.set(use.site, [...(groups.get(use.site) ?? []), use]);
+    const rank = (site: string | undefined): number =>
+        site === undefined ? siteOrder.length + 1 : siteOrder.indexOf(site) === -1 ? siteOrder.length : siteOrder.indexOf(site);
+    return [...groups.entries()]
+        .sort(([left], [right]) => rank(left) - rank(right))
+        .map(([site, held]) => ({
+            site,
+            uses: held,
+        }));
+};
+
+/**
+ * Where Move can send images: each library's top level and folders, nested
+ * under their parents.
+ */
+export interface MoveDestination {
+    site: string | undefined;
+    folder: string | undefined;
+    name: string;
+    depth: number;
+}
+
+/**
+ * The places of one library as Move lists them: its top level, then its
+ * folders, each under its parent.
+ */
+export const destinationsIn = (folders: readonly MediaFolderItem[], site: string | undefined): MoveDestination[] => {
+    const rows: MoveDestination[] = [
+        {
+            site,
+            folder: undefined,
+            name: 'Top level',
+            depth: 0,
+        },
+    ];
+    const add = (parent: string | undefined, depth: number): void => {
+        for (const folder of foldersAt(folders, parent, site)) {
+            rows.push({
+                site,
+                folder: folder.id,
+                name: folder.name,
+                depth,
+            });
+            add(folder.id, depth + 1);
+        }
+    };
+    add(undefined, 0);
+    return rows;
+};

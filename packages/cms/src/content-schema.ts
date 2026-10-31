@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
-import { isImageSchema } from './image.js';
+import { cropShapeOf, isImageSchema } from './image.js';
 
 /**
  * An image as a reader returns it.
@@ -13,13 +13,23 @@ export const ResolvedImageSchema = z.object({
     height: z.int(),
 });
 
+const ResolvedCropSchema = z.object({
+    url: z.string(),
+    width: z.int(),
+    height: z.int(),
+});
+
 /**
  * The schema of content as a reader returns it: every image reference becomes
  * a {@link ResolvedImageSchema}, and everything else is what it was.
  */
 export const resolvedSchema = (schema: z.core.$ZodType): z.ZodType => {
     if (isImageSchema(unwrapOptionalWrappers(schema).inner) && readDef(schema).type !== 'optional' && readDef(schema).type !== 'nullable') {
-        return ResolvedImageSchema;
+        const shape = cropShapeOf(schema);
+        if (shape === undefined || !('crops' in shape)) return ResolvedImageSchema;
+        return ResolvedImageSchema.extend({
+            crops: z.object(Object.fromEntries(Object.keys(shape.crops).map((name) => [name, ResolvedCropSchema]))),
+        });
     }
     const def = readDef(schema);
     switch (def.type) {

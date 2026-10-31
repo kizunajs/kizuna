@@ -14,7 +14,7 @@ export type CmsDatabase = PgDatabase<PgQueryResultHKT, any, any>;
  * What a document is: a page, a global, an item of a collection, or a media
  * item's metadata.
  */
-export type DocumentKind = 'page' | 'global' | 'item' | 'media';
+export type DocumentKind = 'page' | 'global' | 'item' | 'media' | 'folder';
 
 /**
  * Content as stored: one value per field.
@@ -1045,10 +1045,57 @@ export class DocumentStore {
                         published: data,
                         publishedVersion: latest + 1,
                         updatedAt: now,
+            await this.replaceRefsIn(tx, id, published === null ? [] : refsOf(published), true);
                         updatedBy: author,
                     })
                     .where(eq(cmsDocuments.id, id));
             }
+    /**
+     * Rebuilds a document's refs from its draft and its published content,
+     * for content indexed before images were.
+     */
+    async reindexRefs(id: string, draft: readonly Ref[], published: readonly Ref[]): Promise<void> {
+        await this.db.transaction(async (tx) => {
+            await this.replaceRefsIn(tx, id, draft);
+            await this.replaceRefsIn(tx, id, published, true);
+        });
+    }
+
+    /**
+     * Every source document holding any of these ids of a brand, every id
+     * when `refIds` is left out, with the field and whether the published
+     * content holds it.
+     */
+    async holders(
+        brand: string,
+        refIds?: readonly string[]
+    ): Promise<Array<{ document: DocumentRow; refId: string; fieldPath: string; published: boolean }>> {
+        if (refIds !== undefined && refIds.length === 0) return [];
+        const rows = await this.db
+            .select({
+                document: cmsDocuments,
+                refId: cmsRefs.refId,
+                fieldPath: cmsRefs.fieldPath,
+                published: cmsRefs.published,
+            })
+            .from(cmsRefs)
+            .innerJoin(cmsDocuments, eq(cmsDocuments.id, cmsRefs.documentId))
+            .where(
+                and(
+                    eq(cmsRefs.brand, brand),
+                    eq(cmsDocuments.locale, SOURCE_LOCALE),
+                    ...(refIds === undefined ? [] : [inArray(cmsRefs.refId, [...refIds])])
+                )
+            )
+            .orderBy(asc(cmsDocuments.site), asc(cmsDocuments.key), asc(cmsRefs.fieldPath));
+        return rows.map((row) => ({
+            document: toRow(row.document),
+            refId: row.refId,
+            fieldPath: row.fieldPath,
+            published: row.published,
+        }));
+    }
+
             await tx.insert(cmsVersions).values({
                 documentId: id,
                 version: latest + 1,
@@ -1082,6 +1129,30 @@ export class DocumentStore {
                 : input.orderBy === 'updatedAt'
                   ? sql`${cmsDocuments.updatedAt}`
                   : read(input.orderBy);
+        return this.saveRecord('media', key, data, author, site);
+    }
+
+    /**
+     * Writes or replaces a media folder, published the moment it exists like
+     * an image.
+     */
+    async saveFolder(key: string, data: Content, author: string, site = SITE): Promise<DocumentRow> {
+        return this.saveRecord('folder', key, data, author, site);
+    }
+
+    /**
+     * Moves a media document or folder into another library, keeping its key.
+     */
+    async moveToSite(kind: 'media' | 'folder', key: string, site = SITE): Promise<void> {
+        await this.db
+            .update(cmsDocuments)
+            .set({
+                site,
+            })
+            .where(and(eq(cmsDocuments.kind, kind), eq(cmsDocuments.locale, SOURCE_LOCALE), eq(cmsDocuments.key, key)));
+    }
+
+    private async saveRecord(kind: 'media' | 'folder', key: string, data: Content, author: string, site: string): Promise<DocumentRow> {
         const direction = input.direction ?? (input.orderBy === undefined || typeof input.orderBy === 'string' ? 'desc' : 'asc');
         const conditions = [
             eq(cmsDocuments.kind, input.kind),
@@ -1290,8 +1361,12 @@ export class DocumentStore {
         return Number(row?.latest ?? 0);
     }
 
-    private async replaceRefsIn(tx: CmsDatabase, documentId: string, refs: readonly Ref[]): Promise<void> {
-        await tx.delete(cmsRefs).where(eq(cmsRefs.documentId, documentId));
+    /**
+     * Replaces the refs of a document's draft, or with `published` those of
+     * its published content.
+     */
+    private async replaceRefsIn(tx: CmsDatabase, documentId: string, refs: readonly Ref[], published = false): Promise<void> {
+        await tx.delete(cmsRefs).where(and(eq(cmsRefs.documentId, documentId), eq(cmsRefs.published, published)));
         if (refs.length === 0) return;
         await tx.insert(cmsRefs).values(
             refs.map((ref) => ({
@@ -1303,3 +1378,14 @@ export class DocumentStore {
         );
     }
 }
+
+    /**
+     * Publishing makes the draft the published content, so its refs become
+     * the published refs too.
+     */
+    private async publishRefsIn(tx: CmsDatabase, documentId: string): Promise<void> {
+        await tx.delete(cmsRefs).where(and(eq(cmsRefs.documentId, documentId), eq(cmsRefs.published, true)));
+        await tx.execute(
+            sql`insert into cms_refs (document_id, brand, ref_id, field_path, published) select document_id, brand, ref_id, field_path, true from cms_refs where document_id = ${documentId} and published = false`
+        );
+    }

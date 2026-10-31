@@ -24,12 +24,45 @@ export interface MediaRecord {
      * The site the image belongs to. Left out for a shared image.
      */
     site?: string;
+    /**
+     * The folder of its library the image sits in. Left out at the top level.
+     */
+    folder?: string;
+}
+
+/**
+ * A folder of one library, the shared one or a site's.
+ */
+export interface MediaFolder {
+    id: string;
+    name: string;
+    /**
+     * The folder it sits in. Left out at the top level.
+     */
+    parent?: string;
+    /**
+     * The site whose library holds it. Left out in the shared library.
+     */
+    site?: string;
 }
 
 /**
  * Why an upload was refused.
  */
 export class UploadRejectedError extends Error {}
+
+/**
+ * A folder change that conflicts with the library: a name taken beside it, a
+ * folder moved into itself, or a folder deleted while it holds something.
+ */
+export class FolderConflictError extends Error {}
+
+/**
+ * A folder that is not in the library named.
+ */
+export class FolderNotFoundError extends Error {}
+
+const MAX_FOLDER_NAME = 60;
 
 const UPLOAD_PREFIX = 'uploads/';
 const SHARED = 'default';
@@ -42,6 +75,14 @@ export interface MediaServiceOptions {
 }
 
 const safeFilename = (filename: string): string => filename.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120);
+
+/**
+ * The content hash a stored file is named by, read from its storage key, so a
+ * moved image is still found by its bytes.
+ */
+const hashOf = (key: string): string | undefined => /([0-9a-f]{24})(?:-[0-9a-f]+)?\.[a-z0-9]+$/.exec(key)?.[1];
+
+const libraryOf = (site: string | undefined): string => site ?? SHARED;
 
 /**
  * Uploads land in storage, are checked by their bytes with sharp, lose their
@@ -84,12 +125,11 @@ export class MediaService {
 
     /**
      * Checks the uploaded bytes and makes the media document, or refuses and
-     * removes the upload.
+     * removes the upload. With `site`, the new image belongs to that site;
+     * without, it is shared. With `folder`, it lands in that folder.
      */
-    /**
-     * With `site`, the new image belongs to that site; without, it is shared.
-     */
-    async completeUpload(uploadId: string, author: string, site?: string): Promise<MediaRecord> {
+    async completeUpload(uploadId: string, author: string, site?: string, folder?: string): Promise<MediaRecord> {
+        if (folder !== undefined) await this.assertFolderIn(folder, site);
         if (!/^[A-Za-z0-9._-]+$/.test(uploadId)) throw new UploadRejectedError('Unknown upload.');
         const key = `${UPLOAD_PREFIX}${uploadId}`;
         const head = await this.options.storage.head(key);
@@ -100,13 +140,20 @@ export class MediaService {
         }
         const bytes = await this.options.storage.get(key);
         if (bytes === undefined) throw new UploadRejectedError('Nothing was uploaded yet.');
-        return this.storeBytes(bytes, uploadId.slice(37), author, key, site);
+        return this.storeBytes(bytes, uploadId.slice(37), author, key, site, folder);
     }
 
     /**
      * Stores bytes that arrived some other way, such as `kizuna cms push`.
      */
-    async storeBytes(bytes: Uint8Array, filename: string, author: string, uploadKey?: string, site?: string): Promise<MediaRecord> {
+    async storeBytes(
+        bytes: Uint8Array,
+        filename: string,
+        author: string,
+        uploadKey?: string,
+        site?: string,
+        folder?: string
+    ): Promise<MediaRecord> {
         let inspected;
         try {
             inspected = await inspectImage(bytes);
@@ -118,15 +165,22 @@ export class MediaService {
         const stripped = await stripMetadata(bytes, inspected);
         const size = inspected.hasExif ? await inspectImage(stripped) : inspected;
         const hash = createHash('sha256').update(stripped).digest('hex').slice(0, 24);
-        // A site's copy of a file is an image of its own, so deleting it leaves the shared one.
-        const id = site === undefined ? `med_${hash}` : `med_${site}_${hash}`;
-        const mediaKey =
-            site === undefined ? `${MEDIA_PREFIX}${hash}.${inspected.extension}` : `${MEDIA_PREFIX}${site}/${hash}.${inspected.extension}`;
-        const existing = await this.get(id);
+        // The same file uploaded twice to one library is one image, wherever it was first uploaded.
+        const existing = (await this.inLibrary(site)).find((record) => hashOf(record.key) === hash);
         if (existing !== undefined) {
             if (uploadKey !== undefined) await this.options.storage.delete(uploadKey);
             return existing;
         }
+        // A site's copy of a file is an image of its own, so deleting it leaves the shared one. An image moved
+        // between libraries keeps its id, so a new upload of its file takes another.
+        const base = site === undefined ? `med_${hash}` : `med_${site}_${hash}`;
+        const taken = (await this.get(base)) !== undefined;
+        const suffix = taken ? `-${randomUUID().replace(/-/g, '').slice(0, 8)}` : '';
+        const id = taken ? `${base}_${suffix.slice(1)}` : base;
+        const mediaKey =
+            site === undefined
+                ? `${MEDIA_PREFIX}${hash}${suffix}.${inspected.extension}`
+                : `${MEDIA_PREFIX}${site}/${hash}${suffix}.${inspected.extension}`;
         await this.options.storage.put(mediaKey, stripped, inspected.contentType);
         if (uploadKey !== undefined) await this.options.storage.delete(uploadKey);
         const record: MediaRecord = {
@@ -144,6 +198,11 @@ export class MediaService {
                 ? {}
                 : {
                       site,
+                  }),
+            ...(folder === undefined
+                ? {}
+                : {
+                      folder,
                   }),
         };
         await this.options.store.saveMedia(id, record as unknown as Record<string, unknown>, author, site);
@@ -163,6 +222,165 @@ export class MediaService {
         return rows
             .filter((row) => row.published !== null && (row.site === SHARED || row.site === site))
             .map((row) => row.published as unknown as MediaRecord);
+    }
+
+    /**
+     * One library's own images: the shared ones without `site`, or that
+     * site's alone.
+     */
+    async inLibrary(site?: string): Promise<MediaRecord[]> {
+        const rows = await this.options.store.list('media', libraryOf(site));
+        return rows.filter((row) => row.published !== null).map((row) => row.published as unknown as MediaRecord);
+    }
+
+    /**
+     * The shared folders, and with `site`, that site's own beside them.
+     */
+    async folders(site?: string): Promise<MediaFolder[]> {
+        const rows = await this.options.store.list('folder');
+        return rows
+            .filter((row) => row.published !== null && (row.site === SHARED || row.site === site))
+            .map((row) => row.published as unknown as MediaFolder)
+            .sort((left, right) => left.name.localeCompare(right.name));
+    }
+
+    async folder(id: string): Promise<MediaFolder | undefined> {
+        return (await this.allFolders()).find((folder) => folder.id === id);
+    }
+
+    /**
+     * Makes a folder in a library, at its top level or inside `parent`.
+     */
+    async createFolder(input: { name: string; parent?: string }, site: string | undefined, author: string): Promise<MediaFolder> {
+        const name = this.folderName(input.name);
+        if (input.parent !== undefined) await this.assertFolderIn(input.parent, site);
+        await this.assertNameFree(name, input.parent, site);
+        const folder: MediaFolder = {
+            id: `fld_${randomUUID().replace(/-/g, '').slice(0, 12)}`,
+            name,
+            ...(input.parent === undefined
+                ? {}
+                : {
+                      parent: input.parent,
+                  }),
+            ...(site === undefined
+                ? {}
+                : {
+                      site,
+                  }),
+        };
+        await this.options.store.saveFolder(folder.id, folder as unknown as Record<string, unknown>, author, libraryOf(site));
+        return folder;
+    }
+
+    /**
+     * Renames a folder, or moves it into another folder of its library, or
+     * with `parent: null` to its top level.
+     */
+    async updateFolder(id: string, changes: { name?: string; parent?: string | null }, author: string): Promise<MediaFolder> {
+        const current = await this.folder(id);
+        if (current === undefined) throw new FolderNotFoundError(`No folder '${id}'.`);
+        const name = changes.name === undefined ? current.name : this.folderName(changes.name);
+        const parent = changes.parent === undefined ? current.parent : (changes.parent ?? undefined);
+        if (parent !== undefined) {
+            await this.assertFolderIn(parent, current.site);
+            const folders = await this.allFolders();
+            for (let step: string | undefined = parent; step !== undefined; step = folders.find((folder) => folder.id === step)?.parent) {
+                if (step === id) throw new FolderConflictError(`The folder '${current.name}' cannot move into itself.`);
+            }
+        }
+        if (name.toLowerCase() !== current.name.toLowerCase() || parent !== current.parent)
+            await this.assertNameFree(name, parent, current.site, id);
+        const { parent: _, ...rest } = current;
+        const next: MediaFolder = {
+            ...rest,
+            name,
+            ...(parent === undefined
+                ? {}
+                : {
+                      parent,
+                  }),
+        };
+        await this.options.store.saveFolder(id, next as unknown as Record<string, unknown>, author, libraryOf(current.site));
+        return next;
+    }
+
+    /**
+     * Deletes an empty folder. Refuses while it holds images or folders.
+     */
+    async deleteFolder(id: string): Promise<void> {
+        const current = await this.folder(id);
+        if (current === undefined) throw new FolderNotFoundError(`No folder '${id}'.`);
+        const holdsImage = (await this.inLibrary(current.site)).some((record) => record.folder === id);
+        const holdsFolder = (await this.allFolders()).some((folder) => folder.parent === id);
+        if (holdsImage || holdsFolder) {
+            throw new FolderConflictError(
+                `The folder '${current.name}' holds ${holdsImage ? 'images' : 'folders'}. Move or delete them first.`
+            );
+        }
+        await this.options.store.delete('folder', id, libraryOf(current.site));
+    }
+
+    /**
+     * Moves images into a folder of a library, or into another library,
+     * keeping their ids so every field holding one keeps showing it. Whether a
+     * move into a site is allowed is the caller's to decide.
+     */
+    async move(ids: readonly string[], to: { site?: string; folder?: string }, author: string): Promise<MediaRecord[]> {
+        if (to.folder !== undefined) await this.assertFolderIn(to.folder, to.site);
+        const moved: MediaRecord[] = [];
+        for (const id of ids) {
+            const current = await this.get(id);
+            if (current === undefined) continue;
+            const { site: _, folder: __, ...rest } = current;
+            const next: MediaRecord = {
+                ...rest,
+                ...(to.site === undefined
+                    ? {}
+                    : {
+                          site: to.site,
+                      }),
+                ...(to.folder === undefined
+                    ? {}
+                    : {
+                          folder: to.folder,
+                      }),
+            };
+            if (current.site !== to.site) await this.options.store.moveToSite('media', id, libraryOf(to.site));
+            await this.options.store.saveMedia(id, next as unknown as Record<string, unknown>, author, to.site);
+            moved.push(next);
+        }
+        return moved;
+    }
+
+    private async allFolders(): Promise<MediaFolder[]> {
+        const rows = await this.options.store.list('folder');
+        return rows.filter((row) => row.published !== null).map((row) => row.published as unknown as MediaFolder);
+    }
+
+    private folderName(name: string): string {
+        const trimmed = name.trim();
+        if (trimmed === '' || trimmed.length > MAX_FOLDER_NAME) {
+            throw new Error(`A folder's name is 1 to ${MAX_FOLDER_NAME} characters.`);
+        }
+        return trimmed;
+    }
+
+    private async assertFolderIn(id: string, site: string | undefined): Promise<void> {
+        const folder = await this.folder(id);
+        if (folder === undefined || folder.site !== site) {
+            throw new FolderNotFoundError(
+                `No folder '${id}' in ${site === undefined ? 'the shared library' : `the library of '${site}'`}.`
+            );
+        }
+    }
+
+    private async assertNameFree(name: string, parent: string | undefined, site: string | undefined, except?: string): Promise<void> {
+        const taken = (await this.allFolders()).some(
+            (folder) =>
+                folder.id !== except && folder.site === site && folder.parent === parent && folder.name.toLowerCase() === name.toLowerCase()
+        );
+        if (taken) throw new FolderConflictError(`There is a folder named '${name}' there already.`);
     }
 
     /**

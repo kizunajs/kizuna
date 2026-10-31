@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import { readMetaBrand, readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { readBlock, readBlocks } from './block.js';
 import { optionOf } from './union.js';
+import { isImageSchema } from './image.js';
 import { conditionForWire, conditionHolds, type WireCondition } from './condition.js';
 import {
     comparedValue,
@@ -292,8 +293,25 @@ export const getAtPath = (content: unknown, path: string): unknown => {
     return cursor;
 };
 
+/**
+ * The brand `cms_refs` records an image field's media id under.
+ */
+export const IMAGE_BRAND = 'CMS.Image';
+
 const collectRefs = (schema: z.core.$ZodType, value: unknown, path: string, into: Ref[]): void => {
     if (value === undefined || value === null) return;
+    if (isImageSchema(schema)) {
+        // A translation's image field holds its alt text, so only the source's object names the image.
+        const id = typeof value === 'object' ? (value as { id?: unknown }).id : undefined;
+        if (typeof id === 'string') {
+            into.push({
+                brand: IMAGE_BRAND,
+                refId: id,
+                fieldPath: path,
+            });
+        }
+        return;
+    }
     const brand = readMetaBrand(schema) ?? readMetaBrand(unwrapOptionalWrappers(schema).inner);
     if (brand !== undefined) {
         into.push({
@@ -326,8 +344,8 @@ const collectRefs = (schema: z.core.$ZodType, value: unknown, path: string, into
 };
 
 /**
- * Every branded id a document holds, with the field path it sits at. Rebuilt
- * on every save, so `cms_refs` always mirrors the content.
+ * Every branded id a document holds, and every image, with the field path it
+ * sits at. Rebuilt on every save, so `cms_refs` always mirrors the content.
  */
 export const refsOf = (page: ContentDefinition, content: Record<string, unknown>): Ref[] => {
     const refs: Ref[] = [];

@@ -11,6 +11,10 @@ export interface MediaRecord {
     width: number;
     height: number;
     alt?: string;
+    focalPoint?: {
+        x: number;
+        y: number;
+    };
 }
 
 /**
@@ -80,7 +84,7 @@ export function MediaPicker({
  * Uploads one file: the CMS hands back where to send it, the browser sends it
  * there, and the CMS checks it and adds it to the library.
  */
-export const uploadMedia = async (connection: Connection, file: File): Promise<MediaRecord | { problem: string }> => {
+export const uploadMedia = async (connection: Connection, file: File, folder?: string): Promise<MediaRecord | { problem: string }> => {
     const started = await connection.call<{ uploadId: string; url: string; headers: Record<string, string>; maxBytes: number }>(
         'editing_media_create_upload',
         {
@@ -115,6 +119,13 @@ export const uploadMedia = async (connection: Connection, file: File): Promise<M
         params: {
             uploadId: started.body.uploadId,
         },
+        ...(folder === undefined
+            ? {}
+            : {
+                  body: {
+                      folder,
+                  },
+              }),
     });
     if (finished.status !== 201) {
         return {

@@ -18,6 +18,7 @@ import {
     describeFields,
     describeLayout,
     getAtPath,
+    IMAGE_BRAND,
     latestMigration,
     migrateContent,
     missingFields,
@@ -41,7 +42,7 @@ import { CMS_MIGRATION_SQL, indexSql, type IndexType, type IndexedField } from '
 import { MediaService, type MediaRecord } from './media/media.js';
 import { memoryMediaStorage, type MediaStorage } from './media/storage.js';
 import { s3MediaStorage } from './media/s3.js';
-import { mediaIdsOf, mediaUsesOf, resolveContent } from './media/resolve.js';
+import { mediaIdsOf, mediaUsesOf, resolveContent, withoutImages } from './media/resolve.js';
 import { pathRefusal, type Caller } from './rules.js';
 import { EditorAccess } from './site-access.js';
 import { queueRefreshes, refreshTargets, REFRESH_JOB } from './refresh.js';
@@ -113,6 +114,11 @@ export interface MediaUse {
     /**
      * Whether the published content shows it. False when only the draft holds
      * it.
+    /**
+     * The languages the document shows the image in: its site's, since an
+     * image is the same in every language.
+     */
+    locales: string[];
      */
     published: boolean;
 }
@@ -3375,7 +3381,12 @@ export class CmsService {
         const { target } = await this.document(ref);
         const migrated = (await this.versionContent(ref, version)).content;
         await this.assertNoLoop(ref, migrated, 'latest');
-        await this.store.saveDraft({
+        // An image deleted since the version was saved leaves its field empty.
+        const held = mediaIdsOf(target.definition, migrated);
+        const gone = new Set<string>();
+        for (const id of held) if ((await this.media.get(id)) === undefined) gone.add(id);
+        const restored = gone.size === 0 ? migrated : withoutImages(target.definition, migrated, gone);
+        await this.saveHeld(ref, {
             kind: target.kind,
             key: target.key,
             site: target.site,
@@ -3444,21 +3455,33 @@ export class CmsService {
 
     /**
      * Every document that holds each image, by media id: in its published
-     * content, its draft, or both, with the fields that hold it. Read from the
-     * content itself, so it is right however the content was written.
+     * content, its draft, or both, with the fields that hold it, read from
+     * the refs index. With `ids`, only those images.
      */
-    async mediaUses(): Promise<Map<string, MediaUse[]>> {
+    async mediaUses(ids?: readonly string[]): Promise<Map<string, MediaUse[]>> {
+        const listings = this.listings();
+        const held = new Map<string, { target: Target; row: DocumentRow; refId: string; fieldPaths: Set<string>; published: boolean }>();
+        for (const holder of await this.store.holders(IMAGE_BRAND, ids)) {
+            const key = `${holder.document.id} ${holder.refId}`;
+            const known = held.get(key);
+            if (known !== undefined) {
+                known.fieldPaths.add(holder.fieldPath);
+                known.published ||= holder.published;
+                continue;
+            }
+            const target = this.declaredTarget(holder.document, listings);
+            if (target === undefined) continue;
+            held.set(key, {
+                target,
+                row: holder.document,
+                refId: holder.refId,
+                fieldPaths: new Set([holder.fieldPath]),
+                published: holder.published,
+            });
+        }
         const found = new Map<string, MediaUse[]>();
         for (const { target, row: stored, refId, fieldPaths, published } of held.values()) {
             const row = this.migrated(target, stored)!;
-            const published = new Set(mediaUsesOf(target.definition, row.published ?? {}).map((use) => use.id));
-            const byId = new Map<string, Set<string>>();
-            for (const content of [row.published, row.draft]) {
-                for (const use of mediaUsesOf(target.definition, content ?? {})) {
-                    byId.set(use.id, (byId.get(use.id) ?? new Set()).add(use.fieldPath));
-                }
-            }
-            if (byId.size === 0) continue;
             const content = row.draft ?? row.published ?? {};
             const labelField =
                 target.kind === 'item'
@@ -3474,17 +3497,21 @@ export class CmsService {
             by: input.author,
                         : null
                     : (target.definition.label ?? null);
-            for (const [id, fieldPaths] of byId) {
-                found.set(id, [
-                    ...(found.get(id) ?? []),
-                    {
-                        ref: formatRef(target.ref),
-                        label,
-                        fieldPaths: [...fieldPaths].sort(),
-                        published: published.has(id),
-                    },
-                ]);
-            }
+            found.set(refId, [
+                ...(found.get(refId) ?? []),
+                {
+                    ref: formatRef(target.ref),
+                    ...(stored.site === DEFAULT_SITE
+                        ? {}
+                        : {
+                              site: stored.site,
+                          }),
+                    label,
+                    locales: [...this.siteLocales(stored.site)],
+                    fieldPaths: [...fieldPaths].sort(),
+                    published,
+                },
+            ]);
         }
         return found;
     }
@@ -3576,13 +3603,17 @@ export class CmsService {
             });
         }
         const listings = this.listings();
-        for (const row of await this.store.list('item')) {
-            const listing = listings.find((candidate) => candidate.site === row.site && row.key.startsWith(candidate.keyPrefix));
-            if (listing === undefined) continue;
-            found.push({
-                target: this.target(listing.refOf(row.key.slice(listing.keyPrefix.length))),
-                row,
-            });
+        const found: Array<{ target: Target; row: DocumentRow }> = [];
+        const kinds: DocumentKind[] = ['page', 'global', 'item'];
+        for (const kind of kinds) {
+            for (const row of await this.store.list(kind)) {
+                const target = this.declaredTarget(row, listings);
+                if (target !== undefined)
+                    found.push({
+                        target,
+                        row,
+                    });
+            }
         }
         return found;
     }
@@ -3769,12 +3800,6 @@ export class CmsService {
     /**
      * Whether a preview token was signed with this CMS's secret and has not
      * expired.
-        await this.claimHold(ref, author);
-        // An image deleted since the version was saved leaves its field empty.
-        const held = mediaIdsOf(target.definition, migrated);
-        const gone = new Set<string>();
-        for (const id of held) if ((await this.media.get(id)) === undefined) gone.add(id);
-        const restored = gone.size === 0 ? migrated : withoutImages(target.definition, migrated, gone);
      */
     verifiesPreview(token: string): boolean {
         return verifyPreviewToken(previewSecret(this.options.previewSecret), token);

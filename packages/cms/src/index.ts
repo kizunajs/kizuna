@@ -92,7 +92,15 @@ export {
     type UndeclaredFieldRole,
 } from './field.js';
 export { type ConditionValue, type FieldCondition } from './condition.js';
-export { isImageSchema, type ImageRef, type ResolvedImage } from './image.js';
+export {
+    isImageSchema,
+    croppedImage,
+    type AspectRatio,
+    type CroppedImageRef,
+    type ImageRef,
+    type ResolvedCrop,
+    type ResolvedImage,
+} from './image.js';
 export { type Output, type Resolved } from './output.js';
 export { cms } from './provider.js';
 export {

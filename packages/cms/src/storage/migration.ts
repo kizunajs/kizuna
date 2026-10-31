@@ -41,6 +41,8 @@ create table if not exists cms_refs (
 
 create index if not exists cms_refs_lookup on cms_refs (brand, ref_id);
 
+alter table cms_refs add column if not exists published boolean not null default false;
+
 alter table cms_documents add column if not exists owner text;
 
 create table if not exists cms_reviews (

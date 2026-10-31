@@ -5,7 +5,7 @@ import type { CmsExports } from './setup.js';
 import { CmsHttpError, type CmsService } from './cms.js';
 import { DEFAULT_SITE, type EnvironmentOptions } from './options.js';
 import { defaultPagesOutput, discoverPages, findAppDir, renderPagesModule } from './discovery.js';
-import { mediaIdsOf } from './media/resolve.js';
+import { mediaIdsOf, renameImages } from './media/resolve.js';
 import { refsOf } from './content.js';
 import type { MediaRecord } from './media/media.js';
 import { formatRef, type DocumentRef } from './refs.js';
@@ -32,6 +32,7 @@ Commands:
   migrate    Write the CMS tables and collection indexes as a migration.
   migrate-content
              Store every document at its latest migration step, so reads stop migrating it.
+  reindex    Rebuild the index of the ids and images each document holds, which media uses read.
   check      List published content that fails its schema. Exits 1 when there is some.
   pages      List every page's path and name.
   orphans    List stored content nothing in the config claims, per site and table. Exits 1 when there is some.
@@ -154,20 +155,28 @@ const expectStatus = (answer: Answer, expected: number, what: string): void => {
 };
 
 /**
- * Copies every media item a document refers to that the target lacks, and
- * returns the ids copied. Ids are content hashes, so the target names each
- * file the same.
+ * Copies every media item a document refers to that the target lacks, into
+ * the same library, and returns the ids copied. Ids come from content hashes,
+ * so the target usually names a file the same. An image moved between
+ * libraries keeps an id the target names otherwise, and `renamed` maps each
+ * such source id to the target's, for the content to follow.
  */
-const copyMedia = async (ids: readonly string[], source: Remote, target: Remote): Promise<string[]> => {
+const copyMedia = async (
+    ids: readonly string[],
+    source: Remote,
+    target: Remote
+): Promise<{ copied: string[]; renamed: Map<string, string> }> => {
     const copied: string[] = [];
+    const renamed = new Map<string, string>();
     for (const id of ids) {
         const existing = await target.call('GET', `/media/${encodeURIComponent(id)}`);
         if (existing.status === 200) continue;
         const record = await source.call('GET', `/media/${encodeURIComponent(id)}`);
         expectStatus(record, 200, `Reading media ${id} from the source`);
         const media = record.body as MediaRecord;
+        const library = media.site === undefined ? '' : `?site=${encodeURIComponent(media.site)}`;
         const bytes = await source.bytes(`/media/${encodeURIComponent(id)}/file`);
-        const created = await target.call('POST', '/media/uploads', {
+        const created = await target.call('POST', `/media/uploads${library}`, {
             filename: media.filename,
             contentType: media.contentType,
             size: bytes.byteLength,
@@ -179,20 +188,22 @@ const copyMedia = async (ids: readonly string[], source: Remote, target: Remote)
             body: bytes,
         });
         if (!put.ok) throw new CliError(`Uploading ${id} to the target storage answered ${put.status}.`);
-        const completed = await target.call('POST', `/media/uploads/${encodeURIComponent(created.body.uploadId)}`);
+        const completed = await target.call('POST', `/media/uploads/${encodeURIComponent(created.body.uploadId)}${library}`);
         expectStatus(completed, 201, `Finishing the upload of ${id} on the target`);
-        if (completed.body.id !== id) {
-            throw new CliError(`The target stored ${id} as ${completed.body.id}; the bytes differ between environments.`);
-        }
+        const stored = completed.body.id as string;
+        if (stored !== id) renamed.set(id, stored);
         if (media.alt !== '' || media.focalPoint !== undefined) {
-            await target.call('PATCH', `/media/${encodeURIComponent(id)}`, {
+            await target.call('PATCH', `/media/${encodeURIComponent(stored)}${library}`, {
                 alt: media.alt,
                 focalPoint: media.focalPoint,
             });
         }
         copied.push(id);
     }
-    return copied;
+    return {
+        copied,
+        renamed,
+    };
 };
 
 interface MissingId {
@@ -323,7 +334,7 @@ const runPush = async (context: PluginCliContext, positional: string[], flags: F
     const missing = await missingRelationshipIds(service, refsOf(entry.page, content), target);
 
     const written = await target.call('PATCH', `${route}/draft`, {
-        changes: content,
+        changes: renameImages(entry.page, content, media.renamed),
         summary: `Pushed from ${from}`,
     });
     expectStatus(written, 200, `Writing the draft of '${label}' on the target`);
@@ -332,7 +343,7 @@ const runPush = async (context: PluginCliContext, positional: string[], flags: F
         to: flags['to'],
         version: written.body.version,
         complete: written.body.complete,
-        mediaCopied: media,
+        mediaCopied: media.copied,
         missingIds: missing,
     };
 };
@@ -372,9 +383,10 @@ const runPull = async (context: PluginCliContext, flags: Flags): Promise<Record<
         }
         expectStatus(published, 200, `Reading '${label}' from the source`);
         const content = published.body.content as Record<string, unknown>;
-        const media = await copyMedia(mediaIdsOf(service.target(ref).definition, content), source, target);
+        const definition = service.target(ref).definition;
+        const media = await copyMedia(mediaIdsOf(definition, content), source, target);
         const written = await target.call('PATCH', `${route}/draft`, {
-            changes: content,
+            changes: renameImages(definition, content, media.renamed),
             summary: `Pulled from ${flags['from']}`,
         });
         expectStatus(written, 200, `Writing '${label}' on the destination`);
@@ -383,7 +395,7 @@ const runPull = async (context: PluginCliContext, flags: Flags): Promise<Record<
         pulled.push({
             document: label,
             version: written.body.version,
-            mediaCopied: media,
+            mediaCopied: media.copied,
         });
     };
     // Items keep their ids, so references to them still resolve on the destination.
@@ -460,6 +472,22 @@ export const run = async (argv: readonly string[], context: PluginCliContext): P
             case 'migrate': {
                 const result = await runMigrate(context, flags);
                 context.stdout(json ? JSON.stringify(result, null, 2) : `Wrote ${result['file']}`);
+                return 0;
+            }
+            case 'reindex': {
+                const service = await serviceOf(context);
+                const documents = await service.reindexRefs();
+                context.stdout(
+                    json
+                        ? JSON.stringify(
+                              {
+                                  documents,
+                              },
+                              null,
+                              2
+                          )
+                        : `Indexed the ids and images of ${documents} ${documents === 1 ? 'document' : 'documents'}.`
+                );
                 return 0;
             }
             case 'migrate-content': {

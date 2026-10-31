@@ -75,8 +75,9 @@ export const cmsVersions = pgTable(
 );
 
 /**
- * Which branded ids each document holds, rebuilt on every save. An index, never
- * the source of truth.
+ * Which branded ids and images each document holds, in its draft and, with
+ * `published`, in its published content. Rebuilt on every save and publish. An
+ * index, never the source of truth.
  */
 export const cmsRefs = pgTable(
     'cms_refs',
@@ -100,8 +101,8 @@ export const cmsReviews = pgTable(
     {
         id: text('id').primaryKey(),
         requestId: text('request_id').notNull(),
-        ref: text('ref').notNull(),
         published: boolean('published').notNull().default(false),
+        ref: text('ref').notNull(),
         documentId: text('document_id')
             .notNull()
             .references(() => cmsDocuments.id),

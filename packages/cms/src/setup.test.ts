@@ -1046,6 +1046,7 @@ describe('media', () => {
                 },
             ],
         });
+            elsewhere: 0,
         await asEditor(request(app).post('/editing/pages/frontPage/publish'));
         const published = await asEditor(request(app).get(`/editing/media/${completed.body.id}/uses`));
         expect(published.body.uses[0].published).toBe(true);
@@ -1088,7 +1089,7 @@ describe('media', () => {
         expect(read.body.content.hero.image.url).toBe(`/api/cms/media/${completed.body.id}/image`);
     });
 
-    it('deletes an image and its file, and refreshes the pages that held it', async () => {
+    it('refuses to delete an image a page holds, and deletes it and its file once nothing does', async () => {
         const completed = await upload(png);
         await asAdmin(request(app).patch('/editing/pages/frontPage/draft')).send({
             changes: {
@@ -1102,6 +1103,20 @@ describe('media', () => {
         await asEditor(request(app).post('/editing/pages/frontPage/publish'));
         revalidated.length = 0;
         expect((await request(app).delete(`/editing/media/${completed.body.id}`)).status).toBe(401);
+        const refused = await asEditor(request(app).delete(`/editing/media/${completed.body.id}`));
+        expect(refused.status).toBe(409);
+        expect(refused.body.uses).toEqual([
+            expect.objectContaining({
+                ref: 'page:frontPage',
+                fieldPaths: ['hero.image'],
+            }),
+        ]);
+        await asAdmin(request(app).patch('/editing/pages/frontPage/draft')).send({
+            changes: {
+                'hero.image': null,
+            },
+        });
+        await asEditor(request(app).post('/editing/pages/frontPage/publish'));
         const deleted = await asEditor(request(app).delete(`/editing/media/${completed.body.id}`));
         expect(deleted.status).toBe(204);
         expect(storage.files.size).toBe(0);

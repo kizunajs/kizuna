@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
+import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { CropSchema, FocalPointSchema } from './image.js';
 import { AvailableActionSchema } from './action.js';
 
@@ -580,6 +581,7 @@ const mediaFields = {
     contentType: z.string(),
     size: z.int(),
     width: z.int(),
+    folder: z.string().optional().describe('The folder of its library the image sits in. Left out at the top level.'),
     height: z.int(),
     filename: z.string(),
     alt: z.string().describe('The default alt text, used where a field sets none.'),
@@ -595,10 +597,22 @@ export const MediaSchema = Kizuna.model({
 });
 
 export const MediaSummarySchema = Kizuna.model({
+export const MediaFolderSchema = Kizuna.model({
+    title: 'CMS.MediaFolder',
+    schema: z.object({
+        id: z.string(),
+        name: z.string(),
+        parent: z.string().optional().describe('The folder it sits in. Left out at the top level.'),
+        site: z.string().optional().describe('The site whose library holds it. Left out in the shared library.'),
+        images: z.int().describe('How many images it holds itself, not counting its folders.'),
+    }),
+});
+
     title: 'CMS.MediaSummary',
     schema: z.object({
         ...mediaFields,
         uses: z.int().describe('How many pages, globals and items hold it, published or in a draft.'),
+        folders: z.array(MediaFolderSchema).describe("The library's folders, and with `site` the shared ones beside them."),
     }),
 });
 
@@ -620,9 +634,61 @@ export const MediaUseSchema = Kizuna.model({
     }),
 });
 
+        elsewhere: z.int().describe('How many more documents hold it in sites the caller does not edit.'),
+    }),
+});
+
+/**
+ * A media change refused because documents hold the image: a delete, or a
+ * move into a site while content outside it holds the image.
+ */
+export const MediaHeldSchema = Kizuna.model({
+    title: 'CMS.MediaHeld',
+    schema: ProblemDetailsSchema.extend({
+        uses: z.array(MediaUseSchema).describe('The documents holding it, that stop the change.'),
+    }),
+});
+
+const folderName = z.string().trim().min(1).max(60);
+
+export const CreateMediaFolderBodySchema = Kizuna.model({
+    title: 'CMS.CreateMediaFolder',
+    schema: z.object({
+        name: folderName,
+        parent: z.string().optional().describe('The folder to make it in. Leave it out for the top level.'),
+    }),
+});
+
+export const UpdateMediaFolderBodySchema = Kizuna.model({
+    title: 'CMS.UpdateMediaFolder',
+    schema: z.object({
+        name: folderName.optional(),
+        parent: z.string().nullable().optional().describe('The folder to move it into. `null` moves it to the top level.'),
+    }),
+});
+
+export const MoveMediaBodySchema = Kizuna.model({
+    title: 'CMS.MoveMedia',
+    schema: z.object({
+        ids: z.array(z.string()).min(1).max(100).describe('The images to move.'),
+        site: z.string().optional().describe('The library they move into. Leave it out for the shared library.'),
+        folder: z.string().optional().describe('A folder of that library. Leave it out for its top level.'),
+    }),
+});
+
+export const MovedMediaSchema = Kizuna.model({
+    title: 'CMS.MovedMedia',
+    schema: z.object({
+        media: z.array(MediaSchema),
 export const MediaUsesSchema = Kizuna.model({
     title: 'CMS.MediaUses',
     schema: z.object({
+export const CompleteUploadBodySchema = z
+    .object({
+        folder: z.string().optional().describe('The folder of the library the image lands in. Leave it out for the top level.'),
+    })
+    .optional();
+
         id: z.string(),
         uses: z.array(MediaUseSchema),
     }),

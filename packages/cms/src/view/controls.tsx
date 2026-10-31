@@ -40,11 +40,12 @@ import { itemNounOf, movedIndex, remapOpen, rowLabelsOf, singularOf } from './ar
 import { blockListsIn, movedBlock, moveTargetsOf, valueAtPath, type BlockPath } from './block-moves.js';
 import { EditorContext, ICON, useEditorContext } from './context.js';
 import { Hint } from './hint.js';
-import { cropOf, edgesOf, type CropEdges } from './crop.js';
+import { defaultCrop, dragCrop, fitsRatio, ratioOf, type Crop, type CropHandle } from './crop.js';
 import { MediaPicker, uploadMedia, type MediaRecord } from './media.js';
 import {
     BLOCK_KEY,
     blockOptionsOf,
+    cropShapeOfJson,
     emptyFor,
     humanize,
     isImage,
@@ -396,47 +397,69 @@ function ReferenceControl({ value, onChange, brand, disabled, id }: ControlProps
 interface ImageRef {
     id?: string;
     alt?: string;
-    crop?: {
-        x: number;
-        y: number;
-        width: number;
-        height: number;
-    };
+    crop?: Crop;
+    crops?: Record<string, Crop | undefined>;
     focalPoint?: {
         x: number;
         y: number;
     };
 }
 
-const CROP_EDGES: Array<{ key: keyof CropEdges; label: string }> = [
-    {
-        key: 'top',
-        label: 'Top',
-    },
-    {
-        key: 'right',
-        label: 'Right',
-    },
-    {
-        key: 'bottom',
-        label: 'Bottom',
-    },
-    {
-        key: 'left',
-        label: 'Left',
-    },
-];
+const WHOLE: Crop = {
+    x: 0,
+    y: 0,
+    width: 1,
+    height: 1,
+};
+
+const CORNERS: CropHandle[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+
+/**
+ * A crop drawn small at a shape's own proportions: the whole image scaled so
+ * the cropped part fills the box.
+ */
+function CropPreview({ source, crop, ratio, label }: { source: string; crop: Crop; ratio: number; label: string }) {
+    const height = 96;
+    const width = Math.round(height * ratio);
+    return (
+        <figure className="k-crop-preview">
+            <span
+                className="k-crop-preview__box"
+                style={{
+                    width: `${width}px`,
+                    height: `${height}px`,
+                }}>
+                <img
+                    src={source}
+                    alt=""
+                    style={{
+                        width: `${width / crop.width}px`,
+                        height: `${height / crop.height}px`,
+                        left: `${(-crop.x * width) / crop.width}px`,
+                        top: `${(-crop.y * height) / crop.height}px`,
+                    }}
+                />
+            </span>
+            <figcaption>{label}</figcaption>
+        </figure>
+    );
+}
 
 /**
  * An image as a card: a thumbnail, its file name and size, and buttons to
  * edit or remove it. In a narrow column the image shows large above its name.
- * Edit opens a sheet with the image at size, where a click sets the focal
- * point, with its alt text and its crop, kept once the person applies them.
- * An empty field takes an image from the library or a file dropped on it.
+ * Edit opens a sheet with the image at size and its crop as a frame dragged
+ * by its corners, kept to the shape a `croppedImage` field declares, one tab
+ * per named crop. A click on the image sets the focal point, which every crop
+ * not set follows, with each shape's crop shown small below. The alt text and
+ * crops are kept once the person applies them. An empty field takes an image
+ * from the library or a file dropped on it.
  */
-function ImageControl({ value, onChange, disabled, required }: ControlProps) {
+function ImageControl({ schema, root, value, onChange, disabled, required }: ControlProps) {
     const { connection, resolveUrl } = useEditorContext();
     const image = (value ?? {}) as ImageRef;
+    const shape = cropShapeOfJson(schema, root);
+    const named = shape !== undefined && 'crops' in shape ? Object.entries(shape.crops) : undefined;
     const [record, setRecord] = useState<MediaRecord | undefined>();
     const [editing, setEditing] = useState(false);
     const [sheet, setSheet] = useState<ImageRef>(image);
@@ -444,6 +467,8 @@ function ImageControl({ value, onChange, disabled, required }: ControlProps) {
     const [uploading, setUploading] = useState(false);
     const [problem, setProblem] = useState<string | undefined>();
     useEffect(() => {
+    const frame = useRef<HTMLDivElement>(null);
+    const drag = useRef<{ handle: CropHandle | undefined; start: Crop; x: number; y: number; moved: boolean } | undefined>(undefined);
         if (image.id === undefined) {
             setRecord(undefined);
             return;
@@ -465,6 +490,7 @@ function ImageControl({ value, onChange, disabled, required }: ControlProps) {
             alt: image.alt === undefined || image.alt === '' ? (picked.alt ?? '') : image.alt,
             crop: undefined,
             focalPoint: undefined,
+            crops: undefined,
         });
     const drop = async (file: File | undefined): Promise<void> => {
         setOver(false);
@@ -525,12 +551,76 @@ function ImageControl({ value, onChange, disabled, required }: ControlProps) {
     }
 
     const source = record === undefined ? undefined : resolveUrl(record.url);
-    const edges = record === undefined ? undefined : edgesOf(sheet.crop, record.width, record.height);
-    const setEdge = (edge: keyof CropEdges, next: number | null): void => {
-        if (record === undefined || edges === undefined) return;
+    const aspect =
+        shape === undefined ? undefined : 'aspectRatio' in shape ? shape.aspectRatio : named?.find(([name]) => name === active)?.[1];
+    const ratio = aspect === undefined ? undefined : ratioOf(aspect);
+    const focal = sheet.focalPoint ?? record?.focalPoint;
+    // The crop a shape shows: the one set, while it has the shape, or the largest of the shape around the focal point.
+    const cropFor = (stored: Crop | undefined, shapeRatio: number | undefined): Crop => {
+        if (record === undefined) return stored ?? WHOLE;
+        if (shapeRatio === undefined) return stored ?? WHOLE;
+        if (stored !== undefined && fitsRatio(stored, shapeRatio, record.width, record.height)) return stored;
+        return defaultCrop(shapeRatio, focal, record.width, record.height);
+    };
+    const stored = named === undefined ? sheet.crop : active === undefined ? undefined : sheet.crops?.[active];
+    const crop = cropFor(stored, ratio);
+    const setCrop = (next: Crop | undefined): void => {
+        if (named === undefined) {
+            setSheet({
+                ...sheet,
+                crop: next,
+            });
+            return;
+        }
+        if (active === undefined) return;
         setSheet({
             ...sheet,
-            crop: cropOf(
+            crops: {
+                ...sheet.crops,
+                [active]: next,
+            },
+        });
+    };
+    const pointAt = (clientX: number, clientY: number): { x: number; y: number } | undefined => {
+        const box = frame.current?.getBoundingClientRect();
+        if (box === undefined || box.width === 0) return undefined;
+        const fraction = (offset: number, length: number): number => Math.min(1, Math.max(0, Math.round((offset / length) * 100) / 100));
+        return {
+            x: fraction(clientX - box.left, box.width),
+            y: fraction(clientY - box.top, box.height),
+        };
+    };
+    const startDrag = (handle: CropHandle | undefined) => (event: ReactPointerEvent<HTMLElement>) => {
+        if (disabled || record === undefined) return;
+        event.stopPropagation();
+        event.preventDefault();
+        frame.current?.setPointerCapture(event.pointerId);
+        const point = pointAt(event.clientX, event.clientY);
+        const inside =
+            point !== undefined &&
+            point.x >= crop.x &&
+            point.x <= crop.x + crop.width &&
+            point.y >= crop.y &&
+            point.y <= crop.y + crop.height;
+        drag.current = {
+            handle: handle ?? (inside ? 'move' : undefined),
+            start: crop,
+            x: event.clientX,
+            y: event.clientY,
+            moved: false,
+        };
+    };
+    const moveDrag = (event: ReactPointerEvent<HTMLElement>): void => {
+        const current = drag.current;
+        const box = frame.current?.getBoundingClientRect();
+        if (current === undefined || box === undefined || record === undefined) return;
+        if (!current.moved && Math.hypot(event.clientX - current.x, event.clientY - current.y) < 4) return;
+        current.moved = true;
+        if (current.handle === undefined) return;
+        setCrop(
+            dragCrop(
+                current.start,
+                current.handle,
                 {
                     ...edges,
                     [edge]: next ?? 0,
@@ -546,6 +636,35 @@ function ImageControl({ value, onChange, disabled, required }: ControlProps) {
                 <span className="k-image__thumb" aria-hidden="true" />
             ) : (
                 <img className="k-image__thumb" src={resolveUrl(`${record.url}?w=640`)} alt={image.alt ?? ''} />
+    // A click without a drag sets the focal point where it lands.
+    const endDrag = (event: ReactPointerEvent<HTMLElement>): void => {
+        const current = drag.current;
+        drag.current = undefined;
+        if (current === undefined || current.moved) return;
+        const point = pointAt(event.clientX, event.clientY);
+        if (point !== undefined) {
+            setSheet({
+                ...sheet,
+                focalPoint: point,
+            });
+        }
+    };
+    const shapes: Array<[string, string]> = named ?? (shape !== undefined && 'aspectRatio' in shape ? [['', shape.aspectRatio]] : []);
+    const previews: Array<{ label: string; ratio: number; crop: Crop }> =
+        record === undefined
+            ? []
+            : shapes.flatMap(([name, aspectRatio]) => {
+                  const shapeRatio = ratioOf(aspectRatio);
+                  if (shapeRatio === undefined) return [];
+                  return [
+                      {
+                          label: name === '' ? aspectRatio : `${humanize(name)} · ${aspectRatio}`,
+                          ratio: shapeRatio,
+                          crop: cropFor(name === '' ? sheet.crop : sheet.crops?.[name], shapeRatio),
+                      },
+                  ];
+              });
+    const cropShown = shape !== undefined || sheet.crop !== undefined || !disabled;
             )}
             <span className="k-image__meta">
                 <span className="k-image__name">
@@ -562,7 +681,10 @@ function ImageControl({ value, onChange, disabled, required }: ControlProps) {
                     <Dialog.Root
                         open={editing}
                         onOpenChange={(open) => {
-                            if (open) setSheet(image);
+                            if (open) {
+                                setSheet(image);
+                                setActive(named?.[0]?.[0]);
+                            }
                             setEditing(open);
                         }}>
                         <Hint label="Edit image">
@@ -581,60 +703,70 @@ function ImageControl({ value, onChange, disabled, required }: ControlProps) {
                                 </div>
                                 {source === undefined ? null : (
                                     <div className="k-sheet__group">
-                                        <div className="k-image-frame">
-                                            <img
-                                                src={source}
-                                                alt=""
-                                                data-editable={!disabled}
-                                                onClick={(event) => {
-                                                    if (disabled) return;
-                                                    const rect = event.currentTarget.getBoundingClientRect();
-                                                    setSheet({
-                                                        ...sheet,
-                                                        focalPoint: {
-                                                            x: Math.round(((event.clientX - rect.left) / rect.width) * 100) / 100,
-                                                            y: Math.round(((event.clientY - rect.top) / rect.height) * 100) / 100,
-                                                        },
-                                                    });
-                                                }}
-                                            />
-                                            {edges === undefined || record === undefined ? null : (
-                                                <span
-                                                    className="k-image-frame__crop"
-                                                    style={{
-                                                        top: `${(edges.top / record.height) * 100}%`,
-                                                        right: `${(edges.right / record.width) * 100}%`,
-                                                        bottom: `${(edges.bottom / record.height) * 100}%`,
-                                                        left: `${(edges.left / record.width) * 100}%`,
-                                                    }}
-                                                />
-                                            )}
-                                            {sheet.focalPoint !== undefined ? (
-                                                <span
-                                                    className="k-image-frame__focal"
-                                                    style={{
-                                                        left: `${sheet.focalPoint.x * 100}%`,
-                                                        top: `${sheet.focalPoint.y * 100}%`,
-                                                    }}
-                                                />
-                                            ) : null}
-                                        </div>
-                                        <div className="k-sheet__row">
-                                            <p className="k-help">Click the image to set its focus. Crops keep that point in view.</p>
-                                            {disabled || sheet.focalPoint === undefined ? null : (
-                                                <button
-                                                    type="button"
-                                                    className="k-text-button"
-                                                    onClick={() =>
-                                                        setSheet({
-                                                            ...sheet,
-                                                            focalPoint: undefined,
-                                                        })
-                                                    }>
-                                                    <RotateCcw {...ICON} />
-                                                    Reset focus
-                                                </button>
-                                            )}
+                                        {named === undefined ? null : (
+                                            <div className="k-crop-tabs" role="radiogroup" aria-label="Crop">
+                                                {named.map(([name, aspectRatio]) => (
+                                                    <button
+                                                        key={name}
+                                                        type="button"
+                                                        role="radio"
+                                                        className="k-tab"
+                                                        aria-checked={active === name}
+                                                        onClick={() => setActive(name)}>
+                                                        {humanize(name)}
+                                                        <span className="k-crop-tabs__ratio">{aspectRatio}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <div className="k-crop-frame" data-editable={!disabled}>
+                                            <div
+                                                ref={frame}
+                                                className="k-crop-frame__clip"
+                                                onPointerDown={startDrag(undefined)}
+                                                onPointerMove={moveDrag}
+                                                onPointerUp={endDrag}
+                                                onPointerCancel={() => {
+                                                    drag.current = undefined;
+                                                }}>
+                                                <img src={source} alt="" draggable={false} />
+                                                {cropShown ? (
+                                                    <span
+                                                        className="k-image-frame__crop"
+                                                        style={{
+                                                            left: `${crop.x * 100}%`,
+                                                            top: `${crop.y * 100}%`,
+                                                            width: `${crop.width * 100}%`,
+                                                            height: `${crop.height * 100}%`,
+                                                        }}
+                                                    />
+                                                ) : null}
+                                                {sheet.focalPoint === undefined && record.focalPoint === undefined ? null : (
+                                                    <span
+                                                        className="k-image-frame__focal"
+                                                        style={{
+                                                            left: `${(focal?.x ?? 0.5) * 100}%`,
+                                                            top: `${(focal?.y ?? 0.5) * 100}%`,
+                                                        }}
+                                                    />
+                                                )}
+                                            </div>
+                                            {disabled || !cropShown
+                                                ? null
+                                                : CORNERS.map((corner) => (
+                                                      <span
+                                                          key={corner}
+                                                          className="k-crop-frame__handle"
+                                                          aria-hidden="true"
+                                                          style={{
+                                                              left: `${(corner.endsWith('left') ? crop.x : crop.x + crop.width) * 100}%`,
+                                                              top: `${(corner.startsWith('top') ? crop.y : crop.y + crop.height) * 100}%`,
+                                                          }}
+                                                          onPointerDown={startDrag(corner)}
+                                                          onPointerMove={moveDrag}
+                                                          onPointerUp={endDrag}
+                                                      />
+                                                  ))}
                                         </div>
                                     </div>
                                 )}
@@ -642,6 +774,43 @@ function ImageControl({ value, onChange, disabled, required }: ControlProps) {
                                     <label className="k-row__label" htmlFor="k-image-alt">
                                         Alt text
                                         {required === true ? <Required /> : null}
+                                        {disabled ? null : (
+                                            <div className="k-sheet__row k-crop-resets">
+                                                {sheet.focalPoint === undefined ? null : (
+                                                    <button
+                                                        type="button"
+                                                        className="k-text-button"
+                                                        onClick={() =>
+                                                            setSheet({
+                                                                ...sheet,
+                                                                focalPoint: undefined,
+                                                            })
+                                                        }>
+                                                        <RotateCcw {...ICON} />
+                                                        Reset focus
+                                                    </button>
+                                                )}
+                                                {stored === undefined ? null : (
+                                                    <button type="button" className="k-text-button" onClick={() => setCrop(undefined)}>
+                                                        <RotateCcw {...ICON} />
+                                                        Reset crop
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                        {previews.length === 0 ? null : (
+                                            <div className="k-crop-previews">
+                                                {previews.map((preview) => (
+                                                    <CropPreview
+                                                        key={preview.label}
+                                                        source={source}
+                                                        crop={preview.crop}
+                                                        ratio={preview.ratio}
+                                                        label={preview.label}
+                                                    />
+                                                ))}
+                                            </div>
+                                        )}
                                     </label>
                                     <div className="k-row__input">
                                         <input
@@ -658,39 +827,8 @@ function ImageControl({ value, onChange, disabled, required }: ControlProps) {
                                                 })
                                             }
                                         />
-                                        <p className="k-help">What the image shows, for screen readers and search.</p>
                                     </div>
                                 </div>
-                                {disabled || edges === undefined || record === undefined ? null : (
-                                    <Collapsible.Root className="k-collapsible" defaultOpen={sheet.crop !== undefined}>
-                                        <Collapsible.Trigger className="k-collapsible__trigger">
-                                            <ChevronRight {...ICON} />
-                                            Crop
-                                        </Collapsible.Trigger>
-                                        <Collapsible.Panel className="k-collapsible__panel k-sheet__group">
-                                            <div className="k-crop">
-                                                {CROP_EDGES.map((edge) => (
-                                                    <NumberField.Root
-                                                        key={edge.key}
-                                                        value={edges[edge.key]}
-                                                        min={0}
-                                                        step={1}
-                                                        onValueChange={(next) => setEdge(edge.key, next)}>
-                                                        <NumberField.Group className="k-crop__edge">
-                                                            <label className="k-row__label" htmlFor={`k-crop-${edge.key}`}>
-                                                                {edge.label}
-                                                            </label>
-                                                            <NumberField.Input className="k-input" id={`k-crop-${edge.key}`} />
-                                                        </NumberField.Group>
-                                                    </NumberField.Root>
-                                                ))}
-                                            </div>
-                                            <p className="k-help">
-                                                Pixels trimmed from each edge of the {record.width} × {record.height} original.
-                                            </p>
-                                        </Collapsible.Panel>
-                                    </Collapsible.Root>
-                                )}
                                 {disabled ? null : (
                                     <div className="k-sheet__foot">
                                         <MediaPicker current={image.id} disabled={disabled} onPick={pick} />
@@ -719,9 +857,23 @@ function ImageControl({ value, onChange, disabled, required }: ControlProps) {
                                 <X {...ICON} />
                             </button>
                         </Hint>
+                                                const { crop: keptCrop, crops, ...rest } = sheet;
+                                                const keptCrops = Object.fromEntries(
+                                                    Object.entries(crops ?? {}).filter(([, each]) => each !== undefined)
+                                                );
                     )}
                 </span>
             </span>
+                                                    ...(named === undefined && keptCrop !== undefined
+                                                        ? {
+                                                              crop: keptCrop,
+                                                          }
+                                                        : {}),
+                                                    ...(named !== undefined && Object.keys(keptCrops).length > 0
+                                                        ? {
+                                                              crops: keptCrops,
+                                                          }
+                                                        : {}),
         </div>
     );
 }

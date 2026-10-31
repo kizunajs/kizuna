@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { ImageRef, ResolvedImage } from './image.js';
+import type { ImageRef, ResolvedCrop, ResolvedImage } from './image.js';
 import type { COLLECTION } from './definitions.js';
 import type { PAGE } from './page.js';
 
@@ -11,7 +11,13 @@ type Primitive = string | number | bigint | boolean | symbol | null | undefined 
  * it.
  */
 export type Resolved<T> = T extends ImageRef
-    ? ResolvedImage
+    ? 'crops' extends keyof T
+        ? ResolvedImage & {
+              crops: {
+                  [Name in keyof NonNullable<T['crops' & keyof T]>]-?: ResolvedCrop;
+              };
+          }
+        : ResolvedImage
     : T extends Primitive
       ? T
       : T extends readonly unknown[]

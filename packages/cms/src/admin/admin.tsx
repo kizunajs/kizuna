@@ -504,6 +504,7 @@ export function Admin({ config }: { config: AdminConfig }) {
                     people={people}
                     collectionLabel={collectionLabel}
                     site={screen.site}
+                    sites={sites}
                 />
             );
         }

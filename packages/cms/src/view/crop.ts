@@ -9,52 +9,96 @@ export interface Crop {
     height: number;
 }
 
-/**
- * A crop as the editor reads it: the pixels trimmed from each edge of the
- * original.
- */
-export interface CropEdges {
-    top: number;
-    right: number;
-    bottom: number;
-    left: number;
-}
-
 const fraction = (value: number): number => Math.round(Math.min(1, Math.max(0, value)) * 10_000) / 10_000;
 
 /**
- * The pixels a crop trims from each edge of an original this size.
+ * A shape like `16:9` as width over height, or `undefined` when it is not two
+ * positive numbers.
  */
-export const edgesOf = (crop: Crop | undefined, width: number, height: number): CropEdges => {
-    const kept = crop ?? {
-        x: 0,
-        y: 0,
-        width: 1,
-        height: 1,
+export const ratioOf = (aspectRatio: string): number | undefined => {
+    const match = /^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/.exec(aspectRatio);
+    if (match === null) return undefined;
+    const width = Number(match[1]);
+    const height = Number(match[2]);
+    return width > 0 && height > 0 ? width / height : undefined;
+};
+
+/**
+ * The largest crop of a shape an original this size holds, centred on the
+ * focal point as far as the edges allow, or on the middle without one.
+ */
+export const defaultCrop = (ratio: number, focalPoint: { x: number; y: number } | undefined, width: number, height: number): Crop => {
+    const focal = focalPoint ?? {
+        x: 0.5,
+        y: 0.5,
     };
+    const wide = width / height > ratio;
+    const keptWidth = wide ? (height * ratio) / width : 1;
+    const keptHeight = wide ? 1 : width / ratio / height;
+    const place = (centre: number, length: number): number => Math.min(1 - length, Math.max(0, centre - length / 2));
     return {
-        top: Math.round(kept.y * height),
-        right: Math.round((1 - kept.x - kept.width) * width),
-        bottom: Math.round((1 - kept.y - kept.height) * height),
-        left: Math.round(kept.x * width),
+        x: fraction(place(focal.x, keptWidth)),
+        y: fraction(place(focal.y, keptHeight)),
+        width: fraction(keptWidth),
+        height: fraction(keptHeight),
     };
 };
 
 /**
- * The crop that trims these pixels from an original this size, or
- * `undefined` when it trims nothing. Edges that meet keep one pixel.
+ * Whether a crop of an original this size has the shape, to within a pixel.
  */
-export const cropOf = (edges: CropEdges, width: number, height: number): Crop | undefined => {
-    if (width <= 0 || height <= 0) return undefined;
-    const left = Math.max(0, Math.min(edges.left, width - 1));
-    const top = Math.max(0, Math.min(edges.top, height - 1));
-    const right = Math.max(0, Math.min(edges.right, width - left - 1));
-    const bottom = Math.max(0, Math.min(edges.bottom, height - top - 1));
-    if (left === 0 && top === 0 && right === 0 && bottom === 0) return undefined;
+export const fitsRatio = (crop: Crop, ratio: number, width: number, height: number): boolean => {
+    const keptWidth = crop.width * width;
+    const keptHeight = crop.height * height;
+    return Math.abs(keptWidth / ratio - keptHeight) <= 1.5;
+};
+
+/**
+ * Which part of the frame is dragged: the whole frame, or one corner.
+ */
+export type CropHandle = 'move' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
+const SMALLEST = 0.05;
+
+/**
+ * The crop after dragging a handle by a distance, as fractions of the
+ * original. With a shape, a corner keeps it; the frame stays inside the image
+ * and the opposite corner stays put.
+ */
+export const dragCrop = (
+    start: Crop,
+    handle: CropHandle,
+    distance: { x: number; y: number },
+    shape: { ratio: number; width: number; height: number } | undefined
+): Crop => {
+    if (handle === 'move') {
+        return {
+            ...start,
+            x: fraction(Math.min(1 - start.width, Math.max(0, start.x + distance.x))),
+            y: fraction(Math.min(1 - start.height, Math.max(0, start.y + distance.y))),
+        };
+    }
+    const left = handle.endsWith('left');
+    const top = handle.startsWith('top');
+    const anchorX = left ? start.x + start.width : start.x;
+    const anchorY = top ? start.y + start.height : start.y;
+    const roomX = left ? anchorX : 1 - anchorX;
+    const roomY = top ? anchorY : 1 - anchorY;
+    let keptWidth = Math.min(roomX, Math.max(SMALLEST, start.width + (left ? -distance.x : distance.x)));
+    let keptHeight = Math.min(roomY, Math.max(SMALLEST, start.height + (top ? -distance.y : distance.y)));
+    if (shape !== undefined) {
+        // In fractions, the shape's width over height scales by the original's height over its width.
+        const across = (shape.ratio * shape.height) / shape.width;
+        keptHeight = keptWidth / across;
+        if (keptHeight > roomY) {
+            keptHeight = roomY;
+            keptWidth = keptHeight * across;
+        }
+    }
     return {
-        x: fraction(left / width),
-        y: fraction(top / height),
-        width: fraction((width - left - right) / width),
-        height: fraction((height - top - bottom) / height),
+        x: fraction(left ? anchorX - keptWidth : anchorX),
+        y: fraction(top ? anchorY - keptHeight : anchorY),
+        width: fraction(keptWidth),
+        height: fraction(keptHeight),
     };
 };

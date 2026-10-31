@@ -316,9 +316,27 @@ export const resolveRef = (schema: JsonSchema, root: JsonSchema): JsonSchema => 
 
 export const isImage = (schema: JsonSchema, root: JsonSchema): boolean => {
     const resolved = resolveRef(schema, root);
-    if (schema.$ref === '#/$defs/CMS.Image' || resolved['id'] === 'CMS.Image') return true;
+    if (schema.$ref === '#/$defs/CMS.Image' || resolved['id'] === 'CMS.Image' || resolved['x-kizuna'] === 'image') return true;
     const keys = Object.keys(resolved.properties ?? {});
     return keys.includes('id') && keys.includes('alt') && keys.every((key) => ['id', 'alt', 'crop', 'focalPoint'].includes(key));
+};
+
+/**
+ * The shape a `croppedImage` field crops to, or `undefined` for a free crop.
+ */
+export const cropShapeOfJson = (
+    schema: JsonSchema,
+    root: JsonSchema
+):
+    | {
+          aspectRatio: string;
+      }
+    | {
+          crops: Record<string, string>;
+      }
+    | undefined => {
+    const shape = resolveRef(schema, root)['x-kizuna-crop'];
+    return typeof shape === 'object' && shape !== null ? (shape as { aspectRatio: string } | { crops: Record<string, string> }) : undefined;
 };
 
 export const typeOf = (schema: JsonSchema): string | undefined => {

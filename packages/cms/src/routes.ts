@@ -30,6 +30,13 @@ import {
     EditorItemSchema,
     TreePlacementShape,
     MediaListSchema,
+    MediaFolderSchema,
+    MediaHeldSchema,
+    MovedMediaSchema,
+    MoveMediaBodySchema,
+    CreateMediaFolderBodySchema,
+    UpdateMediaFolderBodySchema,
+    CompleteUploadBodySchema,
     MediaSchema,
     MediaUsesSchema,
     MissingFieldsSchema,
@@ -60,7 +67,7 @@ import {
     ReviewListSchema,
     WhereUsedSchema,
 } from './wire.js';
-import { UploadRejectedError } from './media/media.js';
+import { FolderConflictError, FolderNotFoundError, UploadRejectedError, type MediaRecord } from './media/media.js';
 import { parseFields, parseFilter } from './item-list.js';
 import { ImageQuerySchema, InvalidateBodySchema, KeepSourceBodySchema, RefreshListSchema, type InvalidateBody } from './wire.js';
 import { invalidate as invalidateDocument, refreshTargets } from './refresh.js';
@@ -452,6 +459,14 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     });
                 }
                 throw error;
+                if (error instanceof FolderConflictError || error instanceof FolderNotFoundError) {
+                    return args.throwError({
+                        status: error instanceof FolderConflictError ? 409 : 404,
+                        body: {
+                            detail: error.message,
+                        },
+                    });
+                }
             }
         };
 
@@ -1739,6 +1754,51 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     const siteGlobalScope: Scope = {
         prefix: '/sites/:site/globals/:name',
         params: z.object({
+
+        placeItem: route({
+            method: 'PUT',
+            path: `${editingBase}${at.prefix}/collections/:name/items/:id/place`,
+            auth: editor,
+            summary: 'Move an item of a collection with an order or a tree, saving the move to its draft',
+            description:
+                'Name one of `after`, `before` and `at`, or none to go last. `after` and `before` make it a sibling of the item they name. In a tree, `parent` puts it under another item, first or last with `at`, and a tree without an order takes `parent` alone. An item takes everything under it wherever it goes. Placing an item where it already is changes nothing.',
+            tool: true,
+            pathParams: at.params.extend({
+                name: z.string(),
+                id: z.string(),
+            }),
+            body: PlaceItemBodySchema,
+            responses: {
+                200: {
+                    body: DraftPageSchema,
+                    headers: DraftHeadersSchema,
+                    cache: 'no-store',
+                },
+                400: ProblemDetailsSchema,
+                404: ProblemDetailsSchema,
+                409: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => {
+                const site = siteOf(cms, args, at);
+                const ref = cms.listing(args.params['name']!, site).refOf(args.params['id']!);
+                const state = await cms.placeItem({
+                    name: args.params['name']!,
+                    id: args.params['id']!,
+                    site,
+                    place: args.body as z.output<typeof PlaceItemBodySchema>,
+                    caller: cms.access(args.auth).callerFor(ref),
+                    author: authorOf(cms, args),
+                });
+                return {
+                    status: 200,
+                    body: draftBody(state),
+                    headers: {
+                        etag: state.etag,
+                    },
+                };
+            }) as never
+        ),
             site: z.string(),
             name: z.string(),
         }),
@@ -1838,51 +1898,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         }) as never
     );
 
-
-        placeItem: route({
-            method: 'PUT',
-            path: `${editingBase}${at.prefix}/collections/:name/items/:id/place`,
-            auth: editor,
-            summary: 'Move an item of a collection with an order or a tree, saving the move to its draft',
-            description:
-                'Name one of `after`, `before` and `at`, or none to go last. `after` and `before` make it a sibling of the item they name. In a tree, `parent` puts it under another item, first or last with `at`, and a tree without an order takes `parent` alone. An item takes everything under it wherever it goes. Placing an item where it already is changes nothing.',
-            tool: true,
-            pathParams: at.params.extend({
-                name: z.string(),
-                id: z.string(),
-            }),
-            body: PlaceItemBodySchema,
-            responses: {
-                200: {
-                    body: DraftPageSchema,
-                    headers: DraftHeadersSchema,
-                    cache: 'no-store',
-                },
-                400: ProblemDetailsSchema,
-                404: ProblemDetailsSchema,
-                409: ProblemDetailsSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => {
-                const site = siteOf(cms, args, at);
-                const ref = cms.listing(args.params['name']!, site).refOf(args.params['id']!);
-                const state = await cms.placeItem({
-                    name: args.params['name']!,
-                    id: args.params['id']!,
-                    site,
-                    place: args.body as z.output<typeof PlaceItemBodySchema>,
-                    caller: cms.access(args.auth).callerFor(ref),
-                    author: authorOf(cms, args),
-                });
-                return {
-                    status: 200,
-                    body: draftBody(state),
-                    headers: {
-                        etag: state.etag,
-                    },
-                };
-            }) as never
-        ),
     const invitePersonRoute = route({
         method: 'POST',
         path: `${editingBase}/people`,
@@ -2575,8 +2590,9 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         method: 'GET',
         path: `${editingBase}/media`,
         auth: editor,
-        summary: 'List uploaded media, with how many pages hold each image',
-        description: "With `site`, that site's own images beside the shared ones, each own image naming its site.",
+        summary: 'List uploaded media and folders, with how many pages hold each image',
+        description:
+            "With `site`, that site's own images and folders beside the shared ones, each own one naming its site. Each image names its folder, left out at the top level.",
         tool: true,
         ...mediaQuery,
         responses: {
@@ -2616,8 +2632,9 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             return {
                 status: 200,
                 body: {
-                    media: (await cms.media.list(site)).map((record) => ({
+                    media: media.map((record) => ({
                         ...withUrl(cms, record),
+            const media = await cms.media.list(site);
                         uses: uses.get(record.id)?.length ?? 0,
                     })),
                     maxBytes: cms.media.maxBytes,
@@ -2625,6 +2642,10 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             };
         }) as never
     );
+                    folders: (await cms.media.folders(site)).map((folder) => ({
+                        ...folder,
+                        images: media.filter((record) => record.folder === folder.id).length,
+                    })),
 
     const mediaUses = route({
         method: 'GET',
@@ -2651,7 +2672,10 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 status: 200,
                 body: {
                     id,
-                    uses: ((await cms.mediaUses()).get(id) ?? []).filter((use) => access.seesRef(use.ref)),
+                    uses: seen,
+                    elsewhere: uses.length - seen.length,
+            const uses = (await cms.mediaUses([id])).get(id) ?? [];
+            const seen = uses.filter((use) => access.seesRef(use.ref));
                 },
             };
         }) as never
@@ -2680,11 +2704,17 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         guarded(async (cms, args) => {
             const id = args.params['id']!;
             const record = await seenMedia(cms, args, id);
+            409: MediaHeldSchema,
             cms.assertOwnMedia(record, seenLibrary(cms, args));
             assertChangesMedia(cms, args, record);
-            const uses = (await cms.mediaUses()).get(id) ?? [];
+            const uses = (await cms.mediaUses([id])).get(id) ?? [];
+            if (uses.length > 0) {
+                throw new CmsHttpError(409, {
+                    detail: `${record.filename} is used in ${uses.length === 1 ? '1 place' : `${uses.length} places`}. Remove it from each before deleting it.`,
+                    uses,
+                });
+            }
             if (!(await cms.media.delete(id))) throw new CmsHttpError(404, { detail: `No media item '${id}'.` });
-            await cms.revalidateMedia(uses);
             return {
                 status: 204,
                 body: undefined,
@@ -2863,7 +2893,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         },
     }).handler(
         guarded(async (cms, args) => {
-            const record = await cms.media.completeUpload(args.params['uploadId']!, authorOf(cms, args), seenLibrary(cms, args));
+            const folder = (args.body as z.output<typeof CompleteUploadBodySchema>)?.folder;
+            const record = await cms.media.completeUpload(args.params['uploadId']!, authorOf(cms, args), seenLibrary(cms, args), folder);
             return {
                 status: 201,
                 body: withUrl(cms, record),
@@ -2877,6 +2908,187 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         auth: editor,
         summary: 'Find the ids a branded field may hold, by brand and an optional search term',
         description:
+    /**
+     * Refuses a change to the shared library's folders or images from an
+     * editor who is no admin over every site.
+     */
+    const assertChangesLibrary = (cms: CmsService, args: Args, site: string | undefined): void => {
+        if (site !== undefined || cms.access(args.auth).publishesShared) return;
+        throw new CmsHttpError(403, {
+            detail: 'Every site shows the shared library, so an admin over every site changes it.',
+        });
+    };
+
+    const folderOf = async (cms: CmsService, args: Args, id: string) => {
+        const folder = await cms.media.folder(id);
+        if (folder === undefined || !cms.access(args.auth).sees(folder.site)) {
+            throw new CmsHttpError(404, { detail: `No folder '${id}'.` });
+        }
+        return folder;
+    };
+
+    const createFolder = route({
+        method: 'POST',
+        path: `${editingBase}/media/folders`,
+        auth: editor,
+        summary: 'Make a folder in a library, at its top level or inside another folder',
+        tool: true,
+        ...mediaQuery,
+        body: CreateMediaFolderBodySchema,
+        responses: {
+            201: MediaFolderSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const site = seenLibrary(cms, args);
+            assertChangesLibrary(cms, args, site);
+            const folder = await cms.media.createFolder(
+                args.body as z.output<typeof CreateMediaFolderBodySchema>,
+                site,
+                authorOf(cms, args)
+            );
+            return {
+                status: 201,
+                body: {
+                    ...folder,
+                    images: 0,
+                },
+            };
+        }) as never
+    );
+
+    const updateFolder = route({
+        method: 'PATCH',
+        path: `${editingBase}/media/folders/:id`,
+        auth: editor,
+        summary: 'Rename a folder, or move it into another folder of its library',
+        tool: true,
+        pathParams: z.object({
+            id: z.string(),
+        }),
+        body: UpdateMediaFolderBodySchema,
+        responses: {
+            200: MediaFolderSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const current = await folderOf(cms, args, args.params['id']!);
+            assertChangesLibrary(cms, args, current.site);
+            const folder = await cms.media.updateFolder(
+                current.id,
+                args.body as z.output<typeof UpdateMediaFolderBodySchema>,
+                authorOf(cms, args)
+            );
+            return {
+                status: 200,
+                body: {
+                    ...folder,
+                    images: (await cms.media.inLibrary(folder.site)).filter((record) => record.folder === folder.id).length,
+                },
+            };
+        }) as never
+    );
+
+    const deleteFolder = route({
+        method: 'DELETE',
+        path: `${editingBase}/media/folders/:id`,
+        auth: editor,
+        summary: 'Delete an empty folder',
+        description: 'Refused with 409 while the folder holds images or folders.',
+        tool: true,
+        pathParams: z.object({
+            id: z.string(),
+        }),
+        responses: {
+            204: z.void(),
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const current = await folderOf(cms, args, args.params['id']!);
+            assertChangesLibrary(cms, args, current.site);
+            await cms.media.deleteFolder(current.id);
+            return {
+                status: 204,
+                body: undefined,
+            };
+        }) as never
+    );
+
+    const moveMedia = route({
+        method: 'POST',
+        path: `${editingBase}/media/move`,
+        auth: editor,
+        summary: 'Move images into a folder, or into another library',
+        description:
+            'Images keep their ids, so what holds them keeps showing them. A shared image moves into a site only while nothing outside that site holds it; otherwise nothing moves, and the 409 lists what holds it under `uses`. Moving into or out of the shared library takes an admin over every site.',
+        tool: true,
+        body: MoveMediaBodySchema,
+        responses: {
+            200: MovedMediaSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: MediaHeldSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const body = args.body as z.output<typeof MoveMediaBodySchema>;
+            const target = cms.mediaSiteOf(body.site);
+            cms.access(args.auth).assertSees(target);
+            const records: MediaRecord[] = [];
+            for (const id of new Set(body.ids)) records.push(await seenMedia(cms, args, id));
+            const crossing = records.filter((record) => record.site !== target);
+            if (crossing.some((record) => record.site === undefined) || (crossing.length > 0 && target === undefined)) {
+                assertChangesLibrary(cms, args, undefined);
+            }
+            if (target !== undefined && crossing.length > 0) {
+                const uses = await cms.mediaUses(crossing.map((record) => record.id));
+                const outsideOf = (record: MediaRecord) => (uses.get(record.id) ?? []).filter((use) => use.site !== target);
+                const held = crossing.filter((record) => outsideOf(record).length > 0);
+                if (held.length > 0) {
+                    const label = options.sites?.values[target]?.label ?? target;
+                    throw new CmsHttpError(409, {
+                        detail:
+                            held.length === 1
+                                ? `${held[0]!.filename} is used outside ${label}.`
+                                : `${held.length} of the images are used outside ${label}, so none of them moved.`,
+                        uses: held.flatMap(outsideOf),
+                    });
+                }
+            }
+            const moved = await cms.media.move(
+                records.map((record) => record.id),
+                {
+                    ...(target === undefined
+                        ? {}
+                        : {
+                              site: target,
+                          }),
+                    ...(body.folder === undefined
+                        ? {}
+                        : {
+                              folder: body.folder,
+                          }),
+                },
+                authorOf(cms, args)
+            );
+            return {
+                status: 200,
+                body: {
+                    media: moved.map((record) => withUrl(cms, record)),
+                },
+            };
+        }) as never
+    );
+
             "A collection's brand lists its items, and a relationship's brand lists what its options answer. Each result has the id to store and a label to show.",
         tool: true,
         pathParams: z.object({
@@ -3071,6 +3283,10 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 editingBase,
                 guarded,
             }),
+                move: moveMedia,
+                createFolder,
+                updateFolder,
+                deleteFolder,
             ...((options.views ?? []).length === 0
                 ? {}
                 : {
@@ -3088,179 +3304,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                       }),
                   }),
             dashboard: dashboardRoute({
-    /**
-     * Refuses a change to the shared library's folders or images from an
-     * editor who is no admin over every site.
-     */
-    const assertChangesLibrary = (cms: CmsService, args: Args, site: string | undefined): void => {
-        if (site !== undefined || cms.access(args.auth).publishesShared) return;
-        throw new CmsHttpError(403, {
-            detail: 'Every site shows the shared library, so an admin over every site changes it.',
-        });
-    };
-
-    const folderOf = async (cms: CmsService, args: Args, id: string) => {
-        const folder = await cms.media.folder(id);
-        if (folder === undefined || !cms.access(args.auth).sees(folder.site)) {
-            throw new CmsHttpError(404, { detail: `No folder '${id}'.` });
-        }
-        return folder;
-    };
-
-    const createFolder = route({
-        method: 'POST',
-        path: `${editingBase}/media/folders`,
-        auth: editor,
-        summary: 'Make a folder in a library, at its top level or inside another folder',
-        tool: true,
-        ...mediaQuery,
-        body: CreateMediaFolderBodySchema,
-        responses: {
-            201: MediaFolderSchema,
-            403: ProblemDetailsSchema,
-            404: ProblemDetailsSchema,
-            409: ProblemDetailsSchema,
-        },
-    }).handler(
-        guarded(async (cms, args) => {
-            const site = seenLibrary(cms, args);
-            assertChangesLibrary(cms, args, site);
-            const folder = await cms.media.createFolder(args.body as z.output<typeof CreateMediaFolderBodySchema>, site, authorOf(cms, args));
-            return {
-                status: 201,
-                body: {
-                    ...folder,
-                    images: 0,
-                },
-            };
-        }) as never
-    );
-
-    const updateFolder = route({
-        method: 'PATCH',
-        path: `${editingBase}/media/folders/:id`,
-        auth: editor,
-        summary: 'Rename a folder, or move it into another folder of its library',
-        tool: true,
-        pathParams: z.object({
-            id: z.string(),
-        }),
-        body: UpdateMediaFolderBodySchema,
-        responses: {
-            200: MediaFolderSchema,
-            403: ProblemDetailsSchema,
-            404: ProblemDetailsSchema,
-            409: ProblemDetailsSchema,
-        },
-    }).handler(
-        guarded(async (cms, args) => {
-            const current = await folderOf(cms, args, args.params['id']!);
-            assertChangesLibrary(cms, args, current.site);
-            const folder = await cms.media.updateFolder(current.id, args.body as z.output<typeof UpdateMediaFolderBodySchema>, authorOf(cms, args));
-            return {
-                status: 200,
-                body: {
-                    ...folder,
-                    images: (await cms.media.inLibrary(folder.site)).filter((record) => record.folder === folder.id).length,
-                },
-            };
-        }) as never
-    );
-
-    const deleteFolder = route({
-        method: 'DELETE',
-        path: `${editingBase}/media/folders/:id`,
-        auth: editor,
-        summary: 'Delete an empty folder',
-        description: 'Refused with 409 while the folder holds images or folders.',
-        tool: true,
-        pathParams: z.object({
-            id: z.string(),
-        }),
-        responses: {
-            204: z.void(),
-            403: ProblemDetailsSchema,
-            404: ProblemDetailsSchema,
-            409: ProblemDetailsSchema,
-        },
-    }).handler(
-        guarded(async (cms, args) => {
-            const current = await folderOf(cms, args, args.params['id']!);
-            assertChangesLibrary(cms, args, current.site);
-            await cms.media.deleteFolder(current.id);
-            return {
-                status: 204,
-                body: undefined,
-            };
-        }) as never
-    );
-
-    const moveMedia = route({
-        method: 'POST',
-        path: `${editingBase}/media/move`,
-        auth: editor,
-        summary: 'Move images into a folder, or into another library',
-        description:
-            "Images keep their ids, so what holds them keeps showing them. A shared image moves into a site only while nothing outside that site holds it; otherwise nothing moves, and the 409 lists what holds it under `uses`. Moving into or out of the shared library takes an admin over every site.",
-        tool: true,
-        body: MoveMediaBodySchema,
-        responses: {
-            200: MovedMediaSchema,
-            403: ProblemDetailsSchema,
-            404: ProblemDetailsSchema,
-            409: MediaHeldSchema,
-        },
-    }).handler(
-        guarded(async (cms, args) => {
-            const body = args.body as z.output<typeof MoveMediaBodySchema>;
-            const target = cms.mediaSiteOf(body.site);
-            cms.access(args.auth).assertSees(target);
-            const records: MediaRecord[] = [];
-            for (const id of new Set(body.ids)) records.push(await seenMedia(cms, args, id));
-            const crossing = records.filter((record) => record.site !== target);
-            if (crossing.some((record) => record.site === undefined) || (crossing.length > 0 && target === undefined)) {
-                assertChangesLibrary(cms, args, undefined);
-            }
-            if (target !== undefined && crossing.length > 0) {
-                const uses = await cms.mediaUses(crossing.map((record) => record.id));
-                const outsideOf = (record: MediaRecord) => (uses.get(record.id) ?? []).filter((use) => use.site !== target);
-                const held = crossing.filter((record) => outsideOf(record).length > 0);
-                if (held.length > 0) {
-                    const label = options.sites?.values[target]?.label ?? target;
-                    throw new CmsHttpError(409, {
-                        detail:
-                            held.length === 1
-                                ? `${held[0]!.filename} is used outside ${label}.`
-                                : `${held.length} of the images are used outside ${label}, so none of them moved.`,
-                        uses: held.flatMap(outsideOf),
-                    });
-                }
-            }
-            const moved = await cms.media.move(
-                records.map((record) => record.id),
-                {
-                    ...(target === undefined
-                        ? {}
-                        : {
-                              site: target,
-                          }),
-                    ...(body.folder === undefined
-                        ? {}
-                        : {
-                              folder: body.folder,
-                          }),
-                },
-                authorOf(cms, args)
-            );
-            return {
-                status: 200,
-                body: {
-                    media: moved.map((record) => withUrl(cms, record)),
-                },
-            };
-        }) as never
-    );
-
                 widgets: options.dashboard,
                 collections: options.collections ?? [],
                 views: options.views ?? [],
