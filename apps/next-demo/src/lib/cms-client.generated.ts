@@ -428,6 +428,10 @@ export namespace API {
              */
             canPublishPastReview: boolean;
             /**
+             * Who edits the document now. One person edits a document at a time: a write from anyone else answers 409 until they stop, or two minutes after their last save. Null when nobody does.
+             */
+            heldBy: string | null;
+            /**
              * One entry per field the draft changes, in the order the fields are shown.
              */
             changes: Array<{
@@ -533,7 +537,7 @@ export namespace API {
              */
             block?: string;
             /**
-             * For a list of blocks, the blocks an item may be. Each item names its block under 'block', beside that block's fields.
+             * For a list of blocks, the blocks an item may be. Each item names its block under 'block', beside that block's fields. For rich text, the blocks it may hold, each a node naming its block under '_type'.
              */
             blocks?: Array<CMS.Block>;
             /**

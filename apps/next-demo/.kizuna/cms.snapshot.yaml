@@ -4189,6 +4189,11 @@ routes:
             optional: false
             schema:
               kind: boolean
+          heldBy:
+            optional: false
+            schema:
+              kind: string
+              nullable: true
           changes:
             optional: false
             schema:
@@ -6978,6 +6983,11 @@ routes:
             optional: false
             schema:
               kind: boolean
+          heldBy:
+            optional: false
+            schema:
+              kind: string
+              nullable: true
           changes:
             optional: false
             schema:
@@ -10555,6 +10565,11 @@ routes:
             optional: false
             schema:
               kind: boolean
+          heldBy:
+            optional: false
+            schema:
+              kind: string
+              nullable: true
           changes:
             optional: false
             schema:
