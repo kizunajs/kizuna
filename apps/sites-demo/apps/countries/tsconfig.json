@@ -34,7 +34,11 @@
     ".next-e2e/uk/types/**/*.ts",
     ".next-e2e/uk/dev/types/**/*.ts",
     ".next-e2e/norway/types/**/*.ts",
-    ".next-e2e/norway/dev/types/**/*.ts"
+    ".next-e2e/norway/dev/types/**/*.ts",
+    ".next-journal/uk/types/**/*.ts",
+    ".next-journal/uk/dev/types/**/*.ts",
+    ".next-journal/norway/types/**/*.ts",
+    ".next-journal/norway/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"
