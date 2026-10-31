@@ -140,7 +140,9 @@ export function WaitingTable({
                                         </td>
                                     ) : null}
                                     <td className="k-waiting-table__change">
-                                        <span className="k-ellipsis">{row.change}</span>
+                                        <span className="k-ellipsis" title={row.change}>
+                                            {row.change}
+                                        </span>
                                     </td>
                                     <td>
                                         {row.from === undefined ? null : (

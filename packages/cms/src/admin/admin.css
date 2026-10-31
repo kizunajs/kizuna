@@ -209,8 +209,14 @@
         color: var(--k-muted);
     }
 
-    .k-waiting-table__change {
-        max-width: 320px;
+    /* The change takes what the other columns leave, and cuts off a long note rather than running over them. */
+    .k-table td.k-waiting-table__change {
+        width: 100%;
+        max-width: 0;
+    }
+
+    .k-waiting-table__change .k-ellipsis {
+        display: block;
     }
 
     .k-waiting-table__answer {
