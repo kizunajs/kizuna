@@ -1,3 +1,5 @@
+import type { DraftChange } from './preview-patch.js';
+
 /**
  * What the site's preview tells the editor framing it.
  */
@@ -43,6 +45,14 @@ export type EditorMessage =
            */
           type: 'renew';
           url: string;
+      }
+    | {
+          /**
+           * Text the person typed and the draft does not hold yet, to show
+           * in place until the draft events confirm it.
+           */
+          type: 'draft';
+          change: DraftChange;
       }
     | {
           /**

@@ -5,6 +5,7 @@ import type { RichTextValue } from './rich-text.js';
 import type { ResolvedImage } from './image.js';
 import { sourceOf } from './reader.js';
 import { DRAFT_EVENTS_PATH } from './draft-events.js';
+import { PREVIEW_COOKIE } from './preview-token.js';
 
 export { inStoredOrder } from './in-order.js';
 
@@ -97,8 +98,10 @@ export async function KizunaPreview(props: KizunaPreviewProps) {
     const runtime = source.service.runtime;
     if (runtime === undefined || !(await runtime.draftMode()).enabled) return null;
     const apiPath = source.service.options.apiPath ?? '/api';
+    const token = (await runtime.cookies()).get(PREVIEW_COOKIE);
     return (
         <PreviewOverlay
+            expiresAt={token === undefined ? undefined : source.service.previewExpiry(token)}
             draftPath={`${apiPath}${source.service.basePath}/draft`}
             eventsPath={`${apiPath}${source.service.basePath}${DRAFT_EVENTS_PATH}`}
         />

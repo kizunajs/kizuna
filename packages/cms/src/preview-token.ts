@@ -41,16 +41,23 @@ export const signPreviewToken = (secret: string, ttlSeconds = PREVIEW_TTL_SECOND
 };
 
 /**
+ * When a token signed with the secret runs out, in milliseconds since the
+ * epoch, or `undefined` for one that has run out or was not signed with it.
+ */
+export const previewTokenExpiry = (secret: string, token: string, now = Date.now()): number | undefined => {
+    const [payload, given] = token.split('.');
+    if (payload === undefined || given === undefined) return undefined;
+    const expected = signature(secret, payload);
+    if (expected.length !== given.length || !timingSafeEqual(Buffer.from(expected), Buffer.from(given))) return undefined;
+    const expires = Number(Buffer.from(payload, 'base64url').toString('utf8'));
+    return Number.isFinite(expires) && expires > now ? expires : undefined;
+};
+
+/**
  * Whether a token was signed with the secret and has not expired.
  */
-export const verifyPreviewToken = (secret: string, token: string, now = Date.now()): boolean => {
-    const [payload, given] = token.split('.');
-    if (payload === undefined || given === undefined) return false;
-    const expected = signature(secret, payload);
-    if (expected.length !== given.length || !timingSafeEqual(Buffer.from(expected), Buffer.from(given))) return false;
-    const expires = Number(Buffer.from(payload, 'base64url').toString('utf8'));
-    return Number.isFinite(expires) && expires > now;
-};
+export const verifyPreviewToken = (secret: string, token: string, now = Date.now()): boolean =>
+    previewTokenExpiry(secret, token, now) !== undefined;
 
 /**
  * The header a refresh between your own deployments carries, signed with the

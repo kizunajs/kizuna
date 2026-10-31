@@ -3869,6 +3869,14 @@ export class CmsService {
      * The sites that read a document: its own site, or for shared content,
      * every site.
      */
+    /**
+     * When a preview token runs out, or `undefined` when it already has or
+     * does not verify.
+     */
+    previewExpiry(token: string): number | undefined {
+        return previewTokenExpiry(previewSecret(this.options.previewSecret), token);
+    }
+
     private readersOf(ref: DocumentRef): string[] {
         if (ref.site !== undefined && ref.site !== DEFAULT_SITE) return [ref.site];
         if (ref.type === 'page') return [DEFAULT_SITE];

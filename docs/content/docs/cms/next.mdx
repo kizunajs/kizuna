@@ -94,7 +94,9 @@ Draft-mode reads skip the cache, and draft mode makes the render dynamic, so a d
 
 The editor opens the site in draft mode, at `/api/draft`, which the CMS serves. It first asks the CMS for a signed link that holds for ten minutes, minted behind the `editor` identity, so the site needs no sign-in of its own. `?redirect=/blog/welcome` lands on a page, and `?disable=1` leaves.
 
-Drafts show only while that link's cookie verifies. The open editor renews it every few minutes, so closing the editor stops the drafts showing soon after. The cookies are set for a cross-site frame, since the site's draft runs inside the editor in your chat.
+Draft mode lasts as long as the link, and the two cookies that hold it, Next's own and the CMS's, run out with it. Following links, opening other pages and reloading keep the draft. The open editor renews both every few minutes, and so does the bar in a tab of its own while you are signed in to the site as an editor. When nothing renews them, the page leaves draft mode by itself at the end and shows what is published, so a browser is never left in draft mode.
+
+The editor frames your site, which is often on another domain or subdomain than the admin. A browser keeps cookies inside a frame on another site only when they are partitioned, so a link opened inside a frame sets both cookies `SameSite=None; Secure; Partitioned`. They live in a jar of the admin's site, apart from your site's own tabs, and survive a browser that blocks third-party cookies. Chrome, Edge, Firefox and Safari 18.4 and later keep them, and in development over plain `http` Chrome and Firefox keep them on `localhost` and its subdomains, as in `norway.localhost`. A link opened in a tab of its own sets ordinary first-party cookies, and **Exit** clears them.
 
 `/api/draft` opened directly, with no link, still works for a signed-in editor. A signed-out editor [signs in](/docs/cms/editing/admin#signing-in) first, on the admin's sign-in screen or at your `signInPath`.
 
@@ -130,6 +132,8 @@ content: cms({
 ## Live updates
 
 A page in draft mode follows its drafts as they change, whoever saves them: you in the editor, an agent through MCP, or someone editing on the page. When a save changes text the page shows as it is, the new text replaces the old one in place. Any other change, like an image, a list or text the page formats, renders the page again with `router.refresh()`, which keeps scroll position and client state.
+
+Inside the admin's Live Preview, text shows before it saves. The admin sends each keystroke to the framed page with `postMessage`, and the page puts it in place the same way, holding it until a save brings the same text back. A field the page does not show as text of its own waits for the save.
 
 The page a collection names as its [preview](/docs/cms/collections#live-preview) also hears about that collection's items before it shows them, so a new employee appears on the team page as soon as their draft is complete.
 

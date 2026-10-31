@@ -163,6 +163,7 @@ export function FieldForm({
     layout,
     draft,
     onSave,
+    onEdit,
     onState,
     changed,
     pointed,
@@ -344,6 +345,7 @@ export function FieldForm({
     }, [pointed]);
 
     const change = (path: string, value: unknown): void => {
+        onEdit?.(path, value);
         setValues((previous) => ({
             ...previous,
             [path]: value,

@@ -375,6 +375,11 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
  * });
  */
 /**
+ * The cookie Next keeps draft mode in.
+ */
+const DRAFT_MODE_COOKIE = '__prerender_bypass';
+
+/**
  * Next's cache, draft mode, cookies and not-found, for content reading. Each
  * imports Next when called, so a config that names this adapter still loads
  * outside Next, as `kizuna generate` does.
@@ -397,11 +402,32 @@ export const nextContentRuntime: ContentRuntime = {
         }
     },
     draftMode: async () => {
-        const { draftMode } = await import('next/headers');
+        const { cookies, draftMode } = await import('next/headers');
         const draft = await draftMode();
+        const jar = await cookies();
         return {
             enabled: draft.isEnabled,
-            enable: () => draft.enable(),
+            enable: (options) => {
+                draft.enable();
+                const value = jar.get(DRAFT_MODE_COOKIE)?.value;
+                if (options === undefined || value === undefined) return;
+                // Next sets its cookie without an expiry, and lax in development, which a frame on another site never sends.
+                jar.set(DRAFT_MODE_COOKIE, value, {
+                    httpOnly: true,
+                    path: '/',
+                    maxAge: options.maxAge,
+                    ...(options.partitioned === true
+                        ? {
+                              sameSite: 'none',
+                              secure: true,
+                              partitioned: true,
+                          }
+                        : {
+                              sameSite: process.env['NODE_ENV'] === 'development' ? 'lax' : 'none',
+                              secure: process.env['NODE_ENV'] !== 'development',
+                          }),
+                });
+            },
             disable: () => draft.disable(),
         };
     },

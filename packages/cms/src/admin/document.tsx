@@ -39,7 +39,7 @@ import { documentNounOf, documentStateOf, roleSubjectOf, titleOfRef } from './ac
 import { OfflineBadge, SaveFailedNotice, retriesSave, useOnline, useRetry, type SaveProblem } from './save-failed.js';
 import { NoAccess, NotFound, shownAddress, type Way } from './states.js';
 import { relativeTimeOf } from './time.js';
-import { AdminPreview } from './preview-pane.js';
+import { AdminPreview, type AdminPreviewHandle } from './preview-pane.js';
 import { AskForReview } from './review-ask.js';
 import { ChangesScreen, SendBack, SentBackNotes, type ViewedChange } from './review-changes.js';
 import { PeopleFact } from './review-screen.js';
@@ -313,6 +313,7 @@ export function DocumentScreen({
     const seen = useRef<string | null>(null);
     const busy = useRef(false);
     const [heldBy, setHeldBy] = useState<string | null>(null);
+    const preview = useRef<AdminPreviewHandle>(null);
     // The document this screen holds by saving it, freed when the screen leaves it.
     const holding = useRef<string | undefined>(undefined);
     const saves = useRef(0);
@@ -1815,6 +1816,15 @@ export function DocumentScreen({
                             layout={document.layout}
                             draft={document.draft}
                             onSave={(changes) => save(document.ref, changes)}
+                            onEdit={(path, value) => {
+                                if (typeof value !== 'string') return;
+                                preview.current?.show({
+                                    ref: document.ref,
+                                    texts: {
+                                        [path]: value,
+                                    },
+                                });
+                            }}
                             onState={(state) => {
                                 typing.current = state === 'pending' || state === 'saving';
                                 setSaveState(state);
@@ -1890,6 +1900,7 @@ export function DocumentScreen({
                     </div>
                     {previewOpened && siteUrl !== null && previewPath !== null ? (
                         <div className="k-document__preview" hidden={!previewShown}>
+                                ref={preview}
                             <AdminPreview
                                 connection={connection}
                                 siteUrl={siteUrl}

@@ -445,6 +445,11 @@ const redirect = (location: string): Response =>
 const safeRedirect = (value: unknown): string =>
     typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : '/';
 
+const headerOf = (headers: unknown, name: string): string | undefined => {
+    const value = (headers as Record<string, string | string[] | undefined>)[name];
+    return Array.isArray(value) ? value[0] : value;
+};
+
 /**
  * `GET /draft`: opens draft mode for a signed-in editor, or for anyone holding
  * a link the editor minted, and lands them on `redirect`. A signed-out editor
@@ -466,6 +471,11 @@ const draftRoute = (service: CmsService, options: ResolvedCmsOptions, api: Plugi
         responses: {
             200: z.object({
                 expired: z.boolean(),
+                /**
+                 * When the renewed preview runs out, in milliseconds since
+                 * the epoch.
+                 */
+                expiresAt: z.number(),
             }),
         },
     }).handler(async (args) => {
@@ -539,11 +549,17 @@ const draftRoute = (service: CmsService, options: ResolvedCmsOptions, api: Plugi
             return rawResponse(redirect(location));
         }
         const held = jar.get(PREVIEW_COOKIE);
-        draft.enable();
+        // A frame on another site keeps only partitioned cookies, in a jar of the editor's site that the site's own tabs never see.
+        const framed = viaLink && (headerOf(args.headers, 'sec-fetch-dest') === 'iframe' || query.renew !== undefined);
+        draft.enable({
+            maxAge: PREVIEW_TTL_SECONDS,
+            partitioned: framed,
+        });
+        const token = service.previewToken();
         jar.set(
             PREVIEW_COOKIE,
-            service.previewToken(),
-            viaLink
+            token,
+            framed
                 ? {
                       httpOnly: true,
                       sameSite: 'none',
@@ -565,6 +581,7 @@ const draftRoute = (service: CmsService, options: ResolvedCmsOptions, api: Plugi
             return rawResponse(
                 Response.json({
                     expired: held === undefined || !service.verifiesPreview(held),
+                    expiresAt: service.previewExpiry(token),
                 })
             );
         }

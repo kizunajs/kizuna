@@ -10,6 +10,12 @@ export interface DraftChange {
 }
 
 /**
+ * Elements whose text the page never shows, like the scripts Next.js streams
+ * its render in, which hold every marked text joined together.
+ */
+const UNSHOWN = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE']);
+
+/**
  * Puts the new text in every text node the page marks with the document and
  * one of the paths, keeping the mark so pointing at the field still works.
  * Answers `false`, and changes nothing, when a path is not shown as a text
@@ -21,6 +27,7 @@ export const patchTexts = (root: Element, change: DraftChange): boolean => {
     const found: Array<{ node: Text; path: string; mark: string }> = [];
     const walker = root.ownerDocument.createTreeWalker(root, 4);
     for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        if (UNSHOWN.has(node.parentElement?.tagName ?? '')) continue;
         const source = decodeSource(node.nodeValue ?? '');
         if (source?.ref !== change.ref || !Object.hasOwn(texts, source.path)) continue;
         const value = node.nodeValue ?? '';
@@ -34,6 +41,9 @@ export const patchTexts = (root: Element, change: DraftChange): boolean => {
         });
     }
     if (Object.keys(texts).some((path) => !found.some((candidate) => candidate.path === path))) return false;
-    for (const { node, path, mark } of found) node.nodeValue = `${texts[path]}${mark}`;
+    for (const { node, path, mark } of found) {
+        const shown = `${texts[path]}${mark}`;
+        if (node.nodeValue !== shown) node.nodeValue = shown;
+    }
     return true;
 };

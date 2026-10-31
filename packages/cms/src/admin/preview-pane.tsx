@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref, type RefObject } from 'react';
 import { ExternalLink, LoaderCircle } from 'lucide-react';
 import { envelope, openEnvelope, type EditorMessage, type PreviewMessage } from '../preview-messages.js';
+import type { DraftChange } from '../preview-patch.js';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
 import { DeviceSelect, DEVICES, frameStyleOf, type DeviceKey } from '../view/devices.js';
@@ -38,10 +39,17 @@ export const shownSizeOf = (device: DeviceKey, stage: { width: number; height: n
     return `${Math.round(width)} × ${Math.round(stage.height / scale)}`;
 };
 
+export interface AdminPreviewHandle {
+    /**
+     * Shows text the person typed in the framed page, before it saves.
+     */
+    show: (change: DraftChange) => void;
+}
+
 /**
  * The site in draft mode, framed beside the fields. The site follows the
  * drafts itself through its live updates, so a save shows without the admin
- * telling it. A click on a field in the page points at it in the form.
+ * telling it, and text shows as it is typed. A click on a field in the page points at it in the form.
  */
 export function AdminPreview({
     connection,
@@ -49,6 +57,7 @@ export function AdminPreview({
     path,
     onPoint,
     onOpen,
+    ref,
 }: {
     connection: Connection;
     /**
@@ -67,6 +76,7 @@ export function AdminPreview({
      * Opens the page in a new tab, in draft mode.
      */
     onOpen?: () => void;
+    ref?: Ref<AdminPreviewHandle>;
 }) {
     const [url, setUrl] = useState<string | undefined>();
     const [problem, setProblem] = useState<string | undefined>();
@@ -112,6 +122,18 @@ export function AdminPreview({
             frame.current?.contentWindow?.postMessage(envelope(message), siteUrl);
         },
         [siteUrl]
+    );
+
+    useImperativeHandle(
+        ref,
+        () => ({
+            show: (change) =>
+                tell({
+                    type: 'draft',
+                    change,
+                }),
+        }),
+        [tell]
     );
 
     // What the framed site says: where it went, what was clicked, and when its cookie runs out.

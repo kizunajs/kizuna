@@ -17,6 +17,11 @@ export interface PreviewOverlayProps {
      * changes.
      */
     eventsPath?: string;
+    /**
+     * When the preview cookie runs out, in milliseconds since the epoch, or
+     * `undefined` when it already has.
+     */
+    expiresAt?: number;
 }
 
 /**
@@ -67,6 +72,34 @@ function Outline({ box, strong }: { box: Box; strong: boolean }) {
 }
 
 /**
+ * Calls `end` when the preview runs out, `undefined` meaning it already has.
+ * A timer longer than a browser keeps fires at once, so a far one waits in
+ * steps.
+ */
+const useExpiry = (expiresAt: number | undefined, end: () => void): void => {
+    const latestEnd = useRef(end);
+    latestEnd.current = end;
+    useEffect(() => {
+        let timer: number | undefined;
+        const wait = (): void => {
+            const left = expiresAt === undefined ? 0 : expiresAt - Date.now();
+            if (left <= 0) {
+                latestEnd.current();
+                return;
+            }
+            timer = window.setTimeout(wait, Math.min(left, 2 ** 31 - 1));
+        };
+        wait();
+        return () => window.clearTimeout(timer);
+    }, [expiresAt]);
+};
+
+interface Renewal {
+    expired: boolean;
+    expiresAt: number;
+}
+
+/**
  * Events a click on a field sends, held back while pointing so a link or a
  * button around the field never acts.
  */
@@ -76,7 +109,7 @@ const HELD_EVENTS = ['click', 'dblclick', 'auxclick', 'pointerup', 'mouseup'];
  * The preview inside the editor: outlines the fields, and tells the editor
  * which one was clicked and which page a link went to.
  */
-function FramedPreview() {
+function FramedPreview({ expiresAt }: { expiresAt: number | undefined }) {
     const router = useRouter();
     const pathname = usePathname();
     const [mode, setMode] = useState<'point' | 'browse'>('point');
@@ -84,6 +117,7 @@ function FramedPreview() {
     const [selected, setSelected] = useState<Element | undefined>();
     const [selectedBox, setSelectedBox] = useState<Box | undefined>();
     const marked = useRef<Map<Element, Source>>(new Map());
+    const [renewedAt, setRenewedAt] = useState<number | undefined>();
 
     const tell = useCallback((message: PreviewMessage) => {
         // The editor runs on the host's own origin, which the site cannot know ahead of time.
@@ -134,9 +168,11 @@ function FramedPreview() {
                     credentials: 'include',
                     cache: 'no-store',
                 })
-                    .then((response) => (response.ok ? (response.json() as Promise<{ expired: boolean }>) : undefined))
+                    .then((response) => (response.ok ? (response.json() as Promise<Renewal>) : undefined))
                     .then((renewed) => {
-                        if (renewed?.expired === true) router.refresh();
+                        if (renewed === undefined) return;
+                        setRenewedAt(renewed.expiresAt);
+                        if (renewed.expired) router.refresh();
                     });
             }
         };
@@ -154,6 +190,13 @@ function FramedPreview() {
         );
         return () => window.clearInterval(timer);
     }, [tell]);
+
+    // A frame that missed its renewal, like one asleep in a background tab, asks for a fresh link at once.
+    useExpiry(Math.max(expiresAt ?? 0, renewedAt ?? 0) || undefined, () =>
+        tell({
+            type: 'renew',
+        })
+    );
 
     useEffect(() => {
         if (mode !== 'point') {
@@ -247,15 +290,15 @@ const exitButton: CSSProperties = {
 };
 
 /**
- * The preview in a tab of its own: a bar saying so, and a way out. The editor
- * is in the chat, so nothing here edits.
+ * The preview in a tab of its own: a bar saying so, and a way out. It lasts
+ * as long as the link it opened with, renewed while the person is signed in
+ * to the site as an editor, and leaves draft mode when it runs out.
  */
-function StandalonePreview({ draftPath }: PreviewOverlayProps) {
-    const router = useRouter();
+function StandalonePreview({ draftPath, expiresAt }: PreviewOverlayProps) {
     const pathname = usePathname();
-    const [expired, setExpired] = useState(false);
+    const [renewedAt, setRenewedAt] = useState<number | undefined>();
+    const exit = `${draftPath}?disable=1&redirect=${encodeURIComponent(pathname)}`;
 
-    // Renewing takes a signed-in editor. A tab opened from the chat has none, so its drafts stop when the link runs out.
     useEffect(() => {
         let cancelled = false;
         const renew = async (): Promise<void> => {
@@ -263,25 +306,22 @@ function StandalonePreview({ draftPath }: PreviewOverlayProps) {
                 credentials: 'same-origin',
                 cache: 'no-store',
             });
-            if (cancelled) return;
-            if (!renewed.ok) {
-                setExpired(true);
-                return;
-            }
-            const { expired: lapsed } = (await renewed.json()) as { expired: boolean };
-            if (lapsed) router.refresh();
+            if (cancelled || !renewed.ok) return;
+            setRenewedAt(((await renewed.json()) as Renewal).expiresAt);
         };
         const timer = window.setInterval(() => void renew(), PREVIEW_RENEW_MS);
         return () => {
             cancelled = true;
             window.clearInterval(timer);
         };
-    }, [draftPath, router]);
+    }, [draftPath]);
+
+    useExpiry(Math.max(expiresAt ?? 0, renewedAt ?? 0) || undefined, () => window.location.replace(exit));
 
     return (
         <div style={bar} role="status">
-            <span>{expired ? 'Draft preview ended. Open it again from the chat.' : 'Draft preview'}</span>
-            <a style={exitButton} href={`${draftPath}?disable=1&redirect=${encodeURIComponent(pathname)}`}>
+            <span>Draft preview</span>
+            <a style={exitButton} href={exit}>
                 Exit
             </a>
         </div>
@@ -312,5 +352,5 @@ export function PreviewOverlay(props: PreviewOverlayProps) {
     }, []);
     useLiveDraft(framed === undefined ? undefined : props.eventsPath);
     if (framed === undefined) return null;
-    return framed ? <FramedPreview /> : <StandalonePreview {...props} />;
+    return framed ? <FramedPreview expiresAt={props.expiresAt} /> : <StandalonePreview {...props} />;
 }

@@ -10,7 +10,13 @@ import { expressAdapter } from '@kizunajs/express';
 import { cms } from './provider.js';
 import { PREVIEW_COOKIE, previewSecret, signPreviewToken } from './preview-token.js';
 
-const draft = {
+const draft: {
+    enabled: boolean;
+    options?: {
+        maxAge?: number;
+        partitioned?: boolean;
+    };
+} = {
     enabled: false,
 };
 const jar = new Map<string, string>();
@@ -21,8 +27,9 @@ const runtime: ContentRuntime = {
     revalidate: () => undefined,
     draftMode: async () => ({
         enabled: draft.enabled,
-        enable: () => {
+        enable: (options) => {
             draft.enabled = true;
+            draft.options = options;
         },
         disable: () => {
             draft.enabled = false;
@@ -75,6 +82,9 @@ const editor = k.identity
 
 const pglite = new PGlite();
 const config = defineConfig({
+    jobRunner: {
+        mode: 'in-process',
+    },
     adapter: {
         ...expressAdapter(),
         content: runtime,
@@ -82,9 +92,6 @@ const config = defineConfig({
     auth: {
         identities: {
             editor,
-    jobRunner: {
-        mode: 'in-process',
-    },
         },
     },
     content: cms({
@@ -107,6 +114,7 @@ const asEditor = (call: request.Test) => call.set('authorization', 'Bearer edito
 
 beforeEach(() => {
     draft.enabled = false;
+    draft.options = undefined;
     jar.clear();
     cookieOptions.clear();
 });
@@ -145,11 +153,11 @@ describe('the draft route', () => {
 
     it('renews the cookie for the overlay, and says when the page rendered without drafts', async () => {
         jar.set(PREVIEW_COOKIE, signPreviewToken(previewSecret(undefined)));
-        expect((await asEditor(request(app).get('/draft').query({ renew: '1' }))).body).toEqual({
-            expired: false,
-        });
+        const renewed = (await asEditor(request(app).get('/draft').query({ renew: '1' }))).body as { expired: boolean; expiresAt: number };
+        expect(renewed.expired).toBe(false);
+        expect(renewed.expiresAt).toBeGreaterThan(Date.now() + 590_000);
         jar.set(PREVIEW_COOKIE, signPreviewToken(previewSecret(undefined), 600, Date.now() - 601_000));
-        expect((await asEditor(request(app).get('/draft').query({ renew: '1' }))).body).toEqual({
+        expect((await asEditor(request(app).get('/draft').query({ renew: '1' }))).body).toMatchObject({
             expired: true,
         });
         expect((await request(app).get('/draft').query({ renew: '1' })).status).toBe(401);
@@ -164,7 +172,7 @@ describe('the draft route', () => {
         expect(jar.has(PREVIEW_COOKIE)).toBe(false);
     });
 
-    it('opens draft mode from a link the editor minted, with a cookie a frame keeps', async () => {
+    it('opens draft mode from a link the editor minted, for as long as the link lasts', async () => {
         const response = await request(app)
             .get('/draft')
             .query({
@@ -174,9 +182,44 @@ describe('the draft route', () => {
         expect(response.status).toBe(307);
         expect(response.headers['location']).toBe('/blog/welcome');
         expect(draft.enabled).toBe(true);
+        expect(draft.options).toEqual({
+            maxAge: 600,
+            partitioned: false,
+        });
+        expect(cookieOptions.get(PREVIEW_COOKIE)).toMatchObject({
+            sameSite: 'lax',
+            maxAge: 600,
+        });
+    });
+
+    it('keeps draft mode inside a frame on another site with partitioned cookies', async () => {
+        await request(app)
+            .get('/draft')
+            .set('sec-fetch-dest', 'iframe')
+            .query({
+                token: signPreviewToken(previewSecret(undefined)),
+                redirect: '/blog/welcome',
+            });
+        expect(draft.options).toEqual({
+            maxAge: 600,
+            partitioned: true,
+        });
         expect(cookieOptions.get(PREVIEW_COOKIE)).toMatchObject({
             sameSite: 'none',
             secure: true,
+            partitioned: true,
+        });
+    });
+
+    it('renews a framed preview from a link with partitioned cookies', async () => {
+        await request(app)
+            .get('/draft')
+            .query({
+                token: signPreviewToken(previewSecret(undefined)),
+                renew: '1',
+            });
+        expect(draft.options?.partitioned).toBe(true);
+        expect(cookieOptions.get(PREVIEW_COOKIE)).toMatchObject({
             partitioned: true,
         });
     });

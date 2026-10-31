@@ -68,7 +68,12 @@ export interface ContentRuntime {
     revalidate: (tags: readonly string[]) => void | Promise<void>;
     draftMode: () => Promise<{
         enabled: boolean;
-        enable: () => void;
+        /**
+         * Turns draft mode on. `maxAge` ends it on its own after that many
+         * seconds, and `partitioned` keeps it inside a frame on another
+         * site, as the preview cookie is kept there.
+         */
+        enable: (options?: { maxAge?: number; partitioned?: boolean }) => void;
         disable: () => void;
     }>;
     cookies: () => Promise<ContentCookies>;

@@ -6,10 +6,14 @@ import { patchTexts } from './preview-patch.js';
 /**
  * A page's text nodes, as far as `patchTexts` walks them.
  */
-const pageOf = (texts: string[]) => {
-    const nodes = texts.map((nodeValue) => ({
-        nodeValue,
-    }));
+const pageOf = (texts: Array<string | { nodeValue: string; parentElement: { tagName: string } }>) => {
+    const nodes = texts.map((text) =>
+        typeof text === 'string'
+            ? {
+                  nodeValue: text,
+              }
+            : text
+    );
     const root = {
         ownerDocument: {
             createTreeWalker: () => {
@@ -71,6 +75,28 @@ describe('patching draft text in place', () => {
             })
         ).toBe(false);
         expect(page.nodes[0]!.nodeValue).toBe(joined);
+    });
+
+    it('passes over the scripts Next.js streams its render in', () => {
+        const heading = withSourcePath('Spring sale', 'heading', 'page:frontPage');
+        const page = pageOf([
+            heading,
+            {
+                nodeValue: `self.__next_f.push([1,"${heading} ${withSourcePath('Opening hours', 'intro', 'page:frontPage')}"])`,
+                parentElement: {
+                    tagName: 'SCRIPT',
+                },
+            },
+        ]);
+        expect(
+            patchTexts(page.root, {
+                ref: 'page:frontPage',
+                texts: {
+                    heading: 'Summer sale',
+                },
+            })
+        ).toBe(true);
+        expect(page.nodes[0]!.nodeValue.startsWith('Summer sale')).toBe(true);
     });
 
     it('asks for a render when the change carries no text', () => {

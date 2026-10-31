@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { markedElements } from './source-marks.js';
 import { patchTexts, type DraftChange } from './preview-patch.js';
+import { openEnvelope, type EditorMessage } from './preview-messages.js';
 
 /**
  * The documents the page marks, as `formatRef` writes them.
@@ -28,9 +29,50 @@ const RECONNECT_MAX_MS = 60_000;
 const REFRESH_DELAY_MS = 150;
 
 /**
+ * Text the editor framing the page says the person typed, by document and
+ * path, held until the draft events bring the same text.
+ */
+type Typed = Map<string, Record<string, string>>;
+
+/**
+ * Puts each typed text in place, one path at a time, so a path the page does
+ * not show as text of its own leaves the others shown.
+ */
+const showTyped = (typed: Typed): void => {
+    for (const [ref, texts] of typed) {
+        for (const [path, text] of Object.entries(texts)) {
+            patchTexts(document.body, {
+                ref,
+                texts: {
+                    [path]: text,
+                },
+            });
+        }
+    }
+};
+
+/**
+ * Drops the typed text a change confirms. A change that renders the page
+ * again saved everything typed before it, so it drops the document's.
+ */
+const confirmTyped = (typed: Typed, change: DraftChange): void => {
+    const held = typed.get(change.ref);
+    if (held === undefined) return;
+    if (change.texts === null) {
+        typed.delete(change.ref);
+        return;
+    }
+    for (const [path, text] of Object.entries(change.texts)) {
+        if (held[path] === text) delete held[path];
+    }
+    if (Object.keys(held).length === 0) typed.delete(change.ref);
+};
+
+/**
  * Follows the draft changes of what the page shows, from any caller, and puts
  * them on the page: text in place where the page marks it, and a soft refresh
- * for anything else.
+ * for anything else. Inside the editor, the text the person types shows at
+ * once, before it saves.
  */
 export const useLiveDraft = (eventsPath: string | undefined): void => {
     const router = useRouter();
@@ -45,6 +87,7 @@ export const useLiveDraft = (eventsPath: string | undefined): void => {
         let dropped = false;
         let refresh: number | undefined;
         let stopped = false;
+        const typed: Typed = new Map();
 
         const refreshSoon = (): void => {
             window.clearTimeout(refresh);
@@ -71,7 +114,10 @@ export const useLiveDraft = (eventsPath: string | undefined): void => {
             });
             opened.addEventListener('change', (event) => {
                 const change = JSON.parse((event as MessageEvent<string>).data) as DraftChange;
+                confirmTyped(typed, change);
                 if (!patchTexts(document.body, change)) refreshSoon();
+                // A save that left with the text typed so far arrives after the person typed more.
+                showTyped(typed);
             });
             opened.addEventListener('error', () => {
                 dropped = true;
@@ -83,12 +129,25 @@ export const useLiveDraft = (eventsPath: string | undefined): void => {
             });
         };
 
+        const typing = (event: MessageEvent): void => {
+            if (window.parent === window || event.source !== window.parent) return;
+            const message = openEnvelope<EditorMessage>(event.data);
+            if (message?.type !== 'draft' || message.change.texts === null) return;
+            typed.set(message.change.ref, {
+                ...typed.get(message.change.ref),
+                ...message.change.texts,
+            });
+            showTyped(typed);
+        };
+        window.addEventListener('message', typing);
+
         connect();
         // The documents the page shows change as it renders again, and a stream waiting to reconnect picks them up then.
         let pending: number | undefined;
         const observer = new MutationObserver(() => {
             window.clearTimeout(pending);
             pending = window.setTimeout(() => {
+                showTyped(typed);
                 if (source !== undefined) connect();
             }, 300);
         });
@@ -99,6 +158,7 @@ export const useLiveDraft = (eventsPath: string | undefined): void => {
         });
         return () => {
             stopped = true;
+            window.removeEventListener('message', typing);
             observer.disconnect();
             source?.close();
             window.clearTimeout(pending);
