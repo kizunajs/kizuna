@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { fieldElementFor, markedElements, type Source } from './source-marks.js';
 import { envelope, openEnvelope, type EditorMessage, type PreviewMessage } from './preview-messages.js';
 import { useLiveDraft } from './preview-live.js';
+import { isElement, ownFrames, pageBoxOf, shownRoots, type Box } from './preview-frames.js';
 
 export interface PreviewOverlayProps {
     /**
@@ -33,23 +34,6 @@ const PREVIEW_RENEW_MS = 4 * 60 * 1000;
 const LAYER = 2147483000;
 
 const FONT = "'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif";
-
-interface Box {
-    top: number;
-    left: number;
-    width: number;
-    height: number;
-}
-
-const boxOf = (element: Element): Box => {
-    const rect = element.getBoundingClientRect();
-    return {
-        top: rect.top,
-        left: rect.left,
-        width: rect.width,
-        height: rect.height,
-    };
-};
 
 function Outline({ box, strong }: { box: Box; strong: boolean }) {
     return (
@@ -133,10 +117,13 @@ function FramedPreview({ expiresAt }: { expiresAt: number | undefined }) {
     }, [pathname, tell]);
 
     useEffect(() => {
+        // The page's own fields, and those of each frame it may read.
         const scan = (): void => {
-            marked.current = markedElements(document.body);
+            marked.current = new Map(shownRoots(document).flatMap((root) => [...markedElements(root)]));
         };
         scan();
+        // A frame's document is new each time it loads.
+        document.addEventListener('load', scan, true);
         let pending: number | undefined;
         const observer = new MutationObserver(() => {
             window.clearTimeout(pending);
@@ -149,6 +136,7 @@ function FramedPreview({ expiresAt }: { expiresAt: number | undefined }) {
             attributes: true,
         });
         return () => {
+            document.removeEventListener('load', scan, true);
             observer.disconnect();
             window.clearTimeout(pending);
         };
@@ -203,10 +191,10 @@ function FramedPreview({ expiresAt }: { expiresAt: number | undefined }) {
             setHovered(undefined);
             return;
         }
-        const fieldAt = (target: EventTarget | null) => (target instanceof Element ? fieldElementFor(target, marked.current) : undefined);
-        const move = (event: PointerEvent): void => {
+        const fieldAt = (target: EventTarget | null) => (isElement(target) ? fieldElementFor(target, marked.current) : undefined);
+        const move = (event: Event): void => {
             const found = fieldAt(event.target);
-            setHovered(found === undefined ? undefined : boxOf(found.element));
+            setHovered(found === undefined ? undefined : pageBoxOf(found.element, window));
         };
         const hold = (event: Event): void => {
             const found = fieldAt(event.target);
@@ -222,13 +210,28 @@ function FramedPreview({ expiresAt }: { expiresAt: number | undefined }) {
             });
         };
         const leave = (): void => setHovered(undefined);
-        document.addEventListener('pointermove', move, true);
-        document.addEventListener('pointerleave', leave);
-        for (const name of HELD_EVENTS) document.addEventListener(name, hold, true);
+        // The page listens in each frame it may read too, and again whenever a frame loads a new document.
+        const listened = new Set<Document>();
+        const listen = (page: Document): void => {
+            if (listened.has(page)) return;
+            listened.add(page);
+            page.addEventListener('pointermove', move, true);
+            page.addEventListener('pointerleave', leave);
+            for (const name of HELD_EVENTS) page.addEventListener(name, hold, true);
+        };
+        const listenToFrames = (): void => {
+            for (const found of ownFrames(document)) listen(found.document);
+        };
+        listen(document);
+        listenToFrames();
+        document.addEventListener('load', listenToFrames, true);
         return () => {
-            document.removeEventListener('pointermove', move, true);
-            document.removeEventListener('pointerleave', leave);
-            for (const name of HELD_EVENTS) document.removeEventListener(name, hold, true);
+            document.removeEventListener('load', listenToFrames, true);
+            for (const page of listened) {
+                page.removeEventListener('pointermove', move, true);
+                page.removeEventListener('pointerleave', leave);
+                for (const name of HELD_EVENTS) page.removeEventListener(name, hold, true);
+            }
         };
     }, [mode, tell]);
 
@@ -237,12 +240,15 @@ function FramedPreview({ expiresAt }: { expiresAt: number | undefined }) {
             setSelectedBox(undefined);
             return;
         }
-        const measure = (): void => setSelectedBox(selected.isConnected ? boxOf(selected) : undefined);
+        const measure = (): void => setSelectedBox(selected.isConnected ? pageBoxOf(selected, window) : undefined);
         measure();
-        window.addEventListener('scroll', measure, true);
+        // A field inside a frame also moves when the frame scrolls.
+        const framed = selected.ownerDocument.defaultView;
+        const views = framed === null || framed === window ? [window] : [window, framed];
+        for (const view of views) view.addEventListener('scroll', measure, true);
         window.addEventListener('resize', measure);
         return () => {
-            window.removeEventListener('scroll', measure, true);
+            for (const view of views) view.removeEventListener('scroll', measure, true);
             window.removeEventListener('resize', measure);
         };
     }, [selected]);

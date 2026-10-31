@@ -3,36 +3,20 @@ import { usePathname, useRouter } from 'next/navigation';
 import { markedElements } from './source-marks.js';
 import { patchTexts, type DraftChange } from './preview-patch.js';
 import { openEnvelope, type EditorMessage } from './preview-messages.js';
-
-/**
- * Where the page shows text: its body, and the body of each frame on its own
- * origin, like an email rendered into a frame's `srcdoc`.
- */
-const shownRoots = (): Element[] => {
-    const roots: Element[] = [document.body];
-    for (const frame of document.querySelectorAll('iframe')) {
-        try {
-            const body = frame.contentDocument?.body;
-            if (body !== undefined && body !== null) roots.push(body);
-        } catch {
-            // A frame on another origin keeps its document to itself.
-        }
-    }
-    return roots;
-};
+import { shownRoots } from './preview-frames.js';
 
 /**
  * Patches the change wherever the page shows it, answering whether any part
  * of the page took it.
  */
-const patchShown = (change: DraftChange): boolean => shownRoots().filter((root) => patchTexts(root, change)).length > 0;
+const patchShown = (change: DraftChange): boolean => shownRoots(document).filter((root) => patchTexts(root, change)).length > 0;
 
 /**
  * The documents the page marks, as `formatRef` writes them.
  */
 const refsOn = (): string[] => {
     const refs = new Set<string>();
-    for (const root of shownRoots()) {
+    for (const root of shownRoots(document)) {
         for (const source of markedElements(root).values()) {
             if (source.ref !== undefined) refs.add(source.ref);
         }
