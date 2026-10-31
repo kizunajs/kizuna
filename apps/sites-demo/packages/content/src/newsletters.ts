@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { defineCollection } from '@kizunajs/cms';
 import { RichTextSchema } from '@kizunajs/cms/schemas';
 import { NewsletterId } from './ids';
-import { renderNewsletter } from './newsletter-email';
+import { BROADCAST_RECIPIENT, renderNewsletter } from './newsletter-email';
 
 /**
  * The editor an action runs as, as the editor identity's guard returns them.
@@ -62,9 +62,7 @@ export const Newsletters = defineCollection({
                     list: 'weekly',
                     name: item.subject,
                     subject: item.subject,
-                    html: await renderNewsletter(item, {
-                        firstName: '{{{FIRST_NAME|there}}}',
-                    }),
+                    html: await renderNewsletter(item, BROADCAST_RECIPIENT),
                 });
             },
         },
