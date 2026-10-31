@@ -522,6 +522,80 @@ export const employees: Array<{ office: string; values: Record<string, unknown>;
 ];
 
 /**
+ * Each person in Norwegian: their title and their two sentences.
+ */
+export const employeesInNorwegian: Record<string, { role: string; bio: string }> = {
+    'Ingrid Solberg': {
+        role: 'Grunnlegger og innkjøper',
+        bio: 'Ingrid åpnet den første Hagen på Grünerløkka i 2019, og velger fortsatt hver plante butikkene selger.',
+    },
+    'Sara Lindqvist': {
+        role: 'Butikkgartner',
+        bio: 'Sara driver butikken i Oslo og bedene i bakgården bak den.',
+    },
+    'Jonas Berg': {
+        role: 'Levering',
+        bio: 'Jonas kjører varebilen og lastesykkelen, og bærer juletrærne opp trappene i desember.',
+    },
+    'Amalie Strand': {
+        role: 'Butikksjef',
+        bio: 'Amalie åpnet Majorstuen i 2023 og vet hvilke bregner som klarer seg i en leilighet over Bogstadveien.',
+    },
+    'Tobias Eide': {
+        role: 'Florist',
+        bio: 'Tobias lager kransene og buketter av snittblomster, og lærer bort begge deler på torsdagskveldene.',
+    },
+    'Erlend Vik': {
+        role: 'Butikksjef',
+        bio: 'Erlend vet hvilke planter som tåler bergensregnet på vei hjem, og hvilke som ikke gjør det.',
+    },
+    'Sigrid Haugen': {
+        role: 'Plantelege',
+        bio: 'Sigrid tar hjemmebesøk over hele Bergen for planter som er for store til å bære inn.',
+    },
+    'Maren Dale': {
+        role: 'Butikkgartner',
+        bio: 'Maren steller orkideene og kaktusene, de to plantene Bergen kjøper mest av om vinteren.',
+    },
+    'Henrik Sæther': {
+        role: 'Butikksjef',
+        bio: 'Henrik åpnet butikken i Øvre Holmegate i 2025, i den gamle fiskebutikken med den grønne døra.',
+    },
+    'Linnea Fossum': {
+        role: 'Butikkgartner',
+        bio: 'Linnea dyrker butikkens egne stiklinger på bakrommet, og selger dem for tjue kroner potta.',
+    },
+    'Kristian Moe': {
+        role: 'Butikksjef',
+        bio: 'Kristian drev en planteskole utenfor Stjørdal i ti år før han kom for å åpne Trondheim.',
+    },
+    'Hanna Lie': {
+        role: 'Butikkgartner',
+        bio: 'Hanna flytter fra butikken i Oslo til Bakklandet, og tar med seg de beste bregnene fra bakgården.',
+    },
+    'Martin Hale': {
+        role: 'Leder for planteklinikken',
+        bio: 'Martin svarer i planteklinikken for alle butikkene, og holder kursene i London.',
+    },
+    'Eleanor Price': {
+        role: 'Butikksjef',
+        bio: 'Eleanor åpnet butikken i Columbia Road i 2024, noen dører fra blomstermarkedet på søndager.',
+    },
+    'Priya Shah': {
+        role: 'Kursansvarlig',
+        bio: 'Priya planlegger kursene i London og holder kjelen varm mens de pågår.',
+    },
+    'Tom Ellery': {
+        role: 'Butikksjef',
+        bio: 'Tom åpnet butikken i North Laine i vår, mellom en platebutikk og et bakeri.',
+    },
+    'Grace Okafor': {
+        role: 'Butikkgartner',
+        bio: 'Grace steller plantene som liker sjøluft: sukkulentene, gressene og oliventrærne ved døra.',
+    },
+};
+
+/**
  * The journal, with the sites each article shows on and how many days ago
  * it is dated. Every article shows on the group's site, which lists them all.
  */
@@ -561,6 +635,13 @@ Flytt dem så nær vinduet de tåler, og bort fra ovnene, som tørker lufta og b
 
 Bring a bag with a flat bottom for pots, and drop in at the shop for a care card for whatever you found.`,
                 showsOn: ['uk', 'group'],
+            },
+            inNorwegian: {
+                title: 'Blomstermarkedet i Columbia Road',
+                summary: 'Butikken vår i London ligger noen dører fra søndagsmarkedet. Når du bør gå, og hva du bør ta med hjem.',
+                body: `Markedet er åpent hver søndag fra åtte til tidlig på ettermiddagen. Kom tidlig for det beste utvalget, eller sent for gode kjøp når handlerne pakker sammen.
+
+Ta med en bag med flat bunn til pottene, og stikk innom butikken for et stellekort til det du fant.`,
             },
             dated: 47,
             written: {
@@ -607,6 +688,13 @@ Vi pakker treet i nett og leverer det på døren i Oslo for 150 kroner.`,
 It is why every Hagen plant comes with a care card written by the people who grew it.`,
                 showsOn: ['group'],
             },
+            inNorwegian: {
+                title: 'Besøk hos gartnerne vi kjøper fra',
+                summary: 'Hver vår besøker innkjøperne fra alle butikkene gartneriene som dyrker plantene våre.',
+                body: `Vi kjøper fra en håndfull gartnere i Norge, Nederland og Kent, og vi besøker hver av dem hver sesong. Vi ser hvordan plantene vokser opp, og vi velger neste års planter sammen.
+
+Derfor får hver plante fra Hagen med seg et stellekort skrevet av dem som dyrket den.`,
+            },
             dated: 186,
             written: {
                 by: ada,
@@ -626,6 +714,13 @@ It is why every Hagen plant comes with a care card written by the people who gre
 Keep them within two metres of the window, water them less than you think, and turn the pot a quarter every time you do, so they grow straight.`,
                 showsOn: ['uk', 'group'],
             },
+            inNorwegian: {
+                title: 'Fem planter for en mørk leilighet',
+                summary: 'Et vindu mot nord kan fortsatt gi deg en jungel. Fem planter som liker skyggen like godt som du ikke gjør.',
+                body: `Et rom mot nord får mykt, jevnt lys hele dagen, slik en skogbunn gjør. Disse fem trives i det: zamioculcas, aspidistra, filodendron, redebregne og svigermors tunge.
+
+Hold dem innenfor to meter fra vinduet, vann dem mindre enn du tror, og vri potta en kvart omdreining hver gang du vanner, så de vokser rett.`,
+            },
             dated: 22,
             written: {
                 by: sam,
@@ -644,6 +739,13 @@ Keep them within two metres of the window, water them less than you think, and t
 
 The plant care desk answers Brighton the same as London, and the care cards are the same too.`,
                 showsOn: ['uk', 'group'],
+            },
+            inNorwegian: {
+                title: 'Vi åpner i Brighton',
+                summary: 'Den andre butikken vår i Storbritannia åpner i North Laine, mellom en platebutikk og et bakeri.',
+                body: `Etter en sommer med sparkling og maling åpner Hagen Brighton dørene i 27 Kensington Gardens. Tom Ellery driver butikken, og Grace Okafor steller plantene som liker sjøluft.
+
+Planteklinikken svarer for Brighton akkurat som for London, og stellekortene er de samme.`,
             },
             dated: 23,
             written: {
@@ -1286,6 +1388,24 @@ Bergen kom i 2021, Majorstuen i 2023 og Stavanger i 2025. Alle butikkene kjøper
                 daysAgo: 40,
             },
         },
+        translation: {
+            locale: 'en',
+            values: {
+                heading: 'The story of Hagen',
+                intro: 'From one courtyard on Grünerløkka to four shops in three cities.',
+                body: `Ingrid Solberg opened the first Hagen in Markveien in April 2019, with forty plants and a borrowed till.
+
+Bergen followed in 2021, Majorstuen in 2023 and Stavanger in 2025. Every shop still buys from the same growers.`,
+            },
+            written: {
+                by: ada,
+                daysAgo: 33,
+                published: {
+                    by: ada,
+                    daysAgo: 33,
+                },
+            },
+        },
     },
     {
         site: 'norway',
@@ -1303,6 +1423,24 @@ Vil du bytte eller returnere en plante, har du 14 dager på deg. Ta den med til 
             published: {
                 by: nils,
                 daysAgo: 49,
+            },
+        },
+        translation: {
+            locale: 'en',
+            values: {
+                heading: 'Customer service',
+                intro: 'The plant care desk answers emails the same day, and the phone from 10 to 16 on weekdays.',
+                body: `Write to hjelp@hagen.example.no with a photo of the plant and the soil, and we answer the same working day. Call 22 41 08 00 if it is urgent.
+
+To exchange or return a plant you have 14 days. Bring it to one of the shops, or write to us and we will collect it.`,
+            },
+            written: {
+                by: ada,
+                daysAgo: 45,
+                published: {
+                    by: ada,
+                    daysAgo: 45,
+                },
             },
         },
     },
@@ -1333,6 +1471,28 @@ Vi selger aldri det vi vet om deg, og vi deler det bare med budene som bringer p
 
 Skriv til privacy@hagen.example.com for å se hva vi har om deg, eller for å be oss slette det.`,
 };
+
+/**
+ * The alt text of each image on Hagen Norge's pages in English, which an
+ * English copy keeps beside the image its Norwegian page shows.
+ */
+export const englishAlts: Array<{ page: string; field: string; alt: string }> = [
+    {
+        page: 'frontPage',
+        field: 'hero',
+        alt: 'A path through spruce forest',
+    },
+    {
+        page: 'osloShopPage',
+        field: 'image',
+        alt: 'Close up of fern fronds unfurled in the shade',
+    },
+    {
+        page: 'bergenShopPage',
+        field: 'image',
+        alt: 'Ferns filling the frame in deep shade',
+    },
+];
 
 /**
  * What the Trondheim opening changes, each a draft in the release: the
@@ -1421,6 +1581,19 @@ Read more about layering bulbs in one pot in [the journal](/journal).`,
         },
         approvedBy: ada,
         approvedDaysAgo: 35,
+        inNorwegian: {
+            subject: 'Løker å plante før frosten',
+            preheader: 'Tulipaner, krokus og en potte som blomstrer fra mars til mai.',
+            body: `Løker trenger en lang, kald periode for å blomstre, og derfor skal de i jorda nå og ikke om våren. Så lenge du får stukket en planteskje i jorda, er det ikke for sent.
+
+## Tre å plante denne uka
+
+- Tulipan «Ballerina», oransje og duftende
+- Snøkrokus, årets første blomst
+- Perleblomst, foran i potta
+
+Les mer om å plante løker i lag i én potte i [journalen](/journal).`,
+        },
     },
     {
         values: {
@@ -1442,6 +1615,19 @@ Our winter care guide is in [the journal](/journal), with a page for every plant
         },
         approvedBy: ada,
         approvedDaysAgo: 14,
+        inNorwegian: {
+            subject: 'De mørke månedene, og hvordan plantene kommer seg gjennom dem',
+            preheader: 'Mindre vann, mer lys, og en ny butikk i Brighton.',
+            body: `De fleste stueplanter hviler fra november til februar. Vann når toppen av jorda er tørr, flytt dem nær vinduet, og hold dem unna ovnen.
+
+## Nytt denne måneden
+
+- Hagen Brighton har åpnet i North Laine
+- Bregneuke i Oslo, Bergen og Stavanger
+- Kurs i London hver lørdag fram til jul
+
+Vinterguiden vår ligger i [journalen](/journal), med en side for hver plante vi selger.`,
+        },
     },
 ];
 

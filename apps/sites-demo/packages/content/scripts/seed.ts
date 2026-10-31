@@ -8,6 +8,8 @@ import {
     christmasNewsletter,
     christmasOpeningHours,
     employees,
+    employeesInNorwegian,
+    englishAlts,
     events,
     kari,
     mia,
@@ -382,6 +384,37 @@ export const seedContent = async (service: CmsService): Promise<void> => {
         });
     }
 
+    /**
+     * Writes the Norwegian copy of each item that has none yet, found by its
+     * label, the day its source was published, or written while a draft.
+     */
+    const translateItems = async (
+        collection: string,
+        copies: ReadonlyArray<{ label: string; values: Record<string, unknown>; written: Written }>
+    ): Promise<void> => {
+        const items = await service.editorItems(collection);
+        for (const copy of copies) {
+            const item = items.find((candidate) => candidate.label === copy.label);
+            if (item === undefined) continue;
+            const ref: DocumentRef = {
+                type: 'item',
+                collection,
+                id: item.id,
+                locale: 'nb',
+            };
+            if (await exists(ref)) continue;
+            const published = copy.written.published;
+            await tell(ref, copy.values, {
+                by: kari,
+                daysAgo: published?.daysAgo ?? copy.written.daysAgo,
+                published: {
+                    by: nils,
+                    daysAgo: published?.daysAgo ?? copy.written.daysAgo,
+                },
+            });
+        }
+    };
+
     // People
 
     for (const employee of employees) {
@@ -397,6 +430,26 @@ export const seedContent = async (service: CmsService): Promise<void> => {
             await publish(created.target.ref, employee.written.published.by, daysAgo(employee.written.published.daysAgo, 1));
         }
     }
+
+    await translateItems(
+        'employees',
+        employees.flatMap((employee) => {
+            const name = String(employee.values['name']);
+            const inNorwegian = employeesInNorwegian[name];
+            return inNorwegian === undefined
+                ? []
+                : [
+                      {
+                          label: name,
+                          values: {
+                              name,
+                              ...inNorwegian,
+                          },
+                          written: employee.written,
+                      },
+                  ];
+        })
+    );
 
     /**
      * Puts a collection's items in the seed's order, for a database seeded
@@ -472,23 +525,6 @@ export const seedContent = async (service: CmsService): Promise<void> => {
         const ref = created.target.ref;
         const published = article.written.published;
         if (published !== undefined) await publish(ref, published.by, daysAgo(published.daysAgo, 1));
-        if (article.inNorwegian !== undefined && published !== undefined && ref.type === 'item') {
-            await tell(
-                {
-                    ...ref,
-                    locale: 'nb',
-                },
-                article.inNorwegian,
-                {
-                    by: kari,
-                    daysAgo: published.daysAgo,
-                    published: {
-                        by: nils,
-                        daysAgo: published.daysAgo,
-                    },
-                }
-            );
-        }
         // Fern week ends in a week, so Nils takes it down then.
         if (title === 'Fern week in Oslo and Bergen' && created.row !== undefined) {
             await asOf(daysAgo(2, 2), () =>
@@ -504,6 +540,20 @@ export const seedContent = async (service: CmsService): Promise<void> => {
         }
         console.log(`[demo] seeded the article ${String(title)}`);
     }
+    await translateItems(
+        'articles',
+        articles.flatMap((article) =>
+            article.inNorwegian === undefined
+                ? []
+                : [
+                      {
+                          label: String(article.values['title']),
+                          values: article.inNorwegian,
+                          written: article.written,
+                      },
+                  ]
+        )
+    );
 
     // The UK's workshops
 
@@ -644,6 +694,39 @@ export const seedContent = async (service: CmsService): Promise<void> => {
             'Nytt toppbilde'
         );
         await publish(norwayFront, nils, daysAgo(25, 1));
+    }
+
+    // The alt text of each image on Hagen Norge's English pages, where the English copy has none yet.
+    for (const { page, field, alt } of englishAlts) {
+        const source = await service.document(
+            pageRef({
+                site: 'norway',
+                name: page,
+            })
+        );
+        const image = source.row?.published?.[field];
+        const english = pageRef(
+            {
+                site: 'norway',
+                name: page,
+            },
+            'en'
+        );
+        const translation = await service.draftState(english);
+        const copy = translation.row?.draft ?? translation.row?.published;
+        if (image === undefined || translation.row === undefined || copy?.[field] !== undefined) continue;
+        const wasPublished = translation.status === 'published';
+        // A translation keeps an image's alt text alone, and shows the image its source does.
+        await save(
+            english,
+            {
+                [field]: alt,
+            },
+            ada,
+            daysAgo(3),
+            'English alt text'
+        );
+        if (wasPublished) await publish(english, ada, daysAgo(3, 1));
     }
 
     // The shared photos nothing shows yet, and the tidying that put the shop photos in a folder.
@@ -877,6 +960,20 @@ Book a visit at the shop or by writing to care@hagen.example.co.uk. Visits run o
         });
         console.log(`[demo] seeded the newsletter ${issue.values.subject}`);
     }
+    await translateItems(
+        'newsletters',
+        newsletters.map((issue) => ({
+            label: issue.values.subject,
+            values: newsletterValues(issue.inNorwegian),
+            written: {
+                ...issue.written,
+                published: {
+                    by: issue.approvedBy,
+                    daysAgo: issue.approvedDaysAgo,
+                },
+            },
+        }))
+    );
 
     if (!(await service.editorItems('newsletters')).some((item) => item.label === christmasNewsletter.values.subject)) {
         const created = await asOf(daysAgo(2), () =>
