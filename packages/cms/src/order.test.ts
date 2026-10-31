@@ -296,6 +296,27 @@ describe('an orderable collection', () => {
         expect(await editingNames('employees')).toEqual(['Priya Shah', 'Eleanor Price', 'Ingrid Solberg', 'Martin Hale']);
     });
 
+    it('lists a move in the changes, where it is live and where the draft puts it', async () => {
+        const ids = await team();
+        await place('employees', ids['Priya Shah']!, {
+            before: ids['Eleanor Price'],
+        });
+        const changes = await asEditor(request(app).get(`/editing/collections/employees/items/${ids['Priya Shah']}/changes`));
+        expect(changes.body.changes).toEqual([
+            {
+                path: '_place',
+                label: 'Place',
+                before: 'After Martin Hale',
+                after: 'After Ingrid Solberg',
+                writable: false,
+            },
+        ]);
+        await publish('employees', ids['Priya Shah']!);
+        expect(
+            (await asEditor(request(app).get(`/editing/collections/employees/items/${ids['Priya Shah']}/changes`))).body.changes
+        ).toEqual([]);
+    });
+
     it('keeps the order through a filter, and reads it by another index when asked', async () => {
         const ids = await team();
         await place('employees', ids['Priya Shah']!, {
@@ -420,6 +441,18 @@ describe('an orderable tree', () => {
         const names = await editingNames('menuItems');
         expect(names.indexOf('Bergen')).toBeLessThan(names.indexOf('Oslo'));
         expect(names.indexOf('Jobb hos oss')).toBeLessThan(names.indexOf('Personvern'));
+    });
+
+    it('lists a move under another parent in the changes', async () => {
+        const ids = await menu();
+        await place('menuItems', ids['Personvern']!, {
+            after: ids['Jobb hos oss'],
+        });
+        const changes = await asEditor(request(app).get(`/editing/collections/menuItems/items/${ids['Personvern']}/changes`));
+        expect(changes.body.changes.find((change: { path: string }) => change.path === '_place')).toMatchObject({
+            before: 'After Om oss',
+            after: 'Under Om oss, after Jobb hos oss',
+        });
     });
 
     it('puts an item first or last under a parent, and back at the top', async () => {

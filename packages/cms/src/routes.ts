@@ -92,7 +92,7 @@ import {
     withdrawReviews,
 } from './reviews.js';
 import { waitingTranslations } from './waiting-translations.js';
-import { placeIn } from './place.js';
+import { PLACE, placeIn } from './place.js';
 import { changePerson, invitePerson, managedSites, peopleWithSites, siteRoles } from './people.js';
 import type { Person } from './options.js';
 import { collectionActionRoutes, itemActions } from './action-routes.js';
@@ -933,6 +933,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         status: 200,
                         body: draftBody(published),
                     };
+                    await cms.assertNotHeld(ref, authorOf(cms, args));
                 }) as never
             ),
 
@@ -971,6 +972,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 method: 'PUT',
                 path: `${editingBase}${scope.prefix}/schedule`,
                 auth: editor,
+                    await cms.assertNotHeld(ref, authorOf(cms, args));
                 summary: `Schedule ${scope.noun} to publish or unpublish at a time`,
                 description:
                     'Publishes the draft as it stands when the time comes, or unpublishes it, and replaces a time set before. When the time comes the same rules hold as for publishing: a draft missing a field, waiting for a required review, or being edited waits until that clears. The person confirms before this runs.',
@@ -1071,7 +1073,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     scope.approveWrites === true
                         ? {
                               needsApproval: true,
-                    await cms.assertNotHeld(ref, authorOf(cms, args));
                               destructiveHint: false,
                           }
                         : {
@@ -1795,6 +1796,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 });
                 return {
                     status: 200,
+                // A drag in a list does not take the item from someone editing it, nor make the mover its holder.
+                await cms.assertNotHeld(ref, authorOf(cms, args));
                     body: draftBody(state),
                     headers: {
                         etag: state.etag,

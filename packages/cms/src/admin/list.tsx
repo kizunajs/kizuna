@@ -46,6 +46,7 @@ import { EmptyTable, FlatRows, TreeRows, type TableOptions, type TreeRow } from 
 import { ColumnsPanel, ListToolbar, SortMenu, type ListPanel } from './list-toolbar.js';
 import { placeAfterMove, selectionMoves, type PlaceBody, type SelectionMove } from './list-order.js';
 import { descendantsIn, pageTreeOf } from './page-tree.js';
+import { branchQuestionOf } from './branch.js';
 import { hrefOf, replaceQuery, useAddress, type CollectionSummary } from './navigation.js';
 import { PageHeader, type MetaPair } from './page-header.js';
 import { Loading, problemOf } from './parts.js';
@@ -1254,7 +1255,7 @@ export function CollectionList({
                       }
             }
             questionOf={
-                tree === undefined ? undefined : (action, refs) => (action === 'delete' ? branchQuestionOf(rows ?? [], refs) : undefined)
+                tree === undefined ? undefined : (action, refs) => (action === 'delete' ? deleteQuestionOf(rows ?? [], refs) : undefined)
             }
             filters={{
                 definitions: options?.filters ?? [],
@@ -1339,23 +1340,13 @@ const arranged = (
  * What Delete asks first when a ticked row has rows under it, which go with
  * it, or `undefined` to ask as any delete does.
  */
-const branchQuestionOf = (rows: readonly TreeRow[], refs: ReadonlySet<string>): string | undefined => {
-    const under = descendantsIn(rows, [...refs]);
-    const going = [...under].filter((ref) => !refs.has(ref));
-    if (going.length === 0) return undefined;
+const deleteQuestionOf = (rows: readonly TreeRow[], refs: ReadonlySet<string>): string | undefined => {
     const titleOf = (ref: string): string => {
         const row = rows.find((candidate) => candidate.ref === ref);
         return row?.tree?.label ?? row?.title ?? ref;
     };
-    const items = (count: number): string => `${count} ${count === 1 ? 'item' : 'items'}`;
-    const ticked = [...refs];
-    const named =
-        going.length <= 3
-            ? `${new Intl.ListFormat('en').format(going.map(titleOf))} go${going.length === 1 ? 'es' : ''} with ${ticked.length === 1 ? 'it' : 'them'}. `
-            : '';
-    return ticked.length === 1
-        ? `Delete ${titleOf(ticked[0]!)} and the ${items(going.length)} under it, with their history? ${named}Pages that show them stop showing them.`
-        : `Delete ${items(ticked.length)} and the ${items(going.length)} under them, with their history? ${named}Pages that show them stop showing them.`;
+    const going = [...descendantsIn(rows, [...refs])].filter((ref) => !refs.has(ref));
+    return branchQuestionOf([...refs].map(titleOf), going.map(titleOf));
 };
 
 /**

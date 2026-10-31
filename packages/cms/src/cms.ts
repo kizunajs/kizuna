@@ -2450,6 +2450,78 @@ export class CmsService {
                 detail: `${listing.name} has no order and no tree, so its items have no place to move to.`,
             });
         }
+    /**
+     * Where a move puts an item, against where it is live, in words, like
+     * "After Hagen London" and "After Hagen Oslo", or `undefined` while its
+     * draft keeps its live place. For the Changes tab, which lists a move as
+     * a change, since the item reads Changed.
+     */
+    async placeChange(ref: DocumentRef): Promise<{ before: string; after: string } | undefined> {
+        const listing = this.listingOf(ref);
+        if (listing === undefined || ref.type !== 'item' || listing.definition.orderable !== true) return undefined;
+        const tree = listing.definition.tree;
+        const labelField = labelFieldOf(listing.definition);
+        const rows: Array<{
+            id: string;
+            rowId: string;
+            latest: Record<string, unknown> | null;
+            published: Record<string, unknown> | null;
+        }> = [];
+        for (const stored of await this.store.list('item', listing.site)) {
+            if (!stored.key.startsWith(listing.keyPrefix)) continue;
+            const id = stored.key.slice(listing.keyPrefix.length);
+            const row = this.migrated(this.target(listing.refOf(id)), stored)!;
+            rows.push({
+                id,
+                rowId: stored.id,
+                latest: row.draft ?? row.published,
+                published: row.published,
+            });
+        }
+        const moving = rows.find((row) => row.id === ref.id);
+        if (moving === undefined || moving.published === null || moving.latest === null) return undefined;
+        const labels = new Map(rows.map((row) => [row.id, itemLabelOf(row.latest ?? {}, labelField)]));
+        const describe = (copy: 'latest' | 'published'): string => {
+            const contentOf = (row: (typeof rows)[number]): Record<string, unknown> | null =>
+                copy === 'latest' ? row.latest : row.published;
+            const parent = tree === undefined ? undefined : parentIn(contentOf(moving), tree);
+            const siblings = rows
+                .filter((row) => contentOf(row) !== null && (tree === undefined || parentIn(contentOf(row), tree) === parent))
+                .map((row) => ({
+                    id: row.id,
+                    place: placeIn(contentOf(row)),
+                    rowId: row.rowId,
+                }))
+                .sort((left, right) =>
+                    byPlace(
+                        {
+                            place: left.place,
+                            id: left.rowId,
+                        },
+                        {
+                            place: right.place,
+                            id: right.rowId,
+                        }
+                    )
+                );
+            const index = siblings.findIndex((row) => row.id === moving.id);
+            const where = index <= 0 ? 'first' : `after ${labels.get(siblings[index - 1]!.id)}`;
+            return parent === undefined
+                ? where.replace(/^./, (first) => first.toUpperCase())
+                : `Under ${labels.get(parent) ?? parent}, ${where}`;
+        };
+        const parentMoved = tree !== undefined && parentIn(moving.latest, tree) !== parentIn(moving.published, tree);
+        if (!parentMoved && placeIn(moving.latest) === placeIn(moving.published)) return undefined;
+        const before = describe('published');
+        const after = describe('latest');
+        return before === after
+            ? undefined
+            : {
+                  before,
+                  after,
+              };
+    }
+
         if (named > 1) throw new CmsHttpError(400, { detail: 'Name one of after, before and at.' });
         if (orderable !== true && named > 0) {
             throw new CmsHttpError(400, {

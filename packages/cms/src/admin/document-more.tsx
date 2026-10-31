@@ -13,6 +13,7 @@ import { hrefOf, navigate } from './navigation.js';
 import { problemOf } from './parts.js';
 import { useOfferUndo } from './toasts.js';
 import { AddToReleaseDialog } from './schedule-ui.js';
+import { branchQuestionOf, itemsUnder } from './branch.js';
 
 const ICONS = {
     ask: MessageCircle,
@@ -249,6 +250,38 @@ export function DocumentMore({
                 entry,
                 question,
             });
+        if (entry.kind === 'delete') void nameWhatGoes(entry);
+    };
+
+    // In a tree, deleting an item takes what sits under it, so Delete names those once the list says.
+    const nameWhatGoes = async (entry: MenuEntry): Promise<void> => {
+        const item = parseRef(document.ref);
+        if (item?.type !== 'item') return;
+        const answer = await connection.call<{ items: Array<{ id: string; label: string; parent?: string | null }> }>(
+            'editing_collections_list_items',
+            {
+                params: {
+                    name: item.collection,
+                },
+            }
+        );
+        if (answer.status !== 200) return;
+        const question = branchQuestionOf(
+            [title],
+            itemsUnder(answer.body.items, item.id).map((under) => under.label)
+        );
+        if (question === undefined) return;
+        setConfirming((current) =>
+            current?.entry !== entry
+                ? current
+                : {
+                      entry,
+                      question: {
+                          label: 'Delete',
+                          question,
+                      },
+                  }
+        );
     };
 
     useImperativeHandle(ref, () => ({
