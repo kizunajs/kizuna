@@ -279,7 +279,12 @@ const Events = defineCollection({
             name: 'title',
             schema: z.string(),
         },
+        {
+            name: 'date',
+            schema: z.string(),
+        },
     ],
+    indexes: ['date'],
 });
 
 const Offices = defineCollection({
@@ -396,6 +401,18 @@ describe('the admin with several sites', () => {
             offices: ['uk', 'norway'],
         });
         expect(served.allSites).toBe(true);
+    });
+
+    it("tells the admin how a site's own collection lists, as it does a shared one", async () => {
+        const served = configOf((await request(sitesApp).get('/admin').set('authorization', 'Bearer editor-token')).text);
+        expect(served.lists['events']?.columns).toEqual([
+            {
+                field: 'date',
+                label: null,
+                sortable: true,
+                shown: false,
+            },
+        ]);
     });
 
     it("serves a site's view of a shared item, a level deeper than the shared one", async () => {
