@@ -612,4 +612,32 @@ describe('RichText', () => {
         expect(html).toContain('<h2 class="title">Ferns</h2>');
         expect(html).toContain('<span>picture</span>');
     });
+
+    it("renders each block with the component named for it, given the block's fields", () => {
+        const value = [
+            ...body,
+            {
+                _type: 'article' as const,
+                _key: 'a1',
+                article: 'article_1',
+            },
+        ];
+        const html = renderToStaticMarkup(
+            createElement(RichText<typeof value>, {
+                value,
+                blocks: {
+                    article: (props: { article: string }) =>
+                        createElement(
+                            'a',
+                            {
+                                href: `/journal/${props.article}`,
+                            },
+                            'Read the article'
+                        ),
+                },
+            })
+        );
+        expect(html).toContain('<h2>Ferns</h2>');
+        expect(html).toContain('<a href="/journal/article_1">Read the article</a>');
+    });
 });

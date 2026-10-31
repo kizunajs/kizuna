@@ -263,7 +263,7 @@ export const DescribedFieldSchema = Kizuna.model({
             .array(DescribedBlockSchema)
             .optional()
             .describe(
-                "For a list of blocks, the blocks an item may be. Each item names its block under 'block', beside that block's fields."
+                "For a list of blocks, the blocks an item may be. Each item names its block under 'block', beside that block's fields. For rich text, the blocks it may hold, each a node naming its block under '_type'."
             ),
         parent: z.string().optional().describe('The path of the block field this one sits in.'),
         position: z.enum(['sidebar']).optional().describe('Where the editor shows it, when beside the main column.'),

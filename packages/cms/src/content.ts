@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import { readMetaBrand, readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { readBlock, readBlocks } from './block.js';
 import { optionOf } from './union.js';
+import { readRichTextBlocks } from './rich-text.js';
 import { isImageSchema } from './image.js';
 import { conditionForWire, conditionHolds, type WireCondition } from './condition.js';
 import {
@@ -59,7 +60,8 @@ export interface DescribedField {
     block: string | undefined;
     fields: DescribedField[] | undefined;
     /**
-     * For a list made with `blocks()`, the blocks an item may be.
+     * For a list made with `blocks()`, the blocks an item may be, and for
+     * rich text made with `richText()`, the blocks it may hold.
      */
     blocks: DescribedBlock[] | undefined;
 }
@@ -136,7 +138,7 @@ const describe = (
         layout: [...within],
         block: block?.name,
         fields: block === undefined ? undefined : describeList(block.fields, path, [], layout),
-        blocks: readBlocks(field.schema)?.map((each) => ({
+        blocks: (readBlocks(field.schema) ?? readRichTextBlocks(field.schema))?.map((each) => ({
             name: each.name,
             label: each.label,
             description: each.description,
@@ -206,11 +208,16 @@ export const hiddenIn = (field: DescribedField, draft: Record<string, unknown>, 
 };
 
 /**
- * What the agent reads about a list of blocks: the key an item names its
- * block under, and the blocks it may name.
+ * What the agent reads about a field holding blocks: for a list, the key an
+ * item names its block under, and for rich text, the node a block sits in.
  */
-export const blocksHint = (blocks: readonly DescribedBlock[]): string =>
-    `A list of blocks. Each item is one block's fields with its name under 'block': ${blocks.map((block) => `'${block.name}'`).join(', ')}.`;
+export const blocksHint = (field: Pick<DescribedField, 'schema' | 'blocks'>): string | undefined => {
+    if (field.blocks === undefined) return undefined;
+    const names = field.blocks.map((block) => `'${block.name}'`).join(', ');
+    return readRichTextBlocks(field.schema) === undefined
+        ? `A list of blocks. Each item is one block's fields with its name under 'block': ${names}.`
+        : `Rich text that may hold blocks between its paragraphs. Each block is a node with its name under '_type', a unique '_key', and that block's fields beside them: ${names}.`;
+};
 
 /**
  * Every field of a page, with the fields of each block inside it. A field in

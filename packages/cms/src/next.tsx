@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { PreviewOverlay } from '@kizunajs/cms/next/preview';
 import type { Resolved } from './output.js';
 import { PortableText, type PortableTextComponents } from '@portabletext/react';
@@ -15,14 +16,60 @@ export { inStoredOrder } from './in-order.js';
  */
 export type RichTextContent = Resolved<RichTextValue>;
 
-export interface RichTextProps {
-    value: RichTextContent;
+/**
+ * The nodes of rich text that are blocks, read off a `richText()` field's
+ * value: every node but its text and images.
+ */
+export type RichTextBlockNode<Value extends readonly RichTextNode[]> = BlockNodeOf<Value[number]>;
+
+type BlockNodeOf<Node> = Node extends RichTextNode
+    ? Node['_type'] extends 'block' | 'image'
+        ? never
+        : string extends Node['_type']
+          ? never
+          : Node
+    : never;
+
+/**
+ * A component for each block rich text may hold, keyed by the block's name.
+ * Each receives the block's fields as its props.
+ */
+export type RichTextBlockComponents<Node extends RichTextNode> = {
+    [Name in Node['_type']]: (
+        props: Extract<
+            Node,
+            {
+                _type: Name;
+            }
+        >
+    ) => ReactNode;
+};
+
+/**
+ * Any node of rich text, a text block, an image or a block.
+ */
+export interface RichTextNode {
+    _type: string;
+    _key: string;
+}
+
+export type RichTextProps<Value extends readonly RichTextNode[] = RichTextContent> = {
+    value: Value;
     /**
      * Overrides for any element, keyed the way `@portabletext/react` keys
      * them: `block.h2`, `list.bullet`, `marks.link`, `types.image`, and so on.
      */
     components?: PortableTextComponents;
-}
+} & ([RichTextBlockNode<Value>] extends [never]
+    ? {
+          blocks?: undefined;
+      }
+    : {
+          /**
+           * The component for each block the field may hold, by name.
+           */
+          blocks: RichTextBlockComponents<RichTextBlockNode<Value>>;
+      });
 
 const RICH_TEXT_COMPONENTS: PortableTextComponents = {
     types: {
@@ -57,15 +104,34 @@ const RICH_TEXT_COMPONENTS: PortableTextComponents = {
  *     }}
  * />
  * ```
+ *
+ * Rich text made with `richText()` names a component for each block it may
+ * hold, which receives the block's fields:
+ *
+ * ```tsx
+ * <RichText
+ *     value={newsletter.body}
+ *     blocks={{
+ *         article: (props) => <ArticleCard id={props.article} />,
+ *     }}
+ * />
+ * ```
  */
-export function RichText(props: RichTextProps) {
+export function RichText<const Value extends readonly RichTextNode[]>(props: RichTextProps<Value>) {
+    const blocks = Object.fromEntries(
+        Object.entries((props.blocks ?? {}) as Record<string, (node: RichTextNode) => ReactNode>).map(([name, Block]) => [
+            name,
+            ({ value }: { value: RichTextNode }) => <Block {...value} />,
+        ])
+    );
     return (
         <PortableText
-            value={props.value}
+            value={props.value as unknown as RichTextContent}
             components={{
                 ...props.components,
                 types: {
                     ...RICH_TEXT_COMPONENTS.types,
+                    ...blocks,
                     ...props.components?.types,
                 },
             }}

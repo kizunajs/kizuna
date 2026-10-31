@@ -105,6 +105,12 @@ Drag a row by its grip to move it within its list, or focus the grip and use the
 
 An item saves as a whole, so a block in the list gives none of its fields `auth` or `readOnly`. Put them on the list's own field instead.
 
+## Blocks in rich text
+
+A rich text field can hold blocks between its paragraphs too, like a card for an article in a newsletter. Name them with `richText({ blocks: [...] })`, and see [Rich text](/docs/cms/rich-text#blocks-in-the-text) for how they are stored and rendered.
+
+## Taking a block out
+
 A block taken out of the list leaves the items that hold one unreadable. Write a [`migrate` step](/docs/cms/changing-the-shape) that drops or converts them:
 
 ```ts

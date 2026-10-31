@@ -159,17 +159,18 @@ const WHOLE_ITEM_OPTIONS: ReadonlyArray<'auth' | 'readOnly'> = ['auth', 'readOnl
 /**
  * Throws when a block, or a block one of its fields holds, gives a field
  * `auth` or `readOnly`, which an item that saves as a whole cannot keep.
+ * `holder` names what holds the block, like `blocks()` or `richText()`.
  */
-const assertWholeItem = (fields: FieldList, block: string): void => {
+export const assertWholeItem = (fields: FieldList, block: string, holder = 'blocks()'): void => {
     for (const field of dataFields(fields)) {
         for (const option of WHOLE_ITEM_OPTIONS) {
             if (field[option] === undefined) continue;
             throw new Error(
-                `blocks() holds the block '${block}', whose field '${field.name}' declares ${option}. An item in the list saves as a whole, so give ${option} to the field that holds the list.`
+                `${holder} holds the block '${block}', whose field '${field.name}' declares ${option}. The block saves as a whole with the field that holds it, so give ${option} to that field.`
             );
         }
         const inner = readBlock(field.schema);
-        if (inner !== undefined) assertWholeItem(inner.fields, block);
+        if (inner !== undefined) assertWholeItem(inner.fields, block, holder);
     }
 };
 

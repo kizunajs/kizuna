@@ -378,6 +378,36 @@ export const blockOptionsOf = (itemSchema: JsonSchema, root: JsonSchema): Array<
 };
 
 /**
+ * The keys every node of rich text holds, which name the node rather than
+ * hold a block's fields.
+ */
+const NODE_KEYS: readonly string[] = ['_type', '_key'];
+
+/**
+ * The blocks rich text may hold besides its text and images, read off the
+ * options of its items: each block's name, and the schema of its fields
+ * without the node's own `_type` and `_key`.
+ */
+export const richTextBlockOptionsOf = (schema: JsonSchema, root: JsonSchema): Array<{ name: string; schema: JsonSchema }> => {
+    const items = resolveRef(schema.items ?? {}, root);
+    return (items.oneOf ?? items.anyOf ?? []).flatMap((option) => {
+        const resolved = resolveRef(option, root);
+        const name = resolved.properties?.['_type']?.const;
+        if (typeof name !== 'string' || name === 'block' || name === 'image') return [];
+        return [
+            {
+                name,
+                schema: {
+                    ...resolved,
+                    properties: Object.fromEntries(Object.entries(resolved.properties ?? {}).filter(([key]) => !NODE_KEYS.includes(key))),
+                    required: (resolved.required ?? []).filter((key) => !NODE_KEYS.includes(key)),
+                },
+            },
+        ];
+    });
+};
+
+/**
  * The block an item names, or `undefined`.
  */
 export const itemBlockName = (value: unknown): string | undefined => {

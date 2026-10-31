@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Menu } from '@base-ui/react/menu';
 import {
     defineAnnotation,
     defineBlockObject,
@@ -10,84 +11,132 @@ import {
     useEditor,
     useEditorSelector,
     type BlockObjectRenderProps,
+    type FieldDefinition,
     type PortableTextBlock,
 } from '@portabletext/editor';
 import { EventListenerPlugin, NodePlugin } from '@portabletext/editor/plugins';
 import { isActiveAnnotation, isActiveDecorator, isActiveListItem, isActiveStyle } from '@portabletext/editor/selectors';
-import { Bold, Code, Heading2, Heading3, Italic, Link, List, ListOrdered, Pilcrow, Quote, Underline, Unlink } from 'lucide-react';
+import {
+    ArrowDown,
+    ArrowUp,
+    Blocks,
+    Bold,
+    Code,
+    Ellipsis,
+    Heading2,
+    Heading3,
+    Italic,
+    Link,
+    List,
+    ListOrdered,
+    Pilcrow,
+    Quote,
+    Trash2,
+    Underline,
+    Unlink,
+} from 'lucide-react';
 import { ICON, useEditorContext } from './context.js';
-import type { ControlProps } from './controls.js';
+import { BlockFields, BlockPicker, type ControlProps } from './controls.js';
 import { Hint } from './hint.js';
 import { MediaPicker, type MediaRecord } from './media.js';
-import { SAFE_HREF } from './schema.js';
+import { humanize, richTextBlockOptionsOf, SAFE_HREF, typeOf, type DescribedBlock, type JsonSchema } from './schema.js';
 
 /**
- * The same marks, styles and blocks `RichTextSchema` stores.
+ * One block rich text may hold, with what the editor shows of it.
  */
-const RICH_TEXT_SCHEMA = defineSchema({
-    decorators: [
-        {
-            name: 'strong',
-        },
-        {
-            name: 'em',
-        },
-        {
-            name: 'code',
-        },
-        {
-            name: 'underline',
-        },
-    ],
-    styles: [
-        {
-            name: 'normal',
-        },
-        {
-            name: 'h2',
-        },
-        {
-            name: 'h3',
-        },
-        {
-            name: 'h4',
-        },
-        {
-            name: 'blockquote',
-        },
-    ],
-    lists: [
-        {
-            name: 'bullet',
-        },
-        {
-            name: 'number',
-        },
-    ],
-    annotations: [
-        {
-            name: 'link',
-            fields: [
-                {
-                    name: 'href',
-                    type: 'string',
-                },
-            ],
-        },
-    ],
-    blockObjects: [
-        {
-            name: 'image',
-            fields: [
-                {
-                    name: 'image',
-                    type: 'object',
-                },
-            ],
-        },
-    ],
-    inlineObjects: [],
-});
+interface RichTextBlockChoice {
+    name: string;
+    label: string;
+    schema: JsonSchema;
+    described: DescribedBlock | undefined;
+}
+
+/**
+ * The kind of value the editor keeps under a block's field.
+ */
+const fieldTypeOf = (schema: JsonSchema): FieldDefinition['type'] => {
+    const type = typeOf(schema);
+    if (type === 'integer') return 'number';
+    return type === 'string' || type === 'number' || type === 'boolean' || type === 'array' ? type : 'object';
+};
+
+/**
+ * The same marks, styles and blocks the field's schema stores, with each block
+ * it may hold beside images.
+ */
+const richTextSchemaOf = (choices: readonly RichTextBlockChoice[]) =>
+    defineSchema({
+        decorators: [
+            {
+                name: 'strong',
+            },
+            {
+                name: 'em',
+            },
+            {
+                name: 'code',
+            },
+            {
+                name: 'underline',
+            },
+        ],
+        styles: [
+            {
+                name: 'normal',
+            },
+            {
+                name: 'h2',
+            },
+            {
+                name: 'h3',
+            },
+            {
+                name: 'h4',
+            },
+            {
+                name: 'blockquote',
+            },
+        ],
+        lists: [
+            {
+                name: 'bullet',
+            },
+            {
+                name: 'number',
+            },
+        ],
+        annotations: [
+            {
+                name: 'link',
+                fields: [
+                    {
+                        name: 'href',
+                        type: 'string',
+                    },
+                ],
+            },
+        ],
+        blockObjects: [
+            {
+                name: 'image',
+                fields: [
+                    {
+                        name: 'image',
+                        type: 'object',
+                    },
+                ],
+            },
+            ...choices.map((choice) => ({
+                name: choice.name,
+                title: choice.label,
+                fields: Object.entries(choice.schema.properties ?? {}).map(([name, property]) => ({
+                    name,
+                    type: fieldTypeOf(property),
+                })),
+            })),
+        ],
+        inlineObjects: [],
+    });
 
 function RichTextImage(props: BlockObjectRenderProps) {
     const { connection, resolveUrl } = useEditorContext();
@@ -139,6 +188,104 @@ function RichTextImage(props: BlockObjectRenderProps) {
     );
 }
 
+/**
+ * A block in the text: its name, a menu to move or remove it, and its fields
+ * below, each writing the node as a whole.
+ */
+function RichTextBlock({ props, choice, root }: { props: BlockObjectRenderProps; choice: RichTextBlockChoice; root: JsonSchema }) {
+    const editor = useEditor();
+    const at = [
+        {
+            _key: props.node._key,
+        },
+    ];
+    const { _type: _name, _key: _ownKey, ...values } = props.node as Record<string, unknown>;
+    const change = (next: unknown): void => {
+        const updated = (next ?? {}) as Record<string, unknown>;
+        const removed = Object.keys(values).filter((name) => !(name in updated));
+        if (removed.length > 0) {
+            editor.send({
+                type: 'block.unset',
+                at,
+                props: removed,
+            });
+        }
+        editor.send({
+            type: 'block.set',
+            at,
+            props: updated,
+        });
+    };
+    return (
+        <div {...props.attributes} className="k-rich__block" data-selected={props.selected}>
+            {props.children}
+            <div
+                contentEditable={false}
+                className="k-rich__block-card"
+                onKeyDown={(event) => event.stopPropagation()}
+                onPaste={(event) => event.stopPropagation()}>
+                <div className="k-rich__block-head">
+                    <span className="k-rich__block-name">{choice.label}</span>
+                    {props.readOnly ? null : (
+                        <Menu.Root>
+                            <Menu.Trigger className="k-icon-button" aria-label={`More for ${choice.label}`}>
+                                <Ellipsis {...ICON} />
+                            </Menu.Trigger>
+                            <Menu.Portal>
+                                <Menu.Positioner sideOffset={6} align="end" className="k-positioner">
+                                    <Menu.Popup className="k-popup k-menu">
+                                        <Menu.Item
+                                            className="k-menu__item"
+                                            onClick={() =>
+                                                editor.send({
+                                                    type: 'move.block up',
+                                                    at,
+                                                })
+                                            }>
+                                            <ArrowUp {...ICON} />
+                                            Move up
+                                        </Menu.Item>
+                                        <Menu.Item
+                                            className="k-menu__item"
+                                            onClick={() =>
+                                                editor.send({
+                                                    type: 'move.block down',
+                                                    at,
+                                                })
+                                            }>
+                                            <ArrowDown {...ICON} />
+                                            Move down
+                                        </Menu.Item>
+                                        <Menu.Item
+                                            className="k-menu__item"
+                                            onClick={() =>
+                                                editor.send({
+                                                    type: 'delete.block',
+                                                    at,
+                                                })
+                                            }>
+                                            <Trash2 {...ICON} />
+                                            Remove
+                                        </Menu.Item>
+                                    </Menu.Popup>
+                                </Menu.Positioner>
+                            </Menu.Portal>
+                        </Menu.Root>
+                    )}
+                </div>
+                <BlockFields
+                    schema={choice.schema}
+                    root={root}
+                    value={values}
+                    onChange={change}
+                    disabled={props.readOnly}
+                    described={choice.described}
+                />
+            </div>
+        </div>
+    );
+}
+
 const RICH_TEXT_NODES = [
     defineTextBlock({
         type: 'block',
@@ -180,6 +327,59 @@ const RICH_TEXT_NODES = [
     }),
 ];
 
+/**
+ * How the editor draws each node, with a node for every block the field may
+ * hold.
+ */
+const richTextNodesOf = (choices: readonly RichTextBlockChoice[], root: JsonSchema) => [
+    ...RICH_TEXT_NODES,
+    ...choices.map((choice) =>
+        defineBlockObject({
+            type: choice.name,
+            render: (props) => <RichTextBlock props={props} choice={choice} root={root} />,
+        })
+    ),
+];
+
+/**
+ * The toolbar's insert for blocks: the block itself when the field holds one,
+ * or a picker of every block it may hold.
+ */
+function InsertBlock({ choices }: { choices: readonly RichTextBlockChoice[] }) {
+    const editor = useEditor();
+    const [picking, setPicking] = useState(false);
+    const insert = (name: string): void => {
+        setPicking(false);
+        editor.send({
+            type: 'insert.block object',
+            placement: 'auto',
+            blockObject: {
+                name,
+                value: {},
+            },
+        });
+        editor.send({
+            type: 'focus',
+        });
+    };
+    const only = choices.length === 1 ? choices[0] : undefined;
+    return (
+        <>
+            <button
+                type="button"
+                className="k-button k-button--secondary k-button--small"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => (only === undefined ? setPicking(true) : insert(only.name))}>
+                <Blocks {...ICON} />
+                {only?.label ?? 'Block'}
+            </button>
+            {only === undefined ? (
+                <BlockPicker open={picking} onOpenChange={setPicking} noun="block" label={undefined} choices={choices} onPick={insert} />
+            ) : null}
+        </>
+    );
+}
+
 function ToolbarButton(props: { label: string; active: boolean; onPress: () => void; children: ReactNode }) {
     return (
         <Hint label={props.label}>
@@ -196,7 +396,7 @@ function ToolbarButton(props: { label: string; active: boolean; onPress: () => v
     );
 }
 
-function Toolbar() {
+function Toolbar({ choices }: { choices: readonly RichTextBlockChoice[] }) {
     const editor = useEditor();
     const focus = (): void =>
         editor.send({
@@ -332,6 +532,7 @@ function Toolbar() {
                         })
                     }
                 />
+                {choices.length === 0 ? null : <InsertBlock choices={choices} />}
             </div>
             {linking ? (
                 <input
@@ -359,13 +560,28 @@ function Toolbar() {
 }
 
 /**
- * Rich text, edited as the Portable Text it is stored as.
+ * Rich text, edited as the Portable Text it is stored as, with any blocks
+ * its schema names between the paragraphs.
  */
-export function RichTextControl({ value, onChange, disabled }: ControlProps) {
+export function RichTextControl({ schema, root, value, onChange, disabled, blocks }: ControlProps) {
+    const choices = useMemo(
+        () =>
+            richTextBlockOptionsOf(schema, root).map((option) => {
+                const described = blocks?.find((block) => block.name === option.name);
+                return {
+                    ...option,
+                    described,
+                    label: described?.label ?? humanize(option.name),
+                };
+            }),
+        [schema, root, blocks]
+    );
+    const [schemaDefinition] = useState(() => richTextSchemaOf(choices));
+    const nodes = useMemo(() => richTextNodesOf(choices, root), [choices, root]);
     return (
         <EditorProvider
             initialConfig={{
-                schemaDefinition: RICH_TEXT_SCHEMA,
+                schemaDefinition,
                 initialValue: Array.isArray(value) ? (value as PortableTextBlock[]) : undefined,
                 readOnly: disabled,
             }}>
@@ -374,9 +590,9 @@ export function RichTextControl({ value, onChange, disabled }: ControlProps) {
                     if (event.type === 'mutation') onChange(event.value);
                 }}
             />
-            <NodePlugin nodes={RICH_TEXT_NODES} />
+            <NodePlugin nodes={nodes} />
             <div className="k-rich">
-                {disabled ? null : <Toolbar />}
+                {disabled ? null : <Toolbar choices={choices} />}
                 <PortableTextEditable className="k-rich__editable" />
             </div>
         </EditorProvider>

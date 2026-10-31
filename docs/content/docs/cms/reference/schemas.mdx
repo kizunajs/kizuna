@@ -12,6 +12,7 @@ From `@kizunajs/cms/schemas`:
 | `croppedImage({ crops: { wide, tall } })` | Media id, alt text, a crop per name, focal point      | The same, with `crops.wide` and `crops.tall` as `{ url, width, height }` |
 | `FileSchema`                              | Media id, a label                                     | `{ id, url, label, size }`                                               |
 | `RichTextSchema`                          | Portable Text                                         | Portable Text, for `<RichText>`                                          |
+| `richText({ blocks: [...] })`             | Portable Text with those blocks between paragraphs    | The same, with each block's images resolved                              |
 | `SiteSchema`                              | A site's built-in shape, to `extend`                  |                                                                          |
 
 `Output<T>` is a block's or field's type with images resolved. `richTextFromPlain(text)` turns a string into rich text, for a `migrate` step.

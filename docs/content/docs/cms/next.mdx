@@ -84,6 +84,8 @@ import { RichText } from '@kizunajs/cms/next';
 />;
 ```
 
+A field made with `richText({ blocks })` names a component for each of its [blocks](/docs/cms/rich-text#blocks-in-the-text) under `blocks`.
+
 ## Caching
 
 A published read runs inside Next's cache, tagged with what it read: the page, the global, the item, or the collection for a list. Publishing revalidates those tags in process, including every page that references a published item. The cache key names the definition's latest `migrate` step, so after a [shape change](/docs/cms/changing-the-shape) a read misses what was cached before it and migrates afresh. `nextAdapter()` on the config is what connects the reader to Next's cache, draft mode and `notFound()`.

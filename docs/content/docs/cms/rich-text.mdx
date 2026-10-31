@@ -16,6 +16,71 @@ import { RichTextSchema } from '@kizunajs/cms/schemas';
 
 It stores [Portable Text](https://www.portabletext.org), structured JSON that never holds HTML: paragraphs, three levels of heading, quotes, lists, bold, italic, code, underline, links and images. Links go to `https://`, `http://`, `mailto:`, `tel:`, a path on the site or an `#anchor`, so a `javascript:` link fails the schema.
 
+## Blocks in the text
+
+`richText()` lets a rich text field hold blocks between its paragraphs, like a card for an article in a newsletter. Each block is one made with [`defineBlock`](/docs/cms/blocks):
+
+```ts title="src/cms/blocks.ts"
+import { defineBlock } from '@kizunajs/cms';
+import { ArticleId } from './content';
+
+export const ArticleBlockSchema = defineBlock({
+    name: 'article',
+    label: 'Article',
+    description: 'A card for one article from the journal.',
+    fields: [
+        {
+            name: 'article',
+            schema: ArticleId,
+        },
+    ],
+});
+```
+
+Name the blocks the field accepts:
+
+```ts title="src/cms/content.ts"
+import { richText } from '@kizunajs/cms/schemas';
+import { ArticleBlockSchema, ProductBlockSchema } from './blocks';
+
+{
+    name: 'body',
+    schema: richText({
+        blocks: [ArticleBlockSchema, ProductBlockSchema],
+    }),
+},
+```
+
+A block sits in the text as a node of its own, with its name under `_type`, a `_key`, and its fields beside them. A field that picks an article or a product stores its id, and the page fetches what it shows of it:
+
+```json
+{
+    "_type": "article",
+    "_key": "k3f9a2c1e8b7",
+    "article": "art_3f2a9c1e8b7d4a5f6c0e1d2b"
+}
+```
+
+Editors insert a block from the toolbar, beside Image. With one block it is a button of its own, and with several, a picker of every block by label and description. The block shows its fields in the text, and its `…` menu moves it up or down, or removes it. The agent reads the same blocks off the field, and writes each node with its `_type`, `_key` and fields. Each node is checked against its block's fields, and one naming a block the field does not hold is refused.
+
+`RichText` takes a component for each block, keyed by its name, and hands it the block's fields:
+
+```tsx title="src/app/newsletters/[id]/page.tsx"
+import { RichText } from '@kizunajs/cms/next';
+
+<RichText
+    value={newsletter.body}
+    blocks={{
+        article: (props) => <ArticleCard id={props.article} />,
+        product: (props) => <ProductRow ids={props.products} />,
+    }}
+/>;
+```
+
+The value's type lists every block the field holds, so `blocks` names a component for each, and a block added to the field fails to compile until it has one.
+
+A block saves with the field that holds it, so it gives none of its fields `auth` or `readOnly`. Its name can't be `block`, `span`, `link` or `image`, which rich text keeps for its own nodes.
+
 ## Images
 
 `ImageSchema` stores the media id with this use's alt text, crop and focal point, so one photo can be cropped differently on every page:

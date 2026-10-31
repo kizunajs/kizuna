@@ -1630,7 +1630,7 @@ function ObjectControl(props: ControlProps) {
  * One item of a list of blocks, open: its block's fields in order, each with
  * the label and help its block gives it.
  */
-function BlockFields({ described, ...props }: ControlProps & { described: DescribedBlock | undefined }) {
+export function BlockFields({ described, ...props }: ControlProps & { described: DescribedBlock | undefined }) {
     const base = useId();
     const required = props.schema.required ?? [];
     const item = (props.value ?? {}) as Record<string, unknown>;
@@ -1681,7 +1681,7 @@ const SEARCHED_FROM = 6;
  * The sheet Add opens on a list of blocks: every block it may hold, by label
  * and description, with a search once there are more than a few.
  */
-function BlockPicker({
+export function BlockPicker({
     open,
     onOpenChange,
     noun,

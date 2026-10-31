@@ -2847,7 +2847,7 @@ export class CmsService {
             const description = [
                 field.description,
                 brand === undefined ? undefined : this.brandHint(brand, isList),
-                field.blocks === undefined ? undefined : blocksHint(field.blocks),
+                blocksHint(field),
                 address,
                 field.condition === undefined ? undefined : conditionText(field.condition),
             ]
