@@ -551,6 +551,9 @@ importers:
       '@kizunajs/next':
         specifier: workspace:*
         version: link:../../../../packages/next
+      '@kizunajs/resend':
+        specifier: workspace:*
+        version: link:../../../../packages/resend
       ai:
         specifier: ^7.0.156
         version: 7.0.156(zod@4.3.6)
@@ -563,6 +566,12 @@ importers:
       postgres:
         specifier: ^3.4.9
         version: 3.4.9
+      react:
+        specifier: 'catalog:'
+        version: 19.2.8
+      resend:
+        specifier: ^6.30.0
+        version: 6.30.0
     devDependencies:
       '@kizunajs/cli':
         specifier: workspace:*
@@ -573,6 +582,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.2
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
       kizunajs:
         specifier: workspace:*
         version: link:../../../../packages/core

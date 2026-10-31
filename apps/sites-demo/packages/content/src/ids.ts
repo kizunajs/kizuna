@@ -20,3 +20,8 @@ export const EventId = Kizuna.brand('EventId', z.string());
  * A post in Hagen's journal, an item of the shared articles collection.
  */
 export const ArticleId = Kizuna.brand('ArticleId', z.string());
+
+/**
+ * An issue of Hagen's newsletter, an item of the shared newsletters collection.
+ */
+export const NewsletterId = Kizuna.brand('NewsletterId', z.string());

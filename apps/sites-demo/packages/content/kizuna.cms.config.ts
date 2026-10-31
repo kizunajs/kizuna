@@ -2,12 +2,14 @@ import { anthropic } from '@ai-sdk/anthropic';
 import { defineConfig } from 'kizunajs';
 import { nextAdapter } from '@kizunajs/next';
 import { mcpPlugin } from '@kizunajs/mcp';
+import { resendPlugin } from '@kizunajs/resend';
 import { cms } from '@kizunajs/cms';
 import { fetchClient, fetchIds } from '@kizunajs/fetch';
 import { editor } from './src/identities';
 import { Employees } from './src/employees';
 import { Offices } from './src/offices';
 import { Articles } from './src/articles';
+import { Newsletters } from './src/newsletters';
 import { PrivacyPolicy } from './src/privacy-policy';
 import { sites } from './src/sites';
 import { db } from './src/db';
@@ -16,6 +18,7 @@ import { localMediaStorage } from './src/media-storage';
 import { auth } from './src/auth';
 import { dashboard, overview } from './src/dashboard';
 import { partner, partners } from './src/partners';
+import { OUTBOX_API_KEY, outboxUrl } from './src/outbox';
 
 /**
  * The site this deployment shows. The setup script names none, and reads as the group.
@@ -52,7 +55,7 @@ export default defineConfig({
                       model: anthropic('claude-sonnet-5-5'),
                   },
               }),
-        collections: [Employees, Offices, Articles],
+        collections: [Employees, Offices, Articles, Newsletters],
         globals: [PrivacyPolicy],
         sites,
         partners,
@@ -115,6 +118,22 @@ export default defineConfig({
     plugins: [
         mcpPlugin({
             name: 'Hagen content',
+        }),
+        resendPlugin({
+            apiKey: process.env.RESEND_API_KEY ?? OUTBOX_API_KEY,
+            from: 'Hagen <news@hagen.example.com>',
+            lists: {
+                weekly: {
+                    segmentId: process.env.RESEND_WEEKLY_SEGMENT_ID ?? 'seg_weekly',
+                },
+            },
+            ...(process.env.RESEND_API_KEY === undefined
+                ? {
+                      resend: {
+                          baseUrl: outboxUrl(current.url),
+                      },
+                  }
+                : {}),
         }),
     ],
 });

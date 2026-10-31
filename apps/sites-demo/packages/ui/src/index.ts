@@ -7,3 +7,4 @@ export { OfficeList } from './OfficeList';
 export { EventList, type Event } from './EventList';
 export { ArticleList, type Article } from './ArticleList';
 export { CmsImage, type Image } from './Image';
+export { EmailPreview } from './EmailPreview';
