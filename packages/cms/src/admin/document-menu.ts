@@ -7,7 +7,7 @@ import type { VersionSummary } from './history.js';
  */
 export type MenuEntry =
     | {
-          kind: 'ask' | 'unpublish' | 'duplicate' | 'delete';
+          kind: 'ask' | 'withdraw' | 'cancelSchedule' | 'addToRelease' | 'unpublish' | 'duplicate' | 'delete';
           label: string;
       }
     | {
@@ -18,8 +18,10 @@ export type MenuEntry =
 
 /**
  * What the `…` menu offers a document: asking for a review when someone else
- * edits, unpublishing what is live, duplicating an item, the collection's own
- * actions, and deleting the item last.
+ * edits, or withdrawing the request while it waits, taking back its schedule
+ * or adding its draft to a release, unpublishing what is
+ * live, duplicating an item, the collection's own actions, and deleting the
+ * item last.
  */
 export const menuEntriesOf = (input: {
     kind: 'page' | 'global' | 'item';
@@ -28,10 +30,25 @@ export const menuEntriesOf = (input: {
      * Whether someone besides the person edits, so a review has someone to ask.
      */
     askable: boolean;
+    /**
+     * Whether the person asked for a review that still waits, so they may
+     * take it back.
+     */
+    withdrawable?: boolean;
+    /**
+     * Whether the document is scheduled on its own or with a release, which
+     * the menu offers to take back.
+     */
+    scheduled?: 'own' | 'release';
     actions: readonly AvailableAction[] | undefined;
 }): MenuEntry[] => {
     const entries: MenuEntry[] = [];
-    if (input.askable) {
+    if (input.withdrawable === true) {
+        entries.push({
+            kind: 'withdraw',
+            label: 'Withdraw request',
+        });
+    } else if (input.askable) {
         entries.push({
             kind: 'ask',
             label: 'Ask for review',

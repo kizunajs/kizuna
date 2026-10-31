@@ -39,9 +39,22 @@ import { NoAccess, NotFound, shownAddress, type Way } from './states.js';
 import { relativeTimeOf } from './time.js';
 import { AdminPreview } from './preview-pane.js';
 import { AskForReview } from './review-ask.js';
-import { CommentLinks, FieldComments } from './review-comments.js';
-import { DecisionCard, PeopleFact, RequestChanges, ReviewScreen, type ViewedChange } from './review-screen.js';
-import { askAgainLabelOf, askAgainOf, gateNoteOf, mayUndoApproval, mayWithdraw, reviewStatusPartsOf, waitsForMe } from './review-state.js';
+import { ChangesScreen, SendBack, SentBackNotes, type ViewedChange } from './review-changes.js';
+import { PeopleFact } from './review-screen.js';
+import {
+    approvalOf,
+    askAgainLabelOf,
+    askAgainOf,
+    askedLineOf,
+    dottedFieldsOf,
+    gateNoteOf,
+    mayUndoApproval,
+    mayWithdraw,
+    reviewStatusPartsOf,
+    reviewsIt,
+    sentBackOf,
+    waitsForMe,
+} from './review-state.js';
 import { sectionLabelOf } from './sections.js';
 import { ownValueCount, setsOwnValue, siteValuesRefOf } from './site-view.js';
 import { useOfferUndo } from './toasts.js';
@@ -62,15 +75,6 @@ const TRANSLATING_ALL = '*';
  */
 let translateOnOpen: string | undefined;
 
-const NAMES = new Intl.ListFormat('en', {
-    type: 'conjunction',
-});
-
-/**
- * Names as a sentence lists them: "Nils", "Nils and Kari".
- */
-const listOfNames = (names: readonly string[]): string => NAMES.format(names);
-
 /**
  * How often the screen checks whether someone else, or a model, changed the
  * draft it shows.
@@ -87,7 +91,7 @@ const CHANGED_MS = 4000;
  */
 const POINTED_MS = 1600;
 
-type DocumentView = 'edit' | 'versions' | 'review';
+type DocumentView = 'edit' | 'versions' | 'changes';
 
 /**
  * Where a document stands, as the header's line says it.
@@ -292,8 +296,6 @@ export function DocumentScreen({
     const [drafts, setDrafts] = useState<Record<string, unknown>>({});
     const [outcomes, setOutcomes] = useState<Record<string, Outcome>>({});
     const [revision, setRevision] = useState(0);
-    // The field whose review comments the person is replying to on the Edit tab.
-    const [replyingOn, setReplyingOn] = useState<string | undefined>();
     const [draftChanges, setDraftChanges] = useState<{ changes: Changes; views: ViewedChange[] } | undefined>();
     // The document the screen last opened, so a review waiting for the person opens on its tab once.
     const opened = useRef<string | undefined>(undefined);
@@ -366,11 +368,11 @@ export function DocumentScreen({
         setHeldBy(null);
     }, [describe, documentRef]);
 
-    // A review waiting for the person opens the document on its Review tab.
+    // A review waiting for the person opens the document on its Changes tab.
     useEffect(() => {
         if (document === undefined || people === undefined || opened.current === document.ref) return;
         opened.current = document.ref;
-        if (waitsForMe(document.review, people.me)) setView('review');
+        if (waitsForMe(document.review, people.me)) setView('changes');
     }, [document, people]);
 
     // Picks up what a model, or another editor, saves while this one is open.
@@ -443,7 +445,7 @@ export function DocumentScreen({
         };
     }, [connection, documentRef, documentVersion]);
 
-    // What the draft changes from what is live, for the Review tab and the request.
+    // What the draft changes from what is live, for the Changes tab, the dots on the fields, and the request.
     const reviewKey = `${document?.review?.id ?? ''}:${document?.review?.status ?? ''}`;
     useEffect(() => {
         const tools = toolsFor(documentRef);
@@ -744,12 +746,46 @@ export function DocumentScreen({
     };
 
     /**
-     * Says who was just asked for a review, with Withdraw, which takes the
+     * Approves the review waiting for the person and publishes the draft in
+     * the same step.
+     */
+    const approveAndPublish = async (): Promise<void> => {
+        const current = latest.current;
+        if (current?.review === null || current?.review === undefined) return;
+        setDeciding(true);
+        setLinkProblem(undefined);
+        // The person answered in the header, so the route runs without asking again.
+        const answer = await connection.call(
+            'editing_reviews_approve_and_publish',
+            {
+                params: {
+                    id: current.review.id,
+                },
+            },
+            {
+                approved: true,
+            }
+        );
+        setDeciding(false);
+        if (answer.status !== 200) {
+            setLinkProblem(problemOf(answer, 'It was not approved and published'));
+            return;
+        }
+        onReviewsChanged();
+        setView('edit');
+        await describe(current.ref, {
+            remount: false,
+        });
+        void reportRefreshes(current.ref);
+    };
+
+    /**
+     * Says who was just asked for a review, with Undo, which takes the
      * request back.
      */
     const confirmAsked = (asked: AskedReview): void => {
         const id: string = toasts.add({
-            description: asked.names.length === 0 ? 'Asked for review' : `Asked ${listOfNames(asked.names)} for review`,
+            description: askedLineOf(asked.names),
             ...(asked.ids.length === 0
                 ? {}
                 : {
@@ -1126,14 +1162,14 @@ export function DocumentScreen({
 
     const title = loadedTitle ?? '';
     const me = people?.me;
-    // A review that went away, once its draft was published, takes its tab with it.
-    const shownView: DocumentView = view === 'review' && document.review === null ? 'edit' : view;
+    // Whoever was asked to review it, or answered, reads the changes on their own tab, which goes once the draft is published.
+    const reviewing = reviewsIt(document.review, me);
+    const shownView: DocumentView = view === 'changes' && !reviewing ? 'edit' : view;
     const comparing = shownView === 'versions' && compared !== undefined;
-    const answering = shownView === 'review' && waitsForMe(document.review, me);
+    // A review waiting for the person is answered from the header on every tab, in Publish's place.
+    const answering = waitsForMe(document.review, me);
     const sentBackBy = askAgainOf(document.review, me);
-    // Someone asked to review it, or who answered, opens the changes from Review beside Publish.
-    const reviewer =
-        document.review !== null && (document.review.reviewers.some((person) => person.id === me) || document.review.decidedBy?.id === me);
+    const approval = approvalOf(document.status, versions);
     // The reviewer who sent it back already knows what Publish waits for.
     const gateNote = document.review?.decidedBy?.id === me ? undefined : gateNoteOf(document.requireReview, document.review);
     const canPublishPast = draftChanges?.changes.canPublishPastReview ?? false;
@@ -1252,9 +1288,11 @@ export function DocumentScreen({
                 void form.current?.flush().then(() => setAskOpen(true));
             }}
             onChanged={() =>
+            withdrawable={mayWithdraw(document.review, me)}
                 void describe(document.ref, {
                     remount: false,
                 })
+            onWithdraw={() => void changeReview('withdraw')}
             }
             onProblem={setLinkProblem}
         />
@@ -1278,7 +1316,7 @@ export function DocumentScreen({
         holder !== undefined ||
         (blocker !== undefined && waiting.length === 0);
     const saveDraftOffered =
-        normalHeader && shownView !== 'review' && saveProblem === undefined && (saveState === 'pending' || filled.size > 0);
+        normalHeader && shownView !== 'changes' && saveProblem === undefined && (saveState === 'pending' || filled.size > 0);
     offered.current = () => {
         const actions: PaletteAction[] = [];
         if (publishShown && !publishDisabled && blocker === undefined) {
@@ -1302,6 +1340,7 @@ export function DocumentScreen({
         });
         const ask = entries.find((entry) => entry.kind === 'ask');
         if (ask !== undefined) {
+            withdrawable: mayWithdraw(document.review, me),
             actions.push({
                 label: ask.label,
                 run: () => moreMenu.current?.choose(ask),
@@ -1328,17 +1367,21 @@ export function DocumentScreen({
     const ownSite = parseRef(document.ref)?.site;
     // The path bar names the site or Shared already, so the fact shows only for a site's document opened from Overview.
     const siteFact = ownSite !== undefined && addressSite() === undefined ? <SiteFact site={siteOf(ownSite)} /> : undefined;
-    // The note of whoever sent the draft back, and the open comments, at the top of the sidebar while the changes are made.
-    const sentBackNote = document.review?.status === 'changes' && document.review.decisionNote !== null;
-    const openComments = document.review?.comments.some((comment) => comment.resolvedAt === null) ?? false;
-    const reviewAside =
-        document.review !== null && (sentBackNote || openComments) ? (
-            <section className="k-review-aside" aria-label="Review">
-                <h2 className="k-review-screen__heading">Review</h2>
-                {sentBackNote ? <DecisionCard review={document.review} me={me} now={now} /> : null}
-                <CommentLinks review={document.review} labelOf={fieldLabelOf} me={me} now={now} onShow={(path) => setPointed(path)} />
-            </section>
-        ) : undefined;
+    // What the reviewer sent back, once, at the top of the form while the changes are made.
+    const sentBack = sentBackOf(document.review, me);
+    const sentBackNotes =
+        sentBack === undefined || document.review === null ? undefined : (
+            <SentBackNotes
+                review={document.review}
+                {...sentBack}
+                labelOf={fieldLabelOf}
+                now={now}
+                connection={connection}
+                onShow={(path) => setPointed(path)}
+                onReviewChanged={reviewChanged}
+            />
+        );
+    const dotted = dottedFieldsOf(document.review, draftChanges?.views);
 
     const locales = document.locale;
     const inTranslation = locales !== undefined && locales.current !== locales.source;
@@ -1483,9 +1526,16 @@ export function DocumentScreen({
                                               <PeopleFact {...reviewStatusPartsOf(document.review, me)} />
                                           ),
                                   },
-                                  shownView === 'review' && document.review !== null
+                                  scheduleFactOf({
+                                      schedule: document.schedule,
+                                      review: document.review,
+                                      requireReview: document.requireReview,
+                                      by: people?.people.find((person) => person.id === document.schedule?.by),
+                                      now,
+                                  }),
+                                  answering && document.review !== null
                                       ? {
-                                            label: 'Requested',
+                                            label: 'Asked',
                                             value: (
                                                 <PeopleFact
                                                     lead={`${relativeTimeOf(document.review.createdAt, now)} by`}
@@ -1493,20 +1543,32 @@ export function DocumentScreen({
                                                 />
                                             ),
                                         }
-                                      : updatedAt === null
-                                        ? null
-                                        : {
-                                              label: 'Updated',
-                                              value:
-                                                  updatedByPerson === undefined ? (
-                                                      relativeTimeOf(updatedAt, now)
-                                                  ) : (
-                                                      <PeopleFact
-                                                          lead={`${relativeTimeOf(updatedAt, now)} by`}
-                                                          people={[updatedByPerson]}
-                                                      />
-                                                  ),
-                                          },
+                                      : mayWithdraw(document.review, me)
+                                        ? {
+                                              label: 'Asked',
+                                              value: relativeTimeOf(document.review.createdAt, now),
+                                          }
+                                        : approval !== undefined
+                                          ? {
+                                                label: 'Approved',
+                                                value: (
+                                                    <PeopleFact lead={`${relativeTimeOf(approval.at, now)} by`} people={[approval.by]} />
+                                                ),
+                                            }
+                                          : updatedAt === null
+                                            ? null
+                                            : {
+                                                  label: 'Updated',
+                                                  value:
+                                                      updatedByPerson === undefined ? (
+                                                          relativeTimeOf(updatedAt, now)
+                                                      ) : (
+                                                          <PeopleFact
+                                                              lead={`${relativeTimeOf(updatedAt, now)} by`}
+                                                              people={[updatedByPerson]}
+                                                          />
+                                                      ),
+                                              },
                                   document.usedOn.everywhere
                                       ? {
                                             label: 'Shows on',
@@ -1540,6 +1602,14 @@ export function DocumentScreen({
                                         Versions
                                         {versions === undefined || versions.length === 0 ? null : (
                                             <span className="k-tab__count">{versions.length}</span>
+                                    {reviewing ? (
+                                        <Tabs.Tab value="changes" className="k-tab">
+                                            Changes
+                                            {draftChanges === undefined || draftChanges.views.length === 0 ? null : (
+                                                <span className="k-tab__count">{draftChanges.views.length}</span>
+                                            )}
+                                        </Tabs.Tab>
+                                    ) : null}
                                         )}
                                     </Tabs.Tab>
                                 </Tabs.List>
@@ -1644,15 +1714,6 @@ export function DocumentScreen({
                                         {askAgainLabelOf(sentBackBy)}
                                     </button>
                                 )}
-                                {mayWithdraw(document.review, me) ? (
-                                    <button
-                                        type="button"
-                                        className="k-button k-button--secondary"
-                                        disabled={deciding}
-                                        onClick={() => void changeReview('withdraw')}>
-                                        Withdraw request
-                                    </button>
-                                ) : null}
                                 {mayUndoApproval(document.review, me) ? (
                                     <button
                                         type="button"
@@ -1764,19 +1825,22 @@ export function DocumentScreen({
                             locales={document.locale}
                             showSource={showSource}
                             onTranslate={document.locale?.translate === true ? (field) => void translateField(field.path) : undefined}
-                            labelAfter={(field) =>
-                                field.parent !== undefined || field.sourceChanged !== true || filled.has(field.path) ? null : (
-                                    <button
-                                        type="button"
-                                        className="k-source-dot"
-                                        aria-label="Source changed"
-                                        aria-expanded={openChange === field.path}
-                                        onClick={() => setOpenChange(openChange === field.path ? undefined : field.path)}
-                                    />
-                                )
-                            }
+                            labelAfter={(field) => (
+                                <>
+                                    {dotted.has(field.path) ? <span className="k-review-dot" role="img" aria-label="Changed" /> : null}
+                                    {field.parent !== undefined || field.sourceChanged !== true || filled.has(field.path) ? null : (
+                                        <button
+                                            type="button"
+                                            className="k-source-dot"
+                                            aria-label="Source changed"
+                                            aria-expanded={openChange === field.path}
+                                            onClick={() => setOpenChange(openChange === field.path ? undefined : field.path)}
+                                        />
+                                    )}
+                                </>
+                            )}
                             translating={translating}
-                            aside={reviewAside}
+                            before={sentBackNotes}
                             controlFor={(field, input) =>
                                 showsOn !== undefined && field.path === 'showsOn' ? <ShowsOn sites={showsOn} input={input} /> : undefined
                             }
@@ -1819,19 +1883,6 @@ export function DocumentScreen({
                                             Use shared
                                         </button>
                                     ) : null}
-                                    {document.review === null ? null : (
-                                        <FieldComments
-                                            review={document.review}
-                                            path={field.path}
-                                            label={fieldLabelOf(field.path)}
-                                            me={me}
-                                            now={now}
-                                            connection={connection}
-                                            composing={replyingOn === field.path}
-                                            onComposingChange={(next) => setReplyingOn(next ? field.path : undefined)}
-                                            onChanged={reviewChanged}
-                                        />
-                                    )}
                                 </>
                             )}
                         />
@@ -1864,9 +1915,9 @@ export function DocumentScreen({
                         onOpen={() => setView('edit')}
                     />
                 </Tabs.Panel>
-                {document.review === null ? null : (
-                    <Tabs.Panel value="review" className="k-document__review">
-                        <ReviewScreen
+                {reviewing && document.review !== null ? (
+                    <Tabs.Panel value="changes" className="k-document__changes">
+                        <ChangesScreen
                             review={document.review}
                             changes={draftChanges?.views}
                             fields={document.fields}
@@ -1888,7 +1939,6 @@ export function DocumentScreen({
                     documentRef={document.ref}
                     owner={document.owner}
                     people={people}
-                    changeCount={draftChanges?.views.length}
                     onSent={(asked) => {
                         onReviewsChanged();
                         void describe(document.ref, {

@@ -41,7 +41,49 @@ describe('menuEntriesOf', () => {
             askable: false,
             actions: undefined,
         });
-        expect(entries).toEqual([]);
+        expect(entries.map((entry) => entry.label)).toEqual(['Add to release']);
+    });
+
+    it('offers nothing for a release when the draft matches what is live', () => {
+        const entries = menuEntriesOf({
+            kind: 'page',
+            status: 'published',
+            askable: false,
+            actions: undefined,
+        });
+        expect(entries.map((entry) => entry.label)).toEqual(['Unpublish']);
+    });
+
+    it('offers to take back a schedule in place of Add to release', () => {
+        expect(
+            menuEntriesOf({
+                kind: 'page',
+                status: 'changed',
+                askable: false,
+                scheduled: 'own',
+                actions: undefined,
+            }).map((entry) => entry.label)
+        ).toEqual(['Cancel schedule', 'Unpublish']);
+        expect(
+            menuEntriesOf({
+                kind: 'page',
+                status: 'draft',
+                askable: false,
+                scheduled: 'release',
+                actions: undefined,
+            }).map((entry) => entry.label)
+        ).toEqual(['Take out of release']);
+    });
+
+    it('offers Withdraw request in place of Ask for review while the request waits', () => {
+        const entries = menuEntriesOf({
+            kind: 'page',
+            status: 'changed',
+            askable: true,
+            withdrawable: true,
+            actions: undefined,
+        });
+        expect(entries.map((entry) => entry.label)).toEqual(['Withdraw request', 'Add to release', 'Unpublish']);
     });
 });
 

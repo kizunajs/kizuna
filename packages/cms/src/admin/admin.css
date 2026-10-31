@@ -4319,8 +4319,7 @@
         margin: 2px 0 0;
     }
 
-    /* The Review tab and a comparison: the changes in the main column, and a column of their own beside them. */
-    .k-review-screen,
+    /* A comparison: the changes in the main column, and a column of their own beside them. */
     .k-compare-view {
         display: flex;
         flex: 1;
@@ -4328,7 +4327,6 @@
         min-width: 0;
     }
 
-    .k-review-screen__changes,
     .k-compare-view__main {
         display: flex;
         flex: 999 1 560px;
@@ -4342,7 +4340,6 @@
         padding-top: 20px;
     }
 
-    .k-review-screen__aside,
     .k-compare-view__aside {
         display: flex;
         flex: 1 0 400px;
@@ -4358,12 +4355,6 @@
         padding-top: 24px;
     }
 
-    .k-review-screen__block {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
     .k-review-screen__heading {
         margin: 0;
         font-size: 13px;
@@ -4371,45 +4362,55 @@
         line-height: 18px;
     }
 
-    .k-review-card {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        padding: 14px 16px;
-        border-radius: var(--k-radius-card);
-        background: var(--k-surface);
-        box-shadow: var(--k-elevation);
-    }
-
-    .k-review-card__head {
-        display: flex;
+    /* Comment beside a change on the Changes tab. */
+    .k-comment-toggle {
+        display: inline-flex;
+        flex-shrink: 0;
         align-items: center;
         gap: 8px;
         min-width: 0;
     }
 
-    .k-review-card__title {
-        flex: 1;
-        min-width: 0;
-        font-size: 13px;
-        font-weight: 500;
+    .k-comment-toggle:hover {
+        background: var(--k-control);
+        color: var(--k-ink);
     }
 
-    .k-review-card__when {
-        flex-shrink: 0;
-        font-size: 12px;
-        color: var(--k-muted);
+    /* The comments under a change, in plain type: a face, who and when, what they said, and Resolve and Reply. */
+    .k-comments {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 14px;
+        padding-top: 6px;
     }
 
-    .k-review-card__text {
-        margin: 0;
+    .k-comment,
+    .k-review-note {
+        display: grid;
+        grid-template-columns: 22px minmax(0, 1fr);
+        align-items: center;
+        align-self: stretch;
+        gap: 2px 10px;
         font-size: 13.5px;
         line-height: 1.55;
         overflow-wrap: anywhere;
         white-space: pre-wrap;
     }
 
-    .k-review-screen__reviewer {
+    .k-comment__actions {
+        display: flex;
+        gap: 16px;
+        margin-top: 2px;
+    }
+
+    .k-comment__resolved {
+        margin: 0;
+        font-size: 12px;
+        color: var(--k-muted);
+    }
+
+    .k-comment-composer {
         display: flex;
         align-items: center;
         gap: 10px;
@@ -4420,7 +4421,12 @@
         box-shadow: var(--k-elevation);
     }
 
-    .k-review-screen__name {
+    .k-comment-composer__space {
+        flex: none;
+        width: 22px;
+    }
+
+    .k-comment-composer__input.k-textarea {
         flex: 1;
         min-width: 0;
         overflow: hidden;
@@ -4429,13 +4435,53 @@
         white-space: nowrap;
     }
 
-    .k-review-screen__verdict {
-        flex-shrink: 0;
-        font-size: 12.5px;
-        color: var(--k-muted);
+    /* A note on a review: the face a little larger, and what they said in body type. */
+    .k-review-note {
+        grid-template-columns: 26px minmax(0, 1fr);
+        gap: 4px 12px;
+        max-width: 720px;
     }
 
-    .k-review-screen__facts {
+    .k-review-note__text {
+        font-size: 14px;
+    }
+
+    /* The Changes tab: the note from whoever asked, then each changed field, locked, live over draft. */
+    .k-document__changes {
+        display: flex;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .k-review-changes {
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+        width: 100%;
+        max-width: 720px;
+        padding: 28px var(--k-gutter) 64px;
+    }
+
+    .k-review-change {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .k-review-change__head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 28px;
+    }
+
+    .k-review-change__label {
+        font-size: 13.5px;
+        font-weight: 500;
+    }
+
+    .k-review-change__value.k-read-only {
+        position: relative;
         display: grid;
         grid-template-columns: auto minmax(0, 1fr);
         gap: 10px 16px;
@@ -4443,32 +4489,49 @@
         font-size: 13px;
     }
 
-    .k-review-screen__facts dt {
+    .k-review-change__value[data-unchanged] {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .k-review-change__lead {
         color: var(--k-muted);
     }
 
-    .k-review-screen__facts dd {
-        justify-self: end;
-        margin: 0;
-        font-variant-numeric: tabular-nums;
-        text-align: right;
+    .k-review-change__before,
+    .k-review-change__same {
+        min-width: 0;
+        color: var(--k-muted);
     }
 
-    .k-review-screen__open {
-        justify-content: center;
-        gap: 7px;
-        font-weight: 500;
+    .k-review-change__after {
+        min-width: 0;
+        color: var(--k-ink);
     }
 
-    /* The reviewer's note at the top of the sidebar while the changes are made. */
-    .k-review-aside {
+    .k-review-change__value .k-diff__prose {
+        line-height: 22px;
+    }
+
+    .k-review-change__value .k-diff__thumb {
+        flex-basis: 56px;
+        width: 56px;
+        height: 38px;
+        border-radius: 6px;
+    }
+
+    .k-review-change__lock {
+        position: absolute;
+        top: 13px;
+        right: 12px;
+    }
+
+    .k-review-change-unchanged {
         display: flex;
         flex-direction: column;
         gap: 10px;
     }
 
-    /* Comment beside a change, and the quiet buttons under a comment. */
-    .k-comment-toggle {
+    .k-review-change-unchanged__toggle {
         display: inline-flex;
         flex-shrink: 0;
         align-items: center;
@@ -4485,24 +4548,28 @@
         cursor: pointer;
     }
 
-    .k-comment-toggle:hover {
-        background: var(--k-control);
+    .k-review-change-unchanged__toggle:hover {
         color: var(--k-ink);
     }
 
-    .k-comments {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
-        padding-top: 4px;
+    .k-review-change-unchanged__toggle[aria-expanded='false'] svg {
+        transform: rotate(-90deg);
     }
 
-    .k-comments > .k-comment-toggle {
-        margin-left: 0;
+    /* The dot after a label the draft under review changes. */
+    .k-review-dot {
+        display: inline-block;
+        flex-shrink: 0;
+        width: 6px;
+        height: 6px;
+        margin-left: 6px;
+        border-radius: 50%;
+        background: var(--k-ink);
+        vertical-align: 2px;
     }
 
-    .k-comment {
+    /* What the reviewer sent back, once at the top of the form, and each comment as the field it is on. */
+    .k-sent-back {
         display: flex;
         flex-direction: column;
         align-self: stretch;
@@ -4525,43 +4592,49 @@
         cursor: pointer;
     }
 
-    .k-comment--link:hover {
-        background: var(--k-control);
+    .k-sent-back__comments {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin: 8px 0 0;
+        padding: 0;
+        list-style: none;
     }
 
-    .k-comment__actions {
+    .k-sent-back__comment {
         display: flex;
         align-items: center;
         gap: 8px;
     }
 
-    .k-comment__actions .k-comment-toggle {
-        margin-left: 0;
-    }
-
-    .k-comment__resolved {
-        margin: 0;
-        font-size: 12px;
-        color: var(--k-muted);
-    }
-
-    .k-comment-composer {
-        display: flex;
-        flex-direction: column;
-        align-self: stretch;
-        gap: 8px;
-    }
-
-    .k-comment-composer__label {
-        font-size: 13px;
+    .k-sent-back__field {
+        padding: 0;
+        border: 0;
+        background: none;
+        font: inherit;
         font-weight: 500;
-        line-height: 18px;
+        color: var(--k-ink);
+        cursor: pointer;
     }
 
-    .k-comment-composer__actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
+    .k-sent-back__field:hover {
+        text-decoration: underline;
+    }
+
+    .k-sent-back__text {
+        flex: 1 1 240px;
+        min-width: 0;
+        color: var(--k-muted);
+        overflow-wrap: anywhere;
+    }
+
+    .k-sent-back__resolve {
+        font-size: 12.5px;
+    }
+
+    /* Field tabs lead the main column flush under the header, so the note keeps its own space above them. */
+    .k-document .k-form__main > .k-sent-back:first-child {
+        padding-top: 28px;
     }
 
     .k-versions__status {
@@ -4606,13 +4679,7 @@
         color: var(--k-ink);
     }
 
-    .k-document__review {
-        display: flex;
-        flex: 1;
-        min-width: 0;
-    }
-
-    /* Request changes: the note, in a popup under the button. */
+    /* Send back: the note, in a popup under the button. */
     .k-send-back {
         display: flex;
         flex-direction: column;
@@ -4678,6 +4745,43 @@
         padding: 20px 24px 24px;
     }
 
+    }
+
+    .k-comment[data-resolved] {
+        color: var(--k-muted);
+    }
+
+    .k-comment__head,
+    .k-review-note__head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 8px;
+        min-width: 0;
+        font-size: 13px;
+    }
+
+    .k-comment__who,
+    .k-review-note__who {
+        font-weight: 500;
+    }
+
+    .k-comment__when,
+    .k-review-note__when {
+        font-size: 12.5px;
+        color: var(--k-muted);
+    }
+
+    .k-comment__text,
+    .k-comment__actions,
+    .k-comment__resolved,
+    .k-review-note > :not(.k-avatar, .k-review-note__head) {
+        grid-column: 2;
+    }
+
+    .k-comment__text,
+    .k-review-note__text {
+        margin: 0;
     .k-ask__group {
         display: flex;
         flex-direction: column;
@@ -4891,7 +4995,6 @@
     }
 
     @media (max-width: 860px) {
-        .k-review-screen__aside,
         .k-compare-view__aside {
             flex-basis: 100%;
             padding-left: var(--k-gutter);
@@ -4910,7 +5013,6 @@
             gap: 8px;
         }
 
-        .k-review-screen__changes,
         .k-compare-view__main {
             padding: 24px var(--k-gutter) 32px;
         }
@@ -4921,3 +5023,7 @@
         }
     }
 }
+        .k-review-changes {
+            padding: 24px var(--k-gutter) 32px;
+        }
+

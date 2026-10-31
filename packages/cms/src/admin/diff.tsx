@@ -66,7 +66,7 @@ function MediaThumb({ id, alt }: { id: string; alt: string | undefined }) {
 /**
  * A value as it reads in a comparison.
  */
-function ShownValue({ shown }: { shown: Shown }): ReactNode {
+export function ShownValue({ shown }: { shown: Shown }): ReactNode {
     if (shown.kind === 'empty') return <span className="k-diff__empty">Empty</span>;
     if (shown.kind === 'image') return <MediaThumb id={shown.id} alt={shown.alt} />;
     if (shown.kind === 'text') return <span className="k-diff__text">{shown.text}</span>;
@@ -100,7 +100,7 @@ function ShownValue({ shown }: { shown: Shown }): ReactNode {
  * One side of a change: what it was, with what went struck through, or what
  * it becomes, with what came marked.
  */
-function SideOf({ view, side }: { view: ChangeView; side: Side }): ReactNode {
+export function SideOf({ view, side }: { view: ChangeView; side: Side }): ReactNode {
     if (view.kind === 'words') {
         return (
             <p className="k-diff__prose">

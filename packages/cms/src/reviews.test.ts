@@ -661,6 +661,88 @@ describe('comments on a field', () => {
 describe('storage', () => {
     it('reads a publish past a review recorded as an approval with a note as published past the review, and creates the tables again', async () => {
         await draft('ada', 'investorRelationsPage', 'Results for Q3');
+describe('approving and publishing in one step', () => {
+    const ask = async (page = 'investorRelationsPage') => {
+        await draft('ada', page, 'Results for Q3');
+        const asked = await as('ada', request(app).post('/editing/reviews')).send({
+            refs: [`page:${page}`],
+            reviewers: ['kari'],
+        });
+        return asked.body.reviews[0].id as string;
+    };
+
+    const approveAndPublish = (who: 'ada' | 'kari' | 'grace', id: string) =>
+        as(who, request(app).post(`/editing/reviews/${id}/approve-and-publish`));
+
+    it('publishes a page that requires review, and records who approved the version that went live', async () => {
+        const id = await ask();
+        const response = await approveAndPublish('kari', id);
+        expect(response.status).toBe(200);
+        expect(response.body.status).toBe('published');
+        const history = await as('ada', request(app).get('/editing/pages/investorRelationsPage/versions'));
+        const published = history.body.versions.find((version: { published: boolean }) => version.published);
+        expect(published.review).toMatchObject({
+            status: 'approved',
+            by: {
+                id: 'kari',
+                name: 'Kari Nordmann',
+            },
+        });
+        const described = await as('ada', request(app).get('/editing/describe?ref=page:investorRelationsPage'));
+        expect(described.body.review).toBeNull();
+    });
+
+    it('refuses the person who made the changes, and a review already answered, publishing nothing', async () => {
+        const id = await ask('frontPage');
+        const self = await approveAndPublish('ada', id);
+        expect(self.status).toBe(403);
+        expect(self.body.detail).toBe("You were not asked to review 'page:frontPage'.");
+        await as('kari', request(app).post('/editing/reviews/decide')).send({
+            ids: [id],
+            decision: 'requestChanges',
+            note: 'The heading needs a date',
+        });
+        const answered = await approveAndPublish('kari', id);
+        expect(answered.status).toBe(409);
+        expect(answered.body.detail).toBe("The review of 'page:frontPage' was already answered.");
+        const described = await as('ada', request(app).get('/editing/describe?ref=page:frontPage'));
+        expect(described.body.status).toBe('draft');
+        expect(described.body.review.status).toBe('changes');
+    });
+
+    it('refuses a reviewer who changed the draft themselves', async () => {
+        const id = await ask('frontPage');
+        await draft('kari', 'frontPage', 'Results for Q3, revised');
+        const response = await approveAndPublish('kari', id);
+        expect(response.status).toBe(403);
+        expect(response.body.detail).toBe("You changed 'page:frontPage' yourself, so someone else approves it.");
+    });
+
+    it('lets a role under reviews.roles answer without being asked', async () => {
+        const id = await ask();
+        expect((await approveAndPublish('grace', id)).status).toBe(200);
+    });
+
+    it('changes nothing when the draft moved past the version the reviewer saw', async () => {
+        const id = await ask();
+        const store = new DocumentStore(drizzle(pglite));
+        const outcome = await store.approveAndPublish('page', 'investorRelationsPage', {
+            review: id,
+            by: 'kari',
+            version: 0,
+        });
+        expect(outcome).toBe('changed');
+        const rows = await pglite.query<{ status: string }>('select status from cms_reviews');
+        expect(rows.rows).toEqual([
+            {
+                status: 'open',
+            },
+        ]);
+        const described = await as('ada', request(app).get('/editing/describe?ref=page:investorRelationsPage'));
+        expect(described.body.status).toBe('draft');
+    });
+});
+
         await as('ada', request(app).post('/editing/reviews')).send({
             refs: ['page:investorRelationsPage'],
             reviewers: ['kari'],

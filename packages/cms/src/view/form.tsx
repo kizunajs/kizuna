@@ -49,6 +49,10 @@ export interface FieldFormProps {
     layout: readonly DescribedLayout[];
     draft: Record<string, unknown> | null;
     onSave: (changes: Record<string, unknown>) => Promise<SaveFailure | undefined>;
+    /**
+     * A field the person changed, as it changes, before it saves.
+     */
+    onEdit?: (path: string, value: unknown) => void;
     onState: (state: SaveState) => void;
     /**
      * Fields someone else changed, marked until the person looks.
@@ -68,6 +72,10 @@ export interface FieldFormProps {
      * it, the sidebar shows even when no field does.
      */
     aside?: ReactNode;
+    /**
+     * What sits at the top of the main column, above the fields.
+     */
+    before?: ReactNode;
     /**
      * What shows under a field, like the comments a review left on it.
      */
@@ -161,6 +169,7 @@ export function FieldForm({
     missing,
     aside,
     below,
+    before,
     controlFor,
     readOnly,
     locales,
@@ -636,6 +645,7 @@ export function FieldForm({
                     <div className="k-form__fields k-stack">{shown(arranged.main, 'k-stack', section)}</div>
                 </div>
                 {hasSidebar ? (
+                    {before}
                     <aside className="k-form__sidebar k-stack" aria-label="Sidebar">
                         {aside}
                         {shown(arranged.sidebar, 'k-stack', section)}

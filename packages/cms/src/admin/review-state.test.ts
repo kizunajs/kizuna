@@ -1,15 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import type { ReviewState } from '../view/schema.js';
+import type { VersionSummary } from './history.js';
 import {
+    approvalOf,
     askAgainOf,
+    askedLineOf,
+    changeQuestionOf,
+    commenterOf,
     commentsOn,
-    draftOwnerOf,
+    dottedFieldsOf,
     gateNoteOf,
     mayUndoApproval,
     mayWithdraw,
     reviewStatusOf,
+    reviewsIt,
+    sendBackLabelOf,
+    sentBackOf,
     takesPart,
-    verdictsOf,
+    unchangedLineOf,
     waitsForMe,
 } from './review-state.js';
 
@@ -70,30 +78,8 @@ describe('where a review stands', () => {
             status: 'changes',
             decidedBy: kari,
         });
-        expect(reviewStatusOf(sentBack, grace.id)).toBe('Changes requested by Kari Nordmann');
-        expect(reviewStatusOf(sentBack, kari.id)).toBe('Changes requested');
-    });
-
-    it('lists each reviewer with their answer', () => {
-        expect(verdictsOf(review(), kari.id)).toEqual([
-            {
-                person: kari,
-                you: true,
-                verdict: 'Not reviewed',
-            },
-        ]);
-        expect(
-            verdictsOf(
-                review({
-                    status: 'changes',
-                    decidedBy: ola,
-                }),
-                grace.id
-            ).map((entry) => [entry.person.name, entry.verdict])
-        ).toEqual([
-            ['Kari Nordmann', ''],
-            ['Ola Berg', 'Asked for changes'],
-        ]);
+        expect(reviewStatusOf(sentBack, grace.id)).toBe('Sent back by Kari Nordmann');
+        expect(reviewStatusOf(sentBack, kari.id)).toBe('Sent back by you');
     });
 
     it('asks again whoever sent the draft back, unless it was you', () => {
@@ -129,9 +115,132 @@ describe('where a review stands', () => {
         ).toBeUndefined();
     });
 
-    it('names whose draft it is', () => {
-        expect(draftOwnerOf(review(), kari.id)).toBe('Grace’s draft');
-        expect(draftOwnerOf(review(), grace.id)).toBe('Your draft');
+    it('asks the reviewer what the person who asked should change, by their full name', () => {
+        expect(changeQuestionOf(review())).toBe('What should Grace Hopper change?');
+        expect(sendBackLabelOf(review())).toBe('Send to Grace Hopper');
+    });
+
+    it('opens the changes for whoever was asked or answered', () => {
+        expect(reviewsIt(review(), kari.id)).toBe(true);
+        expect(reviewsIt(review(), grace.id)).toBe(false);
+        expect(
+            reviewsIt(
+                review({
+                    status: 'approved',
+                    decidedBy: ola,
+                }),
+                ola.id
+            )
+        ).toBe(true);
+        expect(reviewsIt(null, kari.id)).toBe(false);
+    });
+});
+
+describe('the changes on the Edit tab', () => {
+    const changes = [
+        {
+            path: 'heading',
+        },
+        {
+            path: 'intro',
+        },
+    ];
+
+    it('marks the changed fields while a review is under way', () => {
+        expect([...dottedFieldsOf(review(), changes)]).toEqual(['heading', 'intro']);
+        expect(dottedFieldsOf(null, changes).size).toBe(0);
+        expect(dottedFieldsOf(review(), undefined).size).toBe(0);
+    });
+
+    it('folds the fields the draft leaves alone into one line', () => {
+        expect(unchangedLineOf(['Button'])).toBe('Button, unchanged');
+        expect(unchangedLineOf(['Button', 'Delivery note'])).toBe('Button and Delivery note, unchanged');
+    });
+});
+
+describe('the person who asked', () => {
+    it('hears who was asked', () => {
+        expect(askedLineOf(['Nils Aas'])).toBe('Asked Nils Aas to review');
+        expect(askedLineOf(['Nils Aas', 'Kari Nordmann'])).toBe('Asked Nils Aas and Kari Nordmann to review');
+        expect(askedLineOf([])).toBe('Asked for review');
+    });
+
+    it('reads what the reviewer sent back, with the open comments, once', () => {
+        const comment = {
+            id: 'comment-1',
+            path: 'intro',
+            text: 'Say all three towns once Trondheim opens',
+            by: kari,
+            createdAt: '2026-10-29T10:05:00.000Z',
+            resolvedBy: null,
+            resolvedAt: null,
+        };
+        const sentBack = review({
+            status: 'changes',
+            decidedBy: kari,
+            decisionNote: 'The intro promises delivery too early.',
+            decidedAt: '2026-10-29T10:06:00.000Z',
+            comments: [
+                comment,
+                {
+                    ...comment,
+                    id: 'comment-2',
+                    resolvedBy: grace,
+                    resolvedAt: '2026-10-29T10:10:00.000Z',
+                },
+            ],
+        });
+        expect(sentBackOf(sentBack, grace.id)).toEqual({
+            by: kari,
+            at: '2026-10-29T10:06:00.000Z',
+            note: 'The intro promises delivery too early.',
+            comments: [comment],
+        });
+        expect(sentBackOf(sentBack, kari.id)).toBeUndefined();
+        expect(sentBackOf(review(), grace.id)).toBeUndefined();
+    });
+
+    it('says who approved the version that went live', () => {
+        const versions: VersionSummary[] = [
+            {
+                version: 2,
+                summary: null,
+                createdAt: '2026-10-29T10:00:00.000Z',
+                createdBy: grace.id,
+                published: true,
+                review: {
+                    status: 'approved',
+                    by: kari,
+                    at: '2026-10-29T10:20:00.000Z',
+                },
+            },
+            {
+                version: 1,
+                summary: null,
+                createdAt: '2026-10-28T10:00:00.000Z',
+                createdBy: grace.id,
+                published: false,
+                review: null,
+            },
+        ];
+        expect(approvalOf('published', versions)).toEqual({
+            by: kari,
+            at: '2026-10-29T10:20:00.000Z',
+        });
+        expect(approvalOf('changed', versions)).toBeUndefined();
+        expect(
+            approvalOf('published', [
+                {
+                    ...versions[0]!,
+                    review: {
+                        status: 'published-past-review',
+                        by: grace,
+                        at: '2026-10-29T10:20:00.000Z',
+                    },
+                },
+            ])
+        ).toBeUndefined();
+        expect(approvalOf('published', undefined)).toBeUndefined();
     });
 });
 
@@ -221,5 +330,23 @@ describe('comments on a field', () => {
         expect(takesPart(review(), grace.id)).toBe(true);
         expect(takesPart(review(), kari.id)).toBe(true);
         expect(takesPart(review(), ola.id)).toBe(false);
+    });
+
+    it('names the person who wrote a comment, or you', () => {
+        const [comment] = review({
+            comments: [
+                {
+                    id: 'comment-1',
+                    path: 'heading',
+                    text: 'Say which spring',
+                    by: kari,
+                    createdAt: '2026-10-29T10:05:00.000Z',
+                    resolvedBy: null,
+                    resolvedAt: null,
+                },
+            ],
+        }).comments;
+        expect(commenterOf(comment!, kari.id)).toBe('You');
+        expect(commenterOf(comment!, grace.id)).toBe('Kari Nordmann');
     });
 });

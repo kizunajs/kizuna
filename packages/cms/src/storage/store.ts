@@ -860,6 +860,64 @@ export class DocumentStore {
             const now = new Date();
             await tx
                 .update(cmsDocuments)
+            await this.publishRefsIn(tx, existing.id);
+            const [row] = await tx.select().from(cmsDocuments).where(eq(cmsDocuments.id, existing.id)).limit(1);
+            return toRow(row!);
+        });
+    }
+
+    /**
+     * Approves a review and publishes the draft it is about in one
+     * transaction, so neither happens without the other. Refuses, changing
+     * nothing, when the review was answered or the draft moved past the
+     * version the reviewer saw.
+     */
+    async approveAndPublish(
+        kind: DocumentKind,
+        key: string,
+        approval: { review: string; by: string; version: number },
+        site = SITE,
+        locale = SOURCE_LOCALE
+    ): Promise<DocumentRow | 'answered' | 'changed' | undefined> {
+        return this.db.transaction(async (tx) => {
+            const [existing] = await tx
+                .select()
+                .from(cmsDocuments)
+                .where(identity(kind, key, site, locale))
+                .for('update');
+            if (existing === undefined || existing.draft === null) return undefined;
+            const [review] = await tx.select().from(cmsReviews).where(eq(cmsReviews.id, approval.review)).for('update');
+            if (review?.status !== 'open') return 'answered';
+            const latest = await this.latestVersionIn(tx, existing.id);
+            if (latest !== approval.version) return 'changed';
+            const now = new Date();
+            await tx
+                .update(cmsReviews)
+                .set({
+                    status: 'approved',
+                    decidedBy: approval.by,
+                    decisionNote: null,
+                    decidedAt: now,
+                    version: latest,
+                })
+                .where(eq(cmsReviews.id, approval.review));
+            await tx
+                .update(cmsDocuments)
+                .set({
+                    published: existing.draft,
+                    publishedVersion: latest,
+                    publishedAt: now,
+                    updatedAt: now,
+                    updatedBy: approval.by,
+                })
+                .where(eq(cmsDocuments.id, existing.id));
+            await tx
+                .update(cmsVersions)
+                .set({
+                    publishedAt: now,
+                })
+                .where(and(eq(cmsVersions.documentId, existing.id), eq(cmsVersions.version, latest)));
+            await this.publishRefsIn(tx, existing.id);
                 .set({
                     draft: existing.draft ?? existing.published,
                     published: null,

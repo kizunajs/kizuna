@@ -1,7 +1,7 @@
 import { Fragment, useImperativeHandle, useState, type Ref } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import { Toast } from '@base-ui/react/toast';
-import { Copy, EyeOff, MessageCircle, Play, Trash2 } from 'lucide-react';
+import { CalendarX, Copy, EyeOff, Layers, MessageCircle, Play, Trash2, Undo2 } from 'lucide-react';
 import { toolsFor, type Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
 import type { Description } from '../view/schema.js';
@@ -16,6 +16,9 @@ import { useOfferUndo } from './toasts.js';
 const ICONS = {
     ask: MessageCircle,
     unpublish: EyeOff,
+    withdraw: Undo2,
+    cancelSchedule: CalendarX,
+    addToRelease: Layers,
     duplicate: Copy,
     delete: Trash2,
     action: Play,
@@ -54,9 +57,9 @@ export interface DocumentMoreHandle {
 }
 
 /**
- * The `…` menu beside Publish: Ask for review, Unpublish, Duplicate, the
- * collection's actions and Delete, each asking first where it cannot be
- * taken back.
+ * The `…` menu beside Publish: Ask for review or Withdraw request,
+ * Unpublish, Duplicate, the collection's actions and Delete, each asking
+ * first where it cannot be taken back.
  */
 export function DocumentMore({
     connection,
@@ -64,7 +67,9 @@ export function DocumentMore({
     title,
     askable,
     onAsk,
+    withdrawable = false,
     onChanged,
+    onWithdraw,
     onProblem,
     ref,
 }: {
@@ -74,6 +79,12 @@ export function DocumentMore({
     askable: boolean;
     onAsk: () => void;
     /**
+     * Whether the person's review request still waits, so the menu offers
+     * Withdraw request in place of Ask for review.
+     */
+    withdrawable?: boolean;
+    /**
+    onWithdraw?: () => void;
      * Called after an entry changes the document, so the screen reloads it.
      */
     onChanged: () => void;
@@ -89,6 +100,12 @@ export function DocumentMore({
         askable,
         actions: document.actions,
     });
+        withdrawable,
+        ...(document.schedule === null || document.schedule === undefined
+            ? {}
+            : {
+                  scheduled: document.schedule.release === null ? ('own' as const) : ('release' as const),
+              }),
 
     const run = async (entry: MenuEntry): Promise<void> => {
         setConfirming(undefined);
@@ -101,6 +118,31 @@ export function DocumentMore({
         }
         if (entry.kind === 'unpublish' && tools !== undefined) {
             // Publishing again brings back what was live only when the draft held nothing more, and no review stands in its way.
+        if (entry.kind === 'withdraw') {
+            onWithdraw?.();
+            return;
+        }
+        if (entry.kind === 'addToRelease') {
+            setAddingToRelease(true);
+            return;
+        }
+        if (entry.kind === 'cancelSchedule' && tools !== undefined) {
+            const answer = await connection.call(`${tools.prefix}_cancel_schedule`, {
+                params: tools.params,
+            });
+            if (answer.status !== 204) {
+                onProblem(problemOf(answer, 'The schedule stayed'));
+                return;
+            }
+            toasts.add({
+                description:
+                    document.schedule?.release === null || document.schedule?.release === undefined
+                        ? `${title} is no longer scheduled.`
+                        : `Took ${title} out of ${document.schedule.release.name}.`,
+            });
+            onChanged();
+            return;
+        }
             const republishes = document.status === 'published' && (!document.requireReview || document.review?.status === 'approved');
             const answer = await connection.call(`${tools.prefix}_unpublish`, {
                 params: tools.params,

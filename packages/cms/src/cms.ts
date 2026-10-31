@@ -3243,6 +3243,78 @@ export class CmsService {
 
     /**
      * Moves a page's stored content, versions and history to another name,
+        if (state.row !== undefined) await this.schedules.endFor(state.row.id);
+        await this.revalidateDocument(ref, sites);
+        await queueRefreshes(this, ref, sites);
+        return this.draftState(ref);
+    }
+
+    /**
+     * Publishes several drafts in one transaction, so a visitor never sees
+     * some of them live and others not, then refreshes each as `publish`
+     * does. Refuses all of them when one is incomplete.
+     */
+    async publishTogether(refs: readonly DocumentRef[], author: string): Promise<Map<string, number | null>> {
+        const states = await Promise.all(refs.map((ref) => this.draftState(ref)));
+        for (const state of states) {
+            if (!state.complete) {
+                throw new CmsHttpError(409, {
+                    detail: `The draft of '${formatRef(state.target.ref)}' is incomplete. Fill in ${state.missing.join(', ')} first.`,
+                    missing: state.missing,
+                });
+            }
+            await this.assertNoLoop(state.target.ref, state.row?.draft, 'published');
+        }
+        const sites = await Promise.all(refs.map((ref) => this.sitesShowing(ref, ['published', 'draft'])));
+        const versions = new Map<string, number | null>();
+        await this.options.db.transaction(async (tx) => {
+            const store = new DocumentStore(tx as unknown as CmsDatabase);
+            for (const state of states) {
+                const published = await store.publish(state.target.kind, state.target.key, author, state.target.site, state.target.locale);
+                versions.set(formatRef(state.target.ref), published?.publishedVersion ?? null);
+            }
+        });
+        for (const [index, ref] of refs.entries()) {
+            await this.revalidateDocument(ref, sites[index]);
+            await queueRefreshes(this, ref, sites[index]);
+        }
+        return versions;
+    }
+
+    /**
+     * Approves a review and publishes its draft in one step, as `publish`
+     * does, so the draft never goes live unapproved or stays approved
+     * unpublished. Refuses when the review was answered meanwhile, or the
+     * draft changed since `version`, the one the reviewer saw.
+     */
+    async approveAndPublish(ref: DocumentRef, approval: { review: string; by: string; version: number }): Promise<DraftState> {
+        const state = await this.draftState(ref);
+        if (!state.complete) {
+            throw new CmsHttpError(409, {
+                detail: `The draft of '${formatRef(ref)}' is incomplete. Fill in ${state.missing.join(', ')} first.`,
+                missing: state.missing,
+            });
+        }
+        await this.assertNoLoop(ref, state.row?.draft, 'published');
+        const sites = await this.sitesShowing(ref, ['published', 'draft']);
+        const outcome = await this.store.approveAndPublish(
+            state.target.kind,
+            state.target.key,
+            approval,
+            state.target.site,
+            state.target.locale
+        );
+        if (outcome === 'answered') {
+            throw new CmsHttpError(409, {
+                detail: `The review of '${formatRef(ref)}' was already answered.`,
+            });
+        }
+        if (outcome === 'changed') {
+            throw new CmsHttpError(409, {
+                detail: `The draft of '${formatRef(ref)}' changed since you opened it. Look at the changes again.`,
+            });
+        }
+        if (state.row !== undefined) await this.schedules.endFor(state.row.id);
      * after the page was renamed in code.
      */
     async renamePage(from: string, to: string, site = DEFAULT_SITE): Promise<void> {

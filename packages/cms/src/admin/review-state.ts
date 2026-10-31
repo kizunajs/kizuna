@@ -1,4 +1,5 @@
 import type { PersonView, ReviewComment, ReviewState } from '../view/schema.js';
+import type { VersionSummary } from './history.js';
 import { sentenceOf } from './sections.js';
 
 const firstNameOf = (person: PersonView): string => person.name.split(' ')[0] ?? person.name;
@@ -38,11 +39,11 @@ export const reviewStatusPartsOf = (review: ReviewState, me: string | undefined)
     if (review.status === 'changes') {
         return byMe
             ? {
-                  lead: 'Changes requested',
+                  lead: 'Sent back by you',
                   people: [],
               }
             : {
-                  lead: 'Changes requested by',
+                  lead: 'Sent back by',
                   people: deciders,
               };
     }
@@ -76,7 +77,7 @@ export const reviewStatusPartsOf = (review: ReviewState, me: string | undefined)
 
 /**
  * Where a review stands in one line: "Waiting for review by Kari Nordmann",
- * "Waiting for your review", "Changes requested by Kari Nordmann".
+ * "Waiting for your review", "Sent back by Kari Nordmann".
  */
 export const reviewStatusOf = (review: ReviewState, me: string | undefined): string => {
     const { lead, people } = reviewStatusPartsOf(review, me);
@@ -88,38 +89,6 @@ export const reviewStatusOf = (review: ReviewState, me: string | undefined): str
  */
 export const waitsForMe = (review: ReviewState | null, me: string | undefined): review is ReviewState =>
     review !== null && review.status === 'open' && review.reviewers.some((reviewer) => reviewer.id === me);
-
-/**
- * Each reviewer with their answer, and whoever answered without being asked.
- */
-export const verdictsOf = (
-    review: ReviewState,
-    me: string | undefined
-): Array<{
-    person: PersonView;
-    you: boolean;
-    verdict: string;
-}> => {
-    const decider = review.decidedBy;
-    const people = [...review.reviewers];
-    if (decider !== null && !people.some((person) => person.id === decider.id)) people.push(decider);
-    return people.map((person) => ({
-        person,
-        you: person.id === me,
-        verdict:
-            decider !== null && decider.id === person.id
-                ? review.status === 'changes'
-                    ? 'Asked for changes'
-                    : review.status === 'published-past-review'
-                      ? 'Published past review'
-                      : review.status === 'withdrawn'
-                        ? 'Withdrew the request'
-                        : 'Approved'
-                : review.status === 'open'
-                  ? 'Not reviewed'
-                  : '',
-    }));
-};
 
 /**
  * Who sent the draft back, to ask once the changes are made, or undefined
@@ -149,22 +118,15 @@ export const gateNoteOf = (requireReview: boolean, review: ReviewState | null): 
 };
 
 /**
- * Whose draft the review shows, over its column: "Kari's draft", or "Your
- * draft" for the person who asked.
- */
-export const draftOwnerOf = (review: ReviewState, me: string | undefined): string =>
-    review.requestedBy.id === me ? 'Your draft' : `${firstNameOf(review.requestedBy)}’s draft`;
-
-/**
  * What the reviewer is asked when they send a draft back: "What should Kari
- * change?"
+ * Nordmann change?"
  */
-export const changeQuestionOf = (review: ReviewState): string => `What should ${firstNameOf(review.requestedBy)} change?`;
+export const changeQuestionOf = (review: ReviewState): string => `What should ${review.requestedBy.name} change?`;
 
 /**
- * The button that sends the draft back: "Send to Kari".
+ * The button that sends the draft back: "Send to Kari Nordmann".
  */
-export const sendBackLabelOf = (review: ReviewState): string => `Send to ${firstNameOf(review.requestedBy)}`;
+export const sendBackLabelOf = (review: ReviewState): string => `Send to ${review.requestedBy.name}`;
 
 /**
  * Whether the person asked for this review and it still waits, so they can
@@ -207,15 +169,82 @@ export const commentsOn = (
 };
 
 /**
- * What a comment's head says: "Kari Nordmann on Products", or "You on
- * Products".
+ * Who wrote a comment, as its head says it: "Kari Nordmann", or "You".
  */
-export const commentTitleOf = (comment: ReviewComment, label: string, me: string | undefined): string =>
-    `${comment.by.id === me ? 'You' : comment.by.name} on ${label}`;
+export const commenterOf = (comment: ReviewComment, me: string | undefined): string => (comment.by.id === me ? 'You' : comment.by.name);
 
 /**
- * What the composer under a change hints: "Felix sees this beside the
- * field", or a plainer line for the person who asked.
+ * Whether the person reviews the draft: they were asked, or they answered.
+ * They read it on the Changes tab.
  */
-export const commentHintOf = (review: ReviewState, me: string | undefined): string =>
-    review.requestedBy.id === me ? 'Reviewers see this under the change' : `${firstNameOf(review.requestedBy)} sees this under the field`;
+export const reviewsIt = (review: ReviewState | null, me: string | undefined): review is ReviewState =>
+    review !== null && (review.reviewers.some((reviewer) => reviewer.id === me) || review.decidedBy?.id === me);
+
+/**
+ * The fields marked with a dot on the Edit tab while a review is under
+ * way: the ones the draft changes.
+ */
+export const dottedFieldsOf = (review: ReviewState | null, changes: readonly { path: string }[] | undefined): ReadonlySet<string> =>
+    new Set(review === null || changes === undefined ? [] : changes.map((change) => change.path));
+
+/**
+ * What the toast says once the review is asked for: "Asked Nils Aas to
+ * review".
+ */
+export const askedLineOf = (names: readonly string[]): string =>
+    names.length === 0 ? 'Asked for review' : `Asked ${sentenceOf(names)} to review`;
+
+/**
+ * The one line the fields a draft leaves alone fold into: "Button and
+ * Delivery note, unchanged".
+ */
+export const unchangedLineOf = (labels: readonly string[]): string => `${sentenceOf(labels)}, unchanged`;
+
+/**
+ * What the reviewer said when they sent the draft back, shown once at the
+ * top of the form for the person who asked: their note and their open
+ * comments. Undefined while nothing was sent back to the person.
+ */
+export const sentBackOf = (
+    review: ReviewState | null,
+    me: string | undefined
+):
+    | {
+          by: PersonView;
+          at: string | null;
+          note: string | null;
+          comments: ReviewComment[];
+      }
+    | undefined => {
+    const by = askAgainOf(review, me);
+    if (by === undefined || review === null) return undefined;
+    return {
+        by,
+        at: review.decidedAt,
+        note: review.decisionNote,
+        comments: review.comments.filter((comment) => comment.resolvedAt === null),
+    };
+};
+
+/**
+ * Who approved the version that is live, and when, for the header of a
+ * document published with nothing changed since. Undefined when it went
+ * live without an approval.
+ */
+export const approvalOf = (
+    status: string,
+    versions: readonly VersionSummary[] | undefined
+):
+    | {
+          by: PersonView;
+          at: string;
+      }
+    | undefined => {
+    if (status !== 'published' || versions === undefined) return undefined;
+    const live = versions.find((version) => version.published);
+    if (live?.review?.status !== 'approved') return undefined;
+    return {
+        by: live.review.by,
+        at: live.review.at,
+    };
+};

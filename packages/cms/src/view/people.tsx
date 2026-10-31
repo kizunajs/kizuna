@@ -94,7 +94,7 @@ export function ReviewBadge({ review, me }: { review: ReviewState; me: string | 
             : review.status === 'approved'
               ? `Approved by ${review.decidedBy?.name.split(' ')[0] ?? 'a reviewer'}`
               : review.status === 'changes'
-                ? `Changes requested`
+                ? `Sent back by ${review.decidedBy?.name.split(' ')[0] ?? 'a reviewer'}`
                 : review.status === 'published-past-review'
                   ? `Published past review by ${review.decidedBy?.name.split(' ')[0] ?? 'someone'}`
                   : review.status === 'withdrawn'

@@ -332,6 +332,20 @@ describe('an editor with no site', () => {
         expect((await askReview(ada, 'global:privacyPolicy', 'grace')).status).toBe(201);
     });
 
+    it('approves shared content, and never publishes it with the approval', async () => {
+        await save(grace, '/globals/privacyPolicy', {
+            text: 'We keep little.',
+        });
+        const asked = await askReview(grace, 'global:privacyPolicy', 'ada');
+        const id = asked.body.reviews[0].id;
+        const refused = await ada.post(`/editing/reviews/${id}/approve-and-publish`);
+        expect(refused.status).toBe(403);
+        expect(refused.body.detail).toBe("You may not publish 'global:privacyPolicy'. Approve it, and someone who may publishes it.");
+        const described = await describeRef(ada, 'global:privacyPolicy');
+        expect(described.body.status).toBe('draft');
+        expect(described.body.review.status).toBe('open');
+    });
+
     it('never unpublishes or deletes shared content', async () => {
         const id = await office();
         expect((await ada.post(`/editing/collections/offices/items/${id}/unpublish`).send({})).status).toBe(403);

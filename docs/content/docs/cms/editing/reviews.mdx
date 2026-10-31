@@ -11,21 +11,26 @@ description: 'Asking someone to look before a change goes live, approving it, an
 
 <EditorFigure kind="ask" />
 
-The status then reads "Waiting for review by Kari Nordmann". The reviewer sees the request in the editor, in their chat, and wherever you send it with `onReviewRequested`.
+A message says "Asked Kari Nordmann to review", and its **Undo** takes the request back. The status then reads "Waiting for review by Kari Nordmann", with when you asked beside it, and each changed field carries a dot after its label. The reviewer sees the request in the editor, in their chat, and wherever you send it with `onReviewRequested`.
 
-While it waits, **Withdraw request** takes it back, and the page reads as if nobody was asked.
+While it waits, **Withdraw request** in the `…` menu takes it back, and the page reads as if nobody was asked.
+
+When Kari sends it back, the status reads "Sent back by Kari Nordmann". Her note and her comments sit once at the top of the form, each comment naming the field it is on, which a click shows. **Resolve** clears a comment once it is dealt with, and **Ask Kari again** in the header sends the draft back to her.
+
+Once she approves, the page is live, and the header reads "Approved 2 min ago by Kari Nordmann".
 
 </Tab>
 
 <Tab value="Reviewing">
 
-For the reviewer, **Review** sits beside Publish and opens the changes. Each change is listed under the tab it sits in, with what is live now beside the draft and the words added or removed marked. They **Approve**, or **Request changes** with a note for the person who asked:
+A page waiting for your review opens on its **Changes** tab, between Edit and Versions, with the number of changed fields beside it. The note from whoever asked comes first. Then each changed field shows locked, with what is live over what the draft holds: the words it lost struck out on the Live line, and the words it gained marked on the Draft line. The fields the draft leaves alone fold into one line, like "Button and Delivery note, unchanged". On the Edit tab, the same fields carry a dot after their label.
 
-<EditorFigure kind="review" />
+The header holds the answer, in Publish's place:
 
-Once it is approved, **Publish** sends it live. An approval covers the draft as it was, and a save after it marks the approval outdated. **Undo approval** takes it back while the draft is still unpublished, and the review waits for an answer again.
+- **Approve and publish** approves the draft and publishes it in one step. Both happen, or neither does, and it is refused when the draft changed since you looked or someone else answered first.
+- **Send back** asks what the person who asked should change, and sends your note to them with your comments.
 
-When changes are requested, the status says who asked for them, and their note sits at the top of the sidebar. **Ask Kari again** sends the draft back to them once it is fixed.
+Someone who may not publish the page, like a site's editor on [shared content](/docs/cms/sites), sees **Approve** instead, and someone who may publishes it afterwards. An approval covers the draft as it was, and a save after it marks the approval outdated. **Undo approval** takes it back while the draft is still unpublished, and the review waits for an answer again.
 
 </Tab>
 
@@ -33,7 +38,7 @@ When changes are requested, the status says who asked for them, and their note s
 
 ## Comments on a field
 
-**Comment** beside a change leaves a note on that one field. The person who asked sees it under the field on the Edit tab, and the reviewer sees it under the change. Either of them can comment, and **Resolve** folds a comment away once it is dealt with. Comments stay with the draft when Kari is asked again, and publishing clears them.
+**Comment** beside a change on the Changes tab leaves a note on that one field, under the change. Enter adds it. The person who asked reads it at the top of the form once the draft is sent back. Either of them can comment, and **Resolve** clears a comment once it is dealt with. Comments stay with the draft when Kari is asked again, and publishing clears them.
 
 > What did Kari say about the products?
 
@@ -67,7 +72,9 @@ The review records that the draft was published past it, and by whom. Versions s
 
 ## Several pages at once
 
-The Publish dialog lists every page with changes. Tick the ones to publish, or ask for one review of all of them.
+The Publish dialog lists every page with changes. Tick the ones to publish, or ask for one review of all of them. Reviews waiting for you are answered there too, all at once:
+
+<EditorFigure kind="review" />
 
 > Publish everything Kari approved today.
 

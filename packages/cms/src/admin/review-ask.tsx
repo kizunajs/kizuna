@@ -32,7 +32,7 @@ export const reviewerDetailOf = (person: People['people'][number], owner: string
 
 /**
  * Asks people to review one document's draft: a tick for each person, the
- * owner first and already ticked, and a note shown above the changes. Send
+ * owner first and already ticked, and a note the reviewers read first. Send
  * request waits until someone is ticked.
  */
 export function AskForReview({
@@ -42,7 +42,6 @@ export function AskForReview({
     documentRef,
     owner,
     people,
-    changeCount,
     onSent,
 }: {
     open: boolean;
@@ -51,10 +50,6 @@ export function AskForReview({
     documentRef: string;
     owner: PersonView | null;
     people: People | undefined;
-    /**
-     * How many fields the draft changes, or undefined while they load.
-     */
-    changeCount: number | undefined;
     onSent: (asked: AskedReview) => void;
 }) {
     const me = people?.me;
@@ -107,7 +102,6 @@ export function AskForReview({
         });
     };
 
-    const fields = changeCount === 1 ? 'changed field' : 'changed fields';
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
             <Dialog.Portal>
@@ -116,10 +110,6 @@ export function AskForReview({
                     <div className="k-ask__head">
                         <div className="k-ask__heading">
                             <Dialog.Title className="k-dialog__title">Ask for review</Dialog.Title>
-                            <Dialog.Description className="k-dialog__detail k-ask__detail">
-                                Reviewers see {changeCount === undefined ? 'your changes' : `your ${changeCount} ${fields}`} side by side
-                                with what is live, and approve or ask for changes.
-                            </Dialog.Description>
                         </div>
                         <Dialog.Close className="k-icon-button k-dialog__close" aria-label="Close">
                             <X {...ICON} />
@@ -170,7 +160,6 @@ export function AskForReview({
                                 value={note}
                                 onChange={(event) => setNote(event.target.value)}
                             />
-                            <p className="k-help">Shown to reviewers above your changes.</p>
                         </div>
                         {problem === undefined ? null : (
                             <p className="k-error" role="alert">

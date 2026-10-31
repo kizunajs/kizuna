@@ -74,6 +74,7 @@ import {
     requestReviews,
     resolveComment,
     reviewOf,
+    approveAndPublishReview as approveAndPublish,
     setOwner,
     versionReviewsOf,
     waitingReviews,
@@ -2115,6 +2116,43 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         }),
         responses: {
             200: DescribedPageSchema,
+    const approveAndPublishReview = route({
+        method: 'POST',
+        path: `${editingBase}/reviews/:id/approve-and-publish`,
+        auth: editor,
+        summary: 'Approve a review and publish its draft in one step',
+        description:
+            'The approval and the publish happen together, or neither does. It is refused when the person may not publish the document, when the review was already answered, and when the draft changed since they looked. The person confirms first: in a host that cannot ask, such as Claude, they answer in the editor instead.',
+        tool: {
+            needsApproval: true,
+            destructiveHint: false,
+        },
+        pathParams: z.object({
+            id: z.string(),
+        }),
+        responses: {
+            200: DraftPageSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const access = await seenReviews(cms, args, [args.params['id']!]);
+            return {
+                status: 200,
+                body: draftBody(
+                    await approveAndPublish(cms, {
+                        id: args.params['id']!,
+                        by: authorOf(cms, args),
+                        roleOn: (ref) => access.callerFor(ref).role,
+                        mayPublish: (ref) => cms.mayPublish(access, ref),
+                    })
+                ),
+            };
+        }) as never
+    );
+
             400: ProblemDetailsSchema,
             404: ProblemDetailsSchema,
         },
@@ -3118,3 +3156,4 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
 
 export type CmsRoutes = ReturnType<typeof cmsRoutes>;
             releaseHold,
+                approveAndPublish: approveAndPublishReview,

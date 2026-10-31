@@ -342,6 +342,56 @@ export const decideReviews = async (
 };
 
 /**
+ * Approves one review and publishes its draft in the same step. The same
+ * people may answer as with `decideReviews`, and `mayPublish` says whether
+ * the person may also publish the document, which they must.
+ */
+export const approveAndPublishReview = async (
+    cms: CmsService,
+    input: {
+        id: string;
+        by: string;
+        roleOn: RoleOn;
+        mayPublish: (ref: DocumentRef) => boolean;
+    }
+): Promise<DraftState> => {
+    const [review] = await cms.store.reviews([input.id]);
+    if (review === undefined) {
+        throw new CmsHttpError(404, {
+            detail: `No review '${input.id}'.`,
+        });
+    }
+    if (review.status !== 'open') {
+        throw new CmsHttpError(409, {
+            detail: `The review of '${review.ref}' was already answered.`,
+        });
+    }
+    if (!review.reviewers.includes(input.by) && !hasRole(input.roleOn(review.ref), reviewRoles(cms))) {
+        throw new CmsHttpError(403, {
+            detail: `You were not asked to review '${review.ref}'.`,
+        });
+    }
+    const ref = refOrThrow(review.ref);
+    if (!input.mayPublish(ref)) {
+        throw new CmsHttpError(403, {
+            detail: `You may not publish '${review.ref}'. Approve it, and someone who may publishes it.`,
+        });
+    }
+    await cms.assertNotHeld(ref, input.by);
+    const { state } = await currentReview(cms, review);
+    if ((await authorsSincePublished(cms, state)).has(input.by)) {
+        throw new CmsHttpError(403, {
+            detail: `You changed '${review.ref}' yourself, so someone else approves it.`,
+        });
+    }
+    return cms.approveAndPublish(ref, {
+        review: review.id,
+        by: input.by,
+        version: state.version,
+    });
+};
+
+/**
  * A review with the document it is about, refused unless it is still that
  * document's current review: not taken back, and from after the last publish.
  */

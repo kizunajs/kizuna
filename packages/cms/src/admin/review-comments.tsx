@@ -1,15 +1,15 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { CircleAlert, MessageCircle } from 'lucide-react';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
 import { Avatar } from '../view/people.js';
-import type { ReviewComment, ReviewState } from '../view/schema.js';
+import type { PersonView, ReviewComment, ReviewState } from '../view/schema.js';
 import { problemOf } from './parts.js';
-import { commentHintOf, commentsOn, commentTitleOf, takesPart } from './review-state.js';
+import { commenterOf, commentsOn, takesPart } from './review-state.js';
 import { relativeTimeOf } from './time.js';
 
 /**
- * Comment, beside a change on the Review tab, which opens the composer
+ * Comment, beside a change on the Changes tab, which opens the composer
  * under it.
  */
 export function CommentButton({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
@@ -21,9 +21,8 @@ export function CommentButton({ label, open, onToggle }: { label: string; open: 
     );
 }
 
-function CommentCard({
+function CommentLine({
     comment,
-    label,
     me,
     now,
     onResolve,
@@ -31,7 +30,6 @@ function CommentCard({
     busy,
 }: {
     comment: ReviewComment;
-    label: string;
     me: string | undefined;
     now: Date;
     onResolve: (() => void) | undefined;
@@ -40,23 +38,23 @@ function CommentCard({
 }) {
     return (
         <div className="k-comment" data-resolved={comment.resolvedAt !== null || undefined}>
-            <div className="k-review-card__head">
-                <Avatar person={comment.by} size={22} />
-                <span className="k-review-card__title">{commentTitleOf(comment, label, me)}</span>
-                <span className="k-review-card__when">{relativeTimeOf(comment.createdAt, now)}</span>
-            </div>
-            <p className="k-review-card__text">{comment.text}</p>
+            <Avatar person={comment.by} size={22} />
+            <span className="k-comment__head">
+                <span className="k-comment__who">{commenterOf(comment, me)}</span>
+                <span className="k-comment__when">{relativeTimeOf(comment.createdAt, now)}</span>
+            </span>
+            <p className="k-comment__text">{comment.text}</p>
             {comment.resolvedBy !== null ? (
                 <p className="k-comment__resolved">Resolved by {comment.resolvedBy.id === me ? 'you' : comment.resolvedBy.name}</p>
             ) : onResolve === undefined && onReply === undefined ? null : (
                 <div className="k-comment__actions">
                     {onResolve === undefined ? null : (
-                        <button type="button" className="k-button k-button--secondary k-button--small" disabled={busy} onClick={onResolve}>
+                        <button type="button" className="k-text-button" disabled={busy} onClick={onResolve}>
                             Resolve
                         </button>
                     )}
                     {onReply === undefined ? null : (
-                        <button type="button" className="k-comment-toggle" onClick={onReply}>
+                        <button type="button" className="k-text-button" onClick={onReply}>
                             Reply
                         </button>
                     )}
@@ -68,8 +66,8 @@ function CommentCard({
 
 /**
  * The comments on one field of a review's draft, under that field: the open
- * ones with Resolve, the resolved ones folded behind a count, and the
- * composer when it is open.
+ * ones with Resolve and Reply, the resolved ones folded behind a count, and
+ * the composer when it is open. Enter adds the comment and Escape closes it.
  */
 export function FieldComments({
     review,
@@ -100,12 +98,15 @@ export function FieldComments({
     const [text, setText] = useState('');
     const [busy, setBusy] = useState(false);
     const [problem, setProblem] = useState<string | undefined>();
-    const textId = useId();
     const mayComment = takesPart(review, me);
+    const self: PersonView | undefined = [review.requestedBy, review.decidedBy, ...review.reviewers].find(
+        (person): person is PersonView => person !== null && person.id === me
+    );
 
     if (open.length === 0 && resolved.length === 0 && !composing) return null;
 
     const send = async (): Promise<void> => {
+        if (text.trim() === '') return;
         setBusy(true);
         setProblem(undefined);
         const answer = await connection.call<ReviewState>('editing_reviews_comment', {
@@ -144,10 +145,9 @@ export function FieldComments({
     return (
         <div className="k-comments" role="group" aria-label={`Comments on ${label}`}>
             {open.map((comment, index) => (
-                <CommentCard
+                <CommentLine
                     key={comment.id}
                     comment={comment}
-                    label={label}
                     me={me}
                     now={now}
                     busy={busy}
@@ -156,20 +156,15 @@ export function FieldComments({
                 />
             ))}
             {resolved.length === 0 ? null : (
-                <button
-                    type="button"
-                    className="k-comment-toggle"
-                    aria-expanded={showResolved}
-                    onClick={() => setShowResolved(!showResolved)}>
+                <button type="button" className="k-text-button" aria-expanded={showResolved} onClick={() => setShowResolved(!showResolved)}>
                     {resolved.length === 1 ? '1 resolved comment' : `${resolved.length} resolved comments`}
                 </button>
             )}
             {showResolved
                 ? resolved.map((comment) => (
-                      <CommentCard
+                      <CommentLine
                           key={comment.id}
                           comment={comment}
-                          label={label}
                           me={me}
                           now={now}
                           busy={busy}
@@ -180,37 +175,28 @@ export function FieldComments({
                 : null}
             {composing && mayComment ? (
                 <div className="k-comment-composer">
-                    <label htmlFor={textId} className="k-comment-composer__label">
-                        Comment on {label}
-                    </label>
+                    {self === undefined ? <span className="k-comment-composer__space" /> : <Avatar person={self} size={22} />}
                     <textarea
-                        id={textId}
-                        className="k-input k-textarea"
-                        rows={2}
+                        className="k-input k-textarea k-comment-composer__input"
+                        rows={1}
                         maxLength={2000}
                         autoFocus
-                        placeholder={commentHintOf(review, me)}
+                        aria-label={`Comment on ${label}`}
+                        placeholder={`Comment on ${label}`}
+                        disabled={busy}
                         value={text}
                         onChange={(event) => setText(event.target.value)}
-                    />
-                    <div className="k-comment-composer__actions">
-                        <button
-                            type="button"
-                            className="k-button k-button--secondary k-button--small"
-                            onClick={() => {
+                        onKeyDown={(event) => {
+                            if (event.key === 'Enter' && !event.shiftKey) {
+                                event.preventDefault();
+                                void send();
+                            }
+                            if (event.key === 'Escape') {
                                 setText('');
                                 onComposingChange(false);
-                            }}>
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            className="k-button k-button--primary k-button--small"
-                            disabled={busy || text.trim() === ''}
-                            onClick={() => void send()}>
-                            {busy ? 'Adding' : 'Add comment'}
-                        </button>
-                    </div>
+                            }
+                        }}
+                    />
                 </div>
             ) : null}
             {problem === undefined ? null : (
@@ -219,42 +205,6 @@ export function FieldComments({
                     {problem}
                 </p>
             )}
-        </div>
-    );
-}
-
-/**
- * The open comments in the sidebar, each a link to the field it is about,
- * for a field that sits in a tab the person is not looking at.
- */
-export function CommentLinks({
-    review,
-    labelOf,
-    me,
-    now,
-    onShow,
-}: {
-    review: ReviewState;
-    labelOf: (path: string) => string;
-    me: string | undefined;
-    now: Date;
-    onShow: (path: string) => void;
-}) {
-    const open = review.comments.filter((comment) => comment.resolvedAt === null);
-    if (open.length === 0) return null;
-    return (
-        <div className="k-review-screen__block" role="group" aria-label="Comments">
-            <span className="k-review-screen__heading">{open.length === 1 ? '1 comment' : `${open.length} comments`}</span>
-            {open.map((comment) => (
-                <button key={comment.id} type="button" className="k-comment k-comment--link" onClick={() => onShow(comment.path)}>
-                    <span className="k-review-card__head">
-                        <Avatar person={comment.by} size={22} />
-                        <span className="k-review-card__title">{commentTitleOf(comment, labelOf(comment.path), me)}</span>
-                        <span className="k-review-card__when">{relativeTimeOf(comment.createdAt, now)}</span>
-                    </span>
-                    <span className="k-review-card__text">{comment.text}</span>
-                </button>
-            ))}
         </div>
     );
 }
