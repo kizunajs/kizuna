@@ -1174,7 +1174,6 @@ export function DocumentScreen({
     const approval = approvalOf(document.status, versions);
     // The reviewer who sent it back already knows what Publish waits for.
     const gateNote = document.review?.decidedBy?.id === me ? undefined : gateNoteOf(document.requireReview, document.review);
-    const canPublishPast = draftChanges?.changes.canPublishPastReview ?? false;
     const previewPath = siteUrl === null ? null : document.previewPath;
     // A document that stops showing on a page, after a change or a reload, loses the preview.
     const previewShown = previewOn && previewPath !== null && shownView === 'edit';
@@ -1301,7 +1300,8 @@ export function DocumentScreen({
     );
 
     const normalHeader = !comparing && !answering;
-    const publishShown = normalHeader && document.canPublish && !(sentBackBy !== undefined && document.requireReview && !canPublishPast);
+    // Sent back, the person asks again rather than publishing.
+    const publishShown = normalHeader && document.canPublish && sentBackBy === undefined;
     // Shared content the editor drafts goes to an admin over every site, so asking takes Publish's place.
     const askShown =
         normalHeader &&
@@ -1751,14 +1751,6 @@ export function DocumentScreen({
                                         people={people}
                                         waiting={waiting.filter((entry) => entry.ref !== document.ref).length}
                                         everywhere={document.usedOn.everywhere}
-                                        secondary={sentBackBy !== undefined}
-                                        schedulable
-                                        scheduledAt={document.schedule?.release === null ? document.schedule.at : null}
-                                        onScheduled={(titles, at) =>
-                                            toasts.add({
-                                                description: `${titles.length === 1 ? titles[0] : `${titles.length} documents`} publish${titles.length === 1 ? 'es' : ''} ${whenOf(at)}.`,
-                                            })
-                                        }
                                         disabled={publishDisabled}
                                         describedBy={blocker === undefined ? undefined : 'k-document-blocker'}
                                         onChanged={(refs) => {
