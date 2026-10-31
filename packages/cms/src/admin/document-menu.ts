@@ -120,6 +120,13 @@ export const blockerOf = (missing: readonly string[], fields: readonly Described
 };
 
 /**
+ * Whether Publish has anything to do: a draft that differs from what is live,
+ * or a review waiting for the person on another document.
+ */
+export const hasSomethingToPublish = (status: DocumentStatus, waitingElsewhere: number): boolean =>
+    status === 'draft' || status === 'changed' || waitingElsewhere > 0;
+
+/**
  * When a document was first saved and last published, from its versions,
  * newest first. `null` for one it has not reached yet.
  */

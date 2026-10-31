@@ -13,7 +13,7 @@ import { sameContent } from '../same-content.js';
 import { parseRef } from '../refs.js';
 import { withMediaSite } from './connection.js';
 import { ConfirmDialog } from './confirm.js';
-import { blockerOf, documentDatesOf, menuEntriesOf } from './document-menu.js';
+import { blockerOf, documentDatesOf, hasSomethingToPublish, menuEntriesOf } from './document-menu.js';
 import { DocumentMore, type DocumentMoreHandle } from './document-more.js';
 import { scheduleFactOf } from './schedule-ui.js';
 import { whenOf } from '../view/schedule-time.js';
@@ -1312,7 +1312,9 @@ export function DocumentScreen({
         sentBackBy === undefined &&
         document.review?.status !== 'open' &&
         (document.status === 'draft' || document.status === 'changed');
+    const waitingElsewhere = waiting.filter((entry) => entry.ref !== document.ref).length;
     const publishDisabled =
+        !hasSomethingToPublish(document.status, waitingElsewhere) ||
         !online ||
         unsaved ||
         filled.size > 0 ||
@@ -1742,7 +1744,7 @@ export function DocumentScreen({
                                         connection={connection}
                                         candidates={reviewCandidates}
                                         people={people}
-                                        waiting={waiting.filter((entry) => entry.ref !== document.ref).length}
+                                        waiting={waitingElsewhere}
                                         everywhere={document.usedOn.everywhere}
                                         disabled={publishDisabled}
                                         describedBy={blocker === undefined ? undefined : 'k-document-blocker'}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DescribedField } from '../view/schema.js';
-import { blockerOf, documentDatesOf, duplicateValuesOf, menuEntriesOf } from './document-menu.js';
+import { blockerOf, documentDatesOf, duplicateValuesOf, hasSomethingToPublish, menuEntriesOf } from './document-menu.js';
 
 const field = (path: string, overrides: Partial<DescribedField> = {}): DescribedField => ({
     path,
@@ -160,5 +160,21 @@ describe('documentDatesOf', () => {
             created: null,
             published: null,
         });
+    });
+});
+
+describe('hasSomethingToPublish', () => {
+    it('has nothing to publish once the draft matches what is live', () => {
+        expect(hasSomethingToPublish('published', 0)).toBe(false);
+        expect(hasSomethingToPublish('empty', 0)).toBe(false);
+    });
+
+    it('has a draft or its changes to publish', () => {
+        expect(hasSomethingToPublish('draft', 0)).toBe(true);
+        expect(hasSomethingToPublish('changed', 0)).toBe(true);
+    });
+
+    it('opens the reviews waiting on other documents', () => {
+        expect(hasSomethingToPublish('published', 2)).toBe(true);
     });
 });
