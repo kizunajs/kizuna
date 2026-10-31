@@ -118,8 +118,9 @@ export interface CmsAuthOptions {
     /**
      * The identity every content route requires, which partners sign in
      * with. Its guard returns the partner's name as `partner`, and that
-     * partner then reads the shared content and the sites in its `reads`.
-     * Content routes are public without it.
+     * partner then reads the sites in its `reads` and the shared content, or
+     * only the `collections` and `globals` it names. Content routes are
+     * public without it.
      *
      * @example
      * read: 'partner',
@@ -373,6 +374,24 @@ export interface PartnerOptions {
      */
     reads: readonly string[];
     /**
+     * The collections it reads, shared or of a site in `reads`. With
+     * `collections` or `globals`, the partner reads only what they name, and
+     * no pages, and hears only their publishes.
+     *
+     * @example
+     * collections: ['events', 'offices'],
+     */
+    collections?: readonly string[];
+    /**
+     * The globals it reads, shared or of a site in `reads`. With
+     * `collections` or `globals`, the partner reads only what they name, and
+     * no pages, and hears only their publishes.
+     *
+     * @example
+     * globals: ['privacyPolicy'],
+     */
+    globals?: readonly string[];
+    /**
      * Where the CMS sends `{ brand, id }` when a document it reads
      * publishes, unpublishes or is deleted.
      */
@@ -385,6 +404,25 @@ export interface PartnerOptions {
         headers?: () => Record<string, string> | Promise<Record<string, string>>;
     };
 }
+
+/**
+ * What a content route reads, as a partner's options name it.
+ */
+export interface PartnerRead {
+    kind: 'collection' | 'global' | 'page';
+    name: string;
+}
+
+/**
+ * Whether a partner reads a collection, a global or a page on its sites:
+ * every one until it names `collections` or `globals`, and then only those.
+ */
+export const partnerReads = (partner: PartnerOptions, read: PartnerRead): boolean => {
+    if (partner.collections === undefined && partner.globals === undefined) return true;
+    if (read.kind === 'collection') return partner.collections?.includes(read.name) ?? false;
+    if (read.kind === 'global') return partner.globals?.includes(read.name) ?? false;
+    return false;
+};
 
 /**
  * Where shared content is stored, and a single-site project's pages.
@@ -477,6 +515,7 @@ export interface CmsPluginOptions<
      *     travelAgency: {
      *         label: 'Travel agency',
      *         reads: ['uk'],
+     *         collections: ['events', 'offices'],
      *         invalidate: {
      *             url: 'https://travel.example.com/api/invalidate',
      *         },
@@ -722,6 +761,8 @@ export const CmsPluginOptionsSchema = z
                 z.object({
                     label: z.string().min(1),
                     reads: z.array(z.string().min(1)),
+                    collections: z.array(z.string().min(1)).optional(),
+                    globals: z.array(z.string().min(1)).optional(),
                     invalidate: z.object({
                         url: z.url(),
                         headers: z.custom<PartnerOptions['invalidate']['headers']>(isFunction).optional(),
@@ -849,6 +890,24 @@ export const CmsPluginOptionsSchema = z
                             : `reads the site '${site}', which declareSites() does not declare. It declares ${declared.join(', ')}`,
                     path: ['partners', name, 'reads'],
                 });
+            }
+            for (const kind of ['collections', 'globals'] as const) {
+                const definitions: ReadonlyArray<{ name: string }> = [
+                    ...(options[kind] ?? []),
+                    ...partner.reads.flatMap((site): ReadonlyArray<{ name: string }> => options.sites?.entries[site]?.[kind] ?? []),
+                ];
+                const readable = definitions.map((definition) => definition.name);
+                for (const named of partner[kind] ?? []) {
+                    if (readable.includes(named)) continue;
+                    context.addIssue({
+                        code: 'custom',
+                        message:
+                            readable.length === 0
+                                ? `reads the ${kind === 'collections' ? 'collection' : 'global'} '${named}', but neither cms() nor the sites it reads declare any ${kind}`
+                                : `reads the ${kind === 'collections' ? 'collection' : 'global'} '${named}', which neither cms() nor the sites it reads declare. It may read ${readable.join(', ')}`,
+                        path: ['partners', name, kind],
+                    });
+                }
             }
         }
     })

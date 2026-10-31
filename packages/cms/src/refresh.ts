@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
 import { CmsHttpError, pageCacheTag, type CmsService } from './cms.js';
-import { DEFAULT_SITE } from './options.js';
+import { DEFAULT_SITE, partnerReads, type PartnerRead } from './options.js';
 import { formatRef, type DocumentRef } from './refs.js';
 import { servesCollection } from './page.js';
 import { previewSecret, REFRESH_SIGNATURE_HEADER, signRefresh } from './preview-token.js';
@@ -29,11 +29,26 @@ export interface RefreshTarget {
 }
 
 /**
+ * What a partner's options call a document.
+ */
+const partnerReadOf = (ref: DocumentRef): PartnerRead =>
+    ref.type === 'item'
+        ? {
+              kind: 'collection',
+              name: ref.collection,
+          }
+        : {
+              kind: ref.type,
+              name: ref.name,
+          };
+
+/**
  * The sites that show a document and the partners that read it: every site
  * and partner for shared content, and for a site's own content or its values
  * on shared content, that site and the partners that read it. A page is
  * its own site's alone. `sites` narrows them to an item's `showsOn` and the
- * partners that read one of those sites.
+ * partners that read one of those sites. A partner that names `collections`
+ * or `globals` hears only those.
  */
 export const refreshTargets = (cms: CmsService, ref: DocumentRef, sites?: readonly string[]): RefreshTarget[] => {
     const names = cms.siteNames();
@@ -50,7 +65,11 @@ export const refreshTargets = (cms: CmsService, ref: DocumentRef, sites?: readon
             })
         ),
         ...Object.entries(cms.options.partners ?? {})
-            .filter(([, partner]) => (shared && sites === undefined) || partner.reads.some((read) => reached.includes(read)))
+            .filter(
+                ([, partner]) =>
+                    ((shared && sites === undefined) || partner.reads.some((read) => reached.includes(read))) &&
+                    partnerReads(partner, partnerReadOf(ref))
+            )
             .map(
                 ([key, partner]): RefreshTarget => ({
                     key,

@@ -113,26 +113,12 @@ h1 {
     font-weight: 400;
 }
 
-.list h3 {
-    margin: 0;
-    font-size: 1.05rem;
-    font-weight: 600;
-}
-
 .list p {
     margin: 0;
 }
 
 .detail {
     color: var(--muted);
-}
-
-.people {
-    margin: 1rem 0 0;
-    padding: 0;
-    list-style: none;
-    display: grid;
-    gap: 1.25rem;
 }
 
 .footer {

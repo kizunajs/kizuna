@@ -54,12 +54,14 @@ export const partner = k.identity
 
 /**
  * The businesses that show Hagen's content on their own websites. The travel
- * agency sells the UK's workshops as day trips, so it reads the UK.
+ * agency sells the UK's workshops as day trips, so it reads the UK's events
+ * and the offices they start from.
  */
 export const partners = {
     travelAgency: {
         label: 'Travel agency',
         reads: ['uk'],
+        collections: ['events', 'offices'],
         invalidate: {
             url: process.env.TRAVEL_AGENCY_INVALIDATE_URL ?? 'http://partner.localhost:3046/api/invalidate',
             headers: () => ({

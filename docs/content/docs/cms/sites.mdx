@@ -307,7 +307,7 @@ The model drafts. It writes the copy, the translation and the suggested update i
 
 Before a shared document publishes, the editor shows where it appears on each site: the pages whose content holds it, and the pages that listed it when they last rendered.
 
-The list names partners under their label too. Publishing then refreshes every site and partner that shows the document, and unpublishing and deleting do the same. Each one gets a job of its own, which calls its `invalidate` with what changed:
+The list names the partners that read the document too, under their label. Publishing then refreshes every site and partner that shows the document, and unpublishing and deleting do the same. Each one gets a job of its own, which calls its `invalidate` with what changed:
 
 | Body            | Refreshes                                |
 | --------------- | ---------------------------------------- |
@@ -338,6 +338,7 @@ content: cms({
         travelAgency: {
             label: 'Travel agency',
             reads: ['uk'],
+            collections: ['events', 'offices'],
             invalidate: {
                 url: 'https://travel.example.com/api/invalidate',
                 headers: () => ({
@@ -351,9 +352,9 @@ content: cms({
 
 ### What it reads
 
-`reads: ['uk']` is the UK's view and the shared content: the offices with the UK's phone numbers, and the UK's events.
+`reads: ['uk']` reads through the UK's view, so the offices carry the UK's phone numbers. `collections` names what the partner reads there, the UK's own events and the shared offices, and `globals` does the same for globals. A partner that names either reads only those and no pages, and appears only on those documents in the editor. Without them, it reads everything its sites show, the shared content with it.
 
-Content routes are public until `auth.read` names an identity. Then every content route requires that identity, and each partner's `reads` limits what its token may read. Image files stay public, since a browser loads them from a page with no token. A request that carries a partner's token is still held to that partner's `reads`. A read of Norway answers `403`, naming the permission it lacks, `content.sites.norway:read`. A token whose guard returns no `partner` reads every site, which suits your own apps.
+Content routes are public until `auth.read` names an identity. Then every content route requires that identity, and each partner's options limit what its token may read. Image files stay public, since a browser loads them from a page with no token. A request that carries a partner's token is still held to that partner's `reads`. A read of Norway answers `403`, naming the permission it lacks, `content.sites.norway:read`, and so does a read of the UK's products, naming `content.sites.uk.collections.products:read`. A token whose guard returns no `partner` reads everything, which suits your own apps.
 
 ### How it signs in
 
@@ -368,7 +369,7 @@ auth: {
 },
 ```
 
-The guard maps the token's client to the partner's name and returns it as `partner`, as in `{ partner: 'travelAgency' }`, and the CMS takes the sites that partner may read from its `reads`. The CMS verifies tokens and never issues them. A read with a token answers with `Cache-Control: private`, so no shared cache keeps it.
+The guard maps the token's client to the partner's name and returns it as `partner`, as in `{ partner: 'travelAgency' }`, and the CMS takes what that partner may read from its `reads`, `collections` and `globals`. The CMS verifies tokens and never issues them. A read with a token answers with `Cache-Control: private`, so no shared cache keeps it.
 
 ### What it installs
 
@@ -390,7 +391,7 @@ A partner that runs Kizuna CMS itself holds your ids through a [relationship](/d
 
 ### How it hears a publish
 
-When a document it reads publishes, the CMS calls the partner's `invalidate` with the same bodies a site gets, `{ brand, id }`, `{ global }` or `{ page }`, and the bearer token the partner gave you. The body carries no content, so the partner reads the document again through its client, and a document that was unpublished or deleted answers `404`. A partner hears only what it reads, so a change to Norway never reaches the travel agency. The editor counts partners beside sites, so publishing a shared office reads "Refreshed 2 of 3 sites and 1 partner. Hagen Norge did not answer, retrying." while Norway is down.
+When a document it reads publishes, the CMS calls the partner's `invalidate` with the same bodies a site gets, `{ brand, id }`, `{ global }` or `{ page }`, and the bearer token the partner gave you. The body carries no content, so the partner reads the document again through its client, and a document that was unpublished or deleted answers `404`. A partner hears only what it reads, so neither a change to Norway nor a newsletter reaches the travel agency. The editor counts partners beside sites, so publishing a shared office reads "Refreshed 2 of 3 sites and 1 partner. Hagen Norge did not answer, retrying." while Norway is down.
 
 ## Sites created by admins
 

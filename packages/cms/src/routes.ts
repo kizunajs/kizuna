@@ -4,7 +4,7 @@ import { BinarySchema, ProblemDetailsSchema, ValidationErrorSchema } from 'kizun
 import type { RouteAuth } from 'kizunajs';
 import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { addressOf, CmsHttpError, fieldOnSite, previewPathOf, type CmsService, type DraftState } from './cms.js';
-import { DEFAULT_SITE, routePrefix, sitesOf, type CmsPluginOptions, type PageMap } from './options.js';
+import { DEFAULT_SITE, partnerReads, routePrefix, sitesOf, type CmsPluginOptions, type PageMap, type PartnerRead } from './options.js';
 import type { Collection, ContentDefinition, Global } from './definitions.js';
 import { dataFields } from './field.js';
 import { servesCollection } from './page.js';
@@ -1155,28 +1155,43 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     ) as never;
 
     /**
-     * Refuses a partner's token a site outside its `reads`. A reader whose
-     * guard names no partner reads every site.
+     * Refuses a partner's token a site outside its `reads`, or a collection,
+     * global or page its options leave out. A reader whose guard names no
+     * partner reads everything.
      */
-    const assertReads = (args: Args, site: string | undefined): void => {
+    const assertReads = (args: Args, site: string, read: PartnerRead): void => {
         if (reader === undefined) return;
-        assertPartnerReads(args.auth?.[reader]?.['partner'], site);
+        assertPartnerReads(args.auth?.[reader]?.['partner'], site, read);
     };
 
     /**
-     * Refuses a partner a site its `reads` leaves out.
+     * Refuses a partner a site its `reads` leaves out, and with `read`, a
+     * collection, global or page its `collections` and `globals` leave out.
      */
-    const assertPartnerReads = (partner: unknown, site: string | undefined): void => {
+    const assertPartnerReads = (partner: unknown, site: string | undefined, read?: PartnerRead): void => {
         if (partner === undefined) return;
-        const reads = typeof partner === 'string' ? options.partners?.[partner]?.reads : undefined;
-        if (reads === undefined) {
+        const declared = typeof partner === 'string' ? options.partners?.[partner] : undefined;
+        if (declared === undefined) {
             throw new CmsHttpError(403, {
                 detail: `Forbidden: the token names the partner '${String(partner)}', which cms() does not declare.`,
             });
         }
-        if (site === undefined || site === DEFAULT_SITE || reads.includes(site)) return;
+        const onSite = site === undefined || site === DEFAULT_SITE;
+        if (!onSite && !declared.reads.includes(site)) {
+            throw new CmsHttpError(403, {
+                detail: `Forbidden: this route requires content.sites.${site}:read, and the ${partner} partner reads ${declared.reads.length === 0 ? 'no site' : declared.reads.join(', ')}.`,
+            });
+        }
+        if (read === undefined || partnerReads(declared, read)) return;
+        const permission = `${onSite ? 'content' : `content.sites.${site}`}.${read.kind}s.${read.name}:read`;
+        const collections = declared.collections ?? [];
+        const globals = declared.globals ?? [];
+        const named = [
+            ...(collections.length === 0 ? [] : [`the collections ${collections.join(', ')}`]),
+            ...(globals.length === 0 ? [] : [`the globals ${globals.join(', ')}`]),
+        ];
         throw new CmsHttpError(403, {
-            detail: `Forbidden: this route requires content.sites.${site}:read, and the ${partner} partner reads ${reads.length === 0 ? 'no site' : reads.join(', ')}.`,
+            detail: `Forbidden: this route requires ${permission}, and the ${partner} partner reads ${named.length === 0 ? 'nothing' : `only ${named.join(' and ')}`}.`,
         });
     };
 
@@ -1223,7 +1238,10 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 },
             }).handler(
                 guarded(async (cms, args) => {
-                    assertReads(args, input.readingSite);
+                    assertReads(args, input.readingSite, {
+                        kind: 'collection',
+                        name: input.collection,
+                    });
                     const { orderBy, direction, limit, cursor, locale, ...where } = (args.query ?? {}) as Record<string, unknown>;
                     const result = await cms.listItems(
                         input.collection,
@@ -1266,7 +1284,10 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 },
             }).handler(
                 guarded(async (cms, args) => {
-                    assertReads(args, input.readingSite);
+                    assertReads(args, input.readingSite, {
+                        kind: 'collection',
+                        name: input.collection,
+                    });
                     const published = await cms.publishedOn(input.refOf(args.params['id']!), input.readingSite, localeOf(args));
                     if (published === undefined)
                         throw new CmsHttpError(404, { detail: `No published ${input.single} '${args.params['id']}'.` });
@@ -1310,7 +1331,10 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         },
                     }).handler(
                         guarded(async (cms, args) => {
-                            assertReads(args, site);
+                            assertReads(args, site, {
+                                kind: 'page',
+                                name,
+                            });
                             const published = await cms.publishedOn(
                                 {
                                     type: 'page',
@@ -1367,7 +1391,10 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             },
         }).handler(
             guarded(async (cms, args) => {
-                assertReads(args, site);
+                assertReads(args, site, {
+                    kind: 'global',
+                    name: definition.name,
+                });
                 const published = await cms.publishedOn(ref, site, localeOf(args));
                 if (published === undefined) throw new CmsHttpError(404, { detail: `The ${definition.name} global is not published.` });
                 return {

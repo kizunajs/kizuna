@@ -21,11 +21,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                         </Link>
                         <nav className="nav" aria-label="Main">
                             <Link href="/">Day trips</Link>
-                            <Link href="/team">Your hosts</Link>
+                            <Link href="/workshops">Workshops</Link>
                         </nav>
                     </header>
                     {children}
-                    <footer className="footer">Shop details and hosts come from Hagen UK, and change when Hagen publishes.</footer>
+                    <footer className="footer">Shop details and workshops come from Hagen UK, and change when Hagen publishes.</footer>
                 </div>
             </body>
         </html>

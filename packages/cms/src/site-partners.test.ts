@@ -41,6 +41,7 @@ const editor = k.identity
 
 const PARTNERS: Record<string, string> = {
     'travel-token': 'travelAgency',
+    'tours-token': 'tourOperator',
     'stranger-token': 'stranger',
 };
 
@@ -71,6 +72,17 @@ const Offices = defineCollection({
     fields: [
         {
             name: 'city',
+            schema: z.string(),
+        },
+    ],
+});
+
+const Products = defineCollection({
+    name: 'products',
+    id: Kizuna.brand('ProductId', z.string()),
+    fields: [
+        {
+            name: 'name',
             schema: z.string(),
         },
     ],
@@ -138,6 +150,15 @@ const travelAgency = {
     },
 };
 
+const tourOperator = {
+    label: 'Tour operator',
+    reads: ['uk'],
+    collections: ['events', 'offices'],
+    invalidate: {
+        url: 'https://tours.example.com/api/invalidate',
+    },
+};
+
 const configWith = (read: string | undefined) => {
     const pglite = new PGlite();
     const db = drizzle(pglite);
@@ -155,9 +176,10 @@ const configWith = (read: string | undefined) => {
             sites,
             site: () => 'uk',
             globals: [PrivacyPolicy],
-            collections: [Offices],
+            collections: [Offices, Products],
             partners: {
                 travelAgency,
+                tourOperator,
             },
             auth: {
                 identity: 'editor',
@@ -261,6 +283,25 @@ describe('content routes with auth.read', () => {
         }
     });
 
+    it('let a partner with collections read those on its sites', async () => {
+        expect((await as('tours-token', '/content/sites/uk/collections/events')).status).toBe(200);
+        expect((await as('tours-token', '/content/sites/uk/collections/offices')).status).toBe(200);
+    });
+
+    it('refuse a partner with collections every other collection, global and page, naming the permission it lacks', async () => {
+        const refusals: Array<[string, string]> = [
+            ['/content/sites/uk/collections/products', 'content.sites.uk.collections.products:read'],
+            ['/content/sites/uk/globals/privacyPolicy', 'content.sites.uk.globals.privacyPolicy:read'],
+            ['/content/sites/uk/pages/frontPage', 'content.sites.uk.pages.frontPage:read'],
+            ['/content/sites/norway/collections/offices', 'content.sites.norway:read'],
+        ];
+        for (const [path, permission] of refusals) {
+            const refused = await as('tours-token', path);
+            expect(refused.status).toBe(403);
+            expect(refused.body.detail).toContain(permission);
+        }
+    });
+
     it('refuse a token naming a partner cms() does not declare', async () => {
         const refused = await as('stranger-token', '/content/sites/uk/collections/offices');
         expect(refused.status).toBe(403);
@@ -309,5 +350,33 @@ describe('partners', () => {
                 }),
             })
         ).toThrow("reads the site 'sweden', which declareSites() does not declare");
+    });
+
+    it('read only collections cms() or the sites they read declare', () => {
+        expect(() =>
+            defineConfig({
+                jobRunner: heldJobs,
+                auth: {
+                    identities: {
+                        editor,
+                    },
+                },
+                content: cms({
+                    db: drizzle(new PGlite()),
+                    sites,
+                    collections: [Offices],
+                    partners: {
+                        travelAgency: {
+                            ...travelAgency,
+                            reads: ['norway'],
+                            collections: ['offices', 'events'],
+                        },
+                    },
+                    auth: {
+                        identity: 'editor',
+                    },
+                }),
+            })
+        ).toThrow("reads the collection 'events', which neither cms() nor the sites it reads declare. It may read offices");
     });
 });

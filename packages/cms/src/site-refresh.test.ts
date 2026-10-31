@@ -16,6 +16,7 @@ import { DocumentStore } from './storage/store.js';
 import { REFRESH_SIGNATURE_HEADER, signRefresh, verifyRefresh } from './preview-token.js';
 import { heldJobs } from './held-jobs.fixture.js';
 import type { CmsExports } from './setup.js';
+import type { DocumentRef } from './refs.js';
 
 const k = new Kizuna();
 const editor = k.identity
@@ -145,6 +146,14 @@ const config = defineConfig({
                     }),
                 },
             },
+            tourOperator: {
+                label: 'Tour operator',
+                reads: ['uk'],
+                collections: ['events'],
+                invalidate: {
+                    url: 'https://tours.example.com/api/invalidate',
+                },
+            },
         },
         auth: {
             identity: 'editor',
@@ -250,11 +259,45 @@ describe('publishing on a CMS with sites', () => {
         });
         const [event] = (await asEditor(request(app).get('/editing/sites/uk/collections/events/items'))).body.items;
         await asEditor(request(app).post(`/editing/sites/uk/collections/events/items/${event.id}/publish`)).send({});
-        expect(queued.map((message) => (message.input as { target: string }).target)).toEqual(['uk', 'travelAgency']);
+        expect(queued.map((message) => (message.input as { target: string }).target)).toEqual(['uk', 'travelAgency', 'tourOperator']);
         expect((queued[0]!.input as { body: unknown }).body).toEqual({
             brand: 'EventId',
             id: event.id,
         });
+    });
+
+    it('names a partner with collections on those alone, and refreshes it only when they publish', async () => {
+        const labelsOn = async (ref: DocumentRef) => (await service.usedOn(ref)).partners.map((partner) => partner.label);
+        const id = await office();
+        expect(queued.map((message) => (message.input as { target: string }).target)).not.toContain('tourOperator');
+        expect(
+            await labelsOn({
+                type: 'item',
+                collection: 'offices',
+                id,
+            })
+        ).toEqual(['Travel agency']);
+        expect(
+            await labelsOn({
+                type: 'global',
+                name: 'privacyPolicy',
+            })
+        ).toEqual(['Travel agency']);
+        expect(
+            await labelsOn({
+                type: 'page',
+                name: 'frontPage',
+                site: 'uk',
+            })
+        ).toEqual(['Travel agency']);
+        expect(
+            await labelsOn({
+                type: 'item',
+                collection: 'events',
+                id: 'pruning',
+                site: 'uk',
+            })
+        ).toEqual(['Travel agency', 'Tour operator']);
     });
 
     it('sends a page to its own site alone, and a global to every site and partner', async () => {

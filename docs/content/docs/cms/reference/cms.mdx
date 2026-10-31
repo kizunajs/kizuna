@@ -99,6 +99,8 @@ partners: {
     travelAgency: {
         label,
         reads,
+        collections,
+        globals,
         invalidate: {
             url,
             headers,
@@ -107,4 +109,4 @@ partners: {
 },
 ```
 
-`reads` lists the sites the partner reads, as in `['uk']`, and it reads the shared content with them. `invalidate` is where the CMS sends `{ brand, id }`, `{ global }` or `{ page }` when a document the partner reads publishes, unpublishes or is deleted, and `headers` returns what that route expects, like the bearer token the partner gave you. See [Partners](/docs/cms/sites#partners).
+`reads` lists the sites the partner reads, as in `['uk']`, and it reads the shared content with them. `collections` and `globals` narrow that to the ones they name, shared or of a site in `reads`, as in `collections: ['events', 'offices']`. A partner that names either reads no pages and hears only their publishes. `invalidate` is where the CMS sends `{ brand, id }`, `{ global }` or `{ page }` when a document the partner reads publishes, unpublishes or is deleted, and `headers` returns what that route expects, like the bearer token the partner gave you. See [Partners](/docs/cms/sites#partners).

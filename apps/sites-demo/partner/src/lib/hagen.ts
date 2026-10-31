@@ -37,15 +37,15 @@ export const offices = async () => {
 };
 
 /**
- * The people at Hagen's shops.
+ * Hagen UK's workshops and open days, soonest first.
  */
-export const employees = async () => {
-    const result = await hagen.content.sites.uk.collections.employees.list({
+export const events = async () => {
+    const result = await hagen.content.sites.uk.collections.events.list({
         query: {
-            orderBy: 'order',
+            orderBy: 'date',
             direction: 'asc',
         },
-        fetchOptions: cachedUnder('EmployeeId'),
+        fetchOptions: cachedUnder('EventId'),
     });
     if (result.status !== 200) throw new Error(`Hagen answered ${result.status}: ${result.body.detail}`);
     return result.body.items;

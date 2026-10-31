@@ -49,7 +49,7 @@ fetchIds({
 
 ## Partners reading
 
-A partner reads with that client and a token from OAuth client credentials, signing in as the identity `auth.read` names. It may read the sites its `reads` names and the shared content, and a read of another site answers `403`, naming the permission it lacks, like `content.sites.norway:read`. A token whose guard returns no `partner` reads every site. A read with a token answers with `Cache-Control: private`. [Partners](/docs/cms/sites#partners) shows the config, the sign-in and how a partner hears a publish.
+A partner reads with that client and a token from OAuth client credentials, signing in as the identity `auth.read` names. It may read the sites its `reads` names and the shared content, or only the `collections` and `globals` it names, and any other read answers `403`, naming the permission it lacks, like `content.sites.norway:read` or `content.sites.uk.collections.products:read`. A token whose guard returns no `partner` reads every site. A read with a token answers with `Cache-Control: private`. [Partners](/docs/cms/sites#partners) shows the config, the sign-in and how a partner hears a publish.
 
 ## Content in the app API
 
