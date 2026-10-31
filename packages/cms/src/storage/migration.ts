@@ -105,6 +105,40 @@ create table if not exists cms_translations (
  */
 export type IndexType = 'text' | 'numeric' | 'boolean';
 
+create table if not exists cms_releases (
+    id text primary key,
+    name text not null,
+    at timestamptz,
+    status text not null,
+    force boolean not null default false,
+    created_by text not null,
+    created_at timestamptz not null,
+    scheduled_by text,
+    published_at timestamptz,
+    published_by text
+);
+
+create table if not exists cms_schedules (
+    id text primary key,
+    ref text not null,
+    document_id text not null,
+    action text not null,
+    at timestamptz,
+    release_id text references cms_releases (id),
+    force boolean not null default false,
+    status text not null,
+    created_by text not null,
+    created_at timestamptz not null,
+    ran_at timestamptz,
+    ran_version int
+);
+
+create unique index if not exists cms_schedules_one on cms_schedules (document_id) where status in ('scheduled', 'running');
+
+create index if not exists cms_schedules_due on cms_schedules (status, at);
+
+create index if not exists cms_schedules_release on cms_schedules (release_id);
+
 export interface IndexedField {
     kind: string;
     keyPrefix: string;

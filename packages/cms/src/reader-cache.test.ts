@@ -91,6 +91,9 @@ const ShopFrontPage = definePage({
 
 const configWith = (frontPage: typeof FeaturedFrontPage | typeof ShopFrontPage) =>
     defineConfig({
+        jobRunner: {
+            mode: 'in-process',
+        },
         adapter: {
             name: 'test',
             mount: () => undefined,

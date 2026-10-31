@@ -267,6 +267,9 @@ describe('chooseSites', () => {
         ).toThrow("The uk site's 'journal' chooses sites, but only a shared collection shows on several.");
         expect(() =>
             defineConfig({
+                jobRunner: {
+                    mode: 'in-process',
+                },
                 adapter: expressAdapter(),
                 auth: {
                     identities: {

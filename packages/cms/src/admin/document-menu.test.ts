@@ -31,7 +31,14 @@ describe('menuEntriesOf', () => {
                 },
             ],
         });
-        expect(entries.map((entry) => entry.label)).toEqual(['Ask for review', 'Unpublish', 'Duplicate', 'Send welcome email', 'Delete']);
+        expect(entries.map((entry) => entry.label)).toEqual([
+            'Ask for review',
+            'Add to release',
+            'Unpublish',
+            'Duplicate',
+            'Send welcome email',
+            'Delete',
+        ]);
     });
 
     it('leaves out Unpublish before anything is live, and Duplicate and Delete outside a collection', () => {

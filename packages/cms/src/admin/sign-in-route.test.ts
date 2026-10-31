@@ -117,6 +117,9 @@ const signOut = (request: SignOutRequest): Response => {
 
 const pglite = new PGlite();
 const config = defineConfig({
+    jobRunner: {
+        mode: 'in-process',
+    },
     adapter: {
         ...expressAdapter(),
         content: runtime,
@@ -377,6 +380,9 @@ describe('the sign-in screen of a deployment with several sites', () => {
 describe('the sign-in options', () => {
     const configWith = (options: { signInPath?: string; signOutPath?: string }) => () =>
         defineConfig({
+            jobRunner: {
+                mode: 'in-process',
+            },
             adapter: expressAdapter(),
             auth: {
                 identities: {

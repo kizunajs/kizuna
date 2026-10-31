@@ -464,8 +464,11 @@ describe('the invalidate route on a CMS with sites', () => {
 });
 
 describe('a CMS with one site', () => {
-    it('declares no jobs, so it needs no jobRunner', () => {
+    it('declares the scheduling job alone, so it names a jobRunner too', () => {
         const single = defineConfig({
+            jobRunner: {
+                mode: 'in-process',
+            },
             auth: {
                 identities: {
                     editor,
@@ -484,7 +487,7 @@ describe('a CMS with one site', () => {
                 },
             }),
         });
-        expect(single.api.jobs).toBeUndefined();
+        expect(Object.keys((single.api.jobs as Record<string, object>)['content']!)).toEqual(['publishScheduled']);
     });
 
     it('declares the refresh job with sites, and runs it in process', () => {
@@ -503,7 +506,7 @@ describe('a CMS with one site', () => {
                 },
             }),
         });
-        expect(Object.keys((several.api.jobs as Record<string, object>)['content']!)).toEqual(['refreshSite']);
+        expect(Object.keys((several.api.jobs as Record<string, object>)['content']!)).toEqual(['publishScheduled', 'refreshSite']);
     });
 });
 

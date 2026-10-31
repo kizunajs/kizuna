@@ -12,6 +12,7 @@ import { duplicateValuesOf, menuEntriesOf, type MenuEntry } from './document-men
 import { hrefOf, navigate } from './navigation.js';
 import { problemOf } from './parts.js';
 import { useOfferUndo } from './toasts.js';
+import { AddToReleaseDialog } from './schedule-ui.js';
 
 const ICONS = {
     ask: MessageCircle,
@@ -92,6 +93,7 @@ export function DocumentMore({
     ref?: Ref<DocumentMoreHandle>;
 }) {
     const [confirming, setConfirming] = useState<{ entry: MenuEntry; question: Confirmation } | undefined>();
+    const [addingToRelease, setAddingToRelease] = useState(false);
     const toasts = Toast.useToastManager();
     const offerUndo = useOfferUndo();
     const entries = menuEntriesOf({
@@ -292,6 +294,19 @@ export function DocumentMore({
                     if (confirming !== undefined) void run(confirming.entry);
                 }}
                 onCancel={() => setConfirming(undefined)}
+            />
+            <AddToReleaseDialog
+                connection={connection}
+                documentRef={document.ref}
+                title={title}
+                open={addingToRelease}
+                onOpenChange={setAddingToRelease}
+                onAdded={(release) => {
+                    toasts.add({
+                        description: `Added ${title} to ${release.name}.`,
+                    });
+                    onChanged();
+                }}
             />
         </>
     );

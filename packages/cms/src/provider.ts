@@ -8,7 +8,7 @@ import type { DeclaredSites } from './site.js';
 import type { Collection, Global } from './definitions.js';
 import { servesCollection } from './page.js';
 import { latestMigration } from './content.js';
-import { refreshJobs, type CmsJobs } from './refresh.js';
+import { refreshJobs, scheduleJobs, type CmsJobs, type ScheduleJobs } from './refresh.js';
 import type { Jobs } from 'kizunajs/adapter';
 
 /**
@@ -100,7 +100,7 @@ export function cms<
         globals?: Globals;
         collections?: Collections;
     }
-): ContentProvider<CmsContent<Pages, Globals, Collections, Sites>, CmsRoutes, [Sites] extends [undefined] ? Jobs : CmsJobs>;
+): ContentProvider<CmsContent<Pages, Globals, Collections, Sites>, CmsRoutes, [Sites] extends [undefined] ? ScheduleJobs : CmsJobs>;
 export function cms(options: CmsPluginOptions): ContentProvider<unknown, CmsRoutes, Jobs> {
     const plugin = cmsPluginDeclaration(options);
     return defineContentProvider({
@@ -108,11 +108,10 @@ export function cms(options: CmsPluginOptions): ContentProvider<unknown, CmsRout
         routes: cmsRoutes(plugin),
         reader: ({ api, runtime }) => createReader((pluginExportsOf(api)[plugin.slug] as CmsExports).service, runtime),
         documents: () => documentsOf(options),
-        // Each publish refreshes the other deployments and the partners, so a CMS with sites runs jobs.
-        ...(options.sites === undefined
-            ? {}
-            : {
-                  jobs: refreshJobs(plugin.slug, options.jobs?.identity),
-              }),
+        // Every CMS publishes what is scheduled, and with sites each publish refreshes the other deployments and the partners.
+        jobs:
+            options.sites === undefined
+                ? scheduleJobs(plugin.slug, options.jobs?.identity)
+                : refreshJobs(plugin.slug, options.jobs?.identity),
     });
 }

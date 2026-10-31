@@ -59,6 +59,9 @@ const Articles = defineCollection({
 const pglite = new PGlite();
 const configWith = (adminPath?: `/${string}`, adminCss?: string) =>
     defineConfig({
+        jobRunner: {
+            mode: 'in-process',
+        },
         adapter: expressAdapter(),
         auth: {
             identities: {
@@ -216,6 +219,9 @@ describe('Edit in your chat', () => {
     it("tells the admin where the MCP route is, its name, and the editor's token", async () => {
         const connected = express();
         defineConfig({
+            jobRunner: {
+                mode: 'in-process',
+            },
             adapter: expressAdapter(),
             auth: {
                 identities: {

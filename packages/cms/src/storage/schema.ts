@@ -1,4 +1,4 @@
-import { integer, jsonb, pgTable, primaryKey, text, timestamp, unique, index } from 'drizzle-orm/pg-core';
+import { boolean, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, index } from 'drizzle-orm/pg-core';
 
 /**
  * One document: a page, a global, an item of a collection, or a media item.
@@ -101,6 +101,7 @@ export const cmsReviews = pgTable(
         id: text('id').primaryKey(),
         requestId: text('request_id').notNull(),
         ref: text('ref').notNull(),
+        published: boolean('published').notNull().default(false),
         documentId: text('document_id')
             .notNull()
             .references(() => cmsDocuments.id),
@@ -182,4 +183,70 @@ export const cmsRefreshes = pgTable(
         index('cms_refreshes_ref').on(table.ref, table.createdAt),
         index('cms_refreshes_updated').on(table.updatedAt),
     ]
+);
+
+/**
+ * A named set of drafts that publish together, at `at` or by hand.
+ */
+export const cmsReleases = pgTable('cms_releases', {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    at: timestamp('at', {
+        withTimezone: true,
+        mode: 'date',
+    }),
+    /**
+     * `open`, `running` or `published`.
+     */
+    status: text('status').notNull(),
+    force: boolean('force').notNull().default(false),
+    createdBy: text('created_by').notNull(),
+    createdAt: timestamp('created_at', {
+        withTimezone: true,
+        mode: 'date',
+    }).notNull(),
+    scheduledBy: text('scheduled_by'),
+    publishedAt: timestamp('published_at', {
+        withTimezone: true,
+        mode: 'date',
+    }),
+    publishedBy: text('published_by'),
+});
+
+/**
+ * One document set to publish or unpublish: at its own `at`, or with its
+ * release. A done row keeps the version it published.
+ */
+export const cmsSchedules = pgTable(
+    'cms_schedules',
+    {
+        id: text('id').primaryKey(),
+        ref: text('ref').notNull(),
+        documentId: text('document_id').notNull(),
+        /**
+         * `publish` or `unpublish`.
+         */
+        action: text('action').notNull(),
+        at: timestamp('at', {
+            withTimezone: true,
+            mode: 'date',
+        }),
+        releaseId: text('release_id').references(() => cmsReleases.id),
+        force: boolean('force').notNull().default(false),
+        /**
+         * `scheduled`, `running`, `done` or `cancelled`.
+         */
+        status: text('status').notNull(),
+        createdBy: text('created_by').notNull(),
+        createdAt: timestamp('created_at', {
+            withTimezone: true,
+            mode: 'date',
+        }).notNull(),
+        ranAt: timestamp('ran_at', {
+            withTimezone: true,
+            mode: 'date',
+        }),
+        ranVersion: integer('ran_version'),
+    },
+    (table) => [index('cms_schedules_due').on(table.status, table.at), index('cms_schedules_release').on(table.releaseId)]
 );

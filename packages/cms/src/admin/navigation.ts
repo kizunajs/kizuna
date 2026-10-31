@@ -49,6 +49,19 @@ export type Screen = (
       }
     | {
           /**
+           * What is set to publish or unpublish, and the releases.
+           */
+          kind: 'scheduled';
+      }
+    | {
+          /**
+           * One release and its documents.
+           */
+          kind: 'release';
+          id: string;
+      }
+    | {
+          /**
            * Every site, with the one chosen beside the list.
            */
           kind: 'sites';
@@ -220,6 +233,8 @@ export const hrefIn = (site: string | undefined, screen: Screen): string => {
     const at = (...segments: string[]): string => under(...(prefix === '' ? segments : [prefix, ...segments]));
     if (screen.kind === 'pages') return at('pages');
     if (screen.kind === 'waiting') return at('waiting');
+    if (screen.kind === 'scheduled') return at('scheduled');
+    if (screen.kind === 'release') return at('releases', screen.id);
     if (screen.kind === 'sites') return screen.key === undefined ? at('sites') : at('sites', screen.key);
     if (screen.kind === 'people') return at('people');
     if (screen.kind === 'media') return screen.id === undefined ? at('media') : at('media', screen.id);
@@ -350,6 +365,17 @@ const screenAt = (segments: readonly string[], site: AdminSite | undefined): Scr
     if (section === 'waiting' && name === undefined) {
         return {
             kind: 'waiting',
+        };
+    }
+    if (section === 'scheduled' && name === undefined) {
+        return {
+            kind: 'scheduled',
+        };
+    }
+    if (section === 'releases' && name !== undefined && id === undefined) {
+        return {
+            kind: 'release',
+            id: name,
         };
     }
     // Every site and the people who edit them are Overview's alone.
@@ -668,6 +694,12 @@ export const navigationOf = (options: {
                     },
                 },
                 {
+                    label: 'Scheduled',
+                    screen: {
+                        kind: 'scheduled',
+                    },
+                },
+                {
                     label: 'Media',
                     screen: {
                         kind: 'media',
@@ -843,6 +875,13 @@ const siteNavigationOf = (options: Parameters<typeof navigationOf>[0], declared:
                         site: shown.key,
                     },
                 },
+                {
+                    label: 'Scheduled',
+                    screen: {
+                        kind: 'scheduled',
+                        site: shown.key,
+                    },
+                },
                 media(shown.key),
             ],
         },
@@ -913,9 +952,16 @@ export const placeOf = (screen: Screen, allSites: boolean): Place => {
  */
 export const screenInPlace = (screen: Screen, place: Place): Screen => {
     if (place.kind === 'site') {
-        if (screen.kind === 'waiting') {
+        if (screen.kind === 'waiting' || screen.kind === 'scheduled') {
             return {
-                kind: 'waiting',
+                kind: screen.kind,
+                site: place.site,
+            };
+        }
+        if (screen.kind === 'release') {
+            return {
+                kind: 'release',
+                id: screen.id,
                 site: place.site,
             };
         }
@@ -1035,6 +1081,7 @@ export const isCurrent = (entry: Screen, shown: Screen): boolean => {
     }
     if (entry.kind === 'media') return shown.kind === 'media' && shown.site === entry.site;
     if (entry.kind === 'waiting') return shown.kind === 'waiting' && shown.site === entry.site;
+    if (entry.kind === 'scheduled') return (shown.kind === 'scheduled' || shown.kind === 'release') && shown.site === entry.site;
     if (entry.kind === 'sites' || entry.kind === 'people') return shown.kind === entry.kind;
     if (entry.kind === 'pages') {
         const ref = shown.kind === 'document' ? parseRef(shown.ref) : undefined;

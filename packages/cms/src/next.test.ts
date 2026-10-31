@@ -167,6 +167,9 @@ const content = cmsContent({
 });
 
 const config = defineConfig({
+    jobRunner: {
+        mode: 'in-process',
+    },
     adapter: {
         name: 'test',
         mount: () => undefined,

@@ -141,6 +141,9 @@ const ArticlePage = definePage({
 const pglite = new PGlite();
 const db = drizzle(pglite);
 const config = defineConfig({
+    jobRunner: {
+        mode: 'in-process',
+    },
     adapter: {
         ...expressAdapter(),
         content: runtime,

@@ -54,6 +54,17 @@ export const menuEntriesOf = (input: {
             label: 'Ask for review',
         });
     }
+    if (input.scheduled !== undefined) {
+        entries.push({
+            kind: 'cancelSchedule',
+            label: input.scheduled === 'release' ? 'Take out of release' : 'Cancel schedule',
+        });
+    } else if (input.status === 'draft' || input.status === 'changed') {
+        entries.push({
+            kind: 'addToRelease',
+            label: 'Add to release',
+        });
+    }
     if (input.status === 'published' || input.status === 'changed') {
         entries.push({
             kind: 'unpublish',

@@ -188,6 +188,26 @@ export const renameSite = async (
                 })
                 .where(eq(cmsReviews.id, review.id));
         }
+        const schedules = await tx
+            .select({
+                id: cmsSchedules.id,
+                ref: cmsSchedules.ref,
+            })
+            .from(cmsSchedules)
+            .where(inArray(cmsSchedules.documentId, documents));
+        for (const schedule of schedules) {
+            const ref = parseRef(schedule.ref);
+            if (ref === undefined) continue;
+            await tx
+                .update(cmsSchedules)
+                .set({
+                    ref: formatRef({
+                        ...ref,
+                        site: to,
+                    }),
+                })
+                .where(eq(cmsSchedules.id, schedule.id));
+        }
         const rekeyed = await tx
             .update(cmsDocuments)
             .set({

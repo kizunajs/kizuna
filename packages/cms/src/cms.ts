@@ -50,12 +50,16 @@ import {
     SOURCE_LOCALE,
     VersionConflictError,
     type DocumentKind,
+    DocumentHeldError,
+    holderOf,
+    type CmsDatabase,
     type DocumentRow,
     type EditingCondition,
     type ListField,
     type Migration,
 } from './storage/store.js';
-import { previewSecret, signPreviewToken, verifyPreviewToken, verifyRefresh } from './preview-token.js';
+import { ScheduleStore } from './storage/schedule-store.js';
+import { previewSecret, previewTokenExpiry, signPreviewToken, verifyPreviewToken, verifyRefresh } from './preview-token.js';
 import { DraftNotices } from './draft-notices.js';
 import { DocumentHolds, type Hold } from './holds.js';
 import { depthRefusal, descendantsOf, loadParents, loopRefusal, parentIn, placeInTree } from './tree.js';
@@ -521,6 +525,10 @@ export class CmsService {
     /**
      * The shared globals.
      */
+    /**
+     * The scheduled publishes and the releases.
+     */
+    readonly schedules: ScheduleStore;
     readonly globals: Record<string, Global>;
     /**
      * The shared collections.
@@ -568,6 +576,7 @@ export class CmsService {
             siteEntries.map(([site, entry]) => [
                 site,
                 Object.fromEntries((entry.globals ?? []).map((definition) => [definition.name, definition])),
+        this.schedules = new ScheduleStore(options.db);
             ])
         );
         this.siteCollections = Object.fromEntries(
@@ -3298,6 +3307,45 @@ export class CmsService {
         await this.assertNoLoop(ref, state.row?.draft, 'published');
         const sites = await this.sitesShowing(ref, ['published', 'draft']);
         const outcome = await this.store.approveAndPublish(
+        await this.revalidateDocument(ref, sites);
+        await queueRefreshes(this, ref, sites);
+        return this.draftState(ref);
+    }
+
+    /**
+     * Withdraws the published copy and drops the same cached reads publishing
+     * does. The draft and every version stay.
+     */
+    async unpublish(ref: DocumentRef, author: string): Promise<DraftState> {
+        const { target, row } = await this.document(ref);
+        if (row === undefined && ref.type === 'item') {
+            throw new CmsHttpError(404, {
+                detail: `There is no item '${ref.id}' in '${ref.collection}'.`,
+            });
+        }
+        const sites = await this.sitesShowing(ref, ['published']);
+        if ((await this.store.unpublish(target.kind, target.key, author, target.site, target.locale)) === undefined) {
+            throw new CmsHttpError(409, {
+                detail: `'${formatRef(ref)}' is not published.`,
+            });
+        }
+        if (row !== undefined) await this.schedules.endFor(row.id);
+        await this.revalidateDocument(ref, sites);
+        await queueRefreshes(this, ref, sites);
+        return this.draftState(ref);
+    }
+
+    /**
+     * An earlier version's content, migrated to the current schema.
+     */
+    async versionContent(
+        ref: DocumentRef,
+        version: number
+    ): Promise<{ content: Record<string, unknown>; summary: string | null; createdAt: Date; createdBy: string }> {
+        const { target, row } = await this.document(ref);
+        if (row === undefined) throw new CmsHttpError(404, { detail: `'${formatRef(ref)}' has no versions.` });
+        const found = await this.store.version(row.id, version);
+        if (found === undefined) throw new CmsHttpError(404, { detail: `'${formatRef(ref)}' has no version ${version}.` });
             state.target.kind,
             state.target.key,
             approval,
@@ -3401,7 +3449,7 @@ export class CmsService {
      */
     async mediaUses(): Promise<Map<string, MediaUse[]>> {
         const found = new Map<string, MediaUse[]>();
-        for (const { target, row: stored } of await this.declaredDocuments()) {
+        for (const { target, row: stored, refId, fieldPaths, published } of held.values()) {
             const row = this.migrated(target, stored)!;
             const published = new Set(mediaUsesOf(target.definition, row.published ?? {}).map((use) => use.id));
             const byId = new Map<string, Set<string>>();
@@ -3443,6 +3491,24 @@ export class CmsService {
 
     /**
      * Refreshes every page that shows an image, once its own alt text or
+    /**
+     * Rebuilds the refs index of every stored document from its draft and its
+     * published content, for a database indexed before images were. Answers
+     * how many documents it went through.
+     */
+    async reindexRefs(): Promise<number> {
+        const documents = await this.declaredDocuments();
+        for (const { target, row: stored } of documents) {
+            const row = this.migrated(target, stored)!;
+            await this.store.reindexRefs(
+                row.id,
+                refsOf(target.definition, row.draft ?? row.published ?? {}),
+                row.published === null ? [] : refsOf(target.definition, row.published)
+            );
+        }
+        return documents.length;
+    }
+
      * focal point changed or it was deleted.
      */
     async revalidateMedia(uses: readonly MediaUse[]): Promise<void> {
@@ -3460,9 +3526,18 @@ export class CmsService {
      * Every stored document something in code still declares, with its
      * target. Orphans are left to `orphanedPages`.
      */
-    private async declaredDocuments(): Promise<Array<{ target: Target; row: DocumentRow }>> {
-        const found: Array<{ target: Target; row: DocumentRow }> = [];
-        for (const row of await this.store.list('page')) {
+    /**
+     * The target of a stored source document something in code still
+     * declares, or `undefined` for an orphan.
+     */
+    private declaredTarget(row: DocumentRow, listings: ReturnType<CmsService['listings']>): Target | undefined {
+        const site =
+            row.site === DEFAULT_SITE
+                ? {}
+                : {
+                      site: row.site,
+                  };
+        if (row.kind === 'page') {
             const entry = this.sites[row.site]?.[row.key];
             if (entry === undefined || servesCollection(entry.page)) continue;
             found.push({
@@ -3482,6 +3557,12 @@ export class CmsService {
             const declared = row.site === DEFAULT_SITE ? this.globals[row.key] : this.siteGlobals[row.site]?.[row.key];
             if (declared === undefined) continue;
             found.push({
+        if (row.kind !== 'item') return undefined;
+        const listing = listings.find((candidate) => candidate.site === row.site && row.key.startsWith(candidate.keyPrefix));
+        return listing === undefined ? undefined : this.target(listing.refOf(row.key.slice(listing.keyPrefix.length)));
+    }
+
+    async declaredDocuments(): Promise<Array<{ target: Target; row: DocumentRow }>> {
                 target: this.target({
                     type: 'global',
                     name: row.key,

@@ -127,6 +127,9 @@ const content = cms({
     revalidate: () => {},
 });
 const config = defineConfig({
+    jobRunner: {
+        mode: 'in-process',
+    },
     adapter: expressAdapter(),
     auth: {
         identities: {

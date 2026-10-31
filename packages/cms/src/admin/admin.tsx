@@ -1,7 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
 import { Toast } from '@base-ui/react/toast';
-import { File, FileText, Globe, Image, Inbox, LayoutGrid, List, Menu as MenuIcon, Table2, Users, X, type LucideIcon } from 'lucide-react';
+import {
+    CalendarClock,
+    File,
+    FileText,
+    Globe,
+    Image,
+    Inbox,
+    LayoutGrid,
+    List,
+    Menu as MenuIcon,
+    Table2,
+    Users,
+    X,
+    type LucideIcon,
+} from 'lucide-react';
 import { EditorContext, ICON, type EditorContextValue } from '../view/context.js';
 import { singularOf } from '../view/array-rows.js';
 import { humanize } from '../view/schema.js';
@@ -42,6 +56,7 @@ import { SiteFact } from './site-switcher.js';
 import { People } from './people.js';
 import { SitesScreen } from './sites-screen.js';
 import { useWaiting, WaitingScreen } from './waiting.js';
+import { ReleaseScreen, ScheduledScreen } from './schedule-ui.js';
 import { waitingRowsOf } from './waiting-rows.js';
 import { PathBar, PlaceHead, usePins, useRecent, type PathStep } from './places.js';
 import { sharedNameOf, siteValuesRefOf } from './site-view.js';
@@ -115,6 +130,7 @@ const entryIconOf = (screen: Screen): LucideIcon | undefined => {
     if (screen.kind === 'view') return Table2;
     if (screen.kind === 'document') return FileText;
     if (screen.kind === 'waiting') return Inbox;
+    if (screen.kind === 'scheduled') return CalendarClock;
     if (screen.kind === 'sites') return Globe;
     if (screen.kind === 'people') return Users;
     return undefined;
@@ -258,6 +274,31 @@ export function Admin({ config }: { config: AdminConfig }) {
             return [
                 {
                     label: 'People',
+                },
+            ];
+        }
+        if (screen.kind === 'scheduled') {
+            return [
+                {
+                    label: 'Scheduled',
+                },
+            ];
+        }
+        if (screen.kind === 'release') {
+            return [
+                {
+                    label: 'Scheduled',
+                    href: hrefOf({
+                        kind: 'scheduled',
+                        ...(screen.site === undefined
+                            ? {}
+                            : {
+                                  site: screen.site,
+                              }),
+                    }),
+                },
+                {
+                    label: 'Release',
                 },
             ];
         }
@@ -442,6 +483,8 @@ export function Admin({ config }: { config: AdminConfig }) {
             return <SitesScreen sites={sites} chosen={screen.key} waiting={openWork} people={people} collectionLabel={collectionLabel} />;
         }
         if (screen.kind === 'people') return <People connection={connection} sites={sites} />;
+        if (screen.kind === 'scheduled') return <ScheduledScreen connection={connection} site={screen.site} sites={sites} />;
+        if (screen.kind === 'release') return <ReleaseScreen connection={connection} id={screen.id} site={screen.site} sites={sites} />;
         if (screen.kind === 'pages') {
             return (
                 <PagesList

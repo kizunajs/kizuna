@@ -82,6 +82,9 @@ const config = defineConfig({
     auth: {
         identities: {
             editor,
+    jobRunner: {
+        mode: 'in-process',
+    },
         },
     },
     content: cms({

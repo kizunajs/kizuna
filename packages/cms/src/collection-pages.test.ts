@@ -106,6 +106,9 @@ const content = cms({
     appDir: 'src/__fixtures__/app',
 });
 const config = defineConfig({
+    jobRunner: {
+        mode: 'in-process',
+    },
     adapter: expressAdapter(),
     auth: {
         identities: {
@@ -295,6 +298,9 @@ describe('pages that show a collection', () => {
 describe('page checks', () => {
     const assemble = (path: string, definition: typeof ArticlePage | typeof FrontPage, collections = [Articles]) =>
         defineConfig({
+            jobRunner: {
+                mode: 'in-process',
+            },
             auth: {
                 identities: {
                     editor,
@@ -347,6 +353,9 @@ describe('brand checks', () => {
         });
         expect(() =>
             defineConfig({
+                jobRunner: {
+                    mode: 'in-process',
+                },
                 auth: {
                     identities: {
                         editor,

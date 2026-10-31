@@ -311,6 +311,9 @@ describe('checking actions', () => {
         });
         expect(() =>
             defineConfig({
+                jobRunner: {
+                    mode: 'in-process',
+                },
                 adapter: expressAdapter(),
                 auth: {
                     identities: {

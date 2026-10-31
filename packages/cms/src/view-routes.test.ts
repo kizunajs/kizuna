@@ -281,6 +281,9 @@ const content = cms({
     },
 });
 const config = defineConfig({
+    jobRunner: {
+        mode: 'in-process',
+    },
     adapter: expressAdapter(),
     auth: {
         identities: {
@@ -808,6 +811,9 @@ describe('checking views', () => {
 
     const assemble = (views: Parameters<typeof cms>[0]['views'], collections: Parameters<typeof cms>[0]['collections'] = []) =>
         defineConfig({
+            jobRunner: {
+                mode: 'in-process',
+            },
             adapter: expressAdapter(),
             auth: {
                 identities: {

@@ -7,6 +7,7 @@ import { formatRef, type DocumentRef } from './refs.js';
 import { servesCollection } from './page.js';
 import { previewSecret, REFRESH_SIGNATURE_HEADER, signRefresh } from './preview-token.js';
 import { InvalidateBodySchema, type InvalidateBody } from './wire.js';
+import { publishScheduledJob } from './schedules.js';
 
 /**
  * How many times the transport tries a site or partner that does not answer.
@@ -243,6 +244,7 @@ const k = new Kizuna();
 export const refreshJobs = (slug: string, identity: string | undefined) => {
     const definitions = {
         refreshSite: k
+        publishScheduled: publishScheduledJob(slug),
             .job({
                 summary: "Refresh one site's or partner's pages after a document changed",
                 retry: REFRESH_ATTEMPTS,
@@ -269,6 +271,22 @@ export const refreshJobs = (slug: string, identity: string | undefined) => {
 };
 
 /**
- * The jobs `cms()` hands `content`.
+ * The job every CMS declares under `content`: the one that publishes what is
+ * scheduled. Without an identity, it runs as the app's jobs do.
+ */
+export const scheduleJobs = (slug: string, identity: string | undefined) => {
+    const definitions = {
+        publishScheduled: publishScheduledJob(slug),
+    };
+    return identity === undefined ? k.jobs(definitions) : k.jobs(identity, definitions);
+};
+
+/**
+ * The jobs `cms()` hands `content` once it serves several sites.
  */
 export type CmsJobs = ReturnType<typeof refreshJobs>;
+
+/**
+ * The jobs `cms()` hands `content` with one site.
+ */
+export type ScheduleJobs = ReturnType<typeof scheduleJobs>;

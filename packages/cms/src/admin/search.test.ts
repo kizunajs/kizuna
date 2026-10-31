@@ -67,6 +67,7 @@ describe('the admin search', () => {
         expect(placesOf(sections).map((place) => [place.label, place.detail])).toEqual([
             ['Dashboard', ''],
             ['Pages', 'Content'],
+            ['Scheduled', 'Content'],
             ['Media', 'Content'],
             ['Site', 'Content'],
             ['Articles', 'Content'],

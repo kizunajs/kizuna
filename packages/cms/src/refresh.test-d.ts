@@ -25,7 +25,7 @@ describe("the refresh job's identity", () => {
                 identity: 'editor',
             },
         });
-        expectTypeOf<keyof NonNullable<typeof provider.jobs>>().toEqualTypeOf<'refreshSite'>();
+        expectTypeOf<keyof NonNullable<typeof provider.jobs>>().toEqualTypeOf<'publishScheduled' | 'refreshSite'>();
     });
 
     it('needs the identity when jobs is given', () => {

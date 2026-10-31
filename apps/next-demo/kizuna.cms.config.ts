@@ -31,6 +31,9 @@ export default defineConfig({
             app,
         },
     },
+    jobRunner: {
+        mode: 'in-process',
+    },
     content: cms({
         name: 'Hagen',
         db,

@@ -25,6 +25,8 @@ import {
     RevertBodySchema,
     DraftHeadersSchema,
     DraftPageSchema,
+    ScheduleBodySchema,
+    ScheduleSchema,
     EditorItemSchema,
     TreePlacementShape,
     MediaListSchema,
@@ -96,6 +98,8 @@ interface Args {
     query: Record<string, unknown> | undefined;
     body: unknown;
     headers: Record<string, string | string[] | undefined>;
+import { scheduleRoutes } from './schedule-routes.js';
+import { cancelSchedule, scheduleDocument } from './schedules.js';
     throwError: (response: { status: number; body: unknown; headers?: Record<string, string> }) => never;
     plugins?: Record<string, unknown>;
     auth?: Record<string, Record<string, unknown>>;
@@ -125,6 +129,19 @@ const draftBody = (state: DraftState) => ({
     version: state.version,
     publishedVersion: state.row?.publishedVersion ?? null,
     content: state.row?.draft ?? null,
+/**
+ * A document's pending schedule, as the draft answers carry it.
+ */
+const scheduleBody = (state: DraftState) =>
+    state.schedule === null
+        ? null
+        : {
+              action: state.schedule.action,
+              at: state.schedule.at?.toISOString() ?? null,
+              release: state.schedule.release,
+              by: state.schedule.by,
+          };
+
     complete: state.complete,
     missing: state.missing,
     updatedAt: state.row?.updatedAt.toISOString() ?? null,
@@ -137,6 +154,13 @@ const draftBody = (state: DraftState) => ({
 const labelOf = (field: { label?: string; name: string }): string =>
     field.label ??
     field.name
+    heldBy: state.heldBy,
+    schedule: scheduleBody(state),
+    ...(placeIn(state.row?.draft ?? state.row?.published) === undefined
+        ? {}
+        : {
+              place: placeIn(state.row?.draft ?? state.row?.published),
+          }),
         .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
         .replace(/[_-]/g, ' ')
         .toLowerCase()
@@ -156,8 +180,6 @@ const reviewFields = async (cms: CmsService, state: DraftState, people?: readonl
                 ? null
                 : {
                       id: owner,
-    heldBy: state.heldBy,
-    schedule: scheduleBody(state),
                       name: person?.name ?? owner,
                       ...(person?.image === undefined
                           ? {}
@@ -924,7 +946,75 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         status: 200,
                         body: draftBody(await cms.unpublish(ref, authorOf(cms, args))),
                     };
-                    await cms.assertNotHeld(ref, authorOf(cms, args));
+                }) as never
+            ),
+
+            schedule: route({
+                method: 'PUT',
+                path: `${editingBase}${scope.prefix}/schedule`,
+                auth: editor,
+                summary: `Schedule ${scope.noun} to publish or unpublish at a time`,
+                description:
+                    'Publishes the draft as it stands when the time comes, or unpublishes it, and replaces a time set before. When the time comes the same rules hold as for publishing: a draft missing a field, waiting for a required review, or being edited waits until that clears. The person confirms before this runs.',
+                tool: {
+                    needsApproval: true,
+                    destructiveHint: false,
+                    idempotentHint: true,
+                },
+                pathParams: scope.params,
+                ...editQuery,
+                body: ScheduleBodySchema,
+                responses: {
+                    200: ScheduleSchema,
+                    404: ProblemDetailsSchema,
+                    409: ProblemDetailsSchema,
+                    422: ValidationErrorSchema,
+                },
+            }).handler(
+                guarded(async (cms, args) => {
+                    const ref = refOf(cms, args);
+                    const access = cms.access(args.auth);
+                    assertPublishes(cms, access, ref);
+                    return {
+                        status: 200,
+                        body: await scheduleDocument(
+                            cms,
+                            access,
+                            ref,
+                            args.body as z.output<typeof ScheduleBodySchema>,
+                            authorOf(cms, args)
+                        ),
+                    };
+                }) as never
+            ),
+
+            cancelSchedule: route({
+                method: 'DELETE',
+                path: `${editingBase}${scope.prefix}/schedule`,
+                auth: editor,
+                summary: `Cancel the schedule of ${scope.noun}`,
+                description: 'Takes back the time it would publish or unpublish, and takes it out of its release. The draft stays a draft.',
+                tool: {
+                    destructiveHint: false,
+                    idempotentHint: true,
+                },
+                pathParams: scope.params,
+                ...editQuery,
+                responses: {
+                    204: z.void(),
+                    404: ProblemDetailsSchema,
+                },
+            }).handler(
+                guarded(async (cms, args) => {
+                    const ref = refOf(cms, args);
+                    if (!(await cancelSchedule(cms, ref))) {
+                        throw new CmsHttpError(404, {
+                            detail: `'${formatRef(ref)}' is not scheduled.`,
+                        });
+                    }
+                    return {
+                        status: 204,
+                    };
                 }) as never
             ),
 
@@ -2284,6 +2374,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                                       : {
                                             translate: true,
                                         }),
+                    heldBy: state.heldBy,
+                    schedule: scheduleBody(state),
                               },
                           }),
                 },
@@ -2464,8 +2556,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
      */
     const seenLibrary = (cms: CmsService, args: Args): string | undefined => {
         const site = cms.mediaSiteOf(mediaSiteOf(args));
-                    heldBy: state.heldBy,
-                    schedule: scheduleBody(state),
         cms.access(args.auth).assertSees(site);
         return site;
     };
@@ -3215,3 +3305,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
 export type CmsRoutes = ReturnType<typeof cmsRoutes>;
             releaseHold,
                 approveAndPublish: approveAndPublishReview,
+            ...scheduleRoutes({
+                editor,
+                editingBase,
+                guarded,
+            }),

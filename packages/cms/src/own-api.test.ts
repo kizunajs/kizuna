@@ -119,6 +119,9 @@ const content = cms({
     appDir: 'src/__fixtures__/app',
 });
 const config = defineConfig({
+    jobRunner: {
+        mode: 'in-process',
+    },
     adapter: expressAdapter(),
     auth: {
         identities: {

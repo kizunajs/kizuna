@@ -148,6 +148,32 @@ export const DraftScheduleSchema = z
     .describe('When the document publishes or unpublishes without anyone pressing Publish. Null when nothing is scheduled.');
 
 const HeldBySchema = z
+export const DraftPageSchema = Kizuna.model({
+    title: 'CMS.Draft',
+    schema: z.object({
+        ref: z.string().describe('The document: page:<name>, page:<site>:<name>, global:<name> or item:<collection>:<id>.'),
+        name: z.string(),
+        path: z
+            .string()
+            .nullable()
+            .describe("Where it is served: a page's path, or an item's address on the page that shows it. Null otherwise."),
+        status: PageStatusSchema,
+        version: z.int(),
+        publishedVersion: z.int().nullable(),
+        content: z.record(z.string(), z.unknown()).nullable(),
+        complete: z.boolean().describe('Whether the draft passes the page schema and may be rendered.'),
+        missing: z.array(z.string()).describe('The fields the draft is missing or fails.'),
+        updatedAt: z.string().nullable(),
+        updatedBy: z.string().nullable(),
+        heldBy: HeldBySchema,
+        schedule: DraftScheduleSchema,
+        place: PlaceSchema.optional().describe("An item's place, in an orderable collection, once it has one."),
+    }),
+});
+
+export const StoredContentSchema = Kizuna.model({
+    title: 'CMS.StoredContent',
+    schema: z.object({
     .string()
     .nullable()
     .describe(
@@ -171,8 +197,6 @@ const ConditionValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 
 export const FieldConditionSchema = Kizuna.model({
     title: 'CMS.FieldCondition',
-        heldBy: HeldBySchema,
-        schedule: DraftScheduleSchema,
     schema: z
         .object({
             field: z.string().describe('The field beside it whose value decides, in the same page, block or item.'),
@@ -390,6 +414,8 @@ export const DescribedPageSchema = Kizuna.model({
             .nullable()
             .describe(
                 "The page the Live Preview opens on: an item's `preview.url`, where the document is served, or the first page that shows it. Null when no page shows it."
+        heldBy: HeldBySchema,
+        schedule: DraftScheduleSchema,
             ),
         usedOn: UsedOnSchema,
         status: PageStatusSchema,
@@ -419,8 +445,6 @@ export const MissingFieldsSchema = Kizuna.model({
     }),
 });
 
-        heldBy: HeldBySchema,
-        schedule: DraftScheduleSchema,
 export const VersionSchema = Kizuna.model({
     title: 'CMS.Version',
     schema: z.object({
@@ -841,5 +865,124 @@ export const ReviewListSchema = Kizuna.model({
     title: 'CMS.Reviews',
     schema: z.object({
         reviews: z.array(ReviewStateSchema),
+    }),
+});
+
+export const ScheduleBodySchema = z.object({
+    action: z.enum(['publish', 'unpublish']).default('publish'),
+    at: z.iso
+        .datetime({
+            offset: true,
+        })
+        .describe('When to publish or unpublish, with its offset, like 2026-11-14T09:00:00+01:00.'),
+    force: z
+        .boolean()
+        .optional()
+        .describe(
+            'Publish past a review that is not approved when the time comes. Only someone with a role under `reviews.roles` may; for anyone else it changes nothing.'
+        ),
+});
+
+const ScheduleStateSchema = z
+    .enum(['scheduled', 'waiting', 'held', 'late'])
+    .describe(
+        '`scheduled`: it runs at its time. `waiting`: something would stop it if it ran now. `held`: its time passed and something stops it, so it runs once that clears. `late`: its time passed and the job has not run yet.'
+    );
+
+export const ScheduleSchema = Kizuna.model({
+    title: 'CMS.Schedule',
+    schema: z.object({
+        id: z.string(),
+        ref: z.string(),
+        title: z.string(),
+        kind: z.string().describe('What it is, like Pages or Articles.'),
+        site: z.string().nullable().describe('The site it belongs to, or null for shared content.'),
+        action: z.enum(['publish', 'unpublish']),
+        at: z.iso.datetime().nullable().describe('When it runs, in UTC. Null in a release that has no time yet.'),
+        release: z
+            .object({
+                id: z.string(),
+                name: z.string(),
+            })
+            .nullable(),
+        state: ScheduleStateSchema,
+        waitingFor: z.string().nullable().describe('What stops it, like "Nils Aas to approve" or "Intro".'),
+        scheduledBy: PersonSchema,
+        createdAt: z.iso.datetime(),
+    }),
+});
+
+export const ReleaseSchema = Kizuna.model({
+    title: 'CMS.Release',
+    schema: z.object({
+        id: z.string(),
+        name: z.string(),
+        at: z.iso.datetime().nullable().describe('When it publishes, in UTC. Null until someone schedules it.'),
+        state: z.enum(['open', 'scheduled', 'waiting', 'held', 'late', 'published']),
+        waiting: z.int().describe('How many of its documents would stop it if it ran now.'),
+        documents: z.array(ScheduleSchema).describe('Its documents that you may open.'),
+        mayPublish: z.boolean().describe('Whether you may schedule or publish it: you may publish every document in it.'),
+        createdBy: PersonSchema,
+        createdAt: z.iso.datetime(),
+        scheduledBy: PersonSchema.nullable(),
+        publishedAt: z.iso.datetime().nullable(),
+        publishedBy: PersonSchema.nullable(),
+    }),
+});
+
+export const ScheduledSchema = Kizuna.model({
+    title: 'CMS.Scheduled',
+    schema: z.object({
+        schedules: z.array(ScheduleSchema).describe('Documents scheduled on their own, soonest first.'),
+        releases: z.array(ReleaseSchema).describe('The releases that have not published yet, soonest first.'),
+    }),
+});
+
+export const CreateReleaseBodySchema = z.object({
+    name: z.string().trim().min(1).max(80),
+    refs: z.array(z.string()).default([]).describe('Documents to put in it, by ref.'),
+});
+
+export const RenameReleaseBodySchema = z.object({
+    name: z.string().trim().min(1).max(80),
+});
+
+export const ReleaseRefsBodySchema = z.object({
+    refs: z.array(z.string()).min(1).describe('The documents, by ref.'),
+});
+
+export const ReleaseScheduleBodySchema = z.object({
+    at: z.iso.datetime({
+        offset: true,
+    }),
+    force: z
+        .boolean()
+        .optional()
+        .describe('Publish past reviews that are not approved. Only someone with a role under `reviews.roles` may.'),
+});
+
+export const ReleasePublishBodySchema = z
+    .object({
+        force: z
+            .boolean()
+            .optional()
+            .describe('Publish past reviews that are not approved. Only someone with a role under `reviews.roles` may.'),
+    })
+    .optional();
+
+export const DraftCandidatesSchema = Kizuna.model({
+    title: 'CMS.DraftCandidates',
+    schema: z.object({
+        drafts: z.array(
+            z.object({
+                ref: z.string(),
+                title: z.string(),
+                kind: z.string().describe('What it is, like Pages or Articles.'),
+                site: z.string().nullable().describe('The site it belongs to, or null for shared content.'),
+                updatedAt: z.iso.datetime(),
+                updatedBy: PersonSchema,
+                scheduled: z.boolean().describe('Whether it is scheduled already, on its own or in a release.'),
+            })
+        ),
     }),
 });

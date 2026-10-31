@@ -15,6 +15,8 @@ import { withMediaSite } from './connection.js';
 import { ConfirmDialog } from './confirm.js';
 import { blockerOf, documentDatesOf, menuEntriesOf } from './document-menu.js';
 import { DocumentMore, type DocumentMoreHandle } from './document-more.js';
+import { scheduleFactOf } from './schedule-ui.js';
+import { whenOf } from '../view/schedule-time.js';
 import { savedAtOf, type VersionSummary } from './history.js';
 import { addressSite, hasSites, hrefOf, navigate, siteOf } from './navigation.js';
 import { SiteFact, SiteTabs } from './site-switcher.js';
@@ -1750,6 +1752,13 @@ export function DocumentScreen({
                                         waiting={waiting.filter((entry) => entry.ref !== document.ref).length}
                                         everywhere={document.usedOn.everywhere}
                                         secondary={sentBackBy !== undefined}
+                                        schedulable
+                                        scheduledAt={document.schedule?.release === null ? document.schedule.at : null}
+                                        onScheduled={(titles, at) =>
+                                            toasts.add({
+                                                description: `${titles.length === 1 ? titles[0] : `${titles.length} documents`} publish${titles.length === 1 ? 'es' : ''} ${whenOf(at)}.`,
+                                            })
+                                        }
                                         disabled={publishDisabled}
                                         describedBy={blocker === undefined ? undefined : 'k-document-blocker'}
                                         onChanged={(refs) => {

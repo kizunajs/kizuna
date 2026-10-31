@@ -8,6 +8,7 @@ import type { MediaRecord } from './media.js';
 import { PeoplePicker, ReviewBadge, type People } from './people.js';
 import { changeView, referencesOf, textOf, type ChangeView, type ReferenceLabel, type Shown, type ValueShape } from './change-value.js';
 import type { DescribedField, Description, PersonView, ReviewState } from './schema.js';
+import { defaultLaterOf, isoOf, localPartsOf, zoneNameOf } from './schedule-time.js';
 
 /**
  * One field the draft changes, as the changes route lists it.
@@ -358,6 +359,19 @@ export interface PublishReviewProps {
      * it opened. With it, asking closes the dialog.
      */
     onAsked?: (asked: AskedReview) => void;
+    /**
+     * Offers Later beside Now, so the documents publish at a time picked in
+     * the dialog.
+     */
+    schedulable?: boolean;
+    /**
+     * The time the open document is scheduled for, which the dialog opens on.
+     */
+    scheduledAt?: string | null;
+    /**
+     * Called once the documents are scheduled, with their titles and the time.
+     */
+    onScheduled?: (titles: string[], at: string) => void;
     ref?: Ref<PublishReviewHandle>;
 }
 
@@ -398,6 +412,9 @@ export function PublishReview({
     onChanged,
     onPublished,
     onAsked,
+    schedulable = false,
+    scheduledAt = null,
+    onScheduled,
     ref,
 }: PublishReviewProps) {
     const [open, setOpen] = useState(false);
@@ -414,6 +431,11 @@ export function PublishReview({
     const blockerId = useId();
     // The document someone is about to publish past its review.
     const [publishingPast, setPublishingPast] = useState<Pending | undefined>();
+    // When the documents go live: now, or at a date and time picked in the browser's zone.
+    const [when, setWhen] = useState<'now' | 'later'>('now');
+    const [laterDate, setLaterDate] = useState('');
+    const [laterTime, setLaterTime] = useState('');
+    const whenId = useId();
 
     const load = useCallback(async () => {
         const listed = await candidates();
@@ -449,6 +471,10 @@ export function PublishReview({
         setSkipped(new Set());
         setStep('changes');
         setNote('');
+        const later = scheduledAt === null ? defaultLaterOf() : localPartsOf(scheduledAt);
+        setWhen(scheduledAt === null ? 'now' : 'later');
+        setLaterDate(later.date);
+        setLaterTime(later.time);
         void load();
     }, [open, load]);
 
@@ -530,6 +556,55 @@ export function PublishReview({
         if (failed.length > 0) {
             setProblem(`${failed.length === 1 ? 'One document was' : `${failed.length} documents were`} not published. See below.`);
         }
+    };
+
+    const laterAt = isoOf(laterDate, laterTime);
+    const laterPassed = laterAt !== undefined && Date.parse(laterAt) <= Date.now();
+    // A schedule waits for a review or a missing field, so everything chosen that the person may publish is scheduled.
+    const schedulableDocuments = selected.filter((document) => document.canPublish);
+    const later = schedulable && when === 'later';
+
+    const schedule = async (documents: readonly Pending[]): Promise<void> => {
+        if (pending === undefined || laterAt === undefined) return;
+        setBusy('schedule');
+        setProblem(undefined);
+        const failed: Pending[] = [];
+        for (const document of documents) {
+            // The person confirmed the time in this dialog, so the route runs without asking again.
+            const answer = await connection.call(
+                `${document.tools.prefix}_schedule`,
+                {
+                    params: document.tools.params,
+                    body: {
+                        action: 'publish',
+                        at: laterAt,
+                    },
+                },
+                {
+                    approved: true,
+                }
+            );
+            if (answer.status !== 200) {
+                failed.push({
+                    ...document,
+                    problem: (answer.body as { detail?: string } | undefined)?.detail ?? `Scheduling failed (${answer.status}).`,
+                });
+            }
+        }
+        setBusy(undefined);
+        onChanged(documents.map((document) => document.ref));
+        const scheduled = documents.filter((document) => !failed.some((failure) => failure.ref === document.ref));
+        if (scheduled.length > 0)
+            onScheduled?.(
+                scheduled.map((document) => document.title),
+                laterAt
+            );
+        if (failed.length === 0) {
+            setOpen(false);
+            return;
+        }
+        setPending(pending.map((document) => failed.find((failure) => failure.ref === document.ref) ?? document));
+        setProblem(`${failed.length === 1 ? 'One document was' : `${failed.length} documents were`} not scheduled. See below.`);
     };
 
     const startAsking = (): void => {
@@ -829,6 +904,63 @@ export function PublishReview({
                             ))
                         )}
                     </div>
+                    {schedulable && step === 'changes' && mine.length === 0 && !reviewOnly && (pending ?? []).length > 0 ? (
+                        <div className="k-schedule-when">
+                            <div className="k-schedule-when__head">
+                                <span className="k-schedule-when__label" id={whenId}>
+                                    When
+                                </span>
+                                <div className="k-segmented" role="radiogroup" aria-labelledby={whenId}>
+                                    {(
+                                        [
+                                            ['now', 'Now'],
+                                            ['later', 'Later'],
+                                        ] as const
+                                    ).map(([key, label]) => (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            role="radio"
+                                            className="k-tab"
+                                            aria-checked={when === key}
+                                            onClick={() => setWhen(key)}>
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            {when === 'later' ? (
+                                <div className="k-schedule-when__fields">
+                                    <label className="k-schedule-when__field">
+                                        <span className="k-schedule-when__label">Date</span>
+                                        <input
+                                            type="date"
+                                            className="k-input"
+                                            value={laterDate}
+                                            min={localPartsOf(new Date().toISOString()).date}
+                                            onChange={(event) => setLaterDate(event.target.value)}
+                                        />
+                                    </label>
+                                    <label className="k-schedule-when__field">
+                                        <span className="k-schedule-when__label">Time</span>
+                                        <input
+                                            type="time"
+                                            className="k-input"
+                                            value={laterTime}
+                                            onChange={(event) => setLaterTime(event.target.value)}
+                                        />
+                                    </label>
+                                    {laterAt === undefined ? null : <span className="k-schedule-when__zone">{zoneNameOf(laterAt)}</span>}
+                                </div>
+                            ) : null}
+                            {when === 'later' && laterPassed ? (
+                                <p className="k-error" role="alert">
+                                    <CircleAlert {...ICON} />
+                                    That time has passed.
+                                </p>
+                            ) : null}
+                        </div>
+                    ) : null}
                     {problem !== undefined ? (
                         <p className="k-error" role="alert">
                             <CircleAlert {...ICON} />
@@ -900,7 +1032,24 @@ export function PublishReview({
                                                 Ask for review
                                             </button>
                                         ) : null}
-                                        {reviewOnly ? null : (
+                                        {reviewOnly ? null : later ? (
+                                            <button
+                                                type="button"
+                                                className="k-button k-button--primary"
+                                                disabled={
+                                                    busy !== undefined ||
+                                                    schedulableDocuments.length === 0 ||
+                                                    laterAt === undefined ||
+                                                    laterPassed
+                                                }
+                                                onClick={() => void schedule(schedulableDocuments)}>
+                                                {busy === 'schedule'
+                                                    ? 'Scheduling'
+                                                    : schedulableDocuments.length > 1
+                                                      ? `Schedule ${schedulableDocuments.length}`
+                                                      : 'Schedule'}
+                                            </button>
+                                        ) : (
                                             <button
                                                 type="button"
                                                 className="k-button k-button--primary"

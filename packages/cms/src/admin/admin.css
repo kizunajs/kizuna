@@ -5416,3 +5416,15 @@
             grid-template-columns: 52px minmax(0, 1fr);
         }
 
+        .k-scheduled__icon,
+        .k-scheduled__action,
+        .k-scheduled__by {
+            display: none;
+        }
+
+        .k-scheduled__state {
+            grid-column: 2;
+            text-align: left;
+        }
+    }
+}

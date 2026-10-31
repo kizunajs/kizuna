@@ -83,6 +83,9 @@ beforeAll(async () => {
     const db = drizzle(pglite);
     await new DocumentStore(db).createTables();
     const config = defineConfig({
+        jobRunner: {
+            mode: 'in-process',
+        },
         adapter: expressAdapter(),
         auth: {
             identities: {

@@ -57,6 +57,9 @@ const serviceWith = (pages: Record<string, string>): CmsService => {
         appDir: 'src/__fixtures__/app',
     });
     const config = defineConfig({
+        jobRunner: {
+            mode: 'in-process',
+        },
         auth: {
             identities: {
                 editor,

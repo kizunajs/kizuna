@@ -156,7 +156,7 @@ describe('the admin navigation', () => {
             },
         });
         expect(sections.map((section) => [section.label, section.entries.map((entry) => entry.label)])).toEqual([
-            ['Content', ['Pages', 'Media', 'Site', 'Articles']],
+            ['Content', ['Pages', 'Scheduled', 'Media', 'Site', 'Articles']],
             ['People', ['Employees']],
         ]);
     });
@@ -479,6 +479,7 @@ describe('the admin navigation with several sites', () => {
             ['Events', '/admin/uk/collections/events'],
             ['Settings', '/admin/uk/globals/settings'],
             ['Waiting', '/admin/uk/waiting'],
+            ['Scheduled', '/admin/uk/scheduled'],
             ['Media', '/admin/uk/media'],
         ]);
     });
@@ -613,6 +614,44 @@ describe('the admin navigation with several sites', () => {
                 code: 'MLM',
             },
         });
+    });
+
+    it("gives a site's Scheduled and a release addresses under the site, and keeps them in the place picked", () => {
+        const addresses: Array<[Screen, string]> = [
+            [
+                {
+                    kind: 'scheduled',
+                    site: 'uk',
+                },
+                '/admin/uk/scheduled',
+            ],
+            [
+                {
+                    kind: 'release',
+                    id: 'rel_8f2k3j9x2a1b',
+                    site: 'uk',
+                },
+                '/admin/uk/releases/rel_8f2k3j9x2a1b',
+            ],
+        ];
+        for (const [screen, address] of addresses) {
+            expect(hrefOf(screen)).toBe(address);
+            expect(screenOf(address)).toEqual(screen);
+        }
+        expect(placeOf(screenOf('/admin/uk/releases/rel_8f2k3j9x2a1b'), true)).toEqual(sitePlace('uk'));
+        expect(screenInPlace(screenOf('/admin/uk/scheduled'), sitePlace('norway'))).toEqual({
+            kind: 'scheduled',
+            site: 'norway',
+        });
+        expect(
+            isCurrent(
+                {
+                    kind: 'scheduled',
+                    site: 'uk',
+                },
+                screenOf('/admin/uk/releases/rel_8f2k3j9x2a1b')
+            )
+        ).toBe(true);
     });
 
     it("gives Overview's Waiting, Sites and People addresses of their own, and a site its Waiting", () => {
