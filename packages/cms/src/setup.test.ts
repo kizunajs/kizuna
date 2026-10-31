@@ -606,6 +606,8 @@ describe('publishing', () => {
         expect(cleared.status).toBe(200);
         const none = await asEditor(request(app).get('/editing/pages/frontPage/changes'));
         expect(none.body.changes).toEqual([]);
+        // Reverted back to what is published, the draft has nothing to publish.
+        expect(cleared.body.status).toBe('published');
     });
 
     it('unpublishes a page, keeping its draft and versions, and revalidates it', async () => {

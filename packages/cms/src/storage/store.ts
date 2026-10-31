@@ -1280,7 +1280,7 @@ export class DocumentStore {
                   ? sql`((${copy} ->> ${field.field})::numeric)`
                   : sql`((${copy} ->> ${field.field})::boolean)`;
         const latest = sql`coalesce((select max(${cmsVersions.version}) from ${cmsVersions} where ${cmsVersions.documentId} = ${cmsDocuments.id}), 0)`;
-        const status = sql`(case when ${cmsDocuments.draft} is null and ${cmsDocuments.published} is null then 'empty' when ${cmsDocuments.published} is null then 'draft' when ${cmsDocuments.publishedVersion} = ${latest} then 'published' else 'changed' end)`;
+        const status = sql`(case when ${cmsDocuments.draft} is null and ${cmsDocuments.published} is null then 'empty' when ${cmsDocuments.published} is null then 'draft' when ${cmsDocuments.publishedVersion} = ${latest} or jsonb_strip_nulls(${cmsDocuments.draft}) = jsonb_strip_nulls(${cmsDocuments.published}) then 'published' else 'changed' end)`;
         const listOf = (values: readonly unknown[]) =>
             sql.join(
                 values.map((value) => sql`${value}`),

@@ -1140,6 +1140,10 @@ export class CmsService {
      * Where a document stands. A draft that holds what is published, like
      * one reverted back to it, reads as published.
      */
+    statusOf(row: DocumentRow | undefined, version: number): PageStatus {
+        if (row === undefined || (row.draft === null && row.published === null)) return 'empty';
+        if (row.published === null) return 'draft';
+        return row.publishedVersion === version || sameContent(row.draft, row.published) ? 'published' : 'changed';
     }
 
     /**

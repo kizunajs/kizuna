@@ -221,6 +221,39 @@ describe('the editing list of a collection', () => {
         ).toEqual(['Repotting']);
     });
 
+    it('lists an item whose draft was reverted back to what is published as published', async () => {
+        const repotting = await create('articles', {
+            title: 'Repotting',
+            topic: 'care',
+        });
+        await publish(repotting);
+        const path = `/editing/collections/articles/items/${repotting}`;
+        expect(
+            (
+                await asEditor(request(app).patch(`${path}/draft`)).send({
+                    changes: {
+                        title: 'Repotting without the mess',
+                    },
+                })
+            ).status
+        ).toBe(200);
+        expect(
+            await titles({
+                filter: 'status:is:changed',
+            })
+        ).toEqual(['Repotting without the mess']);
+        const reverted = await asEditor(request(app).post(`${path}/revert`)).send({
+            paths: ['title'],
+        });
+        expect(reverted.status).toBe(200);
+        expect(reverted.body.status).toBe('published');
+        expect(
+            await titles({
+                filter: 'status:is:published',
+            })
+        ).toEqual(['Repotting']);
+    });
+
     it('sorts by an index, by status and by when an item changed', async () => {
         const first = await create('articles', {
             title: 'Bulbs',
