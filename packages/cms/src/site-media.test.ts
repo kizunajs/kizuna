@@ -244,3 +244,19 @@ describe('media per site', () => {
         expect((await request(app).get('/editing/media').query(library('denmark'))).status).toBe(404);
     });
 });
+
+describe("a site's draft link", () => {
+    it('opens on the site it names', async () => {
+        const response = await request(app).post('/editing/preview').send({
+            path: '/',
+            site: 'norway',
+        });
+        expect(response.status).toBe(200);
+        expect(new URL(response.body.url).origin).toBe('https://hagen.example.no');
+        expect(new URL(response.body.proxy).origin).toBe('https://hagen.example.no');
+    });
+
+    it('refuses a site no declareSites() names', async () => {
+        expect((await request(app).post('/editing/preview').send({ site: 'denmark' })).status).toBe(404);
+    });
+});

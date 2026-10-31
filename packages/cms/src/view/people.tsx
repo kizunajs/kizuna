@@ -11,9 +11,20 @@ export interface People {
         PersonView & {
             email?: string;
             roles?: string[];
+            /**
+             * The person's roles on each site they edit, by site key.
+             */
+            sites?: Record<string, string[]>;
         }
     >;
 }
+
+/**
+ * A person's roles on a site: the site's own roles when they have some
+ * there, and otherwise their roles over every site.
+ */
+export const rolesOn = (person: People['people'][number], site: string | undefined): string[] =>
+    (site === undefined ? undefined : person.sites?.[site]) ?? person.roles ?? [];
 
 /**
  * Everyone who edits, and which of them is using the editor, loaded once.

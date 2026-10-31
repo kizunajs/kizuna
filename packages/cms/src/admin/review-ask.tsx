@@ -3,7 +3,8 @@ import { Dialog } from '@base-ui/react/dialog';
 import { Check, CircleAlert, X } from 'lucide-react';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
-import { Avatar, type People } from '../view/people.js';
+import { Avatar, rolesOn, type People } from '../view/people.js';
+import { parseRef } from '../refs.js';
 import type { AskedReview } from '../view/review.js';
 import type { PersonView } from '../view/schema.js';
 import { problemOf } from './parts.js';
@@ -23,8 +24,8 @@ const capitalized = (word: string): string => word.charAt(0).toUpperCase() + wor
  * What the Ask dialog says under a name: the person's roles, and that they
  * own the page: "Admin", "Editor · Owner of this page".
  */
-export const reviewerDetailOf = (person: PersonView & { roles?: readonly string[] }, owner: string | null): string | undefined => {
-    const parts = (person.roles ?? []).map(capitalized);
+export const reviewerDetailOf = (person: People['people'][number], owner: string | null, site?: string): string | undefined => {
+    const parts = rolesOn(person, site).map(capitalized);
     if (person.id === owner) parts.push('Owner of this page');
     return parts.length === 0 ? undefined : parts.join(' · ');
 };
@@ -134,7 +135,7 @@ export function AskForReview({
                             ) : (
                                 <div className="k-ask__people">
                                     {offered.map((person) => {
-                                        const detail = reviewerDetailOf(person, owner?.id ?? null);
+                                        const detail = reviewerDetailOf(person, owner?.id ?? null, parseRef(documentRef)?.site);
                                         return (
                                             <button
                                                 key={person.id}

@@ -9,7 +9,7 @@ import { Logo } from '../view/logo.js';
 import { usePeople } from '../view/people.js';
 import { CommandPalette, SearchButton, usePaletteShortcut } from './command-palette.js';
 import type { AdminConfig } from './config.js';
-import { connectOverHttp, withSearchOn, withSiteCollections } from './connection.js';
+import { connectOverHttp, withPreviewSite, withSearchOn, withSiteCollections } from './connection.js';
 import { Dashboard, type WaitingReview } from './dashboard.js';
 import { DocumentScreen } from './document.js';
 import { EditInChat } from './edit-in-chat.js';
@@ -507,10 +507,13 @@ export function Admin({ config }: { config: AdminConfig }) {
             const onSiteTab = screen.site !== undefined && tabSites.some((candidate) => candidate.key === screen.site);
             const documentRef = onSiteTab ? siteValuesRefOf(screen.ref, screen.site!) : screen.ref;
             const ownSite = parseRef(documentRef)?.site;
+            // A site's page previews on that site, and shared content on the site whose place is open.
+            const previewSite = sites.find((candidate) => candidate.key === (ownSite ?? screen.site) && candidate.url !== undefined);
+            const previewing = withPreviewSite(connection, previewSite?.key);
             return (
                 <DocumentScreen
                     key={documentRef}
-                    connection={translationConnection(ownSite === undefined ? connection : withSearchOn(connection, ownSite), documentRef)}
+                    connection={translationConnection(ownSite === undefined ? previewing : withSearchOn(previewing, ownSite), documentRef)}
                     documentRef={documentRef}
                     siteTabs={
                         tabSites.length === 0
@@ -521,7 +524,7 @@ export function Admin({ config }: { config: AdminConfig }) {
                                   current: onSiteTab ? screen.site : undefined,
                               }
                     }
-                    siteUrl={config.siteUrl}
+                    siteUrl={previewSite === undefined ? config.siteUrl : new URL(previewSite.url!).origin}
                     people={people}
                     waiting={waiting ?? []}
                     collectionLabel={collectionLabel}
@@ -644,7 +647,7 @@ export function Admin({ config }: { config: AdminConfig }) {
     const signedIn = (
         <SignedIn
             person={me}
-            role={config.role}
+            role={me === undefined || place.kind !== 'site' ? config.role : (me.sites?.[place.site]?.[0] ?? config.role)}
             signOutPath={config.signOutPath}
             signOutMethod={config.signOutMethod ?? 'GET'}
             theme={theme}

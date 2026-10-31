@@ -127,6 +127,42 @@ export const withMediaSite = (connection: Connection, site: string | undefined):
           };
 
 /**
+ * A connection whose draft links open on `site`, so a site's page previews
+ * on that site rather than at `preview.url`.
+ */
+export const withPreviewSite = (connection: Connection, site: string | undefined): Connection => {
+    if (site === undefined) return connection;
+    const bySite = previewConnections.get(connection) ?? new Map<string, Connection>();
+    previewConnections.set(connection, bySite);
+    const known = bySite.get(site);
+    if (known !== undefined) return known;
+    const previewing: Connection = {
+        ...connection,
+        call: (name, input, options) =>
+            connection.call(
+                name,
+                name === 'editing_create_preview'
+                    ? {
+                          ...input,
+                          body: {
+                              ...((input?.['body'] ?? {}) as Record<string, unknown>),
+                              site,
+                          },
+                      }
+                    : input,
+                options
+            ),
+    };
+    bySite.set(site, previewing);
+    return previewing;
+};
+
+/**
+ * Each connection's previewing copies, kept so a document's connection stays the same object between renders.
+ */
+const previewConnections = new WeakMap<Connection, Map<string, Connection>>();
+
+/**
  * A connection whose collection calls reach a site's own collections, like
  * the UK's events, at the routes under the site.
  */

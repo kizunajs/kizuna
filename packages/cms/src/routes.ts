@@ -2707,6 +2707,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         body: z
             .object({
                 path: z.string().optional().describe('The page to land on, like /blog/spring-sale.'),
+                site: z.string().optional().describe('The site whose draft to open, like norway. Without it, the site at `preview.url`.'),
             })
             .optional(),
         responses: {
@@ -2722,21 +2723,25 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         },
     }).handler(
         guarded(async (cms, args) => {
-            if (options.preview === undefined) {
+            const body = args.body as { path?: string; site?: string } | undefined;
+            const siteUrl = body?.site === undefined ? options.preview?.url : options.sites?.values[body.site]?.url;
+            if (siteUrl === undefined) {
                 throw new CmsHttpError(404, {
-                    detail: 'The CMS does not know where the site is. Set `preview.url` on cms().',
+                    detail:
+                        body?.site === undefined
+                            ? 'The CMS does not know where the site is. Set `preview.url` on cms().'
+                            : `The CMS has no site named '${body.site}' with a \`url\`.`,
                 });
             }
-            const body = args.body as { path?: string } | undefined;
             const token = cms.previewToken();
-            const draft = new URL(`${options.apiPath ?? '/api'}${base}/draft`, options.preview.url);
+            const draft = new URL(`${options.apiPath ?? '/api'}${base}/draft`, siteUrl);
             draft.searchParams.set('token', token);
             draft.searchParams.set('redirect', body?.path ?? '/');
             return {
                 status: 200,
                 body: {
                     url: draft.toString(),
-                    proxy: previewProxyUrl(options.preview.url, options.apiPath ?? '/api', base),
+                    proxy: previewProxyUrl(siteUrl, options.apiPath ?? '/api', base),
                     token,
                     expiresAt: new Date(Date.now() + PREVIEW_TTL_SECONDS * 1000).toISOString(),
                 },

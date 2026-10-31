@@ -313,6 +313,8 @@ The list names partners under their label too. Publishing then refreshes every s
 | `{ global }`    | A global, like `{ global: 'settings' }`  |
 | `{ page }`      | A page, like `{ page: 'frontPage' }`     |
 
+Live Preview opens a site's page on that site's `url`, and shared content on the site whose place is open. Each app checks the draft link with the same `KIZUNA_CMS_PREVIEW_SECRET`.
+
 A declared site's `invalidate` is at its `url`, `apiPath` and `path`, as in `https://hagen.example.co.uk/api/invalidate`. The call carries a `kizuna-cms-signature` header, an HMAC of the body made with `KIZUNA_CMS_PREVIEW_SECRET`, which every app already shares, and valid for five minutes. Anything else calling `invalidate` uses the credential `auth.invalidate` names.
 
 Each publish records one row per site and partner, with its status and attempts: `queued` waits for its turn, `answered` refreshed, `retrying` did not answer and is tried again, and `failed` will not be. The editor reads them from `GET /editing/refreshes?ref=`, which lists the latest publish's refreshes, and shows how it went:
