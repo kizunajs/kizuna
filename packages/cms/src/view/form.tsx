@@ -19,7 +19,7 @@ import { Control, foldsItems, listsItems, Required } from './controls.js';
 import { Hint } from './hint.js';
 import { lockReasonOf, readOnlyTextOf, readsAsText } from './read-only.js';
 import { richTextOf } from './change-value.js';
-import { labelOf, valueAt, writeInOf, type DescribedField, type DescribedLayout } from './schema.js';
+import { isImage, labelOf, valueAt, writeInOf, type DescribedField, type DescribedLayout } from './schema.js';
 
 /**
  * How long typing pauses before a change saves.
@@ -412,7 +412,10 @@ export function FieldForm({
                 </div>
                 {sourceLine(field)}
                 {field.help !== undefined && !list ? <p className="k-help">{field.help}</p> : null}
-                {writable ? null : <p className="k-help">{lockReasonOf(field, readOnly === true)}</p>}
+                {/* A locked image shows its lock in place of the edit button, so it needs no line. */}
+                {writable || isImage(field.schema, field.schema) ? null : (
+                    <p className="k-help">{lockReasonOf(field, readOnly === true)}</p>
+                )}
             </>
         );
     };

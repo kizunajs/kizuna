@@ -2115,6 +2115,13 @@
 
     .k-image__thumb {
         display: block;
+    /* Locked, like a read-only field: the fainter fill and muted name. */
+    .k-image[data-locked] {
+        background: var(--k-surface);
+        box-shadow: none;
+        color: var(--k-muted);
+    }
+
         flex-shrink: 0;
         width: 44px;
         height: 44px;

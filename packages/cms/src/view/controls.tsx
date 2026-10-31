@@ -665,6 +665,12 @@ function ImageControl({ schema, root, value, onChange, disabled, required }: Con
                   ];
               });
     const cropShown = shape !== undefined || sheet.crop !== undefined || !disabled;
+    return (
+        <div className="k-image" data-locked={disabled ? '' : undefined}>
+            {record === undefined ? (
+                <span className="k-image__thumb" aria-hidden="true" />
+            ) : (
+                <img className="k-image__thumb" src={resolveUrl(`${record.url}?w=640`)} alt={image.alt ?? ''} />
             )}
             <span className="k-image__meta">
                 <span className="k-image__name">
@@ -687,9 +693,9 @@ function ImageControl({ schema, root, value, onChange, disabled, required }: Con
                             }
                             setEditing(open);
                         }}>
-                        <Hint label="Edit image">
-                            <Dialog.Trigger className="k-icon-button" aria-label="Edit image">
-                                <Pencil {...ICON} />
+                        <Hint label={disabled ? 'View image' : 'Edit image'}>
+                            <Dialog.Trigger className="k-icon-button" aria-label={disabled ? 'View image' : 'Edit image'}>
+                                {disabled ? <Lock {...ICON} /> : <Pencil {...ICON} />}
                             </Dialog.Trigger>
                         </Hint>
                         <Dialog.Portal>
