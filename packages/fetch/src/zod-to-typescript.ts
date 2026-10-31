@@ -159,6 +159,8 @@ export class TypeCollector {
 const quote = (value: string): string => JSON.stringify(value);
 
 const REFERENCE_MARK = '\u0000';
+// The NUL character marks a reference in the written source, since no type text contains one.
+// eslint-disable-next-line no-control-regex
 const REFERENCE_PATTERN = /\u0000([^\u0000]+)\u0000/g;
 
 /**

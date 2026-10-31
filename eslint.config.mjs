@@ -17,6 +17,14 @@ export default [
                 '**/.turbo',
                 '**/.source',
                 '**/.next',
+                '**/.next-*',
+                '**/.pglite*',
+                '**/.media',
+                '**/.outbox',
+                '**/.gradle',
+                '**/test-results',
+                '**/playwright-report',
+                '.claude',
                 '**/.vercel',
                 '**/.build',
                 '**/.swiftpm',
@@ -55,6 +63,18 @@ export default [
             },
         }
     ),
+    {
+        // Build scripts run in Node, with its globals.
+        files: ['**/scripts/**/*.mjs'],
+        languageOptions: {
+            globals: {
+                Buffer: 'readonly',
+                URL: 'readonly',
+                console: 'readonly',
+                process: 'readonly',
+            },
+        },
+    },
     {
         files: ['**/*.test.ts', '**/*.test-d.ts', '**/*.fixture.ts'],
         rules: {

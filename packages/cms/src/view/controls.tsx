@@ -20,7 +20,6 @@ import {
     ArrowUp,
     Check,
     ChevronDown,
-    ChevronRight,
     ChevronsUpDown,
     CornerDownRight,
     Ellipsis,
