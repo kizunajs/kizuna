@@ -642,6 +642,30 @@ describe('a translation whose source changed', () => {
         expect([...(await service.sourceChangesOf(english.target, english.row)).keys()]).toEqual(['heading']);
     });
 
+    it('shows the published source under a translation, and counts nothing the source has only drafted', async () => {
+        await publish(norwayFront(), {
+            heading: 'Velkommen',
+        });
+        await publish(norwayFront('en'), {
+            heading: 'Welcome',
+        });
+        await write(norwayFront(), {
+            heading: 'Velkommen til Hagen',
+            intro: 'Hagen i Norge.',
+        });
+        const described = await request(app)
+            .get('/editing/describe')
+            .query({
+                ref: 'page:norway:frontPage@en',
+            })
+            .set('authorization', 'Bearer token');
+        expect(described.body.fields.map((field: { path: string; sourceValue: unknown }) => [field.path, field.sourceValue])).toEqual([
+            ['heading', 'Velkommen'],
+            ['intro', undefined],
+        ]);
+        expect(described.body.locale.locales[1].missing).toEqual([]);
+    });
+
     it('keeps a field as it is, without changing it, until the source changes again', async () => {
         await publish(norwayFront(), {
             heading: 'Velkommen',

@@ -19,7 +19,7 @@ import { Control, foldsItems, listsItems, Required } from './controls.js';
 import { Hint } from './hint.js';
 import { lockReasonOf, readOnlyTextOf, readsAsText } from './read-only.js';
 import { richTextOf } from './change-value.js';
-import { labelOf, valueAt, type DescribedField, type DescribedLayout } from './schema.js';
+import { labelOf, valueAt, writeInOf, type DescribedField, type DescribedLayout } from './schema.js';
 
 /**
  * How long typing pauses before a change saves.
@@ -95,8 +95,8 @@ export interface FieldFormProps {
      */
     showSource?: boolean;
     /**
-     * Drafts one empty translated field from the source, offered on its
-     * source line.
+     * Drafts one translated field from the source as an unsaved change,
+     * offered on its source line.
      */
     onTranslate?: (field: DescribedField) => void;
     /**
@@ -358,6 +358,11 @@ export function FieldForm({
             value: valueOf(field.path),
             onChange: (value) => change(field.path, value),
             disabled: !writable,
+    /**
+     * Whether a field is written in this translation's own language.
+     */
+    const translates = (field: DescribedField): boolean =>
+        locales !== undefined && locales.current !== locales.source && field.translated === true && field.parent === undefined;
         });
         return (
             <>
@@ -385,7 +390,13 @@ export function FieldForm({
                             labels={field.options}
                             blocks={field.blocks}
                             help={list ? field.help : undefined}
-                            placeholder={typeof field.sharedValue === 'string' ? field.sharedValue : undefined}
+                            placeholder={
+                                typeof field.sharedValue === 'string'
+                                    ? field.sharedValue
+                                    : translates(field)
+                                      ? writeInOf(locales!.current)
+                                      : undefined
+                            }
                             required
                         />
                     )}
@@ -440,15 +451,7 @@ export function FieldForm({
      * translated field. A field still empty offers Translate.
      */
     const sourceLine = (field: DescribedField): ReactNode => {
-        if (
-            showSource !== true ||
-            locales === undefined ||
-            locales.current === locales.source ||
-            field.translated !== true ||
-            field.parent !== undefined
-        ) {
-            return null;
-        }
+        if (showSource !== true || locales === undefined || !translates(field)) return null;
         const text =
             typeof field.sourceValue === 'string'
                 ? field.sourceValue

@@ -2140,7 +2140,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 source === undefined
                     ? undefined
                     : {
-                          source: source.row?.draft ?? source.row?.published ?? null,
+                          source: source.row?.published ?? null,
                           changed: await cms.sourceChangesOf(state.target, state.row),
                       };
             const locale = await cms.documentLocales(ref);

@@ -2,12 +2,11 @@ import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { ICON } from '../view/context.js';
 import { Avatar, type People } from '../view/people.js';
-import { humanize } from '../view/schema.js';
+import { humanize, languageNameOf } from '../view/schema.js';
 import type { AdminSite } from './config.js';
 import { hrefOf, SHARED_GROUP, siteGroupsOf } from './navigation.js';
 import { PageHeader } from './page-header.js';
 import { SiteIcon } from './site-switcher.js';
-import { languageNameOf } from './translation-ui.js';
 import { WaitingTable } from './waiting.js';
 import { waitingRowsOf, type OpenReview, type OpenTranslation } from './waiting-rows.js';
 

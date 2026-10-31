@@ -7,7 +7,7 @@ import type { AdminRoute, AdminSite } from './config.js';
 import { hrefOf, SHARED_GROUP } from './navigation.js';
 import { PageHeader } from './page-header.js';
 import { SiteIcon } from './site-switcher.js';
-import { languageNameOf } from './translation-ui.js';
+import { languageNameOf } from '../view/schema.js';
 import { relativeTimeOf } from './time.js';
 import { waitingRowsOf, type OpenReview, type OpenTranslation, type WaitingRow } from './waiting-rows.js';
 

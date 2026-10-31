@@ -1,33 +1,11 @@
 import type { ReactNode } from 'react';
 import { Menu } from '@base-ui/react/menu';
-import { Check, ChevronDown, Circle, CircleCheck, Languages, LayoutGrid, Lock, ArrowDown } from 'lucide-react';
+import { Check, ChevronDown, Circle, CircleCheck, Languages, LayoutGrid, ArrowDown } from 'lucide-react';
 import { ICON } from '../view/context.js';
 import { Control } from '../view/controls.js';
 import { richTextOf, wordDiff } from '../view/change-value.js';
 import { readOnlyTextOf } from '../view/read-only.js';
-import { labelOf, type DescribedField, type Description, type DocumentLocales } from '../view/schema.js';
-
-/**
- * Bokmål names itself Norsk, as people who write it do.
- */
-const NAMED_AS: Readonly<Record<string, string>> = {
-    nb: 'no',
-};
-
-/**
- * A language as it names itself, like Dansk or Svenska.
- */
-export const languageNameOf = (code: string): string => {
-    try {
-        const named = NAMED_AS[code] ?? code;
-        const name = new Intl.DisplayNames([named], {
-            type: 'language',
-        }).of(named);
-        return name === undefined ? code : `${name.charAt(0).toLocaleUpperCase(named)}${name.slice(1)}`;
-    } catch {
-        return code;
-    }
-};
+import { labelOf, languageNameOf, writeInOf, type DescribedField, type Description, type DocumentLocales } from '../view/schema.js';
 
 type LocaleEntry = DocumentLocales['locales'][number];
 
@@ -259,8 +237,9 @@ export function LanguagesGrid({ document, onTranslate }: { document: Description
 export type Outcome = 'updated' | 'kept';
 
 /**
- * One field at a time, of those that wait: the source above with what
- * changed in it, the translation under it, and Update, Keep or Translate.
+ * One field at a time, of those that wait: the source above as text, with
+ * what changed in it, the translation under it, and Update, Keep or
+ * Translate.
  */
 export function TranslateMode({
     document,
@@ -300,7 +279,6 @@ export function TranslateMode({
     if (step === undefined) return null;
     const { field, pending } = step;
     const value = field.path in drafts ? drafts[field.path] : document.draft?.[field.path];
-    const sourceCode = locales.source.toUpperCase();
     return (
         <div className="k-translate-mode">
             <nav className="k-translate-mode__outline" aria-label="Fields to translate">
@@ -338,45 +316,27 @@ export function TranslateMode({
             </nav>
             <section className="k-translate-mode__focus" aria-label={labelOf(field)}>
                 <h2 className="k-translate-mode__title">{labelOf(field)}</h2>
-                <div className="k-translate-mode__pair">
-                    <span className="k-translate-mode__caption">
-                        <span className="k-source__code">{sourceCode}</span>
-                        {languageNameOf(locales.source)}
-                    </span>
-                    <div className="k-read-only k-translate-mode__source">
-                        {pending === 'changed' ? (
-                            <SourceChange field={field} />
-                        ) : (
-                            <span className="k-read-only__text">{textOf(field, field.sourceValue)}</span>
-                        )}
-                        <span className="k-read-only__lock">
-                            <Lock size={13} strokeWidth={1.75} aria-hidden />
-                        </span>
-                    </div>
+                <div className="k-translate-mode__source" lang={locales.source}>
+                    {pending === 'changed' ? <SourceChange field={field} /> : <p>{textOf(field, field.sourceValue)}</p>}
                 </div>
-                <div className="k-translate-mode__pair">
-                    <span className="k-translate-mode__caption">
-                        <span className="k-source__code">{locales.current.toUpperCase()}</span>
-                        {languageNameOf(locales.current)}
-                    </span>
-                    {/* A new value from the model replaces the input, which rich text reads only once. */}
-                    <Control
-                        key={`${field.path}:${revision}`}
-                        id={`translate-${field.path}`}
-                        name={field.name}
-                        label={labelOf(field)}
-                        schema={field.schema}
-                        root={field.schema}
-                        value={value}
-                        onChange={(next) => onChange(field.path, next)}
-                        disabled={!field.writable || busy}
-                        brand={field.brand}
-                        searchTool={field.searchTool}
-                        labels={field.options}
-                        blocks={field.blocks}
-                        required
-                    />
-                </div>
+                {/* A new value from the model replaces the input, which rich text reads only once. */}
+                <Control
+                    key={`${field.path}:${revision}`}
+                    id={`translate-${field.path}`}
+                    name={field.name}
+                    label={labelOf(field)}
+                    schema={field.schema}
+                    root={field.schema}
+                    value={value}
+                    onChange={(next) => onChange(field.path, next)}
+                    disabled={!field.writable || busy}
+                    brand={field.brand}
+                    searchTool={field.searchTool}
+                    labels={field.options}
+                    blocks={field.blocks}
+                    placeholder={writeInOf(locales.current)}
+                    required
+                />
                 <div className="k-translate-mode__actions">
                     <button
                         type="button"

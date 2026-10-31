@@ -1381,7 +1381,8 @@ export class CmsService {
         const translated = translationOf(source.definition);
         if (first === undefined || others.length === 0 || translated === undefined) return undefined;
         const sourceState = await this.draftState(source.ref);
-        const sourceContent = sourceState.row?.draft ?? sourceState.row?.published ?? null;
+        // A translation waits on the published source, so a field the source has only drafted is not missing yet.
+        const sourceContent = sourceState.row?.published ?? null;
         const written = dataFields(translated.fields)
             .map((field) => field.name)
             .filter((name) => !isEmptyValue(sourceValueOf(source.definition, sourceContent, name)));

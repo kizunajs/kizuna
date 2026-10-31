@@ -401,3 +401,31 @@ export const documentTitle = (document: Description): string => {
     }
     return humanize(document.name);
 };
+/**
+ * Bokmål names itself Norsk, as people who write it do.
+ */
+const NAMED_AS: Readonly<Record<string, string>> = {
+    nb: 'no',
+};
+
+/**
+ * A language as it names itself, like Dansk or Svenska.
+ */
+export const languageNameOf = (code: string): string => {
+    try {
+        const named = NAMED_AS[code] ?? code;
+        const name = new Intl.DisplayNames([named], {
+            type: 'language',
+        }).of(named);
+        return name === undefined ? code : `${name.charAt(0).toLocaleUpperCase(named)}${name.slice(1)}`;
+    } catch {
+        return code;
+    }
+};
+
+/**
+ * The placeholder of an empty field in a translation, which names its
+ * language.
+ */
+export const writeInOf = (code: string): string => `Write in ${languageNameOf(code)}…`;
+

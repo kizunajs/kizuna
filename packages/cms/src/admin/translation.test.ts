@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Connection } from '../view/connection.js';
-import type { DescribedField, Description, DocumentLocales } from '../view/schema.js';
+import { languageNameOf, type DescribedField, type Description, type DocumentLocales } from '../view/schema.js';
 import { refInLocale, translationConnection, withSourceFields } from './translation.js';
-import { languageNameOf, localeStateOf } from './translation-ui.js';
+import { localeStateOf } from './translation-ui.js';
 import { hrefIn, screenOf, setAdminPath } from './navigation.js';
 
 const field = (path: string, extra: Partial<DescribedField> = {}): DescribedField => ({

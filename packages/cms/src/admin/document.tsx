@@ -8,7 +8,7 @@ import { EditorContext, ICON, type EditorContextValue } from '../view/context.js
 import { FieldForm, fieldDomId, type FieldFormHandle, type SaveFailure, type SaveState } from '../view/form.js';
 import { OwnerControl, type People } from '../view/people.js';
 import { PublishReview, changeViewsOf, type AskedReview, type Changes, type PublishReviewHandle } from '../view/review.js';
-import { documentTitle, valueAt, type Description, type Draft, type ReviewState } from '../view/schema.js';
+import { documentTitle, languageNameOf, valueAt, type Description, type Draft, type ReviewState } from '../view/schema.js';
 import { sameContent } from '../same-content.js';
 import { parseRef } from '../refs.js';
 import { withMediaSite } from './connection.js';
@@ -28,7 +28,6 @@ import {
     SourceChange,
     TranslateMode,
     TranslateProgress,
-    languageNameOf,
     pendingFieldsOf,
     type Outcome,
     type Pending,

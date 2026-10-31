@@ -875,27 +875,14 @@
         letter-spacing: -0.01em;
     }
 
-    .k-translate-mode__pair {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-    }
-
-    .k-translate-mode__caption {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 12.5px;
-        color: var(--k-muted);
-    }
-
+    /* The source as text above the translation. Only the language being written is a field. */
     .k-translate-mode__source {
         align-items: flex-start;
         line-height: 22px;
     }
 
-    .k-translate-mode__source .k-source-change {
-        flex: 1;
+    .k-translate-mode__source > p {
+        margin: 0;
     }
 
     .k-translate-mode__source .k-source-change p {
@@ -905,10 +892,6 @@
 
     .k-translate-mode__source .k-source-change__before {
         opacity: 0.8;
-    }
-
-    .k-translate-mode__source .k-read-only__lock {
-        margin-top: 4px;
     }
 
     .k-translate-mode__actions {
