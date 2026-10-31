@@ -51,6 +51,11 @@ export namespace API {
     };
 
     /**
+     * A branded `string`. Responses hand one back, and `toProductId` makes one from a plain value.
+     */
+    export type ProductId = string & KizunaBrand<"ProductId">;
+
+    /**
      * RFC 9457 Problem Details error response for validation failures.
      */
     export type ValidationError = {
@@ -467,6 +472,13 @@ export namespace API {
                     summary: string;
                     body: string;
                     date: string;
+                    image?: {
+                        id: string;
+                        url: string;
+                        alt: string;
+                        width: number;
+                        height: number;
+                    };
                     showsOn: Array<string>;
                     id: ArticleId;
                 }>;
@@ -497,8 +509,101 @@ export namespace API {
                 summary: string;
                 body: string;
                 date: string;
+                image?: {
+                    id: string;
+                    url: string;
+                    alt: string;
+                    width: number;
+                    height: number;
+                };
                 showsOn: Array<string>;
                 id: ArticleId;
+            }; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace ContentSitesUkCollectionsProductsList {
+        export type Query = {
+            name?: string;
+            orderBy?: "name" | "publishedAt" | "updatedAt";
+            direction?: "asc" | "desc";
+            limit?: number;
+            /**
+             * The `next` of the previous page.
+             */
+            cursor?: string;
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
+        };
+
+        export type Result =
+            | { status: 200; body: {
+                items: Array<{
+                    name: string;
+                    /**
+                     * The price as it reads, like £24 or from £18.
+                     */
+                    price: string;
+                    /**
+                     * One or two sentences, under 25 words.
+                     */
+                    summary: string;
+                    photo: {
+                        id: string;
+                        url: string;
+                        alt: string;
+                        width: number;
+                        height: number;
+                    };
+                    id: ProductId;
+                }>;
+                next: string | null;
+            }; headers: Record<string, string> }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace ContentSitesUkCollectionsProductsGet {
+        export type Params = {
+            id: string;
+        };
+
+        export type Query = {
+            /**
+             * The language to read, en when left out.
+             */
+            locale?: "en";
+        };
+
+        export type Result =
+            | { status: 200; body: {
+                name: string;
+                /**
+                 * The price as it reads, like £24 or from £18.
+                 */
+                price: string;
+                /**
+                 * One or two sentences, under 25 words.
+                 */
+                summary: string;
+                photo: {
+                    id: string;
+                    url: string;
+                    alt: string;
+                    width: number;
+                    height: number;
+                };
+                id: ProductId;
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
@@ -558,6 +663,14 @@ export namespace API {
                             width: number;
                             height: number;
                         };
+                    } | {
+                        _type: "article";
+                        _key: string;
+                        article: ArticleId;
+                    } | {
+                        _type: "product";
+                        _key: string;
+                        products: Array<ProductId>;
                     }>;
                     id: NewsletterId;
                 }>;
@@ -616,6 +729,14 @@ export namespace API {
                         width: number;
                         height: number;
                     };
+                } | {
+                    _type: "article";
+                    _key: string;
+                    article: ArticleId;
+                } | {
+                    _type: "product";
+                    _key: string;
+                    products: Array<ProductId>;
                 }>;
                 id: NewsletterId;
             }; headers: Record<string, string> }
@@ -887,6 +1008,35 @@ export interface Client {
                             fetchOptions?: RequestInit;
                         }, API.ContentSitesUkCollectionsArticlesGet.Result>;
                     };
+                    products: {
+                        /**
+                         * List the published products
+                         *
+                         * @example
+                         * const result = await client.content.sites.uk.collections.products.list();
+                         */
+                        list: ClientMethod<'GET', false, {
+                            query?: API.ContentSitesUkCollectionsProductsList.Query;
+                            headers?: Record<string, string>;
+                            fetchOptions?: RequestInit;
+                        }, API.ContentSitesUkCollectionsProductsList.Result>;
+                        /**
+                         * Read one published item of products
+                         *
+                         * @example
+                         * const result = await client.content.sites.uk.collections.products.get({
+                         *     params: {
+                         *         id: '1',
+                         *     },
+                         * });
+                         */
+                        get: ClientMethod<'GET', false, {
+                            params: API.ContentSitesUkCollectionsProductsGet.Params;
+                            query?: API.ContentSitesUkCollectionsProductsGet.Query;
+                            headers?: Record<string, string>;
+                            fetchOptions?: RequestInit;
+                        }, API.ContentSitesUkCollectionsProductsGet.Result>;
+                    };
                     newsletters: {
                         /**
                          * List the published newsletters
@@ -1106,6 +1256,29 @@ const routes: GeneratedRoutes = {
                             },
                         },
                     },
+                    products: {
+                        list: {
+                            method: 'GET',
+                            path: '/content/sites/uk/collections/products',
+                            responses: {
+                                200: {},
+                                400: {},
+                                401: {},
+                                403: {},
+                            },
+                        },
+                        get: {
+                            method: 'GET',
+                            path: '/content/sites/uk/collections/products/:id',
+                            responses: {
+                                200: {},
+                                401: {},
+                                403: {},
+                                404: {},
+                                400: {},
+                            },
+                        },
+                    },
                     newsletters: {
                         list: {
                             method: 'GET',
@@ -1181,6 +1354,14 @@ export const toEmployeeId = (value: string): API.EmployeeId => value as API.Empl
  * const id = toArticleId('1');
  */
 export const toArticleId = (value: string): API.ArticleId => value as API.ArticleId;
+
+/**
+ * Brands a value from outside the API, like a URL segment, as `API.ProductId`. A value from a response is branded already.
+ *
+ * @example
+ * const id = toProductId('1');
+ */
+export const toProductId = (value: string): API.ProductId => value as API.ProductId;
 
 /**
  * Brands a value from outside the API, like a URL segment, as `API.NewsletterId`. A value from a response is branded already.

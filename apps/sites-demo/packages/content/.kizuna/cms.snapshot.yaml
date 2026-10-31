@@ -1247,6 +1247,31 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                  image:
+                    optional: true
+                    schema:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        url:
+                          optional: false
+                          schema:
+                            kind: string
+                        alt:
+                          optional: false
+                          schema:
+                            kind: string
+                        width:
+                          optional: false
+                          schema:
+                            kind: number
+                        height:
+                          optional: false
+                          schema:
+                            kind: number
                   showsOn:
                     optional: false
                     schema:
@@ -1365,6 +1390,31 @@ routes:
             optional: false
             schema:
               kind: string
+          image:
+            optional: true
+            schema:
+              kind: object
+              fields:
+                id:
+                  optional: false
+                  schema:
+                    kind: string
+                url:
+                  optional: false
+                  schema:
+                    kind: string
+                alt:
+                  optional: false
+                  schema:
+                    kind: string
+                width:
+                  optional: false
+                  schema:
+                    kind: number
+                height:
+                  optional: false
+                  schema:
+                    kind: number
           showsOn:
             optional: false
             schema:
@@ -1376,6 +1426,294 @@ routes:
             schema:
               kind: string
               brand: ArticleId
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.sites.group.collections.products.list:
+    method: GET
+    path: /content/sites/group/collections/products
+    statuses:
+      - 200
+      - 400
+      - 401
+      - 403
+    deprecated: false
+    query:
+      kind: object
+      fields:
+        name:
+          optional: true
+          schema:
+            kind: string
+        orderBy:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - name
+              - publishedAt
+              - updatedAt
+        direction:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - asc
+              - desc
+        limit:
+          optional: true
+          schema:
+            kind: number
+        cursor:
+          optional: true
+          schema:
+            kind: string
+        locale:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - en
+    responses:
+      "200":
+        kind: object
+        fields:
+          items:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  name:
+                    optional: false
+                    schema:
+                      kind: string
+                  price:
+                    optional: false
+                    schema:
+                      kind: string
+                  summary:
+                    optional: false
+                    schema:
+                      kind: string
+                  photo:
+                    optional: false
+                    schema:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        url:
+                          optional: false
+                          schema:
+                            kind: string
+                        alt:
+                          optional: false
+                          schema:
+                            kind: string
+                        width:
+                          optional: false
+                          schema:
+                            kind: number
+                        height:
+                          optional: false
+                          schema:
+                            kind: number
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                      brand: ProductId
+          next:
+            optional: false
+            schema:
+              kind: string
+              nullable: true
+      "400":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.sites.group.collections.products.get:
+    method: GET
+    path: /content/sites/group/collections/products/:id
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+    query:
+      kind: object
+      fields:
+        locale:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - en
+    responses:
+      "200":
+        kind: object
+        fields:
+          name:
+            optional: false
+            schema:
+              kind: string
+          price:
+            optional: false
+            schema:
+              kind: string
+          summary:
+            optional: false
+            schema:
+              kind: string
+          photo:
+            optional: false
+            schema:
+              kind: object
+              fields:
+                id:
+                  optional: false
+                  schema:
+                    kind: string
+                url:
+                  optional: false
+                  schema:
+                    kind: string
+                alt:
+                  optional: false
+                  schema:
+                    kind: string
+                width:
+                  optional: false
+                  schema:
+                    kind: number
+                height:
+                  optional: false
+                  schema:
+                    kind: number
+          id:
+            optional: false
+            schema:
+              kind: string
+              brand: ProductId
       "401":
         kind: object
         fields:
@@ -1620,6 +1958,44 @@ routes:
                                       optional: false
                                       schema:
                                         kind: number
+                          article:
+                            kind: object
+                            fields:
+                              _type:
+                                optional: false
+                                schema:
+                                  kind: enum
+                                  values:
+                                    - article
+                              _key:
+                                optional: false
+                                schema:
+                                  kind: string
+                              article:
+                                optional: false
+                                schema:
+                                  kind: string
+                                  brand: ArticleId
+                          product:
+                            kind: object
+                            fields:
+                              _type:
+                                optional: false
+                                schema:
+                                  kind: enum
+                                  values:
+                                    - product
+                              _key:
+                                optional: false
+                                schema:
+                                  kind: string
+                              products:
+                                optional: false
+                                schema:
+                                  kind: array
+                                  element:
+                                    kind: string
+                                    brand: ProductId
                   id:
                     optional: false
                     schema:
@@ -1852,6 +2228,44 @@ routes:
                               optional: false
                               schema:
                                 kind: number
+                  article:
+                    kind: object
+                    fields:
+                      _type:
+                        optional: false
+                        schema:
+                          kind: enum
+                          values:
+                            - article
+                      _key:
+                        optional: false
+                        schema:
+                          kind: string
+                      article:
+                        optional: false
+                        schema:
+                          kind: string
+                          brand: ArticleId
+                  product:
+                    kind: object
+                    fields:
+                      _type:
+                        optional: false
+                        schema:
+                          kind: enum
+                          values:
+                            - product
+                      _key:
+                        optional: false
+                        schema:
+                          kind: string
+                      products:
+                        optional: false
+                        schema:
+                          kind: array
+                          element:
+                            kind: string
+                            brand: ProductId
           id:
             optional: false
             schema:
@@ -3399,6 +3813,31 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                  image:
+                    optional: true
+                    schema:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        url:
+                          optional: false
+                          schema:
+                            kind: string
+                        alt:
+                          optional: false
+                          schema:
+                            kind: string
+                        width:
+                          optional: false
+                          schema:
+                            kind: number
+                        height:
+                          optional: false
+                          schema:
+                            kind: number
                   showsOn:
                     optional: false
                     schema:
@@ -3517,6 +3956,31 @@ routes:
             optional: false
             schema:
               kind: string
+          image:
+            optional: true
+            schema:
+              kind: object
+              fields:
+                id:
+                  optional: false
+                  schema:
+                    kind: string
+                url:
+                  optional: false
+                  schema:
+                    kind: string
+                alt:
+                  optional: false
+                  schema:
+                    kind: string
+                width:
+                  optional: false
+                  schema:
+                    kind: number
+                height:
+                  optional: false
+                  schema:
+                    kind: number
           showsOn:
             optional: false
             schema:
@@ -3528,6 +3992,294 @@ routes:
             schema:
               kind: string
               brand: ArticleId
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.sites.uk.collections.products.list:
+    method: GET
+    path: /content/sites/uk/collections/products
+    statuses:
+      - 200
+      - 400
+      - 401
+      - 403
+    deprecated: false
+    query:
+      kind: object
+      fields:
+        name:
+          optional: true
+          schema:
+            kind: string
+        orderBy:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - name
+              - publishedAt
+              - updatedAt
+        direction:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - asc
+              - desc
+        limit:
+          optional: true
+          schema:
+            kind: number
+        cursor:
+          optional: true
+          schema:
+            kind: string
+        locale:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - en
+    responses:
+      "200":
+        kind: object
+        fields:
+          items:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  name:
+                    optional: false
+                    schema:
+                      kind: string
+                  price:
+                    optional: false
+                    schema:
+                      kind: string
+                  summary:
+                    optional: false
+                    schema:
+                      kind: string
+                  photo:
+                    optional: false
+                    schema:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        url:
+                          optional: false
+                          schema:
+                            kind: string
+                        alt:
+                          optional: false
+                          schema:
+                            kind: string
+                        width:
+                          optional: false
+                          schema:
+                            kind: number
+                        height:
+                          optional: false
+                          schema:
+                            kind: number
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                      brand: ProductId
+          next:
+            optional: false
+            schema:
+              kind: string
+              nullable: true
+      "400":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.sites.uk.collections.products.get:
+    method: GET
+    path: /content/sites/uk/collections/products/:id
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+    query:
+      kind: object
+      fields:
+        locale:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - en
+    responses:
+      "200":
+        kind: object
+        fields:
+          name:
+            optional: false
+            schema:
+              kind: string
+          price:
+            optional: false
+            schema:
+              kind: string
+          summary:
+            optional: false
+            schema:
+              kind: string
+          photo:
+            optional: false
+            schema:
+              kind: object
+              fields:
+                id:
+                  optional: false
+                  schema:
+                    kind: string
+                url:
+                  optional: false
+                  schema:
+                    kind: string
+                alt:
+                  optional: false
+                  schema:
+                    kind: string
+                width:
+                  optional: false
+                  schema:
+                    kind: number
+                height:
+                  optional: false
+                  schema:
+                    kind: number
+          id:
+            optional: false
+            schema:
+              kind: string
+              brand: ProductId
       "401":
         kind: object
         fields:
@@ -3772,6 +4524,44 @@ routes:
                                       optional: false
                                       schema:
                                         kind: number
+                          article:
+                            kind: object
+                            fields:
+                              _type:
+                                optional: false
+                                schema:
+                                  kind: enum
+                                  values:
+                                    - article
+                              _key:
+                                optional: false
+                                schema:
+                                  kind: string
+                              article:
+                                optional: false
+                                schema:
+                                  kind: string
+                                  brand: ArticleId
+                          product:
+                            kind: object
+                            fields:
+                              _type:
+                                optional: false
+                                schema:
+                                  kind: enum
+                                  values:
+                                    - product
+                              _key:
+                                optional: false
+                                schema:
+                                  kind: string
+                              products:
+                                optional: false
+                                schema:
+                                  kind: array
+                                  element:
+                                    kind: string
+                                    brand: ProductId
                   id:
                     optional: false
                     schema:
@@ -4004,6 +4794,44 @@ routes:
                               optional: false
                               schema:
                                 kind: number
+                  article:
+                    kind: object
+                    fields:
+                      _type:
+                        optional: false
+                        schema:
+                          kind: enum
+                          values:
+                            - article
+                      _key:
+                        optional: false
+                        schema:
+                          kind: string
+                      article:
+                        optional: false
+                        schema:
+                          kind: string
+                          brand: ArticleId
+                  product:
+                    kind: object
+                    fields:
+                      _type:
+                        optional: false
+                        schema:
+                          kind: enum
+                          values:
+                            - product
+                      _key:
+                        optional: false
+                        schema:
+                          kind: string
+                      products:
+                        optional: false
+                        schema:
+                          kind: array
+                          element:
+                            kind: string
+                            brand: ProductId
           id:
             optional: false
             schema:
@@ -6158,6 +6986,31 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                  image:
+                    optional: true
+                    schema:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        url:
+                          optional: false
+                          schema:
+                            kind: string
+                        alt:
+                          optional: false
+                          schema:
+                            kind: string
+                        width:
+                          optional: false
+                          schema:
+                            kind: number
+                        height:
+                          optional: false
+                          schema:
+                            kind: number
                   showsOn:
                     optional: false
                     schema:
@@ -6277,6 +7130,31 @@ routes:
             optional: false
             schema:
               kind: string
+          image:
+            optional: true
+            schema:
+              kind: object
+              fields:
+                id:
+                  optional: false
+                  schema:
+                    kind: string
+                url:
+                  optional: false
+                  schema:
+                    kind: string
+                alt:
+                  optional: false
+                  schema:
+                    kind: string
+                width:
+                  optional: false
+                  schema:
+                    kind: number
+                height:
+                  optional: false
+                  schema:
+                    kind: number
           showsOn:
             optional: false
             schema:
@@ -6288,6 +7166,296 @@ routes:
             schema:
               kind: string
               brand: ArticleId
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.sites.norway.collections.products.list:
+    method: GET
+    path: /content/sites/norway/collections/products
+    statuses:
+      - 200
+      - 400
+      - 401
+      - 403
+    deprecated: false
+    query:
+      kind: object
+      fields:
+        name:
+          optional: true
+          schema:
+            kind: string
+        orderBy:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - name
+              - publishedAt
+              - updatedAt
+        direction:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - asc
+              - desc
+        limit:
+          optional: true
+          schema:
+            kind: number
+        cursor:
+          optional: true
+          schema:
+            kind: string
+        locale:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - en
+              - nb
+    responses:
+      "200":
+        kind: object
+        fields:
+          items:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  name:
+                    optional: false
+                    schema:
+                      kind: string
+                  price:
+                    optional: false
+                    schema:
+                      kind: string
+                  summary:
+                    optional: false
+                    schema:
+                      kind: string
+                  photo:
+                    optional: false
+                    schema:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        url:
+                          optional: false
+                          schema:
+                            kind: string
+                        alt:
+                          optional: false
+                          schema:
+                            kind: string
+                        width:
+                          optional: false
+                          schema:
+                            kind: number
+                        height:
+                          optional: false
+                          schema:
+                            kind: number
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                      brand: ProductId
+          next:
+            optional: false
+            schema:
+              kind: string
+              nullable: true
+      "400":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.sites.norway.collections.products.get:
+    method: GET
+    path: /content/sites/norway/collections/products/:id
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    params:
+      kind: object
+      fields:
+        id:
+          optional: false
+          schema:
+            kind: string
+    query:
+      kind: object
+      fields:
+        locale:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - en
+              - nb
+    responses:
+      "200":
+        kind: object
+        fields:
+          name:
+            optional: false
+            schema:
+              kind: string
+          price:
+            optional: false
+            schema:
+              kind: string
+          summary:
+            optional: false
+            schema:
+              kind: string
+          photo:
+            optional: false
+            schema:
+              kind: object
+              fields:
+                id:
+                  optional: false
+                  schema:
+                    kind: string
+                url:
+                  optional: false
+                  schema:
+                    kind: string
+                alt:
+                  optional: false
+                  schema:
+                    kind: string
+                width:
+                  optional: false
+                  schema:
+                    kind: number
+                height:
+                  optional: false
+                  schema:
+                    kind: number
+          id:
+            optional: false
+            schema:
+              kind: string
+              brand: ProductId
       "401":
         kind: object
         fields:
@@ -6533,6 +7701,44 @@ routes:
                                       optional: false
                                       schema:
                                         kind: number
+                          article:
+                            kind: object
+                            fields:
+                              _type:
+                                optional: false
+                                schema:
+                                  kind: enum
+                                  values:
+                                    - article
+                              _key:
+                                optional: false
+                                schema:
+                                  kind: string
+                              article:
+                                optional: false
+                                schema:
+                                  kind: string
+                                  brand: ArticleId
+                          product:
+                            kind: object
+                            fields:
+                              _type:
+                                optional: false
+                                schema:
+                                  kind: enum
+                                  values:
+                                    - product
+                              _key:
+                                optional: false
+                                schema:
+                                  kind: string
+                              products:
+                                optional: false
+                                schema:
+                                  kind: array
+                                  element:
+                                    kind: string
+                                    brand: ProductId
                   id:
                     optional: false
                     schema:
@@ -6766,6 +7972,44 @@ routes:
                               optional: false
                               schema:
                                 kind: number
+                  article:
+                    kind: object
+                    fields:
+                      _type:
+                        optional: false
+                        schema:
+                          kind: enum
+                          values:
+                            - article
+                      _key:
+                        optional: false
+                        schema:
+                          kind: string
+                      article:
+                        optional: false
+                        schema:
+                          kind: string
+                          brand: ArticleId
+                  product:
+                    kind: object
+                    fields:
+                      _type:
+                        optional: false
+                        schema:
+                          kind: enum
+                          values:
+                            - product
+                      _key:
+                        optional: false
+                        schema:
+                          kind: string
+                      products:
+                        optional: false
+                        schema:
+                          kind: array
+                          element:
+                            kind: string
+                            brand: ProductId
           id:
             optional: false
             schema:
@@ -36013,6 +37257,7 @@ brands:
   - EventId
   - NewsletterId
   - OfficeId
+  - ProductId
 jobs:
   - content.publishScheduled
   - content.refreshSite
@@ -36177,6 +37422,53 @@ content:
           optional: false
           schema:
             kind: string
+        image:
+          optional: true
+          schema:
+            kind: object
+            fields:
+              id:
+                optional: false
+                schema:
+                  kind: string
+              alt:
+                optional: false
+                schema:
+                  kind: string
+              crop:
+                optional: true
+                schema:
+                  kind: object
+                  fields:
+                    x:
+                      optional: false
+                      schema:
+                        kind: number
+                    y:
+                      optional: false
+                      schema:
+                        kind: number
+                    width:
+                      optional: false
+                      schema:
+                        kind: number
+                    height:
+                      optional: false
+                      schema:
+                        kind: number
+              focalPoint:
+                optional: true
+                schema:
+                  kind: object
+                  fields:
+                    x:
+                      optional: false
+                      schema:
+                        kind: number
+                    y:
+                      optional: false
+                      schema:
+                        kind: number
         showsOn:
           optional: true
           schema:
@@ -36374,6 +37666,42 @@ content:
                                   optional: false
                                   schema:
                                     kind: number
+                article:
+                  kind: object
+                  fields:
+                    _type:
+                      optional: false
+                      schema:
+                        kind: enum
+                        values:
+                          - article
+                    _key:
+                      optional: false
+                      schema:
+                        kind: string
+                    article:
+                      optional: false
+                      schema:
+                        kind: string
+                product:
+                  kind: object
+                  fields:
+                    _type:
+                      optional: false
+                      schema:
+                        kind: enum
+                        values:
+                          - product
+                    _key:
+                      optional: false
+                      schema:
+                        kind: string
+                    products:
+                      optional: false
+                      schema:
+                        kind: array
+                        element:
+                          kind: string
   collection:offices:
     kind: collection
     migration: 0
@@ -36402,6 +37730,71 @@ content:
             kind: string
         photo:
           optional: true
+          schema:
+            kind: object
+            fields:
+              id:
+                optional: false
+                schema:
+                  kind: string
+              alt:
+                optional: false
+                schema:
+                  kind: string
+              crop:
+                optional: true
+                schema:
+                  kind: object
+                  fields:
+                    x:
+                      optional: false
+                      schema:
+                        kind: number
+                    y:
+                      optional: false
+                      schema:
+                        kind: number
+                    width:
+                      optional: false
+                      schema:
+                        kind: number
+                    height:
+                      optional: false
+                      schema:
+                        kind: number
+              focalPoint:
+                optional: true
+                schema:
+                  kind: object
+                  fields:
+                    x:
+                      optional: false
+                      schema:
+                        kind: number
+                    y:
+                      optional: false
+                      schema:
+                        kind: number
+  collection:products:
+    kind: collection
+    migration: 0
+    schema:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
+        price:
+          optional: false
+          schema:
+            kind: string
+        summary:
+          optional: false
+          schema:
+            kind: string
+        photo:
+          optional: false
           schema:
             kind: object
             fields:

@@ -20,7 +20,7 @@ export function ArticleList({ articles, locale }: { articles: Article[]; locale:
     return (
         <ol className={styles.list}>
             {articles.map((article) => (
-                <li key={article.id} className={styles.article}>
+                <li key={article.id} id={article.id} className={styles.article}>
                     <p className={styles.date}>{dateFormat.format(new Date(article.date))}</p>
                     <div className={styles.body}>
                         <h2 className={styles.title}>{article.title}</h2>

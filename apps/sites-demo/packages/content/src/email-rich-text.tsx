@@ -2,6 +2,7 @@ import { Fragment, type CSSProperties, type ReactNode } from 'react';
 import { Heading, Img, Link, Text } from '@react-email/components';
 import type { Output } from '@kizunajs/cms';
 import type { Newsletters } from './newsletters';
+import { absolute } from './email-blocks';
 import { colors, fonts } from './email-theme';
 
 type RichTextNode = Output<typeof Newsletters>['body'][number];
@@ -12,6 +13,31 @@ type TextBlock = Extract<
     }
 >;
 type Span = TextBlock['children'][number];
+
+/**
+ * The nodes of the body that are blocks, like an article card.
+ */
+type BlockNode = Exclude<
+    RichTextNode,
+    {
+        _type: 'block' | 'image';
+    }
+>;
+
+/**
+ * The component for each block the body may hold, by its name, given the
+ * block's fields.
+ */
+export type EmailBlocks = {
+    [Name in BlockNode['_type']]: (
+        props: Extract<
+            BlockNode,
+            {
+                _type: Name;
+            }
+        >
+    ) => ReactNode;
+};
 
 const styles = {
     paragraph: {
@@ -70,12 +96,6 @@ const HEADING_SIZES = {
     h4: '18px',
 } satisfies Record<string, string>;
 
-/**
- * A link or image source as an inbox can follow it: a path on the site, like
- * `/journal`, joined to the site's address.
- */
-const absolute = (href: string, siteUrl: string): string => new URL(href, siteUrl).toString();
-
 const spanContent = (span: Span, block: TextBlock, siteUrl: string): ReactNode => {
     let content: ReactNode = span.text;
     for (const mark of span.marks) {
@@ -99,7 +119,14 @@ const spanContent = (span: Span, block: TextBlock, siteUrl: string): ReactNode =
 
 const blockContent = (block: TextBlock, siteUrl: string): ReactNode => block.children.map((span) => spanContent(span, block, siteUrl));
 
-function EmailBlock({ node, siteUrl }: { node: RichTextNode; siteUrl: string }) {
+/**
+ * A block's node handed to the component named for it.
+ */
+const renderBlock = <Node extends BlockNode>(node: Node, blocks: EmailBlocks): ReactNode =>
+    (blocks[node._type] as (props: Node) => ReactNode)(node);
+
+function EmailBlock({ node, siteUrl, blocks }: { node: RichTextNode; siteUrl: string; blocks: EmailBlocks }) {
+    if (node._type !== 'block' && node._type !== 'image') return renderBlock(node, blocks);
     if (node._type === 'image') {
         return <Img src={absolute(node.image.url, siteUrl)} alt={node.image.alt} width={node.image.width} style={styles.image} />;
     }
@@ -140,9 +167,10 @@ function EmailList({ items, siteUrl }: { items: TextBlock[]; siteUrl: string }) 
 /**
  * Rich text as email markup, with inline styles an inbox keeps. Portable Text
  * stores each list item as a block of its own, so consecutive items of one
- * kind of list join into one list.
+ * kind of list join into one list. Each block goes to its component in
+ * `blocks`.
  */
-export function EmailRichText({ value, siteUrl }: { value: readonly RichTextNode[]; siteUrl: string }) {
+export function EmailRichText({ value, siteUrl, blocks }: { value: readonly RichTextNode[]; siteUrl: string; blocks: EmailBlocks }) {
     const groups: (RichTextNode | TextBlock[])[] = [];
     for (const node of value) {
         const last = groups.at(-1);
@@ -157,7 +185,7 @@ export function EmailRichText({ value, siteUrl }: { value: readonly RichTextNode
         Array.isArray(group) ? (
             <EmailList key={group[0]?._key} items={group} siteUrl={siteUrl} />
         ) : (
-            <EmailBlock key={group._key} node={group} siteUrl={siteUrl} />
+            <EmailBlock key={group._key} node={group} siteUrl={siteUrl} blocks={blocks} />
         )
     );
 }

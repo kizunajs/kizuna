@@ -5,6 +5,7 @@ import type { Output } from '@kizunajs/cms';
 import type { Newsletters } from './newsletters';
 import { sites } from './sites';
 import { EmailRichText } from './email-rich-text';
+import { ArticleCard, ProductRows, type Article, type NewsletterLinked, type Product } from './email-blocks';
 import { colors, fonts } from './email-theme';
 
 /**
@@ -98,7 +99,15 @@ const styles = {
  * Hagen's newsletter in its sites' look: the name on white, the issue below,
  * and the company in a green band at the bottom.
  */
-export function NewsletterEmail({ newsletter, recipient }: { newsletter: NewsletterContent; recipient: NewsletterRecipient }) {
+export function NewsletterEmail({
+    newsletter,
+    recipient,
+    linked,
+}: {
+    newsletter: NewsletterContent;
+    recipient: NewsletterRecipient;
+    linked: NewsletterLinked;
+}) {
     return (
         <Html lang="en">
             <Head />
@@ -113,7 +122,16 @@ export function NewsletterEmail({ newsletter, recipient }: { newsletter: Newslet
                             {newsletter.subject}
                         </Heading>
                         <Text style={styles.greeting}>Hi {recipient.firstName},</Text>
-                        <EmailRichText value={newsletter.body} siteUrl={group.url} />
+                        <EmailRichText
+                            value={newsletter.body}
+                            siteUrl={group.url}
+                            blocks={{
+                                article: (props) => <ArticleCard article={linked.articles.get(props.article)} siteUrl={group.url} />,
+                                product: (props) => (
+                                    <ProductRows products={props.products.map((id) => linked.products.get(id))} siteUrl={group.url} />
+                                ),
+                            }}
+                        />
                     </Section>
                     <Section style={styles.footer}>
                         <Text style={styles.company}>{group.companyName}</Text>
@@ -131,8 +149,35 @@ export function NewsletterEmail({ newsletter, recipient }: { newsletter: Newslet
 }
 
 /**
+ * The articles and plants an issue's blocks name, read the way the page reads
+ * them, so Live Preview shows their drafts.
+ */
+const linkedOf = async (body: NewsletterContent['body']): Promise<NewsletterLinked> => {
+    const articleIds = body.flatMap((node) => (node._type === 'article' ? [node.article] : []));
+    const productIds = body.flatMap((node) => (node._type === 'product' ? node.products : []));
+    // The config holds the newsletters, so it loads once an issue renders rather than with this file.
+    const { default: kizuna } = await import('../kizuna.cms.config');
+    const [articles, products]: [Article[], Product[]] = await Promise.all([
+        articleIds.length === 0
+            ? []
+            : kizuna.content.collections.articles.getMany({
+                  ids: articleIds,
+              }),
+        productIds.length === 0
+            ? []
+            : kizuna.content.collections.products.getMany({
+                  ids: productIds,
+              }),
+    ]);
+    return {
+        articles: new Map(articles.map((article) => [article.id, article])),
+        products: new Map(products.map((product) => [product.id, product])),
+    };
+};
+
+/**
  * An issue as the HTML its recipients get, for Live Preview, the test email
  * and the broadcast alike.
  */
-export const renderNewsletter = (newsletter: NewsletterContent, recipient: NewsletterRecipient): Promise<string> =>
-    render(<NewsletterEmail newsletter={newsletter} recipient={recipient} />);
+export const renderNewsletter = async (newsletter: NewsletterContent, recipient: NewsletterRecipient): Promise<string> =>
+    render(<NewsletterEmail newsletter={newsletter} recipient={recipient} linked={await linkedOf(newsletter.body)} />);

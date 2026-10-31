@@ -10,6 +10,7 @@ import { Employees } from './src/employees';
 import { Offices } from './src/offices';
 import { Articles } from './src/articles';
 import { Newsletters } from './src/newsletters';
+import { Products } from './src/products';
 import { PrivacyPolicy } from './src/privacy-policy';
 import { sites } from './src/sites';
 import { db } from './src/db';
@@ -55,7 +56,7 @@ export default defineConfig({
                       model: anthropic('claude-sonnet-5-5'),
                   },
               }),
-        collections: [Employees, Offices, Articles, Newsletters],
+        collections: [Employees, Offices, Articles, Products, Newsletters],
         globals: [PrivacyPolicy],
         sites,
         partners,

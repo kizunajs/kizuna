@@ -80,7 +80,147 @@ export const photos = {
         file: 'ferns.jpg',
         alt: 'Bregner som fyller bildet i dyp skygge',
     },
+    winterCare: {
+        file: 'ferns.jpg',
+        alt: 'Lady fern fronds filling the frame in deep shade',
+    },
+    nordmannFir: {
+        file: 'forest-trunks.jpg',
+        alt: 'Tall fir trunks above a green understorey',
+    },
+    bostonFern: {
+        file: 'fern-fronds.jpg',
+        alt: 'Fern fronds unfurling in soft light',
+    },
+    ladyFern: {
+        file: 'forest-floor.jpg',
+        alt: 'Young ferns in the sun along a forest path',
+    },
+    kanzanCherry: {
+        file: 'cherry-blossom.jpg',
+        alt: 'A Japanese cherry in flower against an April sky',
+    },
+    cherryBranches: {
+        file: 'cherry-branch.jpg',
+        alt: 'A cluster of pale pink cherry blossom close up',
+    },
 };
+
+/**
+ * The plants Hagen sells, as the newsletter shows them. Each is published.
+ */
+export const products: Array<{
+    values: Record<string, unknown>;
+    photo: keyof typeof photos;
+    written: Written;
+    inNorwegian: Record<string, unknown>;
+}> = [
+    {
+        values: {
+            name: 'Nordmann fir, 180 cm',
+            price: '£65',
+            summary: 'Grown in Hedmarken and cut in late November, so it keeps its needles until Twelfth Night.',
+        },
+        photo: 'nordmannFir',
+        inNorwegian: {
+            name: 'Nordmannsgran, 180 cm',
+            summary: 'Dyrket på Hedmarken og hogd i slutten av november, så den holder på nålene til trettende dag.',
+            photo: 'Høye granstammer over en grønn skogbunn',
+        },
+        written: {
+            by: una,
+            daysAgo: 20,
+            published: {
+                by: ada,
+                daysAgo: 19,
+            },
+        },
+    },
+    {
+        values: {
+            name: 'Boston fern',
+            price: '£18',
+            summary: 'A full fern for a bright bathroom or a cool hall. Keep the soil moist and mist it in winter.',
+        },
+        photo: 'bostonFern',
+        inNorwegian: {
+            name: 'Sverdbregne',
+            summary: 'En frodig bregne til et lyst bad eller en kjølig gang. Hold jorda fuktig og dusj den om vinteren.',
+            photo: 'Bregneblader som folder seg ut i mykt lys',
+        },
+        written: {
+            by: una,
+            daysAgo: 20,
+            published: {
+                by: ada,
+                daysAgo: 19,
+            },
+        },
+    },
+    {
+        values: {
+            name: 'Lady fern',
+            price: '£14',
+            summary: 'A hardy fern for a shady corner of the garden, back every spring.',
+        },
+        photo: 'ladyFern',
+        inNorwegian: {
+            name: 'Skogburkne',
+            summary: 'En hardfør bregne til et skyggefullt hjørne av hagen, som kommer tilbake hver vår.',
+            photo: 'Unge bregner i sola langs en skogssti',
+        },
+        written: {
+            by: sam,
+            daysAgo: 18,
+            published: {
+                by: ada,
+                daysAgo: 17,
+            },
+        },
+    },
+    {
+        values: {
+            name: "Japanese cherry 'Kanzan'",
+            price: '£95',
+            summary: 'Double pink flowers in late April, on a young tree of about two metres.',
+        },
+        photo: 'kanzanCherry',
+        inNorwegian: {
+            name: 'Japansk kirsebær «Kanzan»',
+            summary: 'Fylte rosa blomster i slutten av april, på et ungt tre på rundt to meter.',
+            photo: 'Et japansk kirsebærtre i blomst mot aprilhimmelen',
+        },
+        written: {
+            by: sam,
+            daysAgo: 18,
+            published: {
+                by: ada,
+                daysAgo: 17,
+            },
+        },
+    },
+    {
+        values: {
+            name: 'Cherry blossom branches',
+            price: '£12 a bunch',
+            summary: 'Branches cut in bud, which open in a vase indoors in a week or two.',
+        },
+        photo: 'cherryBranches',
+        inNorwegian: {
+            name: 'Kirsebærgreiner',
+            summary: 'Greiner skåret i knopp, som springer ut i en vase innendørs på en uke eller to.',
+            photo: 'En klase lyserosa kirsebærblomster på nært hold',
+        },
+        written: {
+            by: sam,
+            daysAgo: 18,
+            published: {
+                by: ada,
+                daysAgo: 17,
+            },
+        },
+    },
+];
 
 /**
  * Hagen's shops, in the order the sites list them. Trondheim opens with the
@@ -599,218 +739,224 @@ export const employeesInNorwegian: Record<string, { role: string; bio: string }>
  * The journal, with the sites each article shows on and how many days ago
  * it is dated. Every article shows on the group's site, which lists them all.
  */
-export const articles: Array<{ values: Record<string, unknown>; dated: number; written: Written; inNorwegian?: Record<string, unknown> }> =
-    [
-        {
-            values: {
-                title: 'Winter care for houseplants',
-                summary: 'Less water, more light and no radiators: how to see a houseplant through the dark months.',
-                body: `Most houseplants rest from November to February. Water when the top few centimetres of soil are dry, not on a schedule, and stop feeding until the days grow longer.
+export const articles: Array<{
+    values: Record<string, unknown>;
+    dated: number;
+    written: Written;
+    photo?: keyof typeof photos;
+    inNorwegian?: Record<string, unknown>;
+}> = [
+    {
+        values: {
+            title: 'Winter care for houseplants',
+            summary: 'Less water, more light and no radiators: how to see a houseplant through the dark months.',
+            body: `Most houseplants rest from November to February. Water when the top few centimetres of soil are dry, not on a schedule, and stop feeding until the days grow longer.
 
 Move them as close to the window as they will go, and away from radiators, which dry the air and the leaves. A tray of wet gravel under the pot helps ferns and calatheas through the heating season.`,
-                showsOn: ['uk', 'norway', 'group'],
+            showsOn: ['uk', 'norway', 'group'],
+        },
+        dated: 11,
+        photo: 'winterCare',
+        written: {
+            by: una,
+            daysAgo: 13,
+            published: {
+                by: ada,
+                daysAgo: 11,
             },
-            dated: 11,
-            written: {
-                by: una,
-                daysAgo: 13,
-                published: {
-                    by: ada,
-                    daysAgo: 11,
-                },
-            },
-            inNorwegian: {
-                title: 'Vinterstell av stueplanter',
-                summary: 'Mindre vann, mer lys og ingen ovner: slik kommer stueplantene gjennom de mørke månedene.',
-                body: `De fleste stueplanter hviler fra november til februar. Vann når de øverste centimeterne av jorda er tørre, ikke etter timeplan, og vent med gjødsel til dagene blir lengre.
+        },
+        inNorwegian: {
+            title: 'Vinterstell av stueplanter',
+            image: 'Bregner som fyller bildet i dyp skygge',
+            summary: 'Mindre vann, mer lys og ingen ovner: slik kommer stueplantene gjennom de mørke månedene.',
+            body: `De fleste stueplanter hviler fra november til februar. Vann når de øverste centimeterne av jorda er tørre, ikke etter timeplan, og vent med gjødsel til dagene blir lengre.
 
 Flytt dem så nær vinduet de tåler, og bort fra ovnene, som tørker lufta og bladene. Et fat med våt grus under potta hjelper bregner og kalateaer gjennom fyringssesongen.`,
-            },
         },
-        {
-            values: {
-                title: 'Columbia Road flower market',
-                summary: 'Our London shop sits a few doors from the Sunday market. When to go, and what to bring home.',
-                body: `The market runs every Sunday from eight until early afternoon. Come early for the pick of the stalls, or late for the bargains as the traders pack up.
+    },
+    {
+        values: {
+            title: 'Columbia Road flower market',
+            summary: 'Our London shop sits a few doors from the Sunday market. When to go, and what to bring home.',
+            body: `The market runs every Sunday from eight until early afternoon. Come early for the pick of the stalls, or late for the bargains as the traders pack up.
 
 Bring a bag with a flat bottom for pots, and drop in at the shop for a care card for whatever you found.`,
-                showsOn: ['uk', 'group'],
-            },
-            inNorwegian: {
-                title: 'Blomstermarkedet i Columbia Road',
-                summary: 'Butikken vår i London ligger noen dører fra søndagsmarkedet. Når du bør gå, og hva du bør ta med hjem.',
-                body: `Markedet er åpent hver søndag fra åtte til tidlig på ettermiddagen. Kom tidlig for det beste utvalget, eller sent for gode kjøp når handlerne pakker sammen.
+            showsOn: ['uk', 'group'],
+        },
+        inNorwegian: {
+            title: 'Blomstermarkedet i Columbia Road',
+            summary: 'Butikken vår i London ligger noen dører fra søndagsmarkedet. Når du bør gå, og hva du bør ta med hjem.',
+            body: `Markedet er åpent hver søndag fra åtte til tidlig på ettermiddagen. Kom tidlig for det beste utvalget, eller sent for gode kjøp når handlerne pakker sammen.
 
 Ta med en bag med flat bunn til pottene, og stikk innom butikken for et stellekort til det du fant.`,
-            },
-            dated: 47,
-            written: {
-                by: sam,
-                daysAgo: 49,
-                published: {
-                    by: una,
-                    daysAgo: 47,
-                },
+        },
+        dated: 47,
+        written: {
+            by: sam,
+            daysAgo: 49,
+            published: {
+                by: una,
+                daysAgo: 47,
             },
         },
-        {
-            values: {
-                title: 'Juletrær i Oslo',
-                summary: 'From the first Sunday of Advent we sell Christmas trees from Hedmarken in the courtyard on Grünerløkka.',
-                body: `We fetch the trees from the grower the same week we sell them, so they keep their needles until New Year. Choose between Norway spruce, Serbian spruce and Nordmann fir.
+    },
+    {
+        values: {
+            title: 'Juletrær i Oslo',
+            summary: 'From the first Sunday of Advent we sell Christmas trees from Hedmarken in the courtyard on Grünerløkka.',
+            body: `We fetch the trees from the grower the same week we sell them, so they keep their needles until New Year. Choose between Norway spruce, Serbian spruce and Nordmann fir.
 
 We wrap the tree in netting and deliver it to your door in Oslo for 150 kroner.`,
-                showsOn: ['norway', 'group'],
+            showsOn: ['norway', 'group'],
+        },
+        dated: 1,
+        written: {
+            by: kari,
+            daysAgo: 3,
+            published: {
+                by: nils,
+                daysAgo: 1,
             },
-            dated: 1,
-            written: {
-                by: kari,
-                daysAgo: 3,
-                published: {
-                    by: nils,
-                    daysAgo: 1,
-                },
-            },
-            inNorwegian: {
-                title: 'Juletrær i Oslo',
-                summary: 'Fra første søndag i advent selger vi juletrær fra Hedmarken i bakgården på Grünerløkka.',
-                body: `Vi henter trærne hos gartneren samme uke som vi selger dem, så de holder nålene til nyttår. Velg mellom vanlig gran, serbisk gran og edelgran.
+        },
+        inNorwegian: {
+            title: 'Juletrær i Oslo',
+            summary: 'Fra første søndag i advent selger vi juletrær fra Hedmarken i bakgården på Grünerløkka.',
+            body: `Vi henter trærne hos gartneren samme uke som vi selger dem, så de holder nålene til nyttår. Velg mellom vanlig gran, serbisk gran og edelgran.
 
 Vi pakker treet i nett og leverer det på døren i Oslo for 150 kroner.`,
-            },
         },
-        {
-            values: {
-                title: 'Visiting the growers we buy from',
-                summary: 'Every spring the buyers from all our shops visit the nurseries that grow our plants.',
-                body: `We buy from a handful of growers in Norway, the Netherlands and Kent, and we visit each of them every season. We see how the plants are raised, and we choose next year's together.
+    },
+    {
+        values: {
+            title: 'Visiting the growers we buy from',
+            summary: 'Every spring the buyers from all our shops visit the nurseries that grow our plants.',
+            body: `We buy from a handful of growers in Norway, the Netherlands and Kent, and we visit each of them every season. We see how the plants are raised, and we choose next year's together.
 
 It is why every Hagen plant comes with a care card written by the people who grew it.`,
-                showsOn: ['group'],
-            },
-            inNorwegian: {
-                title: 'Besøk hos gartnerne vi kjøper fra',
-                summary: 'Hver vår besøker innkjøperne fra alle butikkene gartneriene som dyrker plantene våre.',
-                body: `Vi kjøper fra en håndfull gartnere i Norge, Nederland og Kent, og vi besøker hver av dem hver sesong. Vi ser hvordan plantene vokser opp, og vi velger neste års planter sammen.
+            showsOn: ['group'],
+        },
+        inNorwegian: {
+            title: 'Besøk hos gartnerne vi kjøper fra',
+            summary: 'Hver vår besøker innkjøperne fra alle butikkene gartneriene som dyrker plantene våre.',
+            body: `Vi kjøper fra en håndfull gartnere i Norge, Nederland og Kent, og vi besøker hver av dem hver sesong. Vi ser hvordan plantene vokser opp, og vi velger neste års planter sammen.
 
 Derfor får hver plante fra Hagen med seg et stellekort skrevet av dem som dyrket den.`,
-            },
-            dated: 186,
-            written: {
+        },
+        dated: 186,
+        written: {
+            by: ada,
+            daysAgo: 188,
+            published: {
                 by: ada,
-                daysAgo: 188,
-                published: {
-                    by: ada,
-                    daysAgo: 186,
-                },
+                daysAgo: 186,
             },
         },
-        {
-            values: {
-                title: 'Five plants for a dark flat',
-                summary: 'A north-facing window still grows a jungle. Five plants that like the shade as much as you do not.',
-                body: `A north-facing room gets soft, even light all day, which is what a forest floor gives. These five are happy in it: the ZZ plant, the cast iron plant, the heartleaf philodendron, the bird's nest fern and the snake plant.
+    },
+    {
+        values: {
+            title: 'Five plants for a dark flat',
+            summary: 'A north-facing window still grows a jungle. Five plants that like the shade as much as you do not.',
+            body: `A north-facing room gets soft, even light all day, which is what a forest floor gives. These five are happy in it: the ZZ plant, the cast iron plant, the heartleaf philodendron, the bird's nest fern and the snake plant.
 
 Keep them within two metres of the window, water them less than you think, and turn the pot a quarter every time you do, so they grow straight.`,
-                showsOn: ['uk', 'group'],
-            },
-            inNorwegian: {
-                title: 'Fem planter for en mørk leilighet',
-                summary: 'Et vindu mot nord kan fortsatt gi deg en jungel. Fem planter som liker skyggen like godt som du ikke gjør.',
-                body: `Et rom mot nord får mykt, jevnt lys hele dagen, slik en skogbunn gjør. Disse fem trives i det: zamioculcas, aspidistra, filodendron, redebregne og svigermors tunge.
+            showsOn: ['uk', 'group'],
+        },
+        inNorwegian: {
+            title: 'Fem planter for en mørk leilighet',
+            summary: 'Et vindu mot nord kan fortsatt gi deg en jungel. Fem planter som liker skyggen like godt som du ikke gjør.',
+            body: `Et rom mot nord får mykt, jevnt lys hele dagen, slik en skogbunn gjør. Disse fem trives i det: zamioculcas, aspidistra, filodendron, redebregne og svigermors tunge.
 
 Hold dem innenfor to meter fra vinduet, vann dem mindre enn du tror, og vri potta en kvart omdreining hver gang du vanner, så de vokser rett.`,
-            },
-            dated: 22,
-            written: {
-                by: sam,
-                daysAgo: 25,
-                published: {
-                    by: una,
-                    daysAgo: 22,
-                },
+        },
+        dated: 22,
+        written: {
+            by: sam,
+            daysAgo: 25,
+            published: {
+                by: una,
+                daysAgo: 22,
             },
         },
-        {
-            values: {
-                title: 'We open in Brighton',
-                summary: 'Our second shop in the UK opens in North Laine, between a record shop and a bakery.',
-                body: `After a summer of plastering and painting, Hagen Brighton opens its doors at 27 Kensington Gardens. Tom Ellery runs the shop, and Grace Okafor looks after the plants that like sea air.
+    },
+    {
+        values: {
+            title: 'We open in Brighton',
+            summary: 'Our second shop in the UK opens in North Laine, between a record shop and a bakery.',
+            body: `After a summer of plastering and painting, Hagen Brighton opens its doors at 27 Kensington Gardens. Tom Ellery runs the shop, and Grace Okafor looks after the plants that like sea air.
 
 The plant care desk answers Brighton the same as London, and the care cards are the same too.`,
-                showsOn: ['uk', 'group'],
-            },
-            inNorwegian: {
-                title: 'Vi åpner i Brighton',
-                summary: 'Den andre butikken vår i Storbritannia åpner i North Laine, mellom en platebutikk og et bakeri.',
-                body: `Etter en sommer med sparkling og maling åpner Hagen Brighton dørene i 27 Kensington Gardens. Tom Ellery driver butikken, og Grace Okafor steller plantene som liker sjøluft.
+            showsOn: ['uk', 'group'],
+        },
+        inNorwegian: {
+            title: 'Vi åpner i Brighton',
+            summary: 'Den andre butikken vår i Storbritannia åpner i North Laine, mellom en platebutikk og et bakeri.',
+            body: `Etter en sommer med sparkling og maling åpner Hagen Brighton dørene i 27 Kensington Gardens. Tom Ellery driver butikken, og Grace Okafor steller plantene som liker sjøluft.
 
 Planteklinikken svarer for Brighton akkurat som for London, og stellekortene er de samme.`,
-            },
-            dated: 23,
-            written: {
-                by: una,
-                daysAgo: 24,
-                published: {
-                    by: ada,
-                    daysAgo: 23,
-                },
+        },
+        dated: 23,
+        written: {
+            by: una,
+            daysAgo: 24,
+            published: {
+                by: ada,
+                daysAgo: 23,
             },
         },
-        {
-            values: {
-                title: 'Fern week in Oslo and Bergen',
-                summary: 'This week every fern in our Norwegian shops is a fifth off, from the smallest maidenhair to the tree ferns.',
-                body: `Ferns are the plant we sell most of in Norway, and November is when they need the most help. This week every fern in Oslo, Majorstuen, Bergen and Stavanger is 20 per cent off.
+    },
+    {
+        values: {
+            title: 'Fern week in Oslo and Bergen',
+            summary: 'This week every fern in our Norwegian shops is a fifth off, from the smallest maidenhair to the tree ferns.',
+            body: `Ferns are the plant we sell most of in Norway, and November is when they need the most help. This week every fern in Oslo, Majorstuen, Bergen and Stavanger is 20 per cent off.
 
 Bring an old fern in for a check-up while you are there. Sigrid and Sara will look it over for free.`,
-                showsOn: ['norway', 'group'],
+            showsOn: ['norway', 'group'],
+        },
+        dated: 2,
+        written: {
+            by: kari,
+            daysAgo: 4,
+            published: {
+                by: nils,
+                daysAgo: 2,
             },
-            dated: 2,
-            written: {
-                by: kari,
-                daysAgo: 4,
-                published: {
-                    by: nils,
-                    daysAgo: 2,
-                },
-            },
-            inNorwegian: {
-                title: 'Bregneuke i Oslo og Bergen',
-                summary:
-                    'Denne uka er alle bregner i butikkene våre i Norge 20 prosent billigere, fra den minste venushåren til trebregnene.',
-                body: `Bregner er planten vi selger mest av i Norge, og november er måneden de trenger mest hjelp. Denne uka er alle bregner på Grünerløkka, Majorstuen, i Bergen og i Stavanger 20 prosent billigere.
+        },
+        inNorwegian: {
+            title: 'Bregneuke i Oslo og Bergen',
+            summary: 'Denne uka er alle bregner i butikkene våre i Norge 20 prosent billigere, fra den minste venushåren til trebregnene.',
+            body: `Bregner er planten vi selger mest av i Norge, og november er måneden de trenger mest hjelp. Denne uka er alle bregner på Grünerløkka, Majorstuen, i Bergen og i Stavanger 20 prosent billigere.
 
 Ta gjerne med en gammel bregne til sjekk mens du er innom. Sigrid og Sara ser over den gratis.`,
-            },
         },
-        {
-            values: {
-                title: 'How we pack plants for winter delivery',
-                summary: 'Paper, wool and a hot water bottle in a cold week: what keeps a plant warm on its way to you.',
-                body: `From November we pack every plant in paper and a sleeve of sheep's wool from a farm in Valdres, never plastic. On days below minus five we hold deliveries back rather than send a plant out to freeze.
+    },
+    {
+        values: {
+            title: 'How we pack plants for winter delivery',
+            summary: 'Paper, wool and a hot water bottle in a cold week: what keeps a plant warm on its way to you.',
+            body: `From November we pack every plant in paper and a sleeve of sheep's wool from a farm in Valdres, never plastic. On days below minus five we hold deliveries back rather than send a plant out to freeze.
 
 Unpack it the day it arrives, let it stand in the box in a cool room for an hour, and then give it its place by the window.`,
-                showsOn: ['uk', 'norway', 'group'],
-            },
-            dated: 8,
-            written: {
+            showsOn: ['uk', 'norway', 'group'],
+        },
+        dated: 8,
+        written: {
+            by: ada,
+            daysAgo: 10,
+            published: {
                 by: ada,
-                daysAgo: 10,
-                published: {
-                    by: ada,
-                    daysAgo: 8,
-                },
-            },
-            inNorwegian: {
-                title: 'Slik pakker vi planter for vinterlevering',
-                summary: 'Papir, ull og en varmeflaske når det er kaldt: dette holder planten varm på vei til deg.',
-                body: `Fra november pakker vi hver plante i papir og en hylse av saueull fra en gård i Valdres, aldri i plast. Når det er kaldere enn minus fem, venter vi heller med leveringen enn å sende en plante ut for å fryse.
-
-Pakk den ut samme dag, la den stå i esken i et kjølig rom i en time, og gi den så plassen sin ved vinduet.`,
+                daysAgo: 8,
             },
         },
-    ];
+        inNorwegian: {
+            title: 'Slik pakker vi planter for vinterlevering',
+            summary: 'Papir, ull og en varmeflaske når det er kaldt: dette holder planten varm på vei til deg.',
+            body: `Fra november pakker vi hver plante i papir og en hylse av saueull fra en gård i Valdres, aldri i plast. Når det er kaldere enn minus fem, venter vi heller med leveringen enn å sende en plante ut for å fryse.
+
+Pakk den ut samme dag, la den stå i esken i et kjølig rom i en time, og gi den så plassen sin ved vinduet.`,
+        },
+    },
+];
 
 /**
  * The UK's workshops, by how many days from today each runs.
@@ -1637,13 +1783,17 @@ export const christmasNewsletter = {
         preheader: 'Christmas trees from Hedmarken, wreath evenings and our December hours.',
         body: `From the first Sunday of Advent the courtyard on Grünerløkka fills with Christmas trees from Hedmarken, and the London shop with wreaths from Kent.
 
+@plants Nordmann fir, 180 cm; Boston fern
+
 ## Before you order
 
 - The last day for delivery before Christmas is 20 December
 - Every shop opens late through December
 - Trees are delivered in Oslo for 150 kroner
 
-How to keep a cut tree fresh until New Year is in [the journal](/journal).`,
+How to keep a cut tree fresh until New Year is in [the journal](/journal).
+
+@article Winter care for houseplants`,
     },
     note: 'Julenummeret. Kan du lese gjennom før det går ut tirsdag morgen?',
 };

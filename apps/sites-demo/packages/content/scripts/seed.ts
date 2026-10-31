@@ -24,6 +24,7 @@ import {
     photos,
     privacyPolicy,
     privacyPolicyInNorwegian,
+    products,
     sam,
     trondheimOpening,
     una,
@@ -511,12 +512,19 @@ export const seedContent = async (service: CmsService): Promise<void> => {
     for (const article of articles) {
         const title = article.values['title'];
         if ((await service.editorItems('articles')).some((item) => item.label === title)) continue;
+        const image =
+            article.photo === undefined
+                ? {}
+                : {
+                      image: await upload(photos[article.photo], article.written.by, daysAgo(article.written.daysAgo)),
+                  };
         const created = await asOf(daysAgo(article.written.daysAgo), () =>
             service.createItem(
                 'articles',
                 {
                     ...article.values,
                     date: dateIn(-article.dated),
+                    ...image,
                 },
                 caller,
                 article.written.by
@@ -930,7 +938,43 @@ Book a visit at the shop or by writing to care@hagen.example.co.uk. Visits run o
         });
     }
 
+    // The plants the newsletter shows.
+
+    for (const product of products) {
+        if ((await service.editorItems('products')).some((item) => item.label === product.values['name'])) continue;
+        const at = daysAgo(product.written.daysAgo);
+        const photo = await upload(photos[product.photo], product.written.by, at);
+        const created = await asOf(at, () =>
+            service.createItem(
+                'products',
+                {
+                    ...product.values,
+                    photo,
+                },
+                caller,
+                product.written.by
+            )
+        );
+        if (product.written.published !== undefined) {
+            await publish(created.target.ref, product.written.published.by, daysAgo(product.written.published.daysAgo, 1));
+        }
+        console.log(`[demo] seeded the product ${String(product.values['name'])}`);
+    }
+    await translateItems(
+        'products',
+        products.map((product) => ({
+            label: String(product.values['name']),
+            values: product.inNorwegian,
+            written: product.written,
+        }))
+    );
+
     // The newsletter: two issues sent, and the Christmas issue waiting for Mia.
+
+    const linked: Linked = {
+        articles: new Map((await service.editorItems('articles')).map((item) => [item.label, item.id])),
+        products: new Map((await service.editorItems('products')).map((item) => [item.label, item.id])),
+    };
 
     for (const issue of newsletters) {
         if ((await service.editorItems('newsletters')).some((item) => item.label === issue.values.subject)) continue;
@@ -977,7 +1021,7 @@ Book a visit at the shop or by writing to care@hagen.example.co.uk. Visits run o
 
     if (!(await service.editorItems('newsletters')).some((item) => item.label === christmasNewsletter.values.subject)) {
         const created = await asOf(daysAgo(2), () =>
-            service.createItem('newsletters', newsletterValues(christmasNewsletter.values), caller, kari)
+            service.createItem('newsletters', newsletterValues(christmasNewsletter.values, linked), caller, kari)
         );
         const ref = created.target.ref;
         await askForReview(ref, {
@@ -1057,20 +1101,58 @@ Book a visit at the shop or by writing to care@hagen.example.co.uk. Visits run o
 };
 
 /**
+ * The ids of the articles and plants an issue's blocks name, by title and by
+ * name.
+ */
+interface Linked {
+    articles: ReadonlyMap<string, string>;
+    products: ReadonlyMap<string, string>;
+}
+
+/**
  * An issue's values with its body as rich text.
  */
-const newsletterValues = (values: { subject: string; preheader: string; body: string }): Record<string, unknown> => ({
+const newsletterValues = (values: { subject: string; preheader: string; body: string }, linked?: Linked): Record<string, unknown> => ({
     subject: values.subject,
     preheader: values.preheader,
-    body: richText(values.body),
+    body: richText(values.body, linked),
 });
 
 /**
- * A few words of plain markup as rich text: blank lines between blocks, `## `
- * for a heading, `- ` for a list item, and `[text](/path)` for a link.
+ * The id of a seeded article or plant, by its title or name.
  */
-const richText = (source: string) => {
+const linkedId = (ids: ReadonlyMap<string, string>, label: string): string => {
+    const id = ids.get(label);
+    if (id === undefined) throw new Error(`The seed has nothing called '${label}' to put in the newsletter.`);
+    return id;
+};
+
+/**
+ * A few words of plain markup as rich text: blank lines between blocks, `## `
+ * for a heading, `- ` for a list item, and `[text](/path)` for a link. A line
+ * `@article <title>` is an article block, and `@plants <name>; <name>` a block
+ * of plants.
+ */
+const richText = (source: string, linked?: Linked) => {
     const key = (): string => randomUUID().replace(/-/g, '').slice(0, 12);
+    const linkedBlock = (chunk: string) => {
+        if (linked === undefined) throw new Error(`The seed has no ids for the block '${chunk}'.`);
+        if (chunk.startsWith('@article ')) {
+            return {
+                _type: 'article',
+                _key: key(),
+                article: linkedId(linked.articles, chunk.slice('@article '.length)),
+            };
+        }
+        return {
+            _type: 'product',
+            _key: key(),
+            products: chunk
+                .slice('@plants '.length)
+                .split(';')
+                .map((name) => linkedId(linked.products, name.trim())),
+        };
+    };
     const block = (line: string, style: string, listItem?: 'bullet') => {
         const markDefs: Array<{ _type: 'link'; _key: string; href: string }> = [];
         const children = line
@@ -1117,7 +1199,8 @@ const richText = (source: string) => {
         .split(/\n\s*\n/)
         .map((chunk) => chunk.trim())
         .filter((chunk) => chunk !== '')
-        .flatMap((chunk) => {
+        .flatMap((chunk): Array<Record<string, unknown>> => {
+            if (chunk.startsWith('@article ') || chunk.startsWith('@plants ')) return [linkedBlock(chunk)];
             const lines = chunk.split('\n');
             if (lines.every((line) => line.startsWith('- '))) return lines.map((line) => block(line.slice(2), 'normal', 'bullet'));
             if (chunk.startsWith('## ')) return [block(chunk.slice(3), 'h2')];

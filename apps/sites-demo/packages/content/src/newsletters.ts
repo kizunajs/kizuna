@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { defineCollection } from '@kizunajs/cms';
-import { RichTextSchema } from '@kizunajs/cms/schemas';
-import { NewsletterId } from './ids';
+import { defineBlock, defineCollection } from '@kizunajs/cms';
+import { richText } from '@kizunajs/cms/schemas';
+import { ArticleId, NewsletterId, ProductId } from './ids';
 import { BROADCAST_RECIPIENT, renderNewsletter } from './newsletter-email';
 
 /**
@@ -11,6 +11,39 @@ import { BROADCAST_RECIPIENT, renderNewsletter } from './newsletter-email';
 const SenderSchema = z.object({
     userId: z.string(),
     name: z.string(),
+});
+
+/**
+ * A card for one article from the journal: its image, title and summary, with
+ * a link to read it.
+ */
+export const ArticleBlockSchema = defineBlock({
+    name: 'article',
+    label: 'Article',
+    description: 'A card for one article from the journal.',
+    fields: [
+        {
+            name: 'article',
+            schema: ArticleId,
+        },
+    ],
+});
+
+/**
+ * A row for each of a few plants: photo, name and price, with a link to the
+ * shops that sell them.
+ */
+export const ProductBlockSchema = defineBlock({
+    name: 'product',
+    label: 'Plants',
+    description: 'One to three plants, each with its photo, name and price.',
+    fields: [
+        {
+            name: 'products',
+            label: 'Plants',
+            schema: z.array(ProductId).min(1).max(3),
+        },
+    ],
 });
 
 /**
@@ -36,7 +69,9 @@ export const Newsletters = defineCollection({
         },
         {
             name: 'body',
-            schema: RichTextSchema,
+            schema: richText({
+                blocks: [ArticleBlockSchema, ProductBlockSchema],
+            }),
         },
     ],
     actions: {
