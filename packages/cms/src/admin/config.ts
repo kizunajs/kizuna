@@ -209,6 +209,15 @@ export interface ListOptions {
      */
     tree?: string;
     /**
+     * How many levels the tree may have, when its collection caps it.
+     */
+    treeDepth?: number;
+    /**
+     * Editors drag the items into an order, for a collection with
+     * `orderable`.
+     */
+    orderable?: boolean;
+    /**
      * Each item picks the sites that show it, under Shows on.
      */
     chooseSites?: boolean;

@@ -11,21 +11,18 @@ const offices = [
         city: 'London',
         address: '14 Columbia Road, London E2 7RG',
         phone: '+47 22 41 08 00',
-        order: 0,
     },
     {
         name: 'Hagen Oslo',
         city: 'Oslo',
         address: 'Markveien 38, 0554 Oslo',
         phone: '+47 22 41 08 00',
-        order: 1,
     },
     {
         name: 'Hagen Bergen',
         city: 'Bergen',
         address: 'Vaskerelven 8, 5014 Bergen',
         phone: '+47 55 30 21 40',
-        order: 2,
     },
 ];
 
@@ -62,7 +59,6 @@ const employees = [
             role: 'Founder and buyer',
             bio: 'Ingrid opened the first Hagen on Grünerløkka in 2019, and still chooses every plant the three shops sell.',
             email: 'ingrid@hagen.example.com',
-            order: 0,
         },
     },
     {
@@ -71,7 +67,6 @@ const employees = [
             name: 'Sara Lindqvist',
             role: 'Shop gardener',
             bio: 'Sara runs the Oslo shop floor and the courtyard beds behind it.',
-            order: 1,
         },
     },
     {
@@ -81,7 +76,6 @@ const employees = [
             role: 'Head of plant care',
             bio: 'Martin answers the plant care desk for all three shops, and runs the London workshops.',
             email: 'martin@hagen.example.co.uk',
-            order: 0,
         },
     },
     {
@@ -91,7 +85,6 @@ const employees = [
             role: 'Shop manager',
             bio: 'Eleanor opened the Columbia Road shop in 2024, a few doors from the Sunday flower market.',
             email: 'eleanor@hagen.example.co.uk',
-            order: 1,
         },
     },
     {
@@ -101,7 +94,6 @@ const employees = [
             role: 'Shop manager',
             bio: 'Erlend knows which plants forgive Bergen rain on the walk home, and which do not.',
             email: 'erlend@hagen.example.no',
-            order: 0,
         },
     },
     {
@@ -110,7 +102,6 @@ const employees = [
             name: 'Sigrid Haugen',
             role: 'Plant doctor',
             bio: 'Sigrid makes house calls across Bergen for plants too big to carry in.',
-            order: 1,
         },
     },
 ];

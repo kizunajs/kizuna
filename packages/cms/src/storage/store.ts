@@ -3,6 +3,7 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, lt, max, ne, sql } from 'd
 import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
 import { cmsDocuments, cmsRefreshes, cmsRefs, cmsReviewComments, cmsReviews, cmsTranslations, cmsVersions } from './schema.js';
 import { CMS_MIGRATION_SQL, likePrefix, type IndexType } from './migration.js';
+import { PLACE } from '../place.js';
 
 /**
  * Any Drizzle Postgres database: node-postgres, postgres.js, Neon, PGlite.
@@ -353,6 +354,32 @@ export class DocumentStore {
     /**
      * Every source document of a kind, on one site when `site` is given.
      */
+    /**
+     * Gives documents a place without a new version, in the draft and the
+     * published copy alike, for the items an orderable collection held
+     * before they had one.
+     */
+    async assignPlaces(kind: DocumentKind, site: string, places: ReadonlyArray<{ key: string; place: string }>): Promise<void> {
+        const path = `{${PLACE}}`;
+        for (const { key, place } of places) {
+            const value = JSON.stringify(place);
+            await this.db
+                .update(cmsDocuments)
+                .set({
+                    draft: sql`case when ${cmsDocuments.draft} is null then null else jsonb_set(${cmsDocuments.draft}, ${path}::text[], ${value}::jsonb) end`,
+                    published: sql`case when ${cmsDocuments.published} is null then null else jsonb_set(${cmsDocuments.published}, ${path}::text[], ${value}::jsonb) end`,
+                })
+                .where(
+                    and(
+                        eq(cmsDocuments.kind, kind),
+                        eq(cmsDocuments.site, site),
+                        eq(cmsDocuments.locale, SOURCE_LOCALE),
+                        eq(cmsDocuments.key, key)
+                    )
+                );
+        }
+    }
+
     async list(kind: DocumentKind, site?: string): Promise<DocumentRow[]> {
         const rows = await this.db
             .select()

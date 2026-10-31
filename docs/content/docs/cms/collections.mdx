@@ -33,12 +33,8 @@ export const Employees = defineCollection({
             name: 'photo',
             schema: ImageSchema.optional(),
         },
-        {
-            name: 'order',
-            schema: z.int().min(0).default(0),
-        },
     ],
-    indexes: ['department', 'order'],
+    indexes: ['department'],
 });
 ```
 
@@ -94,6 +90,38 @@ The CMS records every id an item holds as it saves, so this needs no index and n
 },
 ```
 
+## Items in an order
+
+The team page lists people in the order an editor sets. `orderable` gives a collection that order:
+
+```ts title="src/cms/content.ts"
+export const Employees = defineCollection({
+    name: 'employees',
+    id: EmployeeId,
+    orderable: true,
+    fields: employeeFields,
+    indexes: ['office'],
+});
+```
+
+Editors drag the rows of its [list](/docs/cms/editing/admin#lists) into place, and `list()` returns the items in that order:
+
+```tsx title="src/app/offices/[id]/page.tsx"
+const { items } = await kizuna.content.collections.employees.list({
+    where: {
+        office: id,
+    },
+});
+```
+
+The collection has one order, and a filter keeps it, so the London page lists London's people in the order they have among everyone. Filtered to one office, the admin's list shows that office's people in the same order, and a drag there orders them among themselves.
+
+A new item goes last. `orderBy` still sorts by any field of `indexes`, and leaving it out reads the order.
+
+A move is a change to the item. The item reads Changed until it is published, the site keeps the old order until then, and a review covers it like any other change. Draft mode shows the order the drafts give.
+
+Each item keeps its place as a short key that sorts between its neighbours, stored with its draft and its published copy, so moving one employee changes that employee alone. A reader never sees the key. Items saved before the collection said `orderable` have no place yet, and come last until the first move, which gives each of them the place it showed in.
+
 ## Trees
 
 A shop's tags nest: Workshop sits under Lighting, and Brushed brass under Brass under Materials. A collection whose items point at one of their own is a tree, and `tree` names the field that points up:
@@ -137,6 +165,73 @@ Wherever a tag appears, editors and the model see it by its path, like "Lighting
 - A filter on a tag can include every tag under it, so "Tags is within Lighting" finds an article tagged Workshop.
 
 A save that would put a tag under itself, or under one of its own, is refused. Pages need no `tree`, since each already sits beside its route.
+
+### A menu
+
+A site's menu is a tree whose items keep an order, and renders two levels:
+
+```ts title="src/cms/content.ts"
+export const MenuItemId = Kizuna.brand('MenuItemId', z.string());
+
+export const MenuItems = defineCollection({
+    name: 'menuItems',
+    id: MenuItemId,
+    tree: {
+        field: 'parent',
+        depth: 2,
+    },
+    orderable: true,
+    fields: [
+        {
+            name: 'label',
+            schema: z.string().max(40),
+        },
+        {
+            name: 'link',
+            schema: z.string().max(200),
+        },
+        {
+            name: 'parent',
+            schema: MenuItemId.optional(),
+            position: 'sidebar',
+        },
+    ],
+});
+```
+
+`depth` counts levels, the top as one, so an item may sit under a top item and nothing may sit under that. A move or a save that would go deeper is refused. With `orderable`, siblings keep the order editors give them, and without it they sort by title, as tags do.
+
+`list()` returns the items in their order, each with its `parent`. `Map.groupBy` keeps that order within each group, so the menu is two lookups:
+
+```tsx title="src/components/site-menu.tsx"
+const { items } = await kizuna.content.collections.menuItems.list();
+const under = Map.groupBy(items, (item) => item.parent ?? null);
+
+return (
+    <ul>
+        {(under.get(null) ?? []).map((item) => (
+            <li key={item.id}>
+                <a href={item.link}>{item.label}</a>
+                <ul>
+                    {(under.get(item.id) ?? []).map((child) => (
+                        <li key={child.id}>
+                            <a href={child.link}>{child.label}</a>
+                        </li>
+                    ))}
+                </ul>
+            </li>
+        ))}
+    </ul>
+);
+```
+
+### Moving and deleting a parent
+
+An item takes everything under it wherever it goes, since each of those still points at it.
+
+An item shows on the site once everything above it is published. Unpublishing About takes Careers and Contact off the menu with it, and a new parent with new items under it can be published in any order.
+
+Deleting an item deletes everything under it. The admin names what goes with it before it asks, and the model's delete tool asks the person first, as every delete does.
 
 ## Actions
 

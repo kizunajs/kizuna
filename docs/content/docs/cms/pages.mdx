@@ -43,3 +43,11 @@ export default definePage({
 ```
 
 Each route param reads the item field it names, so `[slug]` reads `slug`. That field is text, indexed and unique, since it is the address. Editors create articles as items of the collection, and the preview opens each one at its address, unless the collection names a [preview page](/docs/cms/collections#live-preview) of its own.
+
+## The pages of a site
+
+A site's **Pages** list in the [admin](/docs/cms/editing/admin#lists) nests each page under the path above it, so `/plant-care/winter` sits under `/plant-care`. The front page comes first and the rest follow by path, every level open. A path with no page of its own, like `/about` when only `/about/history` and `/about/careers` exist, shows in grey.
+
+A route that shows a collection, like `/shops/[slug]`, is a row of its own that counts the collection's items and opens its list.
+
+Pages sit where their paths put them, which the site's code decides, so the list has no grips. Searching or sorting lists them flat, and **Overview** lists every site's pages flat, each with its site.

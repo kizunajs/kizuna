@@ -48,12 +48,7 @@ export const Offices = defineCollection({
             schema: ImageSchema.optional(),
             position: 'sidebar',
         },
-        {
-            name: 'order',
-            label: 'Sort order',
-            schema: z.int().min(0).default(0).describe('Lower comes first.'),
-            position: 'sidebar',
-        },
     ],
-    indexes: ['order', 'name'],
+    orderable: true,
+    indexes: ['name'],
 });

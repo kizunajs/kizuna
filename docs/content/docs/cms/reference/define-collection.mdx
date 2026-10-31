@@ -7,19 +7,20 @@ description: 'Many items of one shape, each with an id type of its own.'
 defineCollection(definition: CollectionDefinition): Collection
 ```
 
-| Option                                             | Type                            | Description                                                                                                |
-| -------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `name`                                             | `string`                        | How it is read: `kizuna.content.collections.<name>`                                                        |
-| `id`                                               | `Kizuna.brand(...)`             | The id type its items get, shared with your routes and clients                                             |
-| `fields`                                           | `Field[]`                       | What editors may change                                                                                    |
-| `indexes`                                          | `string[]`                      | Fields a list may filter and sort by                                                                       |
-| `immutable`                                        | `string[]`                      | Fields that never change once published, like a SKU                                                        |
-| `tree`                                             | `string`                        | The field holding an item's parent. See [Trees](/docs/cms/collections#trees)                               |
-| `actions`                                          | `Record<string, Action>`        | Buttons on an item. See [Actions](/docs/cms/collections#actions)                                           |
-| `preview`                                          | `{ url: ({ item }) => string }` | The page the admin's Live Preview shows an item on. See [Live Preview](/docs/cms/collections#live-preview) |
-| `columns`                                          | `string[]`                      | Fields the admin's list shows beside each item's title, until an editor hides them                         |
-| `chooseSites`                                      | `boolean`                       | Each item picks the sites that show it. See [Articles across sites](/docs/cms/sites#articles-across-sites) |
-| `label`, `group`, `requireReview`, `migrate`, `on` |                                 | As on a global                                                                                             |
+| Option                                             | Type                            | Description                                                                                                                   |
+| -------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `name`                                             | `string`                        | How it is read: `kizuna.content.collections.<name>`                                                                           |
+| `id`                                               | `Kizuna.brand(...)`             | The id type its items get, shared with your routes and clients                                                                |
+| `fields`                                           | `Field[]`                       | What editors may change                                                                                                       |
+| `indexes`                                          | `string[]`                      | Fields a list may filter and sort by                                                                                          |
+| `immutable`                                        | `string[]`                      | Fields that never change once published, like a SKU                                                                           |
+| `tree`                                             | `string \| { field, depth }`    | The field holding an item's parent, and how many levels the tree may have. See [Trees](/docs/cms/collections#trees)           |
+| `orderable`                                        | `boolean`                       | Editors drag the items into an order, and `list()` reads it. See [Items in an order](/docs/cms/collections#items-in-an-order) |
+| `actions`                                          | `Record<string, Action>`        | Buttons on an item. See [Actions](/docs/cms/collections#actions)                                                              |
+| `preview`                                          | `{ url: ({ item }) => string }` | The page the admin's Live Preview shows an item on. See [Live Preview](/docs/cms/collections#live-preview)                    |
+| `columns`                                          | `string[]`                      | Fields the admin's list shows beside each item's title, until an editor hides them                                            |
+| `chooseSites`                                      | `boolean`                       | Each item picks the sites that show it. See [Articles across sites](/docs/cms/sites#articles-across-sites)                    |
+| `label`, `group`, `requireReview`, `migrate`, `on` |                                 | As on a global                                                                                                                |
 
 `Collection.id` is the field schema a page uses to hold one item.
 

@@ -1760,6 +1760,43 @@
 
     /* A field's choices open exactly as wide as the field, long labels wrapping. */
     .k-menu--select {
+    /* A block's menu: Move up and Move down, then the other lists it can move into, each with the field holding it. */
+    .k-array__menu {
+        min-width: 240px;
+    }
+
+    .k-array__menu .k-menu__item svg {
+        flex-shrink: 0;
+        color: var(--k-muted);
+    }
+
+    .k-array__menu .k-menu__item[data-disabled] {
+        color: var(--k-muted);
+        cursor: default;
+    }
+
+    .k-array__menu-separator {
+        height: 1px;
+        margin: 4px;
+        background: var(--k-line);
+    }
+
+    .k-array__menu-label {
+        padding: 6px 10px 4px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--k-muted);
+    }
+
+    .k-array__menu-detail {
+        margin-left: auto;
+        padding-left: 16px;
+        font-size: 12.5px;
+        color: var(--k-muted);
+    }
+
         width: var(--anchor-width);
     }
 

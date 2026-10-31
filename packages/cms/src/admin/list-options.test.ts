@@ -70,6 +70,36 @@ describe('how the admin lists each collection', () => {
         });
     });
 
+    it('says when a collection is in an order, and how deep its tree may go', () => {
+        const MenuItemId = Kizuna.brand('MenuItemId', z.string());
+        const MenuItems = defineCollection({
+            name: 'menuItems',
+            id: MenuItemId,
+            tree: {
+                field: 'parent',
+                depth: 2,
+            },
+            orderable: true,
+            fields: [
+                {
+                    name: 'label',
+                    schema: z.string(),
+                },
+                {
+                    name: 'parent',
+                    schema: MenuItemId.optional(),
+                },
+            ],
+        });
+        expect(listOptionsOf([MenuItems]).menuItems).toEqual({
+            tree: 'parent',
+            treeDepth: 2,
+            orderable: true,
+            filters: [],
+            columns: [],
+        });
+    });
+
     it('filters by the enums and ids of its indexes, and offers its columns, then every index', () => {
         expect(listOptionsOf([Tags, Articles]).articles).toEqual({
             filters: [

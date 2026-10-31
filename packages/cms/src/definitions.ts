@@ -108,12 +108,32 @@ export interface CollectionDefinition<Name extends string, Fields extends FieldL
     /**
      * The field holding the id of the item above, which nests the items into
      * a tree. Its schema is the collection's own id, optional, and an item
-     * without one is at the top.
+     * without one is at the top. `depth` caps how many levels the tree may
+     * have, counting the top as one.
      *
      * @example
      * tree: 'parent',
+     *
+     * @example
+     * tree: {
+     *     field: 'parent',
+     *     depth: 2,
+     * },
      */
-    tree?: DataFieldOf<Fields>['name'];
+    tree?:
+        | DataFieldOf<Fields>['name']
+        | {
+              field: DataFieldOf<Fields>['name'];
+              depth?: number;
+          };
+    /**
+     * Editors give the items an order by dragging them in the admin's list,
+     * and `list()` reads them in it. In a tree, siblings keep that order.
+     *
+     * @example
+     * orderable: true,
+     */
+    orderable?: boolean;
     /**
      * Buttons on an item, keyed by name, each running your own handler on the
      * published item.
@@ -212,9 +232,17 @@ export interface Collection<
     Name extends string = string,
     Fields extends FieldList = FieldList,
     Id extends z.ZodType = z.ZodType,
-> extends CollectionDefinition<Name, Fields, Id> {
+> extends Omit<CollectionDefinition<Name, Fields, Id>, 'tree'> {
     readonly [COLLECTION]: true;
     readonly schema: z.ZodObject<ShapeOf<Fields>, z.core.$strip>;
+    /**
+     * The field `tree` names, in either form.
+     */
+    readonly tree?: DataFieldOf<Fields>['name'];
+    /**
+     * How many levels the tree may have, when `tree` caps it.
+     */
+    readonly treeDepth?: number;
 }
 
 const NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -311,8 +339,25 @@ export const defineCollection = <
     if (definition.preview !== undefined && typeof definition.preview.url !== 'function') {
         throw new Error(`${owner} has a \`preview\` without a \`url\` function, like ({ item }) => \`/team/\${item.id}\`.`);
     }
+    if (definition.orderable !== undefined && typeof definition.orderable !== 'boolean') {
+        throw new Error(`${owner} has an orderable that is not true or false.`);
+    }
+    const tree = typeof definition.tree === 'object' ? definition.tree : undefined;
+    if (tree !== undefined && tree.depth !== undefined && (!Number.isInteger(tree.depth) || tree.depth < 1)) {
+        throw new Error(`${owner} has a tree of depth ${String(tree.depth)}. A depth counts levels, from 1 for the top alone.`);
+    }
     return {
         ...definition,
+        ...(tree === undefined
+            ? {}
+            : {
+                  tree: tree.field,
+                  ...(tree.depth === undefined
+                      ? {}
+                      : {
+                            treeDepth: tree.depth,
+                        }),
+              }),
         fields,
         [COLLECTION]: true,
         schema: objectOf(fields),

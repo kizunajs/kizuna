@@ -77,13 +77,24 @@ type IndexOf<C> = C extends {
     : never;
 
 /**
+ * `order` for a collection with `orderable`, which reads in that order.
+ */
+type OrderOf<C> = C extends {
+    readonly orderable?: infer Orderable;
+}
+    ? true extends Orderable
+        ? 'order'
+        : never
+    : never;
+
+/**
  * What a collection's `list()` takes: filters and a sort over its indexes,
  * and the cursor of the page before. A field a route reads from the address
  * is an index too.
  */
 export interface ListInput<C> extends LocaleInput {
     where?: Partial<Record<IndexOf<C>, string | number | boolean>>;
-    orderBy?: IndexOf<C> | 'publishedAt' | 'updatedAt';
+    orderBy?: IndexOf<C> | OrderOf<C> | 'publishedAt' | 'updatedAt';
     direction?: 'asc' | 'desc';
     limit?: number;
     cursor?: string;
@@ -121,9 +132,10 @@ export interface CmsCollectionReader<C> {
      */
     getMany(input: { ids: readonly string[] } & LocaleInput): Promise<Array<Output<C>>>;
     /**
-     * Items filtered and sorted by the collection's indexes, newest
-     * `publishedAt` first unless `orderBy` says otherwise, a page at a time.
-     * In draft mode the list includes drafts that pass the schema.
+     * Items filtered and sorted by the collection's indexes, a page at a
+     * time: in their order for a collection with `orderable`, otherwise
+     * newest `publishedAt` first, unless `orderBy` says otherwise. In draft
+     * mode the list includes drafts that pass the schema.
      */
     list(input?: ListInput<C>): Promise<{ items: Array<Output<C>>; next: string | undefined }>;
 }

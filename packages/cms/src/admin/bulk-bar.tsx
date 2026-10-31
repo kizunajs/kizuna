@@ -1,9 +1,34 @@
 import { useState } from 'react';
+import { Menu } from '@base-ui/react/menu';
 import { Toast } from '@base-ui/react/toast';
-import { CircleAlert, LoaderCircle } from 'lucide-react';
+import { ArrowDown, ArrowDownToLine, ArrowUp, ArrowUpToLine, CircleAlert, LoaderCircle } from 'lucide-react';
 import { ICON } from '../view/context.js';
 import { bulkLabelOf, bulkQuestionOf, type BulkAction, type BulkSummary } from './bulk.js';
 import { ConfirmDialog } from './confirm.js';
+import type { SelectionMove } from './list-order.js';
+
+const MOVES: ReadonlyArray<{ move: SelectionMove; label: string; icon: typeof ArrowUp }> = [
+    {
+        move: 'top',
+        label: 'Move to top',
+        icon: ArrowUpToLine,
+    },
+    {
+        move: 'up',
+        label: 'Move up',
+        icon: ArrowUp,
+    },
+    {
+        move: 'down',
+        label: 'Move down',
+        icon: ArrowDown,
+    },
+    {
+        move: 'bottom',
+        label: 'Move to bottom',
+        icon: ArrowDownToLine,
+    },
+];
 
 /**
  * What the selection's actions share between the header, where they sit,
@@ -65,11 +90,21 @@ export function SelectionActions({
     bulk,
     onSelectAll,
     onClear,
+    onMove,
+    question,
 }: {
     count: number;
     total: number;
     actions: readonly BulkAction[];
     bulk: BulkRun;
+    /**
+     * Moves the ticked rows together, for a list in an order.
+     */
+    onMove?: ((move: SelectionMove) => void) | undefined;
+    /**
+     * What the action being confirmed asks, when the list words it itself.
+     */
+    question?: string | undefined;
     onSelectAll: () => void;
     onClear: () => void;
 }) {
@@ -87,7 +122,26 @@ export function SelectionActions({
             <button type="button" className="k-button k-button--small k-selection__button" disabled={busy} onClick={onClear}>
                 Clear
             </button>
-            {actions.length === 0 ? null : <span className="k-selection__divider" aria-hidden="true" />}
+            {actions.length === 0 && onMove === undefined ? null : <span className="k-selection__divider" aria-hidden="true" />}
+            {onMove === undefined ? null : (
+                <Menu.Root>
+                    <Menu.Trigger className="k-button k-button--small k-button--secondary" disabled={busy}>
+                        Move
+                    </Menu.Trigger>
+                    <Menu.Portal>
+                        <Menu.Positioner sideOffset={6} align="start" className="k-positioner">
+                            <Menu.Popup className="k-popup k-menu">
+                                {MOVES.map(({ move, label, icon: Icon }) => (
+                                    <Menu.Item key={move} className="k-menu__item" onClick={() => onMove(move)}>
+                                        <Icon {...ICON} className="k-menu__icon" />
+                                        {label}
+                                    </Menu.Item>
+                                ))}
+                            </Menu.Popup>
+                        </Menu.Positioner>
+                    </Menu.Portal>
+                </Menu.Root>
+            )}
             {actions.map((action) => (
                 <button
                     key={action}
@@ -106,7 +160,7 @@ export function SelectionActions({
                         ? undefined
                         : {
                               label: bulkLabelOf(bulk.confirming),
-                              question: bulkQuestionOf(bulk.confirming, count),
+                              question: question ?? bulkQuestionOf(bulk.confirming, count),
                           }
                 }
                 onConfirm={() => {

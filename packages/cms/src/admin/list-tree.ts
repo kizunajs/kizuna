@@ -60,21 +60,3 @@ export const treeLinesOf = <Row extends { tree?: TreePlace | undefined }>(
     for (const row of placed) visit(row, 0, true);
     return lines;
 };
-
-/**
- * The parent a drop gives the dragged item: the row it lands on, or `null`
- * for the top. `undefined` when the drop changes nothing.
- */
-export const parentAfterDrop = (dragged: TreePlace, target: TreePlace | null): string | null | undefined => {
-    const parent = target === null ? null : target.id;
-    if (parent === dragged.id || parent === dragged.parent) return undefined;
-    return parent;
-};
-
-/**
- * The draft change that puts an item under a parent, or at the top with
- * `null`, which empties the field.
- */
-export const parentChange = (field: string, parent: string | null): Record<string, string | null> => ({
-    [field]: parent,
-});

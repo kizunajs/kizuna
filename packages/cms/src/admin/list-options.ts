@@ -86,6 +86,16 @@ export const listOptionsOf = (
                         : {
                               tree: definition.tree,
                           }),
+                    ...(definition.treeDepth === undefined
+                        ? {}
+                        : {
+                              treeDepth: definition.treeDepth,
+                          }),
+                    ...(definition.orderable === true
+                        ? {
+                              orderable: true,
+                          }
+                        : {}),
                     ...(chooses
                         ? {
                               chooseSites: true,

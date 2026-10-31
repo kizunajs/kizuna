@@ -31,6 +31,17 @@ export const PageSummarySchema = Kizuna.model({
 });
 
 /**
+export const CollectionPageSchema = Kizuna.model({
+    title: 'CMS.CollectionPage',
+    schema: z.object({
+        site: z.string().describe('The site the route belongs to, default unless several apps share the CMS.'),
+        name: z.string(),
+        label: z.string().nullable().describe('What editors call the page, when it declares a label.'),
+        path: z.string().describe('The route, with a param per address field, like /shops/[slug].'),
+        collection: z.string().describe('The collection whose items the route shows, one per address.'),
+    }),
+});
+
  * Where an item sits in a collection with a `tree`, as the editing list and
  * the picker answer it.
  */
@@ -70,6 +81,17 @@ export const EditorItemSchema = Kizuna.model({
 });
 
 export const CreateItemBodySchema = z
+export const PlaceItemBodySchema = z.object({
+    after: z.string().optional().describe('Right after this item, as its sibling under the same parent.'),
+    before: z.string().optional().describe('Right before this item, as its sibling under the same parent.'),
+    at: z.enum(['first', 'last']).optional().describe('First or last among its siblings.'),
+    parent: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('In a tree, the item it goes under, null for the top. Alone or with `at`; left out, it keeps its parent.'),
+});
+
     .object({
         values: z.record(z.string(), z.unknown()).optional().describe('Field values for the new item, keyed by field path.'),
     })

@@ -74,6 +74,9 @@ const db = drizzle(pglite);
 
 const configWith = (collections: Collection[]) =>
     defineConfig({
+        jobRunner: {
+            mode: 'in-process',
+        },
         adapter: expressAdapter(),
         auth: {
             identities: {
@@ -374,15 +377,11 @@ describe('labels', () => {
         expect(listed.body.items[0]).not.toHaveProperty('parent');
     });
 
-    it('puts a tag whose parent was deleted at the top', async () => {
-        const lighting = await create('tags', {
-            name: 'Lighting',
-        });
+    it('puts a tag whose parent is gone at the top', async () => {
         await create('tags', {
             name: 'Workshop',
-            parent: lighting,
+            parent: 'gone',
         });
-        expect((await asEditor(request(app).delete(`/editing/collections/tags/items/${lighting}`))).status).toBe(204);
         const listed = await asEditor(request(app).get('/editing/collections/tags/items'));
         expect(listed.body.items).toMatchObject([
             {

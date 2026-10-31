@@ -17,6 +17,8 @@ import { PREVIEW_TTL_SECONDS } from './preview-token.js';
 import { previewProxyUrl } from './preview-proxy.js';
 import {
     CreateItemBodySchema,
+    CollectionPageSchema,
+    PlaceItemBodySchema,
     CreateUploadBodySchema,
     DescribedPageSchema,
     DraftChangesSchema,
@@ -361,7 +363,14 @@ const listQueryOf = (definition: ContentDefinition, indexes: readonly string[], 
     return z
         .object({
             ...shape,
-            orderBy: z.enum([...indexes, 'publishedAt', 'updatedAt']).optional(),
+            orderBy: z
+                .enum([
+                    ...indexes,
+                    'publishedAt',
+                    'updatedAt',
+                    ...((definition as { orderable?: boolean }).orderable === true ? ['order'] : []),
+                ])
+                .optional(),
             direction: z.enum(['asc', 'desc']).optional(),
             limit: z.int().min(1).max(200).optional(),
             cursor: z.string().optional().describe('The `next` of the previous page.'),
@@ -1739,6 +1748,51 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         }) as never
     );
 
+
+        placeItem: route({
+            method: 'PUT',
+            path: `${editingBase}${at.prefix}/collections/:name/items/:id/place`,
+            auth: editor,
+            summary: 'Move an item of a collection with an order or a tree, saving the move to its draft',
+            description:
+                'Name one of `after`, `before` and `at`, or none to go last. `after` and `before` make it a sibling of the item they name. In a tree, `parent` puts it under another item, first or last with `at`, and a tree without an order takes `parent` alone. An item takes everything under it wherever it goes. Placing an item where it already is changes nothing.',
+            tool: true,
+            pathParams: at.params.extend({
+                name: z.string(),
+                id: z.string(),
+            }),
+            body: PlaceItemBodySchema,
+            responses: {
+                200: {
+                    body: DraftPageSchema,
+                    headers: DraftHeadersSchema,
+                    cache: 'no-store',
+                },
+                400: ProblemDetailsSchema,
+                404: ProblemDetailsSchema,
+                409: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => {
+                const site = siteOf(cms, args, at);
+                const ref = cms.listing(args.params['name']!, site).refOf(args.params['id']!);
+                const state = await cms.placeItem({
+                    name: args.params['name']!,
+                    id: args.params['id']!,
+                    site,
+                    place: args.body as z.output<typeof PlaceItemBodySchema>,
+                    caller: cms.access(args.auth).callerFor(ref),
+                    author: authorOf(cms, args),
+                });
+                return {
+                    status: 200,
+                    body: draftBody(state),
+                    headers: {
+                        etag: state.etag,
+                    },
+                };
+            }) as never
+        ),
     const invitePersonRoute = route({
         method: 'POST',
         path: `${editingBase}/people`,
@@ -2377,10 +2431,13 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 ),
             },
         })) as never
+        description:
+            'Each item of a collection a route shows is a page of its own, at its address. `collectionPages` lists those routes, like `/shops/[slug]`, with the collection each shows.',
     );
 
     // A single-site project has one library, so its media routes take no `site`.
     const mediaQuery =
+                collectionPages: z.array(CollectionPageSchema),
         siteEntries.length === 0
             ? {}
             : {
@@ -2390,6 +2447,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
               };
 
     /**
+                    collectionPages: cms.collectionPages().filter((page) => access.sees(page.site)),
      * A media item the editor may open: shared, or of a site they open.
      */
     const seenMedia = async (cms: CmsService, args: Args, id: string) => {

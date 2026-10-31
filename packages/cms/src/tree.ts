@@ -140,3 +140,49 @@ export const descendantsOf = (parents: Parents, id: string): Set<string> => {
     }
     return found;
 };
+
+/**
+ * How many levels an item and everything under it take up, 1 for an item
+ * with nothing under it.
+ */
+export const heightOf = (parents: Parents, id: string): number => {
+    const children = new Map<string, string[]>();
+    for (const [child, parent] of parents) {
+        if (parent !== undefined) children.set(parent, [...(children.get(parent) ?? []), child]);
+    }
+    const seen = new Set<string>([id]);
+    let level = [id];
+    let height = 0;
+    while (level.length > 0) {
+        height++;
+        level = level.flatMap((current) => (children.get(current) ?? []).filter((child) => !seen.has(child) && seen.add(child)));
+    }
+    return height;
+};
+
+/**
+ * The level an item sits at under a parent, 1 at the top.
+ */
+export const levelUnder = (parents: Parents, parent: string | undefined): number => {
+    const seen = new Set<string>();
+    let level = 1;
+    let current = parent;
+    while (current !== undefined && !seen.has(current)) {
+        seen.add(current);
+        level++;
+        current = parents.get(current);
+    }
+    return level;
+};
+
+/**
+ * The refusal for a parent that puts an item, or anything under it, deeper
+ * than the collection's `depth`, or `undefined` when it fits.
+ */
+export const depthRefusal = (listing: Listing, parents: Parents, id: string, parent: string | undefined): string | undefined => {
+    const depth = listing.definition.treeDepth;
+    if (depth === undefined) return undefined;
+    const deepest = levelUnder(parents, parent) + heightOf(parents, id) - 1;
+    if (deepest <= depth) return undefined;
+    return `${listing.name} is a tree of ${depth} level${depth === 1 ? '' : 's'}, and item '${id}' under '${parent}' would reach level ${deepest}.`;
+};

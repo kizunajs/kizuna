@@ -1716,6 +1716,28 @@ export class CmsService {
                 name,
                 ...(site === DEFAULT_SITE
                     ? {}
+    /**
+     * Every route that shows a collection, one item per address, with the
+     * collection it shows.
+     */
+    collectionPages(): Array<{ site: string; name: string; label: string | null; path: string; collection: string }> {
+        return Object.entries(this.sites).flatMap(([site, pages]) =>
+            Object.entries(pages).flatMap(([name, entry]) =>
+                servesCollection(entry.page)
+                    ? [
+                          {
+                              site,
+                              name,
+                              label: entry.page.label ?? null,
+                              path: entry.path,
+                              collection: entry.page.collection.name,
+                          },
+                      ]
+                    : []
+            )
+        );
+    }
+
                     : {
                           site,
                       }),
@@ -1811,13 +1833,18 @@ export class CmsService {
                       },
                   }
                 : {}),
-            ...(query.orderBy === undefined
+            ...(query.orderBy === undefined && listing.definition.orderable !== true
                 ? {}
                 : {
                       orderBy:
-                          query.orderBy === 'publishedAt' || query.orderBy === 'updatedAt'
-                              ? query.orderBy
-                              : this.indexOf(listing, query.orderBy),
+                          query.orderBy === undefined || (query.orderBy === 'order' && listing.definition.orderable === true)
+                              ? {
+                                    field: PLACE,
+                                    type: 'text',
+                                }
+                              : query.orderBy === 'publishedAt' || query.orderBy === 'updatedAt'
+                                ? query.orderBy
+                                : this.indexOf(listing, query.orderBy),
                   }),
             ...(query.direction === undefined
                 ? {}
@@ -1848,6 +1875,7 @@ export class CmsService {
                             content: source,
                         };
                     }
+        const hidden = query.draft ? undefined : await this.underUnpublished(listing);
                     const translated =
                         (query.draft ? (await this.draft(copy))?.content : undefined) ?? (await this.published(copy))?.content;
                     return translated === undefined
@@ -1944,7 +1972,7 @@ export class CmsService {
         const groups = await Promise.all(
             (query.groups ?? []).map((group) => Promise.all(group.map((condition) => this.editingCondition(listing, condition))))
         );
-        const orderBy = query.orderBy ?? 'title';
+        const orderBy = query.orderBy ?? (definition.orderable === true ? 'order' : 'title');
         const result = await this.store.editingQuery({
             kind: 'item',
             keyPrefix: listing.keyPrefix,
@@ -2242,7 +2270,12 @@ export class CmsService {
                 kind: 'item',
                 key: this.target(ref).key,
                 site: listing.site,
-                draft: {},
+                draft:
+                    place === undefined
+                        ? {}
+                        : {
+                              [PLACE]: place,
+                          },
                 author,
                 summary: 'Created',
                 migration: migrationOf(listing.definition),
@@ -2261,6 +2294,11 @@ export class CmsService {
                 ? {}
                 : {
                       access,
+        // A new item goes last.
+        const place =
+            listing.definition.orderable === true
+                ? keyBetween((await this.placedItems(listing, true)).at(-1)?.place, undefined)
+                : undefined;
                   }),
             author,
             summary: 'Created',
@@ -2275,8 +2313,199 @@ export class CmsService {
         if (!(await this.store.delete('item', target.key, target.site))) {
             throw new CmsHttpError(404, { detail: `There is no item '${id}' in '${listing.name}'.` });
         }
-        await this.revalidateDocument(ref, sites);
-        await queueRefreshes(this, ref, sites);
+    }
+
+    /**
+     * Every item of a collection with its place and, in a tree, its parent,
+     * as its latest copy has them, in the order the store sorts them. With
+     * `placeAll`, items still without a place first get the places they
+     * show in, after the others.
+     */
+    private async placedItems(
+        listing: Listing,
+        placeAll = false
+    ): Promise<Array<{ id: string; key: string; rowId: string; place: string | undefined; parent: string | undefined }>> {
+        const tree = listing.definition.tree;
+        const items = [];
+        for (const stored of await this.store.list('item', listing.site)) {
+            if (!stored.key.startsWith(listing.keyPrefix)) continue;
+            const id = stored.key.slice(listing.keyPrefix.length);
+            const row = this.migrated(this.target(listing.refOf(id)), stored)!;
+            const content = row.draft ?? row.published;
+            items.push({
+                id,
+                key: stored.key,
+                rowId: stored.id,
+                place: placeIn(content),
+                parent: tree === undefined ? undefined : parentIn(content, tree),
+            });
+        }
+        items.sort((left, right) =>
+            byPlace(
+                {
+                    place: left.place,
+                    id: left.rowId,
+                },
+                {
+                    place: right.place,
+                    id: right.rowId,
+                }
+            )
+        );
+        const unplaced = items.filter((item) => item.place === undefined);
+        if (!placeAll || unplaced.length === 0) return items;
+        let last = items.filter((item) => item.place !== undefined).at(-1)?.place;
+        const assigned = new Map<string, string>();
+        for (const item of unplaced) {
+            last = keyBetween(last, undefined);
+            assigned.set(item.key, last);
+        }
+        await this.store.assignPlaces(
+            'item',
+            listing.site,
+            [...assigned].map(([key, place]) => ({
+                key,
+                place,
+            }))
+        );
+        return items.map((item) => ({
+            ...item,
+            place: item.place ?? assigned.get(item.key),
+        }));
+    }
+
+    /**
+     * The items of a tree that sit under one with no published copy, which
+     * the site leaves out until everything above them is published.
+     */
+    private async underUnpublished(listing: Listing): Promise<Set<string> | undefined> {
+        const tree = listing.definition.tree;
+        if (tree === undefined) return undefined;
+        const parents = new Map<string, string | undefined>();
+        for (const stored of await this.store.list('item', listing.site)) {
+            if (!stored.key.startsWith(listing.keyPrefix) || stored.published === null) continue;
+            const id = stored.key.slice(listing.keyPrefix.length);
+            parents.set(id, parentIn(this.migrated(this.target(listing.refOf(id)), stored)!.published, tree));
+        }
+        const hidden = new Set<string>();
+        for (const id of parents.keys()) {
+            const seen = new Set<string>();
+            let current = parents.get(id);
+            while (current !== undefined && !seen.has(current)) {
+                if (!parents.has(current)) {
+                    hidden.add(id);
+                    break;
+                }
+                seen.add(current);
+                current = parents.get(current);
+            }
+        }
+        return hidden;
+    }
+
+    /**
+     * Moves an item of an orderable collection or a tree: beside another
+     * item, as its sibling, first or last among its siblings, or under
+     * another parent. The move saves to the item's draft, like any change.
+     */
+    async placeItem(input: {
+        name: string;
+        id: string;
+        site?: string;
+        place: {
+            after?: string | undefined;
+            before?: string | undefined;
+            at?: 'first' | 'last' | undefined;
+            parent?: string | null | undefined;
+        };
+        caller: Caller;
+        author: string;
+    }): Promise<DraftState> {
+        const listing = this.listing(input.name, input.site ?? DEFAULT_SITE);
+        const { orderable, tree } = listing.definition;
+        const { after, before, at } = input.place;
+        const named = [after, before, at].filter((value) => value !== undefined).length;
+        if (orderable !== true && tree === undefined) {
+            throw new CmsHttpError(400, {
+                detail: `${listing.name} has no order and no tree, so its items have no place to move to.`,
+            });
+        }
+        if (named > 1) throw new CmsHttpError(400, { detail: 'Name one of after, before and at.' });
+        if (orderable !== true && named > 0) {
+            throw new CmsHttpError(400, {
+                detail: `${listing.name} has no order, so an item moves by its parent alone.`,
+            });
+        }
+        if (tree === undefined && input.place.parent !== undefined) {
+            throw new CmsHttpError(400, {
+                detail: `${listing.name} has no tree, so its items have no parent.`,
+            });
+        }
+        const items = await this.placedItems(listing, orderable === true);
+        const missing = (id: string) =>
+            new CmsHttpError(404, {
+                detail: `There is no item '${id}' in '${listing.name}'.`,
+            });
+        const moving = items.find((item) => item.id === input.id);
+        if (moving === undefined) throw missing(input.id);
+        const beside = after ?? before;
+        const neighbour = beside === undefined ? undefined : items.find((item) => item.id === beside);
+        if (beside !== undefined && neighbour === undefined) throw missing(beside);
+        if (beside === input.id) throw new CmsHttpError(400, { detail: `Item '${input.id}' cannot sit beside itself.` });
+        let parent = neighbour === undefined ? moving.parent : neighbour.parent;
+        if (input.place.parent !== undefined) {
+            const asked = input.place.parent ?? undefined;
+            if (neighbour !== undefined && asked !== parent) {
+                throw new CmsHttpError(409, {
+                    detail: `Item '${beside}' sits ${parent === undefined ? 'at the top' : `under '${parent}'`}, so an item beside it does too.`,
+                });
+            }
+            if (asked !== undefined && !items.some((item) => item.id === asked)) throw missing(asked);
+            parent = asked;
+        }
+        let place: string | undefined;
+        if (orderable === true) {
+            const siblings = items.filter((item) => item.id !== input.id && (tree === undefined || item.parent === parent));
+            const index = siblings.findIndex((item) => item.id === beside);
+            const low =
+                after !== undefined
+                    ? siblings[index]?.place
+                    : before !== undefined
+                      ? siblings[index - 1]?.place
+                      : at === 'first'
+                        ? undefined
+                        : siblings.at(-1)?.place;
+            let high =
+                after !== undefined
+                    ? siblings[index + 1]?.place
+                    : before !== undefined
+                      ? siblings[index]?.place
+                      : at === 'first'
+                        ? siblings[0]?.place
+                        : undefined;
+            // Two items on one place sort by id, so the next place after it is the nearest room.
+            if (low !== undefined && high !== undefined && low >= high) high = undefined;
+            const stays =
+                parent === moving.parent &&
+                moving.place !== undefined &&
+                (low === undefined || moving.place > low) &&
+                (high === undefined || moving.place < high);
+            place = stays ? undefined : keyBetween(low, high);
+        }
+        const changes = tree !== undefined && parent !== moving.parent ? { [tree]: parent ?? null } : {};
+        if (place === undefined && Object.keys(changes).length === 0) return this.draftState(listing.refOf(input.id));
+        return this.update({
+            ref: listing.refOf(input.id),
+            changes,
+            caller: input.caller,
+            author: input.author,
+            summary: 'Moved',
+            ...(place === undefined
+                ? {}
+                : {
+                      place,
+                  }),
+        });
     }
 
     /**
@@ -2288,6 +2517,11 @@ export class CmsService {
         try {
             routes = this.api.routes;
         } catch {
+            ...(place === undefined
+                ? {}
+                : {
+                      place,
+                  }),
             return undefined;
         }
         const found = flattenRoutes(routes as never).find(
@@ -2703,7 +2937,7 @@ export class CmsService {
         const row = this.migrated(target, await this.store.get(target.kind, target.key, target.site, target.locale));
         const fields = target.definition.fields;
         const paths = Object.keys(input.changes);
-        if (paths.length === 0) throw new CmsHttpError(400, { detail: 'No changes were sent.' });
+        if (paths.length === 0 && input.place === undefined) throw new CmsHttpError(400, { detail: 'No changes were sent.' });
         if (target.shared !== undefined && (await this.store.get(target.kind, target.key, DEFAULT_SITE)) === undefined) {
             throw new CmsHttpError(404, {
                 detail: `'${formatRef(target.shared)}' has no content yet. Save the shared item first, then the values the ${target.site} site sets.`,
@@ -2733,6 +2967,11 @@ export class CmsService {
                 throw new CmsHttpError(422, {
                     detail: `'${formatRef(input.ref)}' has no field at '${path}'.`,
                     errors: [
+        /**
+         * A new place for an item of an orderable collection. Without it the
+         * item keeps the place it has.
+         */
+        place?: string;
                         {
                             code: 'unrecognized_keys',
                             path: path.split('.'),
@@ -2766,7 +3005,16 @@ export class CmsService {
                 })),
             });
         }
-        const stored = parsed.success ? (parsed.data as Record<string, unknown>) : draft;
+        const checked = parsed.success ? (parsed.data as Record<string, unknown>) : draft;
+        // The schema strips the place, so it goes back beside the fields.
+        const place = input.place ?? placeIn(draft);
+        const stored =
+            place === undefined
+                ? checked
+                : {
+                      ...checked,
+                      [PLACE]: place,
+                  };
         if (this.choosesSitesFor(input.ref) && paths.some((path) => path.split('.')[0] === SHOWS_ON)) {
             this.assertShowsOn(showsOnOf(row?.draft ?? row?.published), showsOnOf(stored), input.access);
         }
@@ -2936,7 +3184,9 @@ export class CmsService {
         const listing = this.listingOf(ref);
         const tree = listing?.definition.tree;
         if (listing === undefined || tree === undefined || ref.type !== 'item') return;
-        const refusal = loopRefusal(listing, await loadParents(this, listing, copy), ref.id, parentIn(content, tree));
+        const parents = await loadParents(this, listing, copy);
+        const parent = parentIn(content, tree);
+        const refusal = loopRefusal(listing, parents, ref.id, parent) ?? depthRefusal(listing, parents, ref.id, parent);
         if (refusal !== undefined) {
             throw new CmsHttpError(409, {
                 detail: refusal,
@@ -2993,6 +3243,78 @@ export class CmsService {
         if (row === undefined) throw new CmsHttpError(404, { detail: `'${formatRef(ref)}' has no versions.` });
         const found = await this.store.version(row.id, version);
         if (found === undefined) throw new CmsHttpError(404, { detail: `'${formatRef(ref)}' has no version ${version}.` });
+        if (state.row !== undefined) await this.schedules.endFor(state.row.id);
+        await this.revalidateDocument(ref, sites);
+        await queueRefreshes(this, ref, sites);
+        return this.draftState(ref);
+    }
+
+    /**
+     * Publishes several drafts in one transaction, so a visitor never sees
+     * some of them live and others not, then refreshes each as `publish`
+     * does. Refuses all of them when one is incomplete.
+     */
+    async publishTogether(refs: readonly DocumentRef[], author: string): Promise<Map<string, number | null>> {
+        const states = await Promise.all(refs.map((ref) => this.draftState(ref)));
+        for (const state of states) {
+            if (!state.complete) {
+                throw new CmsHttpError(409, {
+                    detail: `The draft of '${formatRef(state.target.ref)}' is incomplete. Fill in ${state.missing.join(', ')} first.`,
+                    missing: state.missing,
+                });
+            }
+            await this.assertNoLoop(state.target.ref, state.row?.draft, 'published');
+        }
+        const sites = await Promise.all(refs.map((ref) => this.sitesShowing(ref, ['published', 'draft'])));
+        const versions = new Map<string, number | null>();
+        await this.options.db.transaction(async (tx) => {
+            const store = new DocumentStore(tx as unknown as CmsDatabase);
+            for (const state of states) {
+                const published = await store.publish(state.target.kind, state.target.key, author, state.target.site, state.target.locale);
+                versions.set(formatRef(state.target.ref), published?.publishedVersion ?? null);
+            }
+        });
+        for (const [index, ref] of refs.entries()) {
+            await this.revalidateDocument(ref, sites[index]);
+            await queueRefreshes(this, ref, sites[index]);
+        }
+        return versions;
+    }
+
+    /**
+     * Approves a review and publishes its draft in one step, as `publish`
+     * does, so the draft never goes live unapproved or stays approved
+     * unpublished. Refuses when the review was answered meanwhile, or the
+     * draft changed since `version`, the one the reviewer saw.
+     */
+    async approveAndPublish(ref: DocumentRef, approval: { review: string; by: string; version: number }): Promise<DraftState> {
+        const state = await this.draftState(ref);
+        if (!state.complete) {
+            throw new CmsHttpError(409, {
+                detail: `The draft of '${formatRef(ref)}' is incomplete. Fill in ${state.missing.join(', ')} first.`,
+                missing: state.missing,
+            });
+        }
+        await this.assertNoLoop(ref, state.row?.draft, 'published');
+        const sites = await this.sitesShowing(ref, ['published', 'draft']);
+        const outcome = await this.store.approveAndPublish(
+            state.target.kind,
+            state.target.key,
+            approval,
+            state.target.site,
+            state.target.locale
+        );
+        if (outcome === 'answered') {
+            throw new CmsHttpError(409, {
+                detail: `The review of '${formatRef(ref)}' was already answered.`,
+            });
+        }
+        if (outcome === 'changed') {
+            throw new CmsHttpError(409, {
+                detail: `The draft of '${formatRef(ref)}' changed since you opened it. Look at the changes again.`,
+            });
+        }
+        if (state.row !== undefined) await this.schedules.endFor(state.row.id);
         return {
             content: migrateContent(target.definition, found.data, found.migrationVersion),
             summary: found.summary,
@@ -3243,78 +3565,6 @@ export class CmsService {
 
     /**
      * Moves a page's stored content, versions and history to another name,
-        if (state.row !== undefined) await this.schedules.endFor(state.row.id);
-        await this.revalidateDocument(ref, sites);
-        await queueRefreshes(this, ref, sites);
-        return this.draftState(ref);
-    }
-
-    /**
-     * Publishes several drafts in one transaction, so a visitor never sees
-     * some of them live and others not, then refreshes each as `publish`
-     * does. Refuses all of them when one is incomplete.
-     */
-    async publishTogether(refs: readonly DocumentRef[], author: string): Promise<Map<string, number | null>> {
-        const states = await Promise.all(refs.map((ref) => this.draftState(ref)));
-        for (const state of states) {
-            if (!state.complete) {
-                throw new CmsHttpError(409, {
-                    detail: `The draft of '${formatRef(state.target.ref)}' is incomplete. Fill in ${state.missing.join(', ')} first.`,
-                    missing: state.missing,
-                });
-            }
-            await this.assertNoLoop(state.target.ref, state.row?.draft, 'published');
-        }
-        const sites = await Promise.all(refs.map((ref) => this.sitesShowing(ref, ['published', 'draft'])));
-        const versions = new Map<string, number | null>();
-        await this.options.db.transaction(async (tx) => {
-            const store = new DocumentStore(tx as unknown as CmsDatabase);
-            for (const state of states) {
-                const published = await store.publish(state.target.kind, state.target.key, author, state.target.site, state.target.locale);
-                versions.set(formatRef(state.target.ref), published?.publishedVersion ?? null);
-            }
-        });
-        for (const [index, ref] of refs.entries()) {
-            await this.revalidateDocument(ref, sites[index]);
-            await queueRefreshes(this, ref, sites[index]);
-        }
-        return versions;
-    }
-
-    /**
-     * Approves a review and publishes its draft in one step, as `publish`
-     * does, so the draft never goes live unapproved or stays approved
-     * unpublished. Refuses when the review was answered meanwhile, or the
-     * draft changed since `version`, the one the reviewer saw.
-     */
-    async approveAndPublish(ref: DocumentRef, approval: { review: string; by: string; version: number }): Promise<DraftState> {
-        const state = await this.draftState(ref);
-        if (!state.complete) {
-            throw new CmsHttpError(409, {
-                detail: `The draft of '${formatRef(ref)}' is incomplete. Fill in ${state.missing.join(', ')} first.`,
-                missing: state.missing,
-            });
-        }
-        await this.assertNoLoop(ref, state.row?.draft, 'published');
-        const sites = await this.sitesShowing(ref, ['published', 'draft']);
-        const outcome = await this.store.approveAndPublish(
-            state.target.kind,
-            state.target.key,
-            approval,
-            state.target.site,
-            state.target.locale
-        );
-        if (outcome === 'answered') {
-            throw new CmsHttpError(409, {
-                detail: `The review of '${formatRef(ref)}' was already answered.`,
-            });
-        }
-        if (outcome === 'changed') {
-            throw new CmsHttpError(409, {
-                detail: `The draft of '${formatRef(ref)}' changed since you opened it. Look at the changes again.`,
-            });
-        }
-        if (state.row !== undefined) await this.schedules.endFor(state.row.id);
      * after the page was renamed in code.
      */
     async renamePage(from: string, to: string, site = DEFAULT_SITE): Promise<void> {

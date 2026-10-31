@@ -36,12 +36,7 @@ export const Employees = defineCollection({
             schema: OfficeId,
             position: 'sidebar',
         },
-        {
-            name: 'order',
-            label: 'Sort order',
-            schema: z.int().min(0).default(0).describe('Lower comes first within an office.'),
-            position: 'sidebar',
-        },
     ],
-    indexes: ['office', 'order', 'name'],
+    orderable: true,
+    indexes: ['office', 'name'],
 });

@@ -99,7 +99,9 @@ export default async function FrontPage() {
 }
 ```
 
-Editors see one row per item, with the block's label and the item's first line of text, and open a row to edit its fields. Add section lists the blocks by label and description. The agent reads the same list from the field: each block's name, label, description and fields, and the `block` key an item it adds carries.
+Editors see one row per item, with the block's label and the item's first line of text, and open a row to edit its fields. Add section lists the blocks by label and description.
+
+Drag a row by its grip to move it within its list, or focus the grip and use the arrow keys. Each row's `…` menu has **Move up** and **Move down**, and under **Move into**, every other list in the field that takes that block, like the left or right column of a block that holds two lists, open or closed. The block lands last there, and the page saves it as one change. The agent reads the same list from the field: each block's name, label, description and fields, and the `block` key an item it adds carries.
 
 An item saves as a whole, so a block in the list gives none of its fields `auth` or `readOnly`. Put them on the list's own field instead.
 

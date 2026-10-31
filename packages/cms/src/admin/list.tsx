@@ -7,6 +7,7 @@ import { Hint } from '../view/hint.js';
 import { usePeople } from '../view/people.js';
 import { parseRef } from '../refs.js';
 import { humanize } from '../view/schema.js';
+import { singularOf } from '../view/array-rows.js';
 import { BulkFailures, SelectionActions, useBulkRun } from './bulk-bar.js';
 import { bulkSummaryOf, offeredActions, runBulk, type BulkAction, type BulkResult, type BulkTarget } from './bulk.js';
 import type { AdminRoute, AdminSite, ListFilter, ListOptions } from './config.js';
@@ -43,7 +44,8 @@ import {
 } from './list-filters.js';
 import { EmptyTable, FlatRows, TreeRows, type TableOptions, type TreeRow } from './list-rows.js';
 import { ColumnsPanel, ListToolbar, SortMenu, type ListPanel } from './list-toolbar.js';
-import { parentAfterDrop, parentChange, type TreePlace } from './list-tree.js';
+import { placeAfterMove, selectionMoves, type PlaceBody, type SelectionMove } from './list-order.js';
+import { descendantsIn, pageTreeOf } from './page-tree.js';
 import { hrefOf, replaceQuery, useAddress, type CollectionSummary } from './navigation.js';
 import { PageHeader, type MetaPair } from './page-header.js';
 import { Loading, problemOf } from './parts.js';
@@ -59,6 +61,16 @@ export const PAGE_SIZE = 25;
 export interface EmptyWords {
     title: string;
     description: string;
+}
+
+/**
+ * One move a list asks to save: the row, its item's id, and where it goes.
+ */
+export interface PlaceMove {
+    ref: string;
+    id: string;
+    title: string;
+    body: PlaceBody;
 }
 
 /**
@@ -248,6 +260,8 @@ export function ListScreen({
     server,
     drafts: draftCount,
     tree,
+    onPlace,
+    questionOf,
     above,
     facts = [],
     nameOf = (id) => id,
@@ -312,11 +326,27 @@ export function ListScreen({
      * How many rows are drafts, when they arrive a page at a time.
      */
     drafts?: number | undefined;
+    /**
+     * How the rows nest, for a list with a tree, while nothing is searched,
+     * filtered or sorted. `folds` off keeps every level open.
+     */
     tree?:
         | {
-              onMove: (dragged: TreePlace, target: TreePlace | null) => void;
+              folds?: boolean;
+              orderable?: boolean;
+              depth?: number | undefined;
           }
         | undefined;
+    /**
+     * Saves moves, for a list editors put in order: a row dragged, or the
+     * ticked rows moved with Move. Without it the rows have no grips.
+     */
+    onPlace?: ((moves: PlaceMove[]) => Promise<void>) | undefined;
+    /**
+     * The question the selection's action asks first, when the list words it
+     * itself, like a delete that takes the items under a parent with it.
+     */
+    questionOf?: ((action: BulkAction, refs: ReadonlySet<string>) => string | undefined) | undefined;
     /**
      * Above the table, like a problem moving a row.
      */
@@ -362,7 +392,32 @@ export function ListScreen({
         [searched, sort, columns, nameOf, server]
     );
     const nested = tree !== undefined && query.trim() === '' && !filtering && sort === undefined ? tree : undefined;
-    const shownPage = server === undefined ? pageOf(sorted, page, perPage) : serverPageOf(sorted, server);
+    // A part of a path with no page of its own only means something in the tree.
+    const flat = useMemo(() => (nested === undefined ? sorted.filter((row) => row.segment !== true) : sorted), [nested, sorted]);
+    const shownPage = server === undefined ? pageOf(flat, page, perPage) : serverPageOf(flat, server);
+    // The rows keep their order only while nothing sorts them, and a tree drags while it nests.
+    const ordering = onPlace !== undefined && sort === undefined && (tree === undefined || nested !== undefined) ? onPlace : undefined;
+    const idOf = (row: TreeRow): string => row.id ?? row.tree?.id ?? row.ref;
+    const moveOf = (row: TreeRow, body: PlaceBody): PlaceMove => ({
+        ref: row.ref,
+        id: idOf(row),
+        title: row.tree?.label ?? row.title,
+        body,
+    });
+    const moveSelected = (move: SelectionMove): void => {
+        if (ordering === undefined) return;
+        const shown = nested === undefined ? shownPage.rows : sorted;
+        const byId = new Map(shown.map((row) => [idOf(row), row]));
+        const moves = selectionMoves(
+            shown.map((row) => ({
+                id: idOf(row),
+                parent: row.tree?.parent ?? null,
+            })),
+            new Set(shown.filter((row) => selected.has(row.ref)).map(idOf)),
+            move
+        );
+        void ordering(moves.map((each) => moveOf(byId.get(each.id)!, each.body)));
+    };
     const matching = server?.matching ?? sorted.length;
     const shownColumns = shownColumnsOf(columns, chosen);
 
@@ -459,6 +514,12 @@ export function ListScreen({
                             count={ticked}
                             total={matching}
                             actions={bulk.actions}
+                            onMove={ordering === undefined ? undefined : moveSelected}
+                            question={
+                                questionOf === undefined || bulkRun.confirming === undefined
+                                    ? undefined
+                                    : questionOf(bulkRun.confirming, selected)
+                            }
                             bulk={bulkRun}
                             onSelectAll={() => void selectAll()}
                             onClear={() => setSelected(new Set())}
@@ -559,10 +620,35 @@ export function ListScreen({
                                 </div>
                             </>
                         ) : nested !== undefined ? (
-                            <TreeRows rows={sorted} options={options} onMove={nested.onMove} />
+                            <TreeRows
+                                rows={sorted}
+                                options={options}
+                                folds={nested.folds ?? true}
+                                orderable={nested.orderable === true}
+                                depth={nested.depth}
+                                onPlace={
+                                    ordering === undefined
+                                        ? undefined
+                                        : (place, body) => {
+                                              const row = sorted.find((candidate) => candidate.tree?.id === place.id);
+                                              if (row !== undefined) void ordering([moveOf(row, body)]);
+                                          }
+                                }
+                            />
                         ) : (
                             <>
-                                <FlatRows rows={shownPage.rows} options={options} />
+                                <FlatRows
+                                    rows={shownPage.rows}
+                                    options={options}
+                                    onMove={
+                                        ordering === undefined
+                                            ? undefined
+                                            : (from, to) => {
+                                                  const body = placeAfterMove(shownPage.rows.map(idOf), from, to);
+                                                  if (body !== undefined) void ordering([moveOf(shownPage.rows[from]!, body)]);
+                                              }
+                                    }
+                                />
                                 <Pager
                                     page={shownPage.page}
                                     pageCount={shownPage.pageCount}
@@ -591,8 +677,17 @@ export function ListScreen({
     );
 }
 
+interface CollectionPageEntry {
+    site: string;
+    name: string;
+    label: string | null;
+    path: string;
+    collection: string;
+}
+
 interface PageEntry {
     ref: string;
+    site: string;
     name: string;
     label: string | null;
     path: string;
@@ -673,39 +768,60 @@ export function PagesList({
     const [loads, setLoads] = useState(0);
     const [filters, setFilters] = useState<Filters>(NO_FILTERS);
     const nameOf = useNames(connection);
+    // Overview lists every site's pages, each with its site, and filters them by it.
+    const everySite = sites !== undefined && sites.length > 0;
     useEffect(() => {
-        void connection.call<{ pages: PageEntry[] }>('editing_pages_list').then((answer) => {
+        void connection.call<{ pages: PageEntry[]; collectionPages?: CollectionPageEntry[] }>('editing_pages_list').then((answer) => {
             if (answer.status !== 200) {
                 setProblem(problemOf(answer, 'The pages did not load'));
                 return;
             }
-            setRows(
-                answer.body.pages
-                    .filter((page) => {
-                        const ref = parseRef(page.ref);
-                        return ref?.type === 'page' && (site === undefined || ref.site === site);
-                    })
-                    .map((page) => ({
+            const onSite = (entry: { site: string }): boolean => site === undefined || entry.site === site;
+            const pages = answer.body.pages
+                .filter((page) => {
+                    const ref = parseRef(page.ref);
+                    return ref?.type === 'page' && (site === undefined || ref.site === site);
+                })
+                .map((page) => ({
+                    ref: page.ref,
+                    href: hrefOf({
+                        kind: 'document',
                         ref: page.ref,
-                        href: hrefOf({
-                            kind: 'document',
-                            ref: page.ref,
-                        }),
-                        title: page.label ?? humanize(page.name.replace(/Page$/, '')),
-                        detail: page.path,
-                        status: page.status,
-                        updatedAt: page.updatedAt,
-                        updatedBy: page.updatedBy ?? undefined,
-                        values: {
-                            [SITE_COLUMN]: parseRef(page.ref)?.site,
-                        },
-                    }))
-            );
+                    }),
+                    title: page.label ?? humanize(page.name.replace(/Page$/, '')),
+                    detail: page.path,
+                    status: page.status,
+                    updatedAt: page.updatedAt,
+                    updatedBy: page.updatedBy ?? undefined,
+                    values: {
+                        [SITE_COLUMN]: parseRef(page.ref)?.site,
+                    },
+                }));
+            if (everySite) {
+                setRows(pages);
+                return;
+            }
+            // A site's own list nests its pages by path, with each route that shows a collection among them.
+            const routesShown = (answer.body.collectionPages ?? []).filter(onSite).map((route) => {
+                const count = answer.body.pages.filter(
+                    (page) => page.name === route.name && page.site === route.site && parseRef(page.ref)?.type === 'item'
+                ).length;
+                const noun = humanize(route.collection).toLowerCase();
+                return {
+                    name: route.name,
+                    title: route.label ?? humanize(route.name.replace(/Page$/, '')),
+                    path: route.path,
+                    href: hrefOf({
+                        kind: 'collection',
+                        name: route.collection,
+                    }),
+                    count: `${countOf(count)} ${count === 1 ? singularOf(noun) : noun}`,
+                };
+            });
+            setRows(pageTreeOf(pages, routesShown, site ?? ''));
         });
-    }, [connection, loads, site]);
+    }, [connection, loads, site, everySite]);
     const actions = offeredActions(routes ?? {}, 'editing_pages');
-    // Overview lists every site's pages, each with its site, and filters them by it.
-    const everySite = sites !== undefined && sites.length > 0;
     const shownRows = useMemo(
         () =>
             !everySite || rows === undefined
@@ -730,7 +846,7 @@ export function PagesList({
             title="Pages"
             noun="pages"
             rows={shownRows}
-            total={rows?.length}
+            total={rows?.filter((row) => row.tree === undefined || (row.segment !== true && row.count === undefined)).length}
             facts={siteFactsOf(siteFact)}
             problem={problem}
             columns={everySite ? SITE_COLUMNS : DOCUMENT_COLUMNS}
@@ -753,7 +869,15 @@ export function PagesList({
                           connection,
                       }
             }
-            defaultSort={NEWEST_FIRST}
+            defaultSort={everySite ? NEWEST_FIRST : undefined}
+            defaultSortLabel="Path"
+            tree={
+                everySite
+                    ? undefined
+                    : {
+                          folds: false,
+                      }
+            }
             nameOf={nameOf}
             empty={{
                 title: 'No pages yet',
@@ -863,7 +987,8 @@ export function CollectionList({
     siteFact?: ReactNode;
 }) {
     const tree = options?.tree;
-    const defaultSort = tree === undefined ? NEWEST_FIRST : undefined;
+    const orderable = options?.orderable === true;
+    const defaultSort = tree === undefined && !orderable ? NEWEST_FIRST : undefined;
     const [items, setItems] = useState<{ items: ItemEntry[]; total: number } | undefined>();
     const [counts, setCounts] = useState<{ total: number; drafts: number } | undefined>();
     const [problem, setProblem] = useState<string | undefined>();
@@ -1002,11 +1127,12 @@ export function CollectionList({
 
     const rows = useMemo<TreeRow[] | undefined>(() => {
         if (items === undefined) return undefined;
-        const ordered = nested
-            ? [...items.items].sort((left, right) => (left.treeLabel ?? left.label).localeCompare(right.treeLabel ?? right.label))
-            : items.items;
+        const ordered =
+            nested && !orderable
+                ? [...items.items].sort((left, right) => (left.treeLabel ?? left.label).localeCompare(right.treeLabel ?? right.label))
+                : items.items;
         return ordered.map((item) => rowOf(item, options));
-    }, [items, nested, options]);
+    }, [items, nested, orderable, options]);
 
     const create = async (): Promise<void> => {
         setCreating(true);
@@ -1019,22 +1145,24 @@ export function CollectionList({
         onOpen(created.ref);
     };
 
-    const move = async (dragged: TreePlace, target: TreePlace | null): Promise<void> => {
-        const parent = parentAfterDrop(dragged, target);
-        if (tree === undefined || parent === undefined) return;
+    // Each move saves to its item's draft in turn, so the next one reads where the last landed.
+    const place = async (moves: PlaceMove[]): Promise<void> => {
         setMoveProblem(undefined);
-        const answer = await connection.call('editing_collections_update_draft', {
-            params: {
-                name,
-                id: dragged.id,
-            },
-            body: {
-                changes: parentChange(tree, parent),
-            },
-        });
-        if (answer.status !== 200) {
-            setMoveProblem(problemOf(answer, `${dragged.label} was not moved`));
-            return;
+        const byRef = new Map((items?.items ?? []).map((item) => [item.ref, item]));
+        // The rows show where they go at once, and the server's order follows.
+        setItems((current) => (current === undefined || moves.length !== 1 ? current : arranged(current, moves[0]!, orderable)));
+        for (const move of moves) {
+            const answer = await connection.call('editing_collections_place_item', {
+                params: {
+                    name,
+                    id: move.id,
+                },
+                body: move.body,
+            });
+            if (answer.status !== 200) {
+                setMoveProblem(problemOf(answer, `${byRef.get(move.ref)?.label ?? move.title} was not moved`));
+                break;
+            }
         }
         setLoads((count) => count + 1);
     };
@@ -1069,7 +1197,7 @@ export function CollectionList({
             problem={problem}
             columns={columns}
             defaultSort={defaultSort}
-            defaultSortLabel="Tree order"
+            defaultSortLabel={orderable ? 'Order' : 'Tree order'}
             nameOf={nameOf}
             server={{
                 sort,
@@ -1107,11 +1235,26 @@ export function CollectionList({
                     : {
                           actions,
                           run: async (action, targets) => {
-                              const results = await runBulk(action, targets, (tool, input) => connection.call(tool, input));
+                              // Deleting a parent takes what is under it, so those need no call of their own.
+                              const under =
+                                  action === 'delete' && tree !== undefined
+                                      ? descendantsIn(
+                                            rows ?? [],
+                                            targets.map((target) => target.ref)
+                                        )
+                                      : new Set<string>();
+                              const results = await runBulk(
+                                  action,
+                                  targets.filter((target) => !under.has(target.ref)),
+                                  (tool, input) => connection.call(tool, input)
+                              );
                               setLoads((count) => count + 1);
                               return results;
                           },
                       }
+            }
+            questionOf={
+                tree === undefined ? undefined : (action, refs) => (action === 'delete' ? branchQuestionOf(rows ?? [], refs) : undefined)
             }
             filters={{
                 definitions: options?.filters ?? [],
@@ -1123,8 +1266,14 @@ export function CollectionList({
                 tree === undefined
                     ? undefined
                     : {
-                          onMove: (dragged, target) => void move(dragged, target),
+                          orderable,
+                          depth: options?.treeDepth,
                       }
+            }
+            onPlace={
+                (orderable || tree !== undefined) && routes['editing_collections_place_item'] !== undefined
+                    ? (moves) => place(moves)
+                    : undefined
             }
             above={
                 moveProblem === undefined ? null : (
@@ -1139,10 +1288,82 @@ export function CollectionList({
 }
 
 /**
+ * The items as they stand once one move lands, for the list to show before
+ * the server answers: a dragged row in its new place, or under its new parent.
+ */
+const arranged = (
+    current: { items: ItemEntry[]; total: number },
+    move: PlaceMove,
+    orderable: boolean
+): { items: ItemEntry[]; total: number } => {
+    const from = current.items.findIndex((item) => item.id === move.id);
+    if (from === -1) return current;
+    const item = {
+        ...current.items[from]!,
+        ...(move.body.parent !== undefined
+            ? {
+                  parent: move.body.parent,
+              }
+            : {}),
+    };
+    const rest = current.items.filter((_, index) => index !== from);
+    const beside = move.body.after ?? move.body.before;
+    const neighbour = rest.findIndex((each) => each.id === beside);
+    if (neighbour !== -1) item.parent = rest[neighbour]!.parent ?? null;
+    if (!orderable) {
+        return {
+            ...current,
+            items: [...rest.slice(0, from), item, ...rest.slice(from)],
+        };
+    }
+    const siblings = rest.filter((each) => (each.parent ?? null) === (item.parent ?? null));
+    const at =
+        neighbour !== -1
+            ? move.body.after !== undefined
+                ? neighbour + 1
+                : neighbour
+            : move.body.at === 'first'
+              ? siblings.length === 0
+                  ? rest.length
+                  : rest.indexOf(siblings[0]!)
+              : siblings.length === 0
+                ? rest.length
+                : rest.indexOf(siblings[siblings.length - 1]!) + 1;
+    return {
+        ...current,
+        items: [...rest.slice(0, at), item, ...rest.slice(at)],
+    };
+};
+
+/**
+ * What Delete asks first when a ticked row has rows under it, which go with
+ * it, or `undefined` to ask as any delete does.
+ */
+const branchQuestionOf = (rows: readonly TreeRow[], refs: ReadonlySet<string>): string | undefined => {
+    const under = descendantsIn(rows, [...refs]);
+    const going = [...under].filter((ref) => !refs.has(ref));
+    if (going.length === 0) return undefined;
+    const titleOf = (ref: string): string => {
+        const row = rows.find((candidate) => candidate.ref === ref);
+        return row?.tree?.label ?? row?.title ?? ref;
+    };
+    const items = (count: number): string => `${count} ${count === 1 ? 'item' : 'items'}`;
+    const ticked = [...refs];
+    const named =
+        going.length <= 3
+            ? `${new Intl.ListFormat('en').format(going.map(titleOf))} go${going.length === 1 ? 'es' : ''} with ${ticked.length === 1 ? 'it' : 'them'}. `
+            : '';
+    return ticked.length === 1
+        ? `Delete ${titleOf(ticked[0]!)} and the ${items(going.length)} under it, with their history? ${named}Pages that show them stop showing them.`
+        : `Delete ${items(ticked.length)} and the ${items(going.length)} under them, with their history? ${named}Pages that show them stop showing them.`;
+};
+
+/**
  * One item as a row of its collection's list, its field columns showing the
  * labels the server gives.
  */
 const rowOf = (item: ItemEntry, options: ListOptions | undefined): TreeRow => ({
+    id: item.id,
     ref: item.ref,
     href: hrefOf({
         kind: 'document',

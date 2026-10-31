@@ -1,15 +1,29 @@
-import { useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import {
+    createContext,
+    useContext,
+    useEffect,
+    useId,
+    useRef,
+    useState,
+    type PointerEvent as ReactPointerEvent,
+    type ReactNode,
+} from 'react';
 import { Collapsible } from '@base-ui/react/collapsible';
 import { Combobox } from '@base-ui/react/combobox';
 import { Dialog } from '@base-ui/react/dialog';
+import { Menu } from '@base-ui/react/menu';
 import { NumberField } from '@base-ui/react/number-field';
 import { Select } from '@base-ui/react/select';
 import { Switch } from '@base-ui/react/switch';
 import {
+    ArrowDown,
+    ArrowUp,
     Check,
     ChevronDown,
     ChevronRight,
     ChevronsUpDown,
+    CornerDownRight,
+    Ellipsis,
     GripVertical,
     LoaderCircle,
     Lock,
@@ -23,6 +37,7 @@ import {
 } from 'lucide-react';
 import { conditionHolds } from '../condition.js';
 import { itemNounOf, movedIndex, remapOpen, rowLabelsOf, singularOf } from './array-rows.js';
+import { blockListsIn, movedBlock, moveTargetsOf, valueAtPath, type BlockPath } from './block-moves.js';
 import { EditorContext, ICON, useEditorContext } from './context.js';
 import { Hint } from './hint.js';
 import { cropOf, edgesOf, type CropEdges } from './crop.js';
@@ -996,6 +1011,24 @@ function ArrayControl(props: ControlProps) {
                                     style={{
                                         transform: `translateY(${shiftFor(index, drag)}px)`,
                                     }}>
+/**
+ * The outermost list of blocks a nested one sits in, for a block's Move
+ * into, and where the nested list's items sit inside it. `at` is unknown
+ * where something other than a block lies between them.
+ */
+interface BlockListPlace {
+    outer: {
+        value: unknown[];
+        onChange: (value: unknown[]) => void;
+        schema: JsonSchema;
+        root: JsonSchema;
+        title: string;
+    };
+    at: BlockPath | undefined;
+}
+
+const BlockListContext = createContext<BlockListPlace | null>(null);
+
                                     <div className="k-array__row">
                                         {grip(index)}
                                         <Collapsible.Trigger className="k-array__summary">
@@ -1042,19 +1075,29 @@ function ArrayControl(props: ControlProps) {
                                                 </p>
                                             </div>
                                         ) : (
-                                            <BlockFields
-                                                {...props}
-                                                id={undefined}
-                                                heading={undefined}
-                                                help={undefined}
-                                                label={undefined}
-                                                schema={choice.schema}
-                                                root={root}
-                                                value={item}
-                                                described={choice.described}
-                                                required
-                                                onChange={(next) => changeItem(index, next)}
-                                            />
+                                            <BlockListContext.Provider
+                                                value={
+                                                    outer === undefined
+                                                        ? null
+                                                        : {
+                                                              outer,
+                                                              at: located ? [...ownPath!, index] : undefined,
+                                                          }
+                                                }>
+                                                <BlockFields
+                                                    {...props}
+                                                    id={undefined}
+                                                    heading={undefined}
+                                                    help={undefined}
+                                                    label={undefined}
+                                                    schema={choice.schema}
+                                                    root={root}
+                                                    value={item}
+                                                    described={choice.described}
+                                                    required
+                                                    onChange={(next) => changeItem(index, next)}
+                                                />
+                                            </BlockListContext.Provider>
                                         )}
                                     </Collapsible.Panel>
                                 </Collapsible.Root>
@@ -1074,6 +1117,86 @@ function ArrayControl(props: ControlProps) {
                     />
                 ) : null}
             </div>
+    // A list of blocks offers each block the other lists of the field that take it.
+    const around = useContext(BlockListContext);
+    const outer =
+        blockOptions === undefined
+            ? undefined
+            : around === null
+              ? {
+                    value: items,
+                    onChange: (next: unknown[]) => onChange(next),
+                    schema,
+                    root,
+                    title: props.label ?? 'Blocks',
+                }
+              : around.outer;
+    const ownPath: BlockPath | undefined =
+        blockOptions === undefined
+            ? undefined
+            : around === null
+              ? []
+              : around.at === undefined || props.name === undefined
+                ? undefined
+                : [...around.at, props.name];
+    const located = outer !== undefined && ownPath !== undefined && (ownPath.length === 0 || valueAtPath(outer.value, ownPath) === value);
+    const blockLists = located ? blockListsIn(outer.value, outer.schema, outer.root, outer.title) : [];
+    const moveInto = (index: number, to: BlockPath): void => {
+        if (outer === undefined || ownPath === undefined) return;
+        setGeneration((current) => current + 1);
+        setOpen((previous) => remapOpen(previous, (at) => (at === index ? undefined : at > index ? at - 1 : at)));
+        outer.onChange(movedBlock(outer.value, ownPath, index, to));
+    };
+    const blockMenu = (index: number, item: unknown) => {
+        if (disabled || blockOptions === undefined) return null;
+        const name = itemBlockName(item);
+        const targets = name === undefined || ownPath === undefined ? [] : moveTargetsOf(blockLists, ownPath, index, name);
+        return (
+            <Menu.Root>
+                <Menu.Trigger className="k-icon-button" aria-label={`More for ${noun} ${index + 1}`}>
+                    <Ellipsis {...ICON} />
+                </Menu.Trigger>
+                <Menu.Portal>
+                    <Menu.Positioner sideOffset={6} align="end" className="k-positioner">
+                        <Menu.Popup className="k-popup k-menu k-array__menu">
+                            <Menu.Item className="k-menu__item" disabled={index === 0} onClick={() => moveTo(index, index - 1)}>
+                                <ArrowUp {...ICON} />
+                                Move up
+                            </Menu.Item>
+                            <Menu.Item
+                                className="k-menu__item"
+                                disabled={index === items.length - 1}
+                                onClick={() => moveTo(index, index + 1)}>
+                                <ArrowDown {...ICON} />
+                                Move down
+                            </Menu.Item>
+                            {targets.length === 0 ? null : (
+                                <>
+                                    <Menu.Separator className="k-array__menu-separator" />
+                                    <Menu.Group>
+                                        <Menu.GroupLabel className="k-array__menu-label">Move into</Menu.GroupLabel>
+                                        {targets.map((target) => (
+                                            <Menu.Item
+                                                key={target.path.join('.')}
+                                                className="k-menu__item"
+                                                onClick={() => moveInto(index, target.path)}>
+                                                <CornerDownRight {...ICON} />
+                                                <span className="k-array__menu-title">{target.title}</span>
+                                                {target.detail === undefined ? null : (
+                                                    <span className="k-array__menu-detail">{target.detail}</span>
+                                                )}
+                                            </Menu.Item>
+                                        ))}
+                                    </Menu.Group>
+                                </>
+                            )}
+                        </Menu.Popup>
+                    </Menu.Positioner>
+                </Menu.Portal>
+            </Menu.Root>
+        );
+    };
+
         );
     }
 
@@ -1175,6 +1298,7 @@ function ReferenceListControl(props: ControlProps & { brand: string }) {
         if (to === undefined || to < 0 || to >= ids.length) return;
         event.preventDefault();
         moveTo(index, to);
+                                        {blockMenu(index, item)}
         window.requestAnimationFrame(() => rows.current[to]?.querySelector<HTMLButtonElement>('.k-array__grip')?.focus());
     };
 

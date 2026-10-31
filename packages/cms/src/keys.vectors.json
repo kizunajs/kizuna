@@ -1,0 +1,113 @@
+{
+    "between": [
+        {
+            "before": null,
+            "after": null,
+            "key": "a0"
+        },
+        {
+            "before": "a0",
+            "after": null,
+            "key": "a1"
+        },
+        {
+            "before": null,
+            "after": "a0",
+            "key": "9z"
+        },
+        {
+            "before": "a0",
+            "after": "a1",
+            "key": "a0i"
+        },
+        {
+            "before": "a0",
+            "after": "a0i",
+            "key": "a09"
+        },
+        {
+            "before": "a0i",
+            "after": "a1",
+            "key": "a0r"
+        },
+        {
+            "before": "az",
+            "after": null,
+            "key": "b00"
+        },
+        {
+            "before": null,
+            "after": "9z",
+            "key": "9y"
+        },
+        {
+            "before": "b00",
+            "after": null,
+            "key": "b01"
+        },
+        {
+            "before": null,
+            "after": "b00",
+            "key": "az"
+        },
+        {
+            "before": "a0i",
+            "after": "a0j",
+            "key": "a0ii"
+        },
+        {
+            "before": "a0ii",
+            "after": "a0ij",
+            "key": "a0iii"
+        },
+        {
+            "before": "zzzzzzzzzzzzzzzzzzzzzzzzzzz",
+            "after": null,
+            "key": "zzzzzzzzzzzzzzzzzzzzzzzzzzzi"
+        },
+        {
+            "before": null,
+            "after": "0000000000001",
+            "key": "0000000000000i"
+        }
+    ],
+    "several": [
+        {
+            "before": "a0",
+            "after": "a1",
+            "count": 5,
+            "keys": ["a05", "a09", "a0i", "a0n", "a0r"]
+        },
+        {
+            "before": null,
+            "after": null,
+            "count": 3,
+            "keys": ["a0", "a1", "a2"]
+        },
+        {
+            "before": null,
+            "after": "a0",
+            "count": 3,
+            "keys": ["9x", "9y", "9z"]
+        }
+    ],
+    "runs": {
+        "append": {
+            "count": 1000,
+            "last": "bqr",
+            "longest": 3
+        },
+        "prepend": {
+            "count": 1000,
+            "last": "899",
+            "longest": 3
+        },
+        "gap": {
+            "before": "a0",
+            "after": "a1",
+            "count": 50,
+            "last": "a0zzzzzzzzzz",
+            "longest": 12
+        }
+    }
+}
