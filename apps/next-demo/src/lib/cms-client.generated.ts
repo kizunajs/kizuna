@@ -105,6 +105,26 @@ export namespace API {
             }>;
         };
 
+        export type CollectionPage = {
+            /**
+             * The site the route belongs to, default unless several apps share the CMS.
+             */
+            site: string;
+            name: string;
+            /**
+             * What editors call the page, when it declares a label.
+             */
+            label: string | null;
+            /**
+             * The route, with a param per address field, like /shops/[slug].
+             */
+            path: string;
+            /**
+             * The collection whose items the route shows, one per address.
+             */
+            collection: string;
+        };
+
         export type CollectionsWidget = {
             type: "collections";
             /**
@@ -132,6 +152,14 @@ export namespace API {
             }>;
         };
 
+        export type CreateMediaFolder = {
+            name: string;
+            /**
+             * The folder to make it in. Leave it out for the top level.
+             */
+            parent?: string;
+        };
+
         export type CreateUpload = {
             filename: string;
             contentType: string;
@@ -157,7 +185,7 @@ export namespace API {
             /**
              * The widgets the person may see, in the order listed.
              */
-            widgets: Array<CMS.StatWidget | CMS.ChartWidget | CMS.ListWidget | CMS.FunnelWidget | CMS.ReviewsWidget | CMS.CollectionsWidget | CMS.SitesWidget | CMS.RefreshesWidget | CMS.ReachWidget | CMS.EditorsWidget>;
+            widgets: Array<CMS.StatWidget | CMS.ChartWidget | CMS.ListWidget | CMS.FunnelWidget | CMS.ReviewsWidget | CMS.WaitingWidget | CMS.CollectionsWidget | CMS.SitesWidget | CMS.RefreshesWidget | CMS.ReachWidget | CMS.EditorsWidget>;
         };
 
         export type DecideReview = {
@@ -209,6 +237,31 @@ export namespace API {
             version: number;
             complete: boolean;
             missing: Array<string>;
+            /**
+             * Who edits the document now. One person edits a document at a time: a write from anyone else answers 409 until they stop, or two minutes after their last save. Null when nobody does.
+             */
+            heldBy: string | null;
+            /**
+             * When the document publishes or unpublishes without anyone pressing Publish. Null when nothing is scheduled.
+             */
+            schedule: {
+                action: "publish" | "unpublish";
+                /**
+                 * When it runs, in UTC. Null in a release that has no time yet.
+                 */
+                at: string | null;
+                /**
+                 * The release it publishes with, or null when it is scheduled on its own.
+                 */
+                release: {
+                    id: string;
+                    name: string;
+                } | null;
+                /**
+                 * Who set the time, by their id.
+                 */
+                by: string;
+            } | null;
             fields: Array<CMS.Field>;
             /**
              * The tabs, rows and collapsibles that arrange the fields, in the order they are shown. Empty when the fields are listed plainly.
@@ -232,10 +285,22 @@ export namespace API {
                     code: string;
                     status: "empty" | "draft" | "published" | "changed";
                     /**
-                     * How many of its fields changed in the source since they were translated.
+                     * How many of its fields changed in the source since they were translated or kept.
                      */
-                    behind: number;
+                    sourceChanged: number;
+                    /**
+                     * The fields whose source changed since they were translated or kept.
+                     */
+                    changed: Array<string>;
+                    /**
+                     * The translated fields the source holds and this language leaves empty.
+                     */
+                    missing: Array<string>;
                 }>;
+                /**
+                 * True when the translate tool drafts a language from the source's published text.
+                 */
+                translate?: boolean;
             };
             /**
              * The person who looks after it, if anyone does.
@@ -279,6 +344,56 @@ export namespace API {
             missing: Array<string>;
             updatedAt: string | null;
             updatedBy: string | null;
+            /**
+             * Who edits the document now. One person edits a document at a time: a write from anyone else answers 409 until they stop, or two minutes after their last save. Null when nobody does.
+             */
+            heldBy: string | null;
+            /**
+             * When the document publishes or unpublishes without anyone pressing Publish. Null when nothing is scheduled.
+             */
+            schedule: {
+                action: "publish" | "unpublish";
+                /**
+                 * When it runs, in UTC. Null in a release that has no time yet.
+                 */
+                at: string | null;
+                /**
+                 * The release it publishes with, or null when it is scheduled on its own.
+                 */
+                release: {
+                    id: string;
+                    name: string;
+                } | null;
+                /**
+                 * Who set the time, by their id.
+                 */
+                by: string;
+            } | null;
+            /**
+             * An item's place, in an orderable collection, once it has one.
+             */
+            place?: string;
+        };
+
+        export type DraftCandidates = {
+            drafts: Array<{
+                ref: string;
+                title: string;
+                /**
+                 * What it is, like Pages or Articles.
+                 */
+                kind: string;
+                /**
+                 * The site it belongs to, or null for shared content.
+                 */
+                site: string | null;
+                updatedAt: string;
+                updatedBy: CMS.Person;
+                /**
+                 * Whether it is scheduled already, on its own or in a release.
+                 */
+                scheduled: boolean;
+            }>;
         };
 
         export type DraftChanges = {
@@ -359,6 +474,10 @@ export namespace API {
              * Its label after the labels of the items above it, like "Lighting / Workshop". Only in a collection with a tree.
              */
             treeLabel?: string;
+            /**
+             * Its place, a key that sorts in the order editors gave the items. Only in an orderable collection.
+             */
+            place?: string;
             /**
              * The fields `fields` names, as stored. Only when the list is asked for fields.
              */
@@ -484,11 +603,11 @@ export namespace API {
              */
             sourceValue?: unknown;
             /**
-             * In a translation, true when the source changed since the field was translated.
+             * In a translation, true when the source changed since the field was translated. Update the field, or keep it as it is.
              */
-            behind?: boolean;
+            sourceChanged?: boolean;
             /**
-             * For a field that is behind, the source value it was translated from.
+             * For a field whose source changed, the source value it was translated from.
              */
             sourceBefore?: unknown;
         };
@@ -583,6 +702,17 @@ export namespace API {
                  * How far the value moved since the period before, as a signed fraction.
                  */
                 change?: number;
+                /**
+                 * The site the row belongs to.
+                 */
+                site?: {
+                    key: string;
+                    label: string;
+                    /**
+                     * The site's icon as a full URL.
+                     */
+                    icon: string | null;
+                };
             }>;
         };
 
@@ -617,10 +747,46 @@ export namespace API {
              * The site the image belongs to. Left out for a shared image, which any site may show.
              */
             site?: string;
+            /**
+             * The folder of its library the image sits in. Left out at the top level.
+             */
+            folder?: string;
+        };
+
+        export type MediaFolder = {
+            id: string;
+            name: string;
+            /**
+             * The folder it sits in. Left out at the top level.
+             */
+            parent?: string;
+            /**
+             * The site whose library holds it. Left out in the shared library.
+             */
+            site?: string;
+            /**
+             * How many images it holds itself, not counting its folders.
+             */
+            images: number;
+        };
+
+        export type MediaHeld = {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            /**
+             * The documents holding it, that stop the change.
+             */
+            uses: Array<CMS.MediaUse>;
         };
 
         export type MediaList = {
             media: Array<CMS.MediaSummary>;
+            /**
+             * The library's folders, and with `site` the shared ones beside them.
+             */
+            folders: Array<CMS.MediaFolder>;
             /**
              * The largest file an upload accepts.
              */
@@ -659,6 +825,10 @@ export namespace API {
              */
             site?: string;
             /**
+             * The folder of its library the image sits in. Left out at the top level.
+             */
+            folder?: string;
+            /**
              * How many pages, globals and items hold it, published or in a draft.
              */
             uses: number;
@@ -670,9 +840,17 @@ export namespace API {
              */
             ref: string;
             /**
+             * The site the document belongs to. Left out for shared content.
+             */
+            site?: string;
+            /**
              * An item's title, or the page's or global's label.
              */
             label: string | null;
+            /**
+             * The languages the document shows the image in.
+             */
+            locales: Array<string>;
             /**
              * The fields holding it, as dotted paths.
              */
@@ -686,6 +864,10 @@ export namespace API {
         export type MediaUses = {
             id: string;
             uses: Array<CMS.MediaUse>;
+            /**
+             * How many more documents hold it in sites the caller does not edit.
+             */
+            elsewhere: number;
         };
 
         export type MissingFields = {
@@ -696,6 +878,25 @@ export namespace API {
              * Something to ask an agent, like "Fill in the front page."
              */
             prompt: string;
+        };
+
+        export type MovedMedia = {
+            media: Array<CMS.Media>;
+        };
+
+        export type MoveMedia = {
+            /**
+             * The images to move.
+             */
+            ids: Array<string>;
+            /**
+             * The library they move into. Leave it out for the shared library.
+             */
+            site?: string;
+            /**
+             * A folder of that library. Leave it out for its top level.
+             */
+            folder?: string;
         };
 
         export type PageSummary = {
@@ -747,7 +948,32 @@ export namespace API {
                  * Their roles, as the app gives them.
                  */
                 roles?: Array<string>;
+                /**
+                 * Their roles on each site you may open, like `{ uk: ["editor"] }`. Left out without sites.
+                 */
+                sites?: Record<string, Array<string>>;
             }>;
+            /**
+             * What you may change about people. Left out without sites.
+             */
+            manage?: {
+                /**
+                 * The sites you may invite people to and change their roles on.
+                 */
+                sites: Array<string>;
+                /**
+                 * The roles a person may hold on a site.
+                 */
+                roles: Array<string>;
+                /**
+                 * Whether the app adds the people you invite.
+                 */
+                invite: boolean;
+                /**
+                 * Whether the app stores changes to people's roles.
+                 */
+                change: boolean;
+            };
         };
 
         export type Person = {
@@ -807,6 +1033,33 @@ export namespace API {
                 answered: number;
                 total: number;
             }>;
+        };
+
+        export type Release = {
+            id: string;
+            name: string;
+            /**
+             * When it publishes, in UTC. Null until someone schedules it.
+             */
+            at: string | null;
+            state: "open" | "scheduled" | "waiting" | "held" | "late" | "published";
+            /**
+             * How many of its documents would stop it if it ran now.
+             */
+            waiting: number;
+            /**
+             * Its documents that you may open.
+             */
+            documents: Array<CMS.Schedule>;
+            /**
+             * Whether you may schedule or publish it: you may publish every document in it.
+             */
+            mayPublish: boolean;
+            createdBy: CMS.Person;
+            createdAt: string;
+            scheduledBy: CMS.Person | null;
+            publishedAt: string | null;
+            publishedBy: CMS.Person | null;
         };
 
         export type RequestReview = {
@@ -931,6 +1184,50 @@ export namespace API {
             version: number;
         };
 
+        export type Schedule = {
+            id: string;
+            ref: string;
+            title: string;
+            /**
+             * What it is, like Pages or Articles.
+             */
+            kind: string;
+            /**
+             * The site it belongs to, or null for shared content.
+             */
+            site: string | null;
+            action: "publish" | "unpublish";
+            /**
+             * When it runs, in UTC. Null in a release that has no time yet.
+             */
+            at: string | null;
+            release: {
+                id: string;
+                name: string;
+            } | null;
+            /**
+             * `scheduled`: it runs at its time. `waiting`: something would stop it if it ran now. `held`: its time passed and something stops it, so it runs once that clears. `late`: its time passed and the job has not run yet.
+             */
+            state: "scheduled" | "waiting" | "held" | "late";
+            /**
+             * What stops it, like "Nils Aas to approve" or "Intro".
+             */
+            waitingFor: string | null;
+            scheduledBy: CMS.Person;
+            createdAt: string;
+        };
+
+        export type Scheduled = {
+            /**
+             * Documents scheduled on their own, soonest first.
+             */
+            schedules: Array<CMS.Schedule>;
+            /**
+             * The releases that have not published yet, soonest first.
+             */
+            releases: Array<CMS.Release>;
+        };
+
         export type SetOwner = {
             /**
              * The id of the person who looks after it, from the people list, or null for nobody.
@@ -941,12 +1238,17 @@ export namespace API {
         export type SitesWidget = {
             type: "sites";
             /**
-             * The chart each site draws, on one scale for every site's.
+             * The small line in each site's row, its label the column's heading.
              */
             chart: {
                 label: string;
-                style: "bar" | "line";
             } | null;
+            /**
+             * The columns, in the order listed.
+             */
+            stats: Array<{
+                label: string;
+            }>;
             sites: Array<{
                 key: string;
                 label: string;
@@ -956,7 +1258,11 @@ export namespace API {
                 icon: string | null;
                 url: string;
                 /**
-                 * The stats named, without a value on a site the stat leaves out.
+                 * The country of the site's first locale, like NO.
+                 */
+                country: string | null;
+                /**
+                 * A value for each column, without one on a site the stat leaves out.
                  */
                 stats: Array<{
                     value?: string;
@@ -968,7 +1274,6 @@ export namespace API {
                      * How far the number moved since the period before, as a signed fraction: 0.081 is up 8.1%.
                      */
                     change?: number;
-                    label: string;
                 }>;
                 /**
                  * Null on a site the chart leaves out.
@@ -981,25 +1286,31 @@ export namespace API {
                      */
                     previous?: number;
                 }> | null;
-                /**
-                 * How many reviews wait on the site.
-                 */
-                waiting: number;
-                lastPublish: {
-                    ref: string;
-                    label: string;
-                    by: string | null;
-                    at: string;
-                } | null;
-                lastRefresh: {
-                    status: "answered" | "failed" | "retrying";
-                    /**
-                     * When it answered, or was last tried.
-                     */
-                    at: string;
-                    attempts: number;
-                } | null;
             }>;
+            /**
+             * The sites by country, once there are more than six. Null until then.
+             */
+            countries: Array<{
+                country: string | null;
+                /**
+                 * The country's sites, by key.
+                 */
+                sites: Array<string>;
+                /**
+                 * Each column's total over the country's sites, where the stat has one.
+                 */
+                stats: Array<{
+                    value?: string;
+                    /**
+                     * A line under the number, like "48 orders".
+                     */
+                    detail?: string;
+                    /**
+                     * How far the number moved since the period before, as a signed fraction: 0.081 is up 8.1%.
+                     */
+                    change?: number;
+                }>;
+            }> | null;
         };
 
         export type StatWidget = {
@@ -1063,6 +1374,14 @@ export namespace API {
                  */
                 y: number;
             } | null;
+        };
+
+        export type UpdateMediaFolder = {
+            name?: string;
+            /**
+             * The folder to move it into. `null` moves it to the top level.
+             */
+            parent?: string | null;
         };
 
         export type Upload = {
@@ -1232,6 +1551,48 @@ export namespace API {
                 ref: string;
                 label: string;
                 path: string | null;
+            }>;
+        };
+
+        export type WaitingTranslations = {
+            translations: Array<{
+                /**
+                 * The translation, like page:norway:frontPage@en.
+                 */
+                ref: string;
+                /**
+                 * The document it translates.
+                 */
+                source: string;
+                locale: string;
+                label: string;
+                /**
+                 * The fields whose source changed since they were translated or kept.
+                 */
+                changed: Array<string>;
+                /**
+                 * The fields its source has a value for and it has none.
+                 */
+                missing: Array<string>;
+            }>;
+        };
+
+        export type WaitingWidget = {
+            type: "waiting";
+            /**
+             * How many reviews wait.
+             */
+            count: number;
+            /**
+             * On the overview, the sites they wait on.
+             */
+            sites: Array<{
+                key: string;
+                label: string;
+                /**
+                 * The site's icon as a full URL.
+                 */
+                icon: string | null;
             }>;
         };
 
@@ -1947,10 +2308,28 @@ export namespace API {
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
     }
 
+    export namespace EditingReleaseHold {
+        export type Query = {
+            /**
+             * The document, as `describe` and every draft answer name it under `ref`.
+             */
+            ref: string;
+        };
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> };
+    }
+
     export namespace EditingPagesList {
         export type Result =
             | { status: 200; body: {
                 pages: Array<CMS.PageSummary>;
+                collectionPages: Array<CMS.CollectionPage>;
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
@@ -2000,6 +2379,31 @@ export namespace API {
             | { status: 409; body: ProblemDetails; headers: Record<string, string> }
             | { status: 422; body: ValidationError; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingPagesKeepSource {
+        export type Params = {
+            name: string;
+        };
+
+        export type Body = {
+            /**
+             * The translated fields to keep as they are, by name, from the fields whose `sourceChanged` is true.
+             */
+            fields: Array<string>;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Draft; headers: {
+                etag: string;
+            } }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingPagesMissingFields {
@@ -2133,6 +2537,49 @@ export namespace API {
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
+    export namespace EditingPagesSchedule {
+        export type Params = {
+            name: string;
+        };
+
+        export type Body = {
+            action?: "publish" | "unpublish";
+            /**
+             * When to publish or unpublish, with its offset, like 2026-11-14T09:00:00+01:00.
+             */
+            at: string;
+            /**
+             * Publish past a review that is not approved when the time comes. Only someone with a role under `reviews.roles` may; for anyone else it changes nothing.
+             */
+            force?: boolean;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Schedule; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingPagesCancelSchedule {
+        export type Params = {
+            name: string;
+        };
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
     export namespace EditingPagesSetOwner {
         export type Params = {
             name: string;
@@ -2230,6 +2677,31 @@ export namespace API {
             | { status: 409; body: ProblemDetails; headers: Record<string, string> }
             | { status: 422; body: ValidationError; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingGlobalsKeepSource {
+        export type Params = {
+            name: string;
+        };
+
+        export type Body = {
+            /**
+             * The translated fields to keep as they are, by name, from the fields whose `sourceChanged` is true.
+             */
+            fields: Array<string>;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Draft; headers: {
+                etag: string;
+            } }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingGlobalsMissingFields {
@@ -2363,6 +2835,49 @@ export namespace API {
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
+    export namespace EditingGlobalsSchedule {
+        export type Params = {
+            name: string;
+        };
+
+        export type Body = {
+            action?: "publish" | "unpublish";
+            /**
+             * When to publish or unpublish, with its offset, like 2026-11-14T09:00:00+01:00.
+             */
+            at: string;
+            /**
+             * Publish past a review that is not approved when the time comes. Only someone with a role under `reviews.roles` may; for anyone else it changes nothing.
+             */
+            force?: boolean;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Schedule; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingGlobalsCancelSchedule {
+        export type Params = {
+            name: string;
+        };
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
     export namespace EditingGlobalsSetOwner {
         export type Params = {
             name: string;
@@ -2430,7 +2945,7 @@ export namespace API {
              */
             filter?: Array<string>;
             /**
-             * `title`, `status`, `updatedAt` or a field of the collection's indexes. `title` when left out.
+             * `title`, `status`, `updatedAt`, `order` for a collection with an order, or a field of the collection's indexes. `order` when left out for a collection with one, otherwise `title`.
              */
             orderBy?: string;
             /**
@@ -2506,6 +3021,44 @@ export namespace API {
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
     }
 
+    export namespace EditingCollectionsPlaceItem {
+        export type Params = {
+            name: string;
+            id: string;
+        };
+
+        export type Body = {
+            /**
+             * Right after this item, as its sibling under the same parent.
+             */
+            after?: string;
+            /**
+             * Right before this item, as its sibling under the same parent.
+             */
+            before?: string;
+            /**
+             * First or last among its siblings.
+             */
+            at?: "first" | "last";
+            /**
+             * In a tree, the item it goes under, null for the top. Alone or with `at`; left out, it keeps its parent.
+             */
+            parent?: string | null;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Draft; headers: {
+                etag: string;
+            } }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> };
+    }
+
     export namespace EditingCollectionsGetDraft {
         export type Params = {
             name: string;
@@ -2550,6 +3103,32 @@ export namespace API {
             | { status: 409; body: ProblemDetails; headers: Record<string, string> }
             | { status: 422; body: ValidationError; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingCollectionsKeepSource {
+        export type Params = {
+            name: string;
+            id: string;
+        };
+
+        export type Body = {
+            /**
+             * The translated fields to keep as they are, by name, from the fields whose `sourceChanged` is true.
+             */
+            fields: Array<string>;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Draft; headers: {
+                etag: string;
+            } }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingCollectionsMissingFields {
@@ -2691,6 +3270,51 @@ export namespace API {
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
+    export namespace EditingCollectionsSchedule {
+        export type Params = {
+            name: string;
+            id: string;
+        };
+
+        export type Body = {
+            action?: "publish" | "unpublish";
+            /**
+             * When to publish or unpublish, with its offset, like 2026-11-14T09:00:00+01:00.
+             */
+            at: string;
+            /**
+             * Publish past a review that is not approved when the time comes. Only someone with a role under `reviews.roles` may; for anyone else it changes nothing.
+             */
+            force?: boolean;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Schedule; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingCollectionsCancelSchedule {
+        export type Params = {
+            name: string;
+            id: string;
+        };
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
     export namespace EditingCollectionsSetOwner {
         export type Params = {
             name: string;
@@ -2810,7 +3434,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: CMS.MediaHeld; headers: Record<string, string> };
     }
 
     export namespace EditingMediaCreateUpload {
@@ -2832,6 +3457,13 @@ export namespace API {
             uploadId: string;
         };
 
+        export type Body = {
+            /**
+             * The folder of the library the image lands in. Leave it out for the top level.
+             */
+            folder?: string;
+        };
+
         export type Result =
             | { status: 201; body: CMS.Media; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
@@ -2839,7 +3471,69 @@ export namespace API {
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 422; body: ValidationError; headers: Record<string, string> };
+            | { status: 422; body: ValidationError; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingMediaMove {
+        export type Body = CMS.MoveMedia;
+
+        export type Result =
+            | { status: 200; body: CMS.MovedMedia; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: CMS.MediaHeld; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingMediaCreateFolder {
+        export type Body = CMS.CreateMediaFolder;
+
+        export type Result =
+            | { status: 201; body: CMS.MediaFolder; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingMediaUpdateFolder {
+        export type Params = {
+            id: string;
+        };
+
+        export type Body = CMS.UpdateMediaFolder;
+
+        export type Result =
+            | { status: 200; body: CMS.MediaFolder; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingMediaDeleteFolder {
+        export type Params = {
+            id: string;
+        };
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> };
     }
 
     export namespace EditingActionsArticlesAnnounce {
@@ -3050,6 +3744,10 @@ export namespace API {
              * The page to land on, like /blog/spring-sale.
              */
             path?: string;
+            /**
+             * The site whose draft to open, like norway. Without it, the site at `preview.url`.
+             */
+            site?: string;
         };
 
         export type Result =
@@ -3076,6 +3774,15 @@ export namespace API {
     export namespace EditingPeopleList {
         export type Result =
             | { status: 200; body: CMS.People; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingTranslationsList {
+        export type Result =
+            | { status: 200; body: CMS.WaitingTranslations; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -3128,6 +3835,21 @@ export namespace API {
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
+    export namespace EditingReviewsApproveAndPublish {
+        export type Params = {
+            id: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Draft; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> };
+    }
+
     export namespace EditingReviewsWithdraw {
         export type Body = CMS.ReviewIds;
 
@@ -3178,6 +3900,246 @@ export namespace API {
 
         export type Result =
             | { status: 200; body: CMS.ReviewState; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingSchedulesList {
+        export type Query = {
+            /**
+             * Only what changes on this site, by its key.
+             */
+            site?: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Scheduled; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingSchedulesDrafts {
+        export type Query = {
+            /**
+             * Only what changes on this site, by its key.
+             */
+            site?: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.DraftCandidates; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingReleasesGet {
+        export type Params = {
+            /**
+             * The release, like rel_8f2k3j9x2a1b.
+             */
+            id: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Release; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingReleasesCreate {
+        export type Body = {
+            name: string;
+            /**
+             * Documents to put in it, by ref.
+             */
+            refs?: Array<string>;
+        };
+
+        export type Result =
+            | { status: 201; body: CMS.Release; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingReleasesRename {
+        export type Params = {
+            /**
+             * The release, like rel_8f2k3j9x2a1b.
+             */
+            id: string;
+        };
+
+        export type Body = {
+            name: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Release; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingReleasesAdd {
+        export type Params = {
+            /**
+             * The release, like rel_8f2k3j9x2a1b.
+             */
+            id: string;
+        };
+
+        export type Body = {
+            /**
+             * The documents, by ref.
+             */
+            refs: Array<string>;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Release; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingReleasesRemove {
+        export type Params = {
+            /**
+             * The release, like rel_8f2k3j9x2a1b.
+             */
+            id: string;
+        };
+
+        export type Body = {
+            /**
+             * The documents, by ref.
+             */
+            refs: Array<string>;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Release; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingReleasesSchedule {
+        export type Params = {
+            /**
+             * The release, like rel_8f2k3j9x2a1b.
+             */
+            id: string;
+        };
+
+        export type Body = {
+            at: string;
+            /**
+             * Publish past reviews that are not approved. Only someone with a role under `reviews.roles` may.
+             */
+            force?: boolean;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Release; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingReleasesUnschedule {
+        export type Params = {
+            /**
+             * The release, like rel_8f2k3j9x2a1b.
+             */
+            id: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Release; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingReleasesPublish {
+        export type Params = {
+            /**
+             * The release, like rel_8f2k3j9x2a1b.
+             */
+            id: string;
+        };
+
+        export type Body = {
+            /**
+             * Publish past reviews that are not approved. Only someone with a role under `reviews.roles` may.
+             */
+            force?: boolean;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Release; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingReleasesDelete {
+        export type Params = {
+            /**
+             * The release, like rel_8f2k3j9x2a1b.
+             */
+            id: string;
+        };
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -3366,7 +4328,7 @@ export interface Client {
         /**
          * Describe what is shown at a URL, or any document by its ref: its fields, what the caller may write, and the draft
          *
-         * Start here when working from the page someone is looking at, or from a ref a source path or another tool gave you. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it. `usedOn` says where else shared content appears; say so before changing it. A document in several languages lists them under `locale`: to translate it, describe `<ref>@<code>` and write each field from its `sourceValue` with that `locale`.
+         * Start here when working from the page someone is looking at, or from a ref a source path or another tool gave you. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it. `usedOn` says where else shared content appears; say so before changing it. A document in several languages lists them under `locale`: to translate it, describe `<ref>@<code>` and write each field from its `sourceValue` with that `locale`. A field whose `sourceChanged` is true is updated, or kept as it is.
          *
          * @example
          * const result = await client.editing.describe();
@@ -3376,9 +4338,28 @@ export interface Client {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }, API.EditingDescribe.Result>;
+        /**
+         * Stop editing a document, so someone else may
+         *
+         * One person edits a document at a time: the first to save holds it until they stop, or for two minutes after their last save. Call this when you are done, so the next person need not wait. It changes nothing when you do not hold the document.
+         *
+         * @example
+         * const result = await client.editing.releaseHold({
+         *     query: {
+         *         ref: 'string',
+         *     },
+         * });
+         */
+        releaseHold: ClientMethod<'DELETE', false, {
+            query: API.EditingReleaseHold.Query;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.EditingReleaseHold.Result>;
         pages: {
             /**
              * List every page with its status
+             *
+             * Each item of a collection a route shows is a page of its own, at its address. `collectionPages` lists those routes, like `/shops/[slug]`, with the collection each shows.
              *
              * @example
              * const result = await client.editing.pages.list();
@@ -3423,6 +4404,29 @@ export interface Client {
                 headers?: API.EditingPagesUpdateDraft.Headers;
                 fetchOptions?: RequestInit;
             }, API.EditingPagesUpdateDraft.Result>;
+            /**
+             * Keep fields of a translation of a page as they are after their source changed
+             *
+             * A translation may differ from its source on purpose. Keeping a field whose `sourceChanged` is true leaves its value as it is and stops showing the change, until the source changes again. Pass the translation's `locale`.
+             *
+             * @example
+             * const result = await client.editing.pages.keepSource({
+             *     params: {
+             *         name: 'string',
+             *     },
+             *     body: {
+             *         fields: [
+             *             'string',
+             *         ],
+             *     },
+             * });
+             */
+            keepSource: ClientMethod<'POST', false, {
+                params: API.EditingPagesKeepSource.Params;
+                body: API.EditingPagesKeepSource.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingPagesKeepSource.Result>;
             /**
              * List the fields the draft of a page still needs before it can publish
              *
@@ -3565,6 +4569,44 @@ export interface Client {
                 fetchOptions?: RequestInit;
             }, API.EditingPagesUnpublish.Result>;
             /**
+             * Schedule a page to publish or unpublish at a time
+             *
+             * Publishes the draft as it stands when the time comes, or unpublishes it, and replaces a time set before. When the time comes the same rules hold as for publishing: a draft missing a field, waiting for a required review, or being edited waits until that clears. The person confirms before this runs.
+             *
+             * @example
+             * const result = await client.editing.pages.schedule({
+             *     params: {
+             *         name: 'string',
+             *     },
+             *     body: {
+             *         at: '2026-01-01T00:00:00Z',
+             *     },
+             * });
+             */
+            schedule: ClientMethod<'PUT', false, {
+                params: API.EditingPagesSchedule.Params;
+                body: API.EditingPagesSchedule.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingPagesSchedule.Result>;
+            /**
+             * Cancel the schedule of a page
+             *
+             * Takes back the time it would publish or unpublish, and takes it out of its release. The draft stays a draft.
+             *
+             * @example
+             * const result = await client.editing.pages.cancelSchedule({
+             *     params: {
+             *         name: 'string',
+             *     },
+             * });
+             */
+            cancelSchedule: ClientMethod<'DELETE', false, {
+                params: API.EditingPagesCancelSchedule.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingPagesCancelSchedule.Result>;
+            /**
              * Name the person who looks after a page
              *
              * The owner is suggested first when someone asks for a review. Pass null for nobody.
@@ -3654,6 +4696,29 @@ export interface Client {
                 headers?: API.EditingGlobalsUpdateDraft.Headers;
                 fetchOptions?: RequestInit;
             }, API.EditingGlobalsUpdateDraft.Result>;
+            /**
+             * Keep fields of a translation of a global, which every page may show as they are after their source changed
+             *
+             * A translation may differ from its source on purpose. Keeping a field whose `sourceChanged` is true leaves its value as it is and stops showing the change, until the source changes again. Pass the translation's `locale`.
+             *
+             * @example
+             * const result = await client.editing.globals.keepSource({
+             *     params: {
+             *         name: 'string',
+             *     },
+             *     body: {
+             *         fields: [
+             *             'string',
+             *         ],
+             *     },
+             * });
+             */
+            keepSource: ClientMethod<'POST', false, {
+                params: API.EditingGlobalsKeepSource.Params;
+                body: API.EditingGlobalsKeepSource.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingGlobalsKeepSource.Result>;
             /**
              * List the fields the draft of a global, which every page may show still needs before it can publish
              *
@@ -3796,6 +4861,44 @@ export interface Client {
                 fetchOptions?: RequestInit;
             }, API.EditingGlobalsUnpublish.Result>;
             /**
+             * Schedule a global, which every page may show to publish or unpublish at a time
+             *
+             * Publishes the draft as it stands when the time comes, or unpublishes it, and replaces a time set before. When the time comes the same rules hold as for publishing: a draft missing a field, waiting for a required review, or being edited waits until that clears. The person confirms before this runs.
+             *
+             * @example
+             * const result = await client.editing.globals.schedule({
+             *     params: {
+             *         name: 'string',
+             *     },
+             *     body: {
+             *         at: '2026-01-01T00:00:00Z',
+             *     },
+             * });
+             */
+            schedule: ClientMethod<'PUT', false, {
+                params: API.EditingGlobalsSchedule.Params;
+                body: API.EditingGlobalsSchedule.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingGlobalsSchedule.Result>;
+            /**
+             * Cancel the schedule of a global, which every page may show
+             *
+             * Takes back the time it would publish or unpublish, and takes it out of its release. The draft stays a draft.
+             *
+             * @example
+             * const result = await client.editing.globals.cancelSchedule({
+             *     params: {
+             *         name: 'string',
+             *     },
+             * });
+             */
+            cancelSchedule: ClientMethod<'DELETE', false, {
+                params: API.EditingGlobalsCancelSchedule.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingGlobalsCancelSchedule.Result>;
+            /**
              * Name the person who looks after a global, which every page may show
              *
              * The owner is suggested first when someone asks for a review. Pass null for nobody.
@@ -3887,7 +4990,7 @@ export interface Client {
             /**
              * Delete an item of a collection, with its history
              *
-             * Its address stops answering, and pages that reference it stop showing it. The person confirms before this runs.
+             * Its address stops answering, and pages that reference it stop showing it. In a collection with a tree, every item under it goes too. The person confirms before this runs.
              *
              * @example
              * const result = await client.editing.collections.deleteItem({
@@ -3902,6 +5005,25 @@ export interface Client {
                 headers?: Record<string, string>;
                 fetchOptions?: RequestInit;
             }, API.EditingCollectionsDeleteItem.Result>;
+            /**
+             * Move an item of a collection with an order or a tree, saving the move to its draft
+             *
+             * Name one of `after`, `before` and `at`, or none to go last. `after` and `before` make it a sibling of the item they name. In a tree, `parent` puts it under another item, first or last with `at`, and a tree without an order takes `parent` alone. An item takes everything under it wherever it goes. Placing an item where it already is changes nothing.
+             *
+             * @example
+             * const result = await client.editing.collections.placeItem({
+             *     params: {
+             *         name: 'string',
+             *         id: '1',
+             *     },
+             * });
+             */
+            placeItem: ClientMethod<'PUT', false, {
+                params: API.EditingCollectionsPlaceItem.Params;
+                body: API.EditingCollectionsPlaceItem.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCollectionsPlaceItem.Result>;
             /**
              * Read the draft of an item of a collection
              *
@@ -3940,6 +5062,30 @@ export interface Client {
                 headers?: API.EditingCollectionsUpdateDraft.Headers;
                 fetchOptions?: RequestInit;
             }, API.EditingCollectionsUpdateDraft.Result>;
+            /**
+             * Keep fields of a translation of an item of a collection as they are after their source changed
+             *
+             * A translation may differ from its source on purpose. Keeping a field whose `sourceChanged` is true leaves its value as it is and stops showing the change, until the source changes again. Pass the translation's `locale`.
+             *
+             * @example
+             * const result = await client.editing.collections.keepSource({
+             *     params: {
+             *         name: 'string',
+             *         id: '1',
+             *     },
+             *     body: {
+             *         fields: [
+             *             'string',
+             *         ],
+             *     },
+             * });
+             */
+            keepSource: ClientMethod<'POST', false, {
+                params: API.EditingCollectionsKeepSource.Params;
+                body: API.EditingCollectionsKeepSource.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCollectionsKeepSource.Result>;
             /**
              * List the fields the draft of an item of a collection still needs before it can publish
              *
@@ -4090,6 +5236,46 @@ export interface Client {
                 fetchOptions?: RequestInit;
             }, API.EditingCollectionsUnpublish.Result>;
             /**
+             * Schedule an item of a collection to publish or unpublish at a time
+             *
+             * Publishes the draft as it stands when the time comes, or unpublishes it, and replaces a time set before. When the time comes the same rules hold as for publishing: a draft missing a field, waiting for a required review, or being edited waits until that clears. The person confirms before this runs.
+             *
+             * @example
+             * const result = await client.editing.collections.schedule({
+             *     params: {
+             *         name: 'string',
+             *         id: '1',
+             *     },
+             *     body: {
+             *         at: '2026-01-01T00:00:00Z',
+             *     },
+             * });
+             */
+            schedule: ClientMethod<'PUT', false, {
+                params: API.EditingCollectionsSchedule.Params;
+                body: API.EditingCollectionsSchedule.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCollectionsSchedule.Result>;
+            /**
+             * Cancel the schedule of an item of a collection
+             *
+             * Takes back the time it would publish or unpublish, and takes it out of its release. The draft stays a draft.
+             *
+             * @example
+             * const result = await client.editing.collections.cancelSchedule({
+             *     params: {
+             *         name: 'string',
+             *         id: '1',
+             *     },
+             * });
+             */
+            cancelSchedule: ClientMethod<'DELETE', false, {
+                params: API.EditingCollectionsCancelSchedule.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCollectionsCancelSchedule.Result>;
+            /**
              * Name the person who looks after an item of a collection
              *
              * The owner is suggested first when someone asks for a review. Pass null for nobody.
@@ -4136,9 +5322,9 @@ export interface Client {
         };
         media: {
             /**
-             * List uploaded media, with how many pages hold each image
+             * List uploaded media and folders, with how many pages hold each image
              *
-             * With `site`, that site's own images beside the shared ones, each own image naming its site.
+             * With `site`, that site's own images and folders beside the shared ones, each own one naming its site. Each image names its folder, left out at the top level.
              *
              * @example
              * const result = await client.editing.media.list();
@@ -4163,7 +5349,7 @@ export interface Client {
                 fetchOptions?: RequestInit;
             }, API.EditingMediaGet.Result>;
             /**
-             * List the pages, globals and items that hold an image, and the fields holding it
+             * List the pages, globals and items that hold an image, with their site, languages and the fields holding it
              *
              * @example
              * const result = await client.editing.media.uses({
@@ -4211,7 +5397,7 @@ export interface Client {
             /**
              * Delete an image and its stored file
              *
-             * Pages, globals and items that hold it lose the image, so list its uses first. The person confirms before this runs.
+             * Refused with 409 while a page, global or item holds the image, published or in a draft, listing them under `uses`. The person confirms before this runs.
              *
              * @example
              * const result = await client.editing.media.delete({
@@ -4250,13 +5436,82 @@ export interface Client {
              *     params: {
              *         uploadId: '1',
              *     },
+             *     body: {},
              * });
              */
             completeUpload: ClientMethod<'POST', false, {
                 params: API.EditingMediaCompleteUpload.Params;
+                body: API.EditingMediaCompleteUpload.Body;
                 headers?: Record<string, string>;
                 fetchOptions?: RequestInit;
             }, API.EditingMediaCompleteUpload.Result>;
+            /**
+             * Move images into a folder, or into another library
+             *
+             * Images keep their ids, so what holds them keeps showing them. A shared image moves into a site only while nothing outside that site holds it; otherwise nothing moves, and the 409 lists what holds it under `uses`. Moving into or out of the shared library takes an admin over every site.
+             *
+             * @example
+             * const result = await client.editing.media.move({
+             *     body: {
+             *         ids: [
+             *             'string',
+             *         ],
+             *     },
+             * });
+             */
+            move: ClientMethod<'POST', false, {
+                body: API.EditingMediaMove.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingMediaMove.Result>;
+            /**
+             * Make a folder in a library, at its top level or inside another folder
+             *
+             * @example
+             * const result = await client.editing.media.createFolder({
+             *     body: {
+             *         name: 'string',
+             *     },
+             * });
+             */
+            createFolder: ClientMethod<'POST', false, {
+                body: API.EditingMediaCreateFolder.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingMediaCreateFolder.Result>;
+            /**
+             * Rename a folder, or move it into another folder of its library
+             *
+             * @example
+             * const result = await client.editing.media.updateFolder({
+             *     params: {
+             *         id: '1',
+             *     },
+             * });
+             */
+            updateFolder: ClientMethod<'PATCH', false, {
+                params: API.EditingMediaUpdateFolder.Params;
+                body: API.EditingMediaUpdateFolder.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingMediaUpdateFolder.Result>;
+            /**
+             * Delete an empty folder
+             *
+             * Refused with 409 while the folder holds images or folders.
+             *
+             * @example
+             * const result = await client.editing.media.deleteFolder({
+             *     params: {
+             *         id: '1',
+             *     },
+             * });
+             */
+            deleteFolder: ClientMethod<'DELETE', false, {
+                params: API.EditingMediaDeleteFolder.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingMediaDeleteFolder.Result>;
         };
         actions: {
             articles: {
@@ -4435,6 +5690,18 @@ export interface Client {
                 fetchOptions?: RequestInit;
             }, API.EditingPeopleList.Result>;
         };
+        translations: {
+            /**
+             * List the translations that wait on someone: fields whose source changed, and fields not translated yet
+             *
+             * @example
+             * const result = await client.editing.translations.list();
+             */
+            list: ClientMethod<'GET', false, {
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingTranslationsList.Result>;
+        };
         reviews: {
             /**
              * List the reviews waiting for an answer, for you or for anyone
@@ -4489,6 +5756,23 @@ export interface Client {
                 headers?: Record<string, string>;
                 fetchOptions?: RequestInit;
             }, API.EditingReviewsDecide.Result>;
+            /**
+             * Approve a review and publish its draft in one step
+             *
+             * The approval and the publish happen together, or neither does. It is refused when the person may not publish the document, when the review was already answered, and when the draft changed since they looked. The person confirms first: in a host that cannot ask, such as Claude, they answer in the editor instead.
+             *
+             * @example
+             * const result = await client.editing.reviews.approveAndPublish({
+             *     params: {
+             *         id: '1',
+             *     },
+             * });
+             */
+            approveAndPublish: ClientMethod<'POST', false, {
+                params: API.EditingReviewsApproveAndPublish.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReviewsApproveAndPublish.Result>;
             /**
              * Withdraw reviews you asked for that still wait for an answer
              *
@@ -4563,6 +5847,207 @@ export interface Client {
                 headers?: Record<string, string>;
                 fetchOptions?: RequestInit;
             }, API.EditingReviewsResolveComment.Result>;
+        };
+        schedules: {
+            /**
+             * List what is set to publish or unpublish, and the releases
+             *
+             * Documents scheduled on their own, and the releases that have not published yet, soonest first. With `site`, only what changes on that site: its own documents and the shared ones it shows. Each says what would stop it, like a review it waits for.
+             *
+             * @example
+             * const result = await client.editing.schedules.list();
+             */
+            list: ClientMethod<'GET', false, {
+                query?: API.EditingSchedulesList.Query;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingSchedulesList.Result>;
+            /**
+             * List the drafts with changes that could be scheduled or put in a release
+             *
+             * Every page, global and item whose draft differs from what is live, newest first. With `site`, that site's and the shared ones it shows.
+             *
+             * @example
+             * const result = await client.editing.schedules.drafts();
+             */
+            drafts: ClientMethod<'GET', false, {
+                query?: API.EditingSchedulesDrafts.Query;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingSchedulesDrafts.Result>;
+        };
+        releases: {
+            /**
+             * Read a release and its documents
+             *
+             * Each document says whether it would publish now, or what it waits for.
+             *
+             * @example
+             * const result = await client.editing.releases.get({
+             *     params: {
+             *         id: '1',
+             *     },
+             * });
+             */
+            get: ClientMethod<'GET', false, {
+                params: API.EditingReleasesGet.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReleasesGet.Result>;
+            /**
+             * Make a release: a named set of drafts that publish together
+             *
+             * Name it after what it is for, like "Trondheim opening", and pass the documents by ref. Nothing publishes until someone schedules or publishes the release.
+             *
+             * @example
+             * const result = await client.editing.releases.create({
+             *     body: {
+             *         name: 'string',
+             *     },
+             * });
+             */
+            create: ClientMethod<'POST', false, {
+                body: API.EditingReleasesCreate.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReleasesCreate.Result>;
+            /**
+             * Rename a release
+             *
+             * @example
+             * const result = await client.editing.releases.rename({
+             *     params: {
+             *         id: '1',
+             *     },
+             *     body: {
+             *         name: 'string',
+             *     },
+             * });
+             */
+            rename: ClientMethod<'PATCH', false, {
+                params: API.EditingReleasesRename.Params;
+                body: API.EditingReleasesRename.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReleasesRename.Result>;
+            /**
+             * Put documents in a release
+             *
+             * A document sits in one release at a time, and a document scheduled on its own answers 409 until its schedule is cancelled.
+             *
+             * @example
+             * const result = await client.editing.releases.add({
+             *     params: {
+             *         id: '1',
+             *     },
+             *     body: {
+             *         refs: [
+             *             'string',
+             *         ],
+             *     },
+             * });
+             */
+            add: ClientMethod<'POST', false, {
+                params: API.EditingReleasesAdd.Params;
+                body: API.EditingReleasesAdd.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReleasesAdd.Result>;
+            /**
+             * Take documents out of a release
+             *
+             * Their drafts stay as they are.
+             *
+             * @example
+             * const result = await client.editing.releases.remove({
+             *     params: {
+             *         id: '1',
+             *     },
+             *     body: {
+             *         refs: [
+             *             'string',
+             *         ],
+             *     },
+             * });
+             */
+            remove: ClientMethod<'POST', false, {
+                params: API.EditingReleasesRemove.Params;
+                body: API.EditingReleasesRemove.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReleasesRemove.Result>;
+            /**
+             * Schedule a release to publish at a time
+             *
+             * Every document publishes together when the time comes, or none does: a document that waits for a review or misses a field holds the whole release until it would publish. It takes someone who may publish every document in it. The person confirms before this runs.
+             *
+             * @example
+             * const result = await client.editing.releases.schedule({
+             *     params: {
+             *         id: '1',
+             *     },
+             *     body: {
+             *         at: '2026-01-01T00:00:00Z',
+             *     },
+             * });
+             */
+            schedule: ClientMethod<'PUT', false, {
+                params: API.EditingReleasesSchedule.Params;
+                body: API.EditingReleasesSchedule.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReleasesSchedule.Result>;
+            /**
+             * Take back a release's time
+             *
+             * The release and its drafts stay, and nothing publishes until someone schedules or publishes it again.
+             *
+             * @example
+             * const result = await client.editing.releases.unschedule({
+             *     params: {
+             *         id: '1',
+             *     },
+             * });
+             */
+            unschedule: ClientMethod<'DELETE', false, {
+                params: API.EditingReleasesUnschedule.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReleasesUnschedule.Result>;
+            /**
+             * Publish every document of a release now, together
+             *
+             * All of them go live in one step, or none does: the answer names each document that waits for a review or misses a field. It takes someone who may publish every document in it. The person confirms before this runs.
+             *
+             * @example
+             * const result = await client.editing.releases.publish({
+             *     params: {
+             *         id: '1',
+             *     },
+             *     body: {},
+             * });
+             */
+            publish: ClientMethod<'POST', false, {
+                params: API.EditingReleasesPublish.Params;
+                body: API.EditingReleasesPublish.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReleasesPublish.Result>;
+            /**
+             * Delete a release, keeping every draft in it
+             *
+             * @example
+             * const result = await client.editing.releases.delete({
+             *     params: {
+             *         id: '1',
+             *     },
+             * });
+             */
+            delete: ClientMethod<'DELETE', false, {
+                params: API.EditingReleasesDelete.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReleasesDelete.Result>;
         };
     };
     /**
@@ -4702,6 +6187,16 @@ const routes: GeneratedRoutes = {
                 404: {},
             },
         },
+        releaseHold: {
+            method: 'DELETE',
+            path: '/editing/hold',
+            responses: {
+                204: {},
+                400: {},
+                401: {},
+                403: {},
+            },
+        },
         pages: {
             list: {
                 method: 'GET',
@@ -4733,6 +6228,18 @@ const routes: GeneratedRoutes = {
                     409: {},
                     422: {},
                     400: {},
+                },
+            },
+            keepSource: {
+                method: 'POST',
+                path: '/editing/pages/:name/keep',
+                responses: {
+                    200: {},
+                    400: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    422: {},
                 },
             },
             missingFields: {
@@ -4821,6 +6328,29 @@ const routes: GeneratedRoutes = {
                     400: {},
                 },
             },
+            schedule: {
+                method: 'PUT',
+                path: '/editing/pages/:name/schedule',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    422: {},
+                    400: {},
+                },
+            },
+            cancelSchedule: {
+                method: 'DELETE',
+                path: '/editing/pages/:name/schedule',
+                responses: {
+                    204: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                },
+            },
             setOwner: {
                 method: 'PUT',
                 path: '/editing/pages/:name/owner',
@@ -4878,6 +6408,18 @@ const routes: GeneratedRoutes = {
                     409: {},
                     422: {},
                     400: {},
+                },
+            },
+            keepSource: {
+                method: 'POST',
+                path: '/editing/globals/:name/keep',
+                responses: {
+                    200: {},
+                    400: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    422: {},
                 },
             },
             missingFields: {
@@ -4966,6 +6508,29 @@ const routes: GeneratedRoutes = {
                     400: {},
                 },
             },
+            schedule: {
+                method: 'PUT',
+                path: '/editing/globals/:name/schedule',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    422: {},
+                    400: {},
+                },
+            },
+            cancelSchedule: {
+                method: 'DELETE',
+                path: '/editing/globals/:name/schedule',
+                responses: {
+                    204: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                },
+            },
             setOwner: {
                 method: 'PUT',
                 path: '/editing/globals/:name/owner',
@@ -5036,6 +6601,18 @@ const routes: GeneratedRoutes = {
                     404: {},
                 },
             },
+            placeItem: {
+                method: 'PUT',
+                path: '/editing/collections/:name/items/:id/place',
+                responses: {
+                    200: {},
+                    400: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                },
+            },
             getDraft: {
                 method: 'GET',
                 path: '/editing/collections/:name/items/:id/draft',
@@ -5057,6 +6634,18 @@ const routes: GeneratedRoutes = {
                     409: {},
                     422: {},
                     400: {},
+                },
+            },
+            keepSource: {
+                method: 'POST',
+                path: '/editing/collections/:name/items/:id/keep',
+                responses: {
+                    200: {},
+                    400: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    422: {},
                 },
             },
             missingFields: {
@@ -5145,6 +6734,29 @@ const routes: GeneratedRoutes = {
                     400: {},
                 },
             },
+            schedule: {
+                method: 'PUT',
+                path: '/editing/collections/:name/items/:id/schedule',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    422: {},
+                    400: {},
+                },
+            },
+            cancelSchedule: {
+                method: 'DELETE',
+                path: '/editing/collections/:name/items/:id/schedule',
+                responses: {
+                    204: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                },
+            },
             setOwner: {
                 method: 'PUT',
                 path: '/editing/collections/:name/items/:id/owner',
@@ -5231,6 +6843,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    409: {},
                 },
             },
             createUpload: {
@@ -5254,6 +6867,54 @@ const routes: GeneratedRoutes = {
                     403: {},
                     404: {},
                     422: {},
+                    400: {},
+                },
+            },
+            move: {
+                method: 'POST',
+                path: '/editing/media/move',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    400: {},
+                },
+            },
+            createFolder: {
+                method: 'POST',
+                path: '/editing/media/folders',
+                responses: {
+                    201: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    400: {},
+                },
+            },
+            updateFolder: {
+                method: 'PATCH',
+                path: '/editing/media/folders/:id',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    400: {},
+                },
+            },
+            deleteFolder: {
+                method: 'DELETE',
+                path: '/editing/media/folders/:id',
+                responses: {
+                    204: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
                 },
             },
         },
@@ -5386,6 +7047,17 @@ const routes: GeneratedRoutes = {
                 },
             },
         },
+        translations: {
+            list: {
+                method: 'GET',
+                path: '/editing/translations',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                },
+            },
+        },
         reviews: {
             list: {
                 method: 'GET',
@@ -5420,6 +7092,17 @@ const routes: GeneratedRoutes = {
                     404: {},
                     409: {},
                     400: {},
+                },
+            },
+            approveAndPublish: {
+                method: 'POST',
+                path: '/editing/reviews/:id/approve-and-publish',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
                 },
             },
             withdraw: {
@@ -5464,6 +7147,139 @@ const routes: GeneratedRoutes = {
                 path: '/editing/reviews/comments/:id/resolve',
                 responses: {
                     200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                },
+            },
+        },
+        schedules: {
+            list: {
+                method: 'GET',
+                path: '/editing/schedules',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    400: {},
+                },
+            },
+            drafts: {
+                method: 'GET',
+                path: '/editing/schedules/drafts',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    400: {},
+                },
+            },
+        },
+        releases: {
+            get: {
+                method: 'GET',
+                path: '/editing/releases/:id',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                },
+            },
+            create: {
+                method: 'POST',
+                path: '/editing/releases',
+                responses: {
+                    201: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    422: {},
+                    400: {},
+                },
+            },
+            rename: {
+                method: 'PATCH',
+                path: '/editing/releases/:id',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    400: {},
+                },
+            },
+            add: {
+                method: 'POST',
+                path: '/editing/releases/:id/add',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    422: {},
+                    400: {},
+                },
+            },
+            remove: {
+                method: 'POST',
+                path: '/editing/releases/:id/remove',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    400: {},
+                },
+            },
+            schedule: {
+                method: 'PUT',
+                path: '/editing/releases/:id/schedule',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    422: {},
+                    400: {},
+                },
+            },
+            unschedule: {
+                method: 'DELETE',
+                path: '/editing/releases/:id/schedule',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                },
+            },
+            publish: {
+                method: 'POST',
+                path: '/editing/releases/:id/publish',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    400: {},
+                },
+            },
+            delete: {
+                method: 'DELETE',
+                path: '/editing/releases/:id',
+                responses: {
+                    204: {},
                     401: {},
                     403: {},
                     404: {},
