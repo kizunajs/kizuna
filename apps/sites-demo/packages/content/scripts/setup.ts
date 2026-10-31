@@ -23,7 +23,7 @@ const people: {
 }[] = [
     {
         email: 'dev@kizunajs.com',
-        name: 'Kizuna Dev',
+        name: 'Mia Holm',
         role: 'admin',
         sites: {},
         password: 'password1234',
@@ -98,6 +98,7 @@ const main = async (): Promise<void> => {
         await db
             .update(user)
             .set({
+                name: person.name,
                 role: person.role,
                 sites: JSON.stringify(person.sites),
             })
