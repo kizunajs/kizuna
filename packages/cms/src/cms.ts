@@ -50,10 +50,10 @@ import {
     DocumentStore,
     SOURCE_LOCALE,
     VersionConflictError,
-    type DocumentKind,
     DocumentHeldError,
     holderOf,
     type CmsDatabase,
+    type DocumentKind,
     type DocumentRow,
     type EditingCondition,
     type ListField,
@@ -106,6 +106,10 @@ const migrationOf = (definition: ContentDefinition): Migration => ({
 export interface MediaUse {
     ref: string;
     /**
+     * The site the document belongs to. Left out for shared content.
+     */
+    site?: string;
+    /**
      * An item's title, or the page's or global's `label`. `null` when it has
      * neither, so the reader writes out its name.
      */
@@ -115,14 +119,14 @@ export interface MediaUse {
      * image is the same in every language.
      */
     locales: string[];
-     */
-    published: boolean;
-}
-
     fieldPaths: string[];
     /**
      * Whether the published content shows it. False when only the draft holds
      * it.
+     */
+    published: boolean;
+}
+
 /**
  * Published content that fails its schema, for the content overview and
  * `kizuna cms check`.
@@ -196,15 +200,15 @@ const parseIfMatch = (header: string | string[] | undefined): { version: number;
 };
 
 /**
- * How long an editor's autosaves keep folding into the version they started.
- */
-const FOLD_WINDOW = 10 * 60 * 1000;
-/**
  * How long a document stays held after its holder last saved it. One person
  * edits a document at a time, and anyone else's write is refused until then.
  */
 export const HOLD_IDLE_MS = 2 * 60 * 1000;
 
+/**
+ * How long an editor's autosaves keep folding into the version they started.
+ */
+const FOLD_WINDOW = 10 * 60 * 1000;
 
 /**
  * The schema of the object holding the last segment of a dotted path, read
@@ -455,18 +459,6 @@ export interface DraftState {
     complete: boolean;
     missing: string[];
     etag: string;
-}
-
-/**
- * Storage for a production app with no bucket: it builds and serves pages, and
- * refuses the first upload.
- */
-const unconfiguredMediaStorage = (): MediaStorage => {
-    const refuse = (): never => {
-        throw new Error('Media needs a bucket: set CMS_S3_BUCKET, or pass `media.bucket` or `media.storage` to cms().');
-    };
-    return {
-        presignUpload: async () => refuse(),
     /**
      * Who edits the document now, the only one whose writes it takes.
      */
@@ -489,6 +481,18 @@ export interface DraftSchedule {
         name: string;
     } | null;
     by: string;
+}
+
+/**
+ * Storage for a production app with no bucket: it builds and serves pages, and
+ * refuses the first upload.
+ */
+const unconfiguredMediaStorage = (): MediaStorage => {
+    const refuse = (): never => {
+        throw new Error('Media needs a bucket: set CMS_S3_BUCKET, or pass `media.bucket` or `media.storage` to cms().');
+    };
+    return {
+        presignUpload: async () => refuse(),
         head: async () => refuse(),
         get: async () => refuse(),
         put: async () => refuse(),
@@ -522,6 +526,10 @@ const mediaStorageFrom = (options: ResolvedCmsOptions['media']): MediaStorage =>
 export class CmsService {
     readonly store: DocumentStore;
     /**
+     * The scheduled publishes and the releases.
+     */
+    readonly schedules: ScheduleStore;
+    /**
      * Tells the draft preview, on every server instance, when a draft is saved.
      */
     readonly notices: DraftNotices;
@@ -537,10 +545,6 @@ export class CmsService {
     /**
      * The shared globals.
      */
-    /**
-     * The scheduled publishes and the releases.
-     */
-    readonly schedules: ScheduleStore;
     readonly globals: Record<string, Global>;
     /**
      * The shared collections.
@@ -572,6 +576,7 @@ export class CmsService {
         private readonly api: PluginApi
     ) {
         this.store = new DocumentStore(options.db);
+        this.schedules = new ScheduleStore(options.db);
         this.notices = new DraftNotices(options.db);
         this.sites = Object.fromEntries(Object.entries(sitesOf(options)).map(([site, declared]) => [site, declared.pages]));
         this.pages = this.sites[DEFAULT_SITE] ?? {};
@@ -582,7 +587,6 @@ export class CmsService {
             siteEntries.map(([site, entry]) => [
                 site,
                 Object.fromEntries((entry.globals ?? []).map((definition) => [definition.name, definition])),
-        this.schedules = new ScheduleStore(options.db);
             ])
         );
         this.siteCollections = Object.fromEntries(
@@ -1132,10 +1136,6 @@ export class CmsService {
         return access.publishesShared || this.target(ref).site !== DEFAULT_SITE;
     }
 
-    statusOf(row: DocumentRow | undefined, version: number): PageStatus {
-        if (row === undefined || (row.draft === null && row.published === null)) return 'empty';
-        if (row.published === null) return 'draft';
-        return row.publishedVersion === version ? 'published' : 'changed';
     /**
      * Where a document stands. A draft that holds what is published, like
      * one reverted back to it, reads as published.
@@ -1276,6 +1276,9 @@ export class CmsService {
             : resolved;
     }
 
+    private passes(target: Target, content: Record<string, unknown> | null): Record<string, unknown> | undefined {
+        if (content === null) return undefined;
+        const parsed = target.definition.schema.safeParse(content);
         return parsed.success ? (parsed.data as Record<string, unknown>) : undefined;
     }
 
@@ -1715,23 +1718,6 @@ export class CmsService {
     }
 
     /**
-     * The shared globals, or with a site, its own, each with its status.
-     */
-    async globalSummaries(
-        site = DEFAULT_SITE
-    ): Promise<
-        Array<{ name: string; label: string | null; group: string | null; status: PageStatus; version: number; updatedAt: string | null }>
-    > {
-        const summaries = [];
-        const globals = site === DEFAULT_SITE ? this.globals : this.siteGlobals[site];
-        if (globals === undefined) throw new CmsHttpError(404, { detail: `There is no site named '${site}'.` });
-        for (const [name, definition] of Object.entries(globals)) {
-            const state = await this.draftState({
-                type: 'global',
-                name,
-                ...(site === DEFAULT_SITE
-                    ? {}
-    /**
      * Every route that shows a collection, one item per address, with the
      * collection it shows.
      */
@@ -1753,6 +1739,23 @@ export class CmsService {
         );
     }
 
+    /**
+     * The shared globals, or with a site, its own, each with its status.
+     */
+    async globalSummaries(
+        site = DEFAULT_SITE
+    ): Promise<
+        Array<{ name: string; label: string | null; group: string | null; status: PageStatus; version: number; updatedAt: string | null }>
+    > {
+        const summaries = [];
+        const globals = site === DEFAULT_SITE ? this.globals : this.siteGlobals[site];
+        if (globals === undefined) throw new CmsHttpError(404, { detail: `There is no site named '${site}'.` });
+        for (const [name, definition] of Object.entries(globals)) {
+            const state = await this.draftState({
+                type: 'global',
+                name,
+                ...(site === DEFAULT_SITE
+                    ? {}
                     : {
                           site,
                       }),
@@ -1873,8 +1876,10 @@ export class CmsService {
                       cursor: query.cursor,
                   }),
         });
+        const hidden = query.draft ? undefined : await this.underUnpublished(listing);
         const items = [];
         for (const row of result.rows) {
+            if (hidden?.has(row.key.slice(listing.keyPrefix.length)) === true) continue;
             const target = this.target(listing.refOf(row.key.slice(listing.keyPrefix.length)));
             const migrated = this.migrated(target, row)!;
             const content =
@@ -1890,7 +1895,6 @@ export class CmsService {
                             content: source,
                         };
                     }
-        const hidden = query.draft ? undefined : await this.underUnpublished(listing);
                     const translated =
                         (query.draft ? (await this.draft(copy))?.content : undefined) ?? (await this.published(copy))?.content;
                     return translated === undefined
@@ -2034,12 +2038,12 @@ export class CmsService {
                 status: this.statusOf(row, stored.latestVersion),
                 complete: missingFields(definition, row.draft).length === 0 && row.draft !== null,
                 updatedAt: row.updatedAt.toISOString(),
+                updatedBy: row.updatedBy,
                 ...(definition.orderable === true && placeIn(content) !== undefined
                     ? {
                           place: placeIn(content),
                       }
                     : {}),
-                updatedBy: row.updatedBy,
                 ...(placement === undefined
                     ? definition.tree === undefined
                         ? {}
@@ -2076,9 +2080,15 @@ export class CmsService {
      * How the editing list sorts by a field, which must be an index.
      */
     private sortIndexOf(listing: Listing, field: string): ListField {
+        if (field === 'order' && listing.definition.orderable === true) {
+            return {
+                field: PLACE,
+                type: 'text',
+            };
+        }
         if (!listing.indexes.includes(field)) {
             throw new CmsHttpError(400, {
-                detail: `The list of ${listing.name} cannot sort by '${field}'. It sorts by ${['title', 'status', 'updatedAt', ...listing.indexes].join(', ')}.`,
+                detail: `The list of ${listing.name} cannot sort by '${field}'. It sorts by ${['title', 'status', 'updatedAt', ...(listing.definition.orderable === true ? ['order'] : []), ...listing.indexes].join(', ')}.`,
             });
         }
         return this.indexOf(listing, field);
@@ -2285,6 +2295,11 @@ export class CmsService {
         const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
         const id = Array.from(randomBytes(12), (byte) => alphabet[byte % alphabet.length]).join('');
         const ref = listing.refOf(id);
+        // A new item goes last.
+        const place =
+            listing.definition.orderable === true
+                ? keyBetween((await this.placedItems(listing, true)).at(-1)?.place, undefined)
+                : undefined;
         if (Object.keys(values).length === 0) {
             await this.store.saveDraft({
                 kind: 'item',
@@ -2314,24 +2329,36 @@ export class CmsService {
                 ? {}
                 : {
                       access,
-        // A new item goes last.
-        const place =
-            listing.definition.orderable === true
-                ? keyBetween((await this.placedItems(listing, true)).at(-1)?.place, undefined)
-                : undefined;
                   }),
             author,
             summary: 'Created',
+            ...(place === undefined
+                ? {}
+                : {
+                      place,
+                  }),
         });
     }
 
+    /**
+     * Deletes an item, and in a tree everything under it.
+     */
     async deleteItem(name: string, id: string, site = DEFAULT_SITE): Promise<void> {
         const listing = this.listing(name, site);
-        const ref = listing.refOf(id);
-        const target = this.target(ref);
-        const sites = await this.sitesShowing(ref, ['published']);
-        if (!(await this.store.delete('item', target.key, target.site))) {
-            throw new CmsHttpError(404, { detail: `There is no item '${id}' in '${listing.name}'.` });
+        const under =
+            listing.definition.tree === undefined
+                ? []
+                : [...descendantsOf(await loadParents(this, listing, 'latest'), id)].filter((each) => each !== id);
+        for (const each of [id, ...under]) {
+            const ref = listing.refOf(each);
+            const target = this.target(ref);
+            const sites = await this.sitesShowing(ref, ['published']);
+            if (!(await this.store.delete('item', target.key, target.site))) {
+                if (each !== id) continue;
+                throw new CmsHttpError(404, { detail: `There is no item '${id}' in '${listing.name}'.` });
+            }
+            await this.revalidateDocument(ref, sites);
+            await queueRefreshes(this, ref, sites);
         }
     }
 
@@ -2424,33 +2451,6 @@ export class CmsService {
     }
 
     /**
-     * Moves an item of an orderable collection or a tree: beside another
-     * item, as its sibling, first or last among its siblings, or under
-     * another parent. The move saves to the item's draft, like any change.
-     */
-    async placeItem(input: {
-        name: string;
-        id: string;
-        site?: string;
-        place: {
-            after?: string | undefined;
-            before?: string | undefined;
-            at?: 'first' | 'last' | undefined;
-            parent?: string | null | undefined;
-        };
-        caller: Caller;
-        author: string;
-    }): Promise<DraftState> {
-        const listing = this.listing(input.name, input.site ?? DEFAULT_SITE);
-        const { orderable, tree } = listing.definition;
-        const { after, before, at } = input.place;
-        const named = [after, before, at].filter((value) => value !== undefined).length;
-        if (orderable !== true && tree === undefined) {
-            throw new CmsHttpError(400, {
-                detail: `${listing.name} has no order and no tree, so its items have no place to move to.`,
-            });
-        }
-    /**
      * Where a move puts an item, against where it is live, in words, like
      * "After Hagen London" and "After Hagen Oslo", or `undefined` while its
      * draft keeps its live place. For the Changes tab, which lists a move as
@@ -2522,6 +2522,33 @@ export class CmsService {
               };
     }
 
+    /**
+     * Moves an item of an orderable collection or a tree: beside another
+     * item, as its sibling, first or last among its siblings, or under
+     * another parent. The move saves to the item's draft, like any change.
+     */
+    async placeItem(input: {
+        name: string;
+        id: string;
+        site?: string;
+        place: {
+            after?: string | undefined;
+            before?: string | undefined;
+            at?: 'first' | 'last' | undefined;
+            parent?: string | null | undefined;
+        };
+        caller: Caller;
+        author: string;
+    }): Promise<DraftState> {
+        const listing = this.listing(input.name, input.site ?? DEFAULT_SITE);
+        const { orderable, tree } = listing.definition;
+        const { after, before, at } = input.place;
+        const named = [after, before, at].filter((value) => value !== undefined).length;
+        if (orderable !== true && tree === undefined) {
+            throw new CmsHttpError(400, {
+                detail: `${listing.name} has no order and no tree, so its items have no place to move to.`,
+            });
+        }
         if (named > 1) throw new CmsHttpError(400, { detail: 'Name one of after, before and at.' });
         if (orderable !== true && named > 0) {
             throw new CmsHttpError(400, {
@@ -2609,11 +2636,6 @@ export class CmsService {
         try {
             routes = this.api.routes;
         } catch {
-            ...(place === undefined
-                ? {}
-                : {
-                      place,
-                  }),
             return undefined;
         }
         const found = flattenRoutes(routes as never).find(
@@ -3023,6 +3045,18 @@ export class CmsService {
         summary?: string;
         ifMatch?: string | string[];
         autosave?: boolean;
+        /**
+         * Whether a person or an agent is editing, so the author holds the
+         * document after saving and a document someone else holds is
+         * refused. The editing routes pass `true`. The app's own writes, like
+         * a seed, a migration or a scheduled publish, leave it out.
+         */
+        hold?: boolean;
+        /**
+         * A new place for an item of an orderable collection. Without it the
+         * item keeps the place it has.
+         */
+        place?: string;
     }): Promise<DraftState> {
         const expected = parseIfMatch(input.ifMatch);
         const target = this.target(input.ref);
@@ -3059,11 +3093,6 @@ export class CmsService {
                 throw new CmsHttpError(422, {
                     detail: `'${formatRef(input.ref)}' has no field at '${path}'.`,
                     errors: [
-        /**
-         * A new place for an item of an orderable collection. Without it the
-         * item keeps the place it has.
-         */
-        place?: string;
                         {
                             code: 'unrecognized_keys',
                             path: path.split('.'),
@@ -3112,18 +3141,6 @@ export class CmsService {
         }
         await this.assertMediaOnSite(target, stored);
         const listing = this.listingOf(input.ref);
-        /**
-         * Whether a person or an agent is editing, so the author holds the
-         * document after saving and a document someone else holds is
-         * refused. The editing routes pass `true`. The app's own writes, like
-         * a seed, a migration or a scheduled publish, leave it out.
-         */
-        hold?: boolean;
-        /**
-         * A new place for an item of an orderable collection. Without it the
-         * item keeps the place it has.
-         */
-        place?: string;
         if (listing !== undefined && paths.some((path) => listing.pathFields.includes(path.split('.')[0]!))) {
             await this.assertFreeAddress(listing, target.key, stored);
         }
@@ -3313,44 +3330,6 @@ export class CmsService {
         await this.assertNoLoop(ref, state.row?.draft, 'published');
         const sites = await this.sitesShowing(ref, ['published', 'draft']);
         await this.store.publish(state.target.kind, state.target.key, author, state.target.site, state.target.locale);
-        await this.revalidateDocument(ref, sites);
-        await queueRefreshes(this, ref, sites);
-        return this.draftState(ref);
-    }
-
-    /**
-     * Withdraws the published copy and drops the same cached reads publishing
-     * does. The draft and every version stay.
-     */
-    async unpublish(ref: DocumentRef, author: string): Promise<DraftState> {
-        const { target, row } = await this.document(ref);
-        if (row === undefined && ref.type === 'item') {
-            throw new CmsHttpError(404, {
-                detail: `There is no item '${ref.id}' in '${ref.collection}'.`,
-            });
-        }
-        const sites = await this.sitesShowing(ref, ['published']);
-        if ((await this.store.unpublish(target.kind, target.key, author, target.site, target.locale)) === undefined) {
-            throw new CmsHttpError(409, {
-                detail: `'${formatRef(ref)}' is not published.`,
-            });
-        }
-        await this.revalidateDocument(ref, sites);
-        await queueRefreshes(this, ref, sites);
-        return this.draftState(ref);
-    }
-
-    /**
-     * An earlier version's content, migrated to the current schema.
-     */
-    async versionContent(
-        ref: DocumentRef,
-        version: number
-    ): Promise<{ content: Record<string, unknown>; summary: string | null; createdAt: Date; createdBy: string }> {
-        const { target, row } = await this.document(ref);
-        if (row === undefined) throw new CmsHttpError(404, { detail: `'${formatRef(ref)}' has no versions.` });
-        const found = await this.store.version(row.id, version);
-        if (found === undefined) throw new CmsHttpError(404, { detail: `'${formatRef(ref)}' has no version ${version}.` });
         if (state.row !== undefined) await this.schedules.endFor(state.row.id);
         await this.revalidateDocument(ref, sites);
         await queueRefreshes(this, ref, sites);
@@ -3406,6 +3385,23 @@ export class CmsService {
         await this.assertNoLoop(ref, state.row?.draft, 'published');
         const sites = await this.sitesShowing(ref, ['published', 'draft']);
         const outcome = await this.store.approveAndPublish(
+            state.target.kind,
+            state.target.key,
+            approval,
+            state.target.site,
+            state.target.locale
+        );
+        if (outcome === 'answered') {
+            throw new CmsHttpError(409, {
+                detail: `The review of '${formatRef(ref)}' was already answered.`,
+            });
+        }
+        if (outcome === 'changed') {
+            throw new CmsHttpError(409, {
+                detail: `The draft of '${formatRef(ref)}' changed since you opened it. Look at the changes again.`,
+            });
+        }
+        if (state.row !== undefined) await this.schedules.endFor(state.row.id);
         await this.revalidateDocument(ref, sites);
         await queueRefreshes(this, ref, sites);
         return this.draftState(ref);
@@ -3445,23 +3441,6 @@ export class CmsService {
         if (row === undefined) throw new CmsHttpError(404, { detail: `'${formatRef(ref)}' has no versions.` });
         const found = await this.store.version(row.id, version);
         if (found === undefined) throw new CmsHttpError(404, { detail: `'${formatRef(ref)}' has no version ${version}.` });
-            state.target.kind,
-            state.target.key,
-            approval,
-            state.target.site,
-            state.target.locale
-        );
-        if (outcome === 'answered') {
-            throw new CmsHttpError(409, {
-                detail: `The review of '${formatRef(ref)}' was already answered.`,
-            });
-        }
-        if (outcome === 'changed') {
-            throw new CmsHttpError(409, {
-                detail: `The draft of '${formatRef(ref)}' changed since you opened it. Look at the changes again.`,
-            });
-        }
-        if (state.row !== undefined) await this.schedules.endFor(state.row.id);
         return {
             content: migrateContent(target.definition, found.data, found.migrationVersion),
             summary: found.summary,
@@ -3616,8 +3595,6 @@ export class CmsService {
     }
 
     /**
-     * Refreshes every page that shows an image, once its own alt text or
-    /**
      * Rebuilds the refs index of every stored document from its draft and its
      * published content, for a database indexed before images were. Answers
      * how many documents it went through.
@@ -3635,6 +3612,8 @@ export class CmsService {
         return documents.length;
     }
 
+    /**
+     * Refreshes every page that shows an image, once its own alt text or
      * focal point changed or it was deleted.
      */
     async revalidateMedia(uses: readonly MediaUse[]): Promise<void> {
@@ -3665,42 +3644,28 @@ export class CmsService {
                   };
         if (row.kind === 'page') {
             const entry = this.sites[row.site]?.[row.key];
-            if (entry === undefined || servesCollection(entry.page)) continue;
-            found.push({
-                target: this.target({
-                    type: 'page',
-                    name: row.key,
-                    ...(row.site === DEFAULT_SITE
-                        ? {}
-                        : {
-                              site: row.site,
-                          }),
-                }),
-                row,
+            if (entry === undefined || servesCollection(entry.page)) return undefined;
+            return this.target({
+                type: 'page',
+                name: row.key,
+                ...site,
             });
         }
-        for (const row of await this.store.list('global')) {
+        if (row.kind === 'global') {
             const declared = row.site === DEFAULT_SITE ? this.globals[row.key] : this.siteGlobals[row.site]?.[row.key];
-            if (declared === undefined) continue;
-            found.push({
+            if (declared === undefined) return undefined;
+            return this.target({
+                type: 'global',
+                name: row.key,
+                ...site,
+            });
+        }
         if (row.kind !== 'item') return undefined;
         const listing = listings.find((candidate) => candidate.site === row.site && row.key.startsWith(candidate.keyPrefix));
         return listing === undefined ? undefined : this.target(listing.refOf(row.key.slice(listing.keyPrefix.length)));
     }
 
     async declaredDocuments(): Promise<Array<{ target: Target; row: DocumentRow }>> {
-                target: this.target({
-                    type: 'global',
-                    name: row.key,
-                    ...(row.site === DEFAULT_SITE
-                        ? {}
-                        : {
-                              site: row.site,
-                          }),
-                }),
-                row,
-            });
-        }
         const listings = this.listings();
         const found: Array<{ target: Target; row: DocumentRow }> = [];
         const kinds: DocumentKind[] = ['page', 'global', 'item'];
@@ -3869,14 +3834,6 @@ export class CmsService {
      * The sites that read a document: its own site, or for shared content,
      * every site.
      */
-    /**
-     * When a preview token runs out, or `undefined` when it already has or
-     * does not verify.
-     */
-    previewExpiry(token: string): number | undefined {
-        return previewTokenExpiry(previewSecret(this.options.previewSecret), token);
-    }
-
     private readersOf(ref: DocumentRef): string[] {
         if (ref.site !== undefined && ref.site !== DEFAULT_SITE) return [ref.site];
         if (ref.type === 'page') return [DEFAULT_SITE];
@@ -3910,6 +3867,14 @@ export class CmsService {
      */
     verifiesPreview(token: string): boolean {
         return verifyPreviewToken(previewSecret(this.options.previewSecret), token);
+    }
+
+    /**
+     * When a preview token runs out, or `undefined` when it already has or
+     * does not verify.
+     */
+    previewExpiry(token: string): number | undefined {
+        return previewTokenExpiry(previewSecret(this.options.previewSecret), token);
     }
 
     /**

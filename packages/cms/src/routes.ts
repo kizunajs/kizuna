@@ -74,6 +74,7 @@ import { invalidate as invalidateDocument, refreshTargets } from './refresh.js';
 import { REFRESH_SIGNATURE_HEADER } from './preview-token.js';
 import { sameContent } from './same-content.js';
 import {
+    approveAndPublishReview as approveAndPublish,
     assertReviewed,
     commentOnReview,
     decideReviews,
@@ -85,7 +86,6 @@ import {
     requestReviews,
     resolveComment,
     reviewOf,
-    approveAndPublishReview as approveAndPublish,
     setOwner,
     versionReviewsOf,
     waitingReviews,
@@ -98,6 +98,8 @@ import type { Person } from './options.js';
 import { collectionActionRoutes, itemActions } from './action-routes.js';
 import { listViewsRoute, viewRoutes } from './view-routes.js';
 import { dashboardRoute } from './dashboard-routes.js';
+import { scheduleRoutes } from './schedule-routes.js';
+import { cancelSchedule, scheduleDocument } from './schedules.js';
 import { TranslateBodySchema, TranslatedDraftSchema, translateDraft } from './translate-draft.js';
 import type { EditorAccess } from './site-access.js';
 
@@ -106,8 +108,6 @@ interface Args {
     query: Record<string, unknown> | undefined;
     body: unknown;
     headers: Record<string, string | string[] | undefined>;
-import { scheduleRoutes } from './schedule-routes.js';
-import { cancelSchedule, scheduleDocument } from './schedules.js';
     throwError: (response: { status: number; body: unknown; headers?: Record<string, string> }) => never;
     plugins?: Record<string, unknown>;
     auth?: Record<string, Record<string, unknown>>;
@@ -129,14 +129,6 @@ const promptFor = (ref: DocumentRef): string => {
     return `Fill in this ${words(ref.collection)} item.`;
 };
 
-const draftBody = (state: DraftState) => ({
-    ref: formatRef(state.target.ref),
-    name: nameOf(state.target.ref),
-    path: addressOf(state.target, state.row?.draft ?? state.row?.published) ?? null,
-    status: state.status,
-    version: state.version,
-    publishedVersion: state.row?.publishedVersion ?? null,
-    content: state.row?.draft ?? null,
 /**
  * A document's pending schedule, as the draft answers carry it.
  */
@@ -150,6 +142,14 @@ const scheduleBody = (state: DraftState) =>
               by: state.schedule.by,
           };
 
+const draftBody = (state: DraftState) => ({
+    ref: formatRef(state.target.ref),
+    name: nameOf(state.target.ref),
+    path: addressOf(state.target, state.row?.draft ?? state.row?.published) ?? null,
+    status: state.status,
+    version: state.version,
+    publishedVersion: state.row?.publishedVersion ?? null,
+    content: state.row?.draft ?? null,
     complete: state.complete,
     missing: state.missing,
     updatedAt: state.row?.updatedAt.toISOString() ?? null,
@@ -244,6 +244,17 @@ const draftChanges = async (cms: CmsService, ref: DocumentRef, access: EditorAcc
                 writable: changed.writable,
             });
         }
+    }
+    // A move changes no field, so it is a change of its own, which only the place route undoes.
+    const moved = await cms.placeChange(ref);
+    if (moved !== undefined) {
+        changes.push({
+            path: PLACE,
+            label: 'Place',
+            before: moved.before,
+            after: moved.after,
+            writable: false,
+        });
     }
     return {
         ref: formatRef(ref),
@@ -459,7 +470,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         },
                     });
                 }
-                throw error;
                 if (error instanceof FolderConflictError || error instanceof FolderNotFoundError) {
                     return args.throwError({
                         status: error instanceof FolderConflictError ? 409 : 404,
@@ -468,6 +478,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         },
                     });
                 }
+                throw error;
             }
         };
 
@@ -585,6 +596,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         summary: body.summary,
                         ifMatch: args.headers['if-match'],
                         autosave: body.autosave,
+                        hold: true,
                     });
                     return {
                         status: 200,
@@ -596,7 +608,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 }) as never
             ),
 
-                        hold: true,
             keepSource: route({
                 method: 'POST',
                 path: `${editingBase}${scope.prefix}/keep`,
@@ -887,6 +898,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         access,
                         author: authorOf(cms, args),
                         summary: paths.length === 1 ? `Reverted ${paths[0]}` : `Reverted ${paths.length} changes`,
+                        hold: true,
                     });
                     return {
                         status: 200,
@@ -898,7 +910,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             publish: route({
                 method: 'POST',
                 path: `${editingBase}${scope.prefix}/publish`,
-                        hold: true,
                 auth: editor,
                 summary: `Publish the draft of ${scope.noun}`,
                 description:
@@ -922,6 +933,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     const body = args.body as z.output<typeof PublishBodySchema>;
                     const access = cms.access(args.auth);
                     assertPublishes(cms, access, ref);
+                    await cms.assertNotHeld(ref, authorOf(cms, args));
                     const state = await cms.draftState(ref);
                     const past = await assertReviewed(cms, state, {
                         force: body?.force === true,
@@ -933,7 +945,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         status: 200,
                         body: draftBody(published),
                     };
-                    await cms.assertNotHeld(ref, authorOf(cms, args));
                 }) as never
             ),
 
@@ -961,6 +972,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 guarded(async (cms, args) => {
                     const ref = refOf(cms, args);
                     assertPublishes(cms, cms.access(args.auth), ref);
+                    await cms.assertNotHeld(ref, authorOf(cms, args));
                     return {
                         status: 200,
                         body: draftBody(await cms.unpublish(ref, authorOf(cms, args))),
@@ -972,7 +984,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 method: 'PUT',
                 path: `${editingBase}${scope.prefix}/schedule`,
                 auth: editor,
-                    await cms.assertNotHeld(ref, authorOf(cms, args));
                 summary: `Schedule ${scope.noun} to publish or unpublish at a time`,
                 description:
                     'Publishes the draft as it stands when the time comes, or unpublishes it, and replaces a time set before. When the time comes the same rules hold as for publishing: a draft missing a field, waiting for a required review, or being edited waits until that clears. The person confirms before this runs.',
@@ -1093,7 +1104,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         await cms.rollback(
                             refOf(cms, args),
                             (args.body as z.output<typeof RollbackBodySchema>).version,
-                            authorOf(cms, args)
+                            authorOf(cms, args),
+                            true
                         )
                     ),
                 })) as never
@@ -1616,7 +1628,9 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 orderBy: z
                     .string()
                     .optional()
-                    .describe("`title`, `status`, `updatedAt` or a field of the collection's indexes. `title` when left out."),
+                    .describe(
+                        "`title`, `status`, `updatedAt`, `order` for a collection with an order, or a field of the collection's indexes. `order` when left out for a collection with one, otherwise `title`."
+                    ),
                 direction: z.enum(['asc', 'desc']).optional().describe('Ascending when left out, newest first for `updatedAt`.'),
                 limit: z.int().min(1).max(200).optional().describe('How many items a page holds. Without it, every item that matches.'),
                 offset: z.int().min(0).optional().describe('How many matching items to skip, for the pages after the first.'),
@@ -1730,7 +1744,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             path: `${editingBase}${at.prefix}/collections/:name/items/:id`,
             auth: editor,
             summary: 'Delete an item of a collection, with its history',
-            description: 'Its address stops answering, and pages that reference it stop showing it. The person confirms before this runs.',
+            description:
+                'Its address stops answering, and pages that reference it stop showing it. In a collection with a tree, every item under it goes too. The person confirms before this runs.',
             tool: {
                 needsApproval: true,
             },
@@ -1753,11 +1768,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 };
             }) as never
         ),
-    });
-
-    const siteGlobalScope: Scope = {
-        prefix: '/sites/:site/globals/:name',
-        params: z.object({
 
         placeItem: route({
             method: 'PUT',
@@ -1786,6 +1796,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             guarded(async (cms, args) => {
                 const site = siteOf(cms, args, at);
                 const ref = cms.listing(args.params['name']!, site).refOf(args.params['id']!);
+                // A drag in a list does not take the item from someone editing it, nor make the mover its holder.
+                await cms.assertNotHeld(ref, authorOf(cms, args));
                 const state = await cms.placeItem({
                     name: args.params['name']!,
                     id: args.params['id']!,
@@ -1796,8 +1808,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 });
                 return {
                     status: 200,
-                // A drag in a list does not take the item from someone editing it, nor make the mover its holder.
-                await cms.assertNotHeld(ref, authorOf(cms, args));
                     body: draftBody(state),
                     headers: {
                         etag: state.etag,
@@ -1805,6 +1815,11 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 };
             }) as never
         ),
+    });
+
+    const siteGlobalScope: Scope = {
+        prefix: '/sites/:site/globals/:name',
+        params: z.object({
             site: z.string(),
             name: z.string(),
         }),
@@ -2065,6 +2080,18 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 const parsed = parseRef(ref);
                 if (parsed !== undefined) access.assertSeesRef(parsed);
             }
+            const reviews = await requestReviews(cms, {
+                access,
+                refs: body.refs,
+                reviewers: body.reviewers,
+                note: body.note ?? null,
+                by: authorOf(cms, args),
+            });
+            // Asking for a review is done editing, so the reviewer finds the pages free.
+            for (const ref of body.refs) {
+                const parsed = parseRef(ref);
+                if (parsed !== undefined) await cms.releaseHold(cms.canonical(parsed), authorOf(cms, args));
+            }
             return {
                 status: 201,
                 body: {
@@ -2107,6 +2134,43 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         roleOn: (ref) => access.callerFor(ref).role,
                     }),
                 },
+            };
+        }) as never
+    );
+
+    const approveAndPublishReview = route({
+        method: 'POST',
+        path: `${editingBase}/reviews/:id/approve-and-publish`,
+        auth: editor,
+        summary: 'Approve a review and publish its draft in one step',
+        description:
+            'The approval and the publish happen together, or neither does. It is refused when the person may not publish the document, when the review was already answered, and when the draft changed since they looked. The person confirms first: in a host that cannot ask, such as Claude, they answer in the editor instead.',
+        tool: {
+            needsApproval: true,
+            destructiveHint: false,
+        },
+        pathParams: z.object({
+            id: z.string(),
+        }),
+        responses: {
+            200: DraftPageSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const access = await seenReviews(cms, args, [args.params['id']!]);
+            return {
+                status: 200,
+                body: draftBody(
+                    await approveAndPublish(cms, {
+                        id: args.params['id']!,
+                        by: authorOf(cms, args),
+                        roleOn: (ref) => access.callerFor(ref).role,
+                        mayPublish: (ref) => cms.mayPublish(access, ref),
+                    })
+                ),
             };
         }) as never
     );
@@ -2218,18 +2282,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         auth: editor,
         summary: 'Resolve a comment on a review once it is dealt with',
         description: 'The comment folds away under its field. Anyone taking part in the review may resolve it.',
-            const reviews = await requestReviews(cms, {
-                access,
-                refs: body.refs,
-                reviewers: body.reviewers,
-                note: body.note ?? null,
-                by: authorOf(cms, args),
-            });
-            // Asking for a review is done editing, so the reviewer finds the pages free.
-            for (const ref of body.refs) {
-                const parsed = parseRef(ref);
-                if (parsed !== undefined) await cms.releaseHold(cms.canonical(parsed), authorOf(cms, args));
-            }
         tool: {
             destructiveHint: false,
             idempotentHint: true,
@@ -2281,43 +2333,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         }),
         responses: {
             200: DescribedPageSchema,
-    const approveAndPublishReview = route({
-        method: 'POST',
-        path: `${editingBase}/reviews/:id/approve-and-publish`,
-        auth: editor,
-        summary: 'Approve a review and publish its draft in one step',
-        description:
-            'The approval and the publish happen together, or neither does. It is refused when the person may not publish the document, when the review was already answered, and when the draft changed since they looked. The person confirms first: in a host that cannot ask, such as Claude, they answer in the editor instead.',
-        tool: {
-            needsApproval: true,
-            destructiveHint: false,
-        },
-        pathParams: z.object({
-            id: z.string(),
-        }),
-        responses: {
-            200: DraftPageSchema,
-            403: ProblemDetailsSchema,
-            404: ProblemDetailsSchema,
-            409: ProblemDetailsSchema,
-        },
-    }).handler(
-        guarded(async (cms, args) => {
-            const access = await seenReviews(cms, args, [args.params['id']!]);
-            return {
-                status: 200,
-                body: draftBody(
-                    await approveAndPublish(cms, {
-                        id: args.params['id']!,
-                        by: authorOf(cms, args),
-                        roleOn: (ref) => access.callerFor(ref).role,
-                        mayPublish: (ref) => cms.mayPublish(access, ref),
-                    })
-                ),
-            };
-        }) as never
-    );
-
             400: ProblemDetailsSchema,
             404: ProblemDetailsSchema,
         },
@@ -2375,6 +2390,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     version: state.version,
                     complete: state.complete,
                     missing: state.missing,
+                    heldBy: state.heldBy,
+                    schedule: scheduleBody(state),
                     fields: cms.describe(ref, draft, caller, await sharedContentOf(cms, state), translation),
                     layout: cms.describeLayout(ref),
                     draft,
@@ -2395,8 +2412,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                                       : {
                                             translate: true,
                                         }),
-                    heldBy: state.heldBy,
-                    schedule: scheduleBody(state),
                               },
                           }),
                 },
@@ -2407,15 +2422,44 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         }) as never
     );
 
+    const releaseHold = route({
+        method: 'DELETE',
+        path: `${editingBase}/hold`,
+        auth: editor,
+        summary: 'Stop editing a document, so someone else may',
+        description:
+            'One person edits a document at a time: the first to save holds it until they stop, or for two minutes after their last save. Call this when you are done, so the next person need not wait. It changes nothing when you do not hold the document.',
+        query: z.object({
+            ref: z.string().describe('The document, as `describe` and every draft answer name it under `ref`.'),
+        }),
+        responses: {
+            204: z.void(),
+            400: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const query = args.query as { ref: string };
+            const ref = parseRef(query.ref);
+            if (ref === undefined) throw new CmsHttpError(400, { detail: `'${query.ref}' is not a ref.` });
+            await cms.releaseHold(cms.canonical(ref), authorOf(cms, args));
+            return {
+                status: 204,
+            };
+        }) as never
+    );
+
     const listPages = route({
         method: 'GET',
         path: `${editingBase}/pages`,
         auth: editor,
         summary: 'List every page with its status',
+        description:
+            'Each item of a collection a route shows is a page of its own, at its address. `collectionPages` lists those routes, like `/shops/[slug]`, with the collection each shows.',
         tool: true,
         responses: {
             200: z.object({
                 pages: z.array(PageSummarySchema),
+                collectionPages: z.array(CollectionPageSchema),
             }),
         },
     }).handler(
@@ -2425,6 +2469,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 status: 200,
                 body: {
                     pages: (await cms.summaries()).filter((page) => access.sees(page.site)),
+                    collectionPages: cms.collectionPages().filter((page) => access.sees(page.site)),
                 },
             };
         }) as never
@@ -2544,13 +2589,10 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 ),
             },
         })) as never
-        description:
-            'Each item of a collection a route shows is a page of its own, at its address. `collectionPages` lists those routes, like `/shops/[slug]`, with the collection each shows.',
     );
 
     // A single-site project has one library, so its media routes take no `site`.
     const mediaQuery =
-                collectionPages: z.array(CollectionPageSchema),
         siteEntries.length === 0
             ? {}
             : {
@@ -2560,7 +2602,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
               };
 
     /**
-                    collectionPages: cms.collectionPages().filter((page) => access.sees(page.site)),
      * A media item the editor may open: shared, or of a site they open.
      */
     const seenMedia = async (cms: CmsService, args: Args, id: string) => {
@@ -2608,56 +2649,30 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     }).handler(
         guarded(async (cms, args) => {
             const site = seenLibrary(cms, args);
-    const releaseHold = route({
-        method: 'DELETE',
-        path: `${editingBase}/hold`,
-        auth: editor,
-        summary: 'Stop editing a document, so someone else may',
-        description:
-            'One person edits a document at a time: the first to save holds it until they stop, or for two minutes after their last save. Call this when you are done, so the next person need not wait. It changes nothing when you do not hold the document.',
-        query: z.object({
-            ref: z.string().describe('The document, as `describe` and every draft answer name it under `ref`.'),
-        }),
-        responses: {
-            204: z.void(),
-            400: ProblemDetailsSchema,
-        },
-    }).handler(
-        guarded(async (cms, args) => {
-            const query = args.query as { ref: string };
-            const ref = parseRef(query.ref);
-            if (ref === undefined) throw new CmsHttpError(400, { detail: `'${query.ref}' is not a ref.` });
-            await cms.releaseHold(cms.canonical(ref), authorOf(cms, args));
-            return {
-                status: 204,
-            };
-        }) as never
-    );
-
             const uses = await cms.mediaUses();
+            const media = await cms.media.list(site);
             return {
                 status: 200,
                 body: {
                     media: media.map((record) => ({
                         ...withUrl(cms, record),
-            const media = await cms.media.list(site);
                         uses: uses.get(record.id)?.length ?? 0,
+                    })),
+                    folders: (await cms.media.folders(site)).map((folder) => ({
+                        ...folder,
+                        images: media.filter((record) => record.folder === folder.id).length,
                     })),
                     maxBytes: cms.media.maxBytes,
                 },
             };
         }) as never
     );
-                    folders: (await cms.media.folders(site)).map((folder) => ({
-                        ...folder,
-                        images: media.filter((record) => record.folder === folder.id).length,
-                    })),
 
     const mediaUses = route({
         method: 'GET',
         path: `${editingBase}/media/:id/uses`,
         auth: editor,
-        summary: 'List the pages, globals and items that hold an image, and the fields holding it',
+        summary: 'List the pages, globals and items that hold an image, with their site, languages and the fields holding it',
         tool: true,
         pathParams: z.object({
             id: z.string(),
@@ -2674,14 +2689,14 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             const id = args.params['id']!;
             await seenMedia(cms, args, id);
             const access = cms.access(args.auth);
+            const uses = (await cms.mediaUses([id])).get(id) ?? [];
+            const seen = uses.filter((use) => access.seesRef(use.ref));
             return {
                 status: 200,
                 body: {
                     id,
                     uses: seen,
                     elsewhere: uses.length - seen.length,
-            const uses = (await cms.mediaUses([id])).get(id) ?? [];
-            const seen = uses.filter((use) => access.seesRef(use.ref));
                 },
             };
         }) as never
@@ -2705,12 +2720,12 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             204: z.void(),
             403: ProblemDetailsSchema,
             404: ProblemDetailsSchema,
+            409: MediaHeldSchema,
         },
     }).handler(
         guarded(async (cms, args) => {
             const id = args.params['id']!;
             const record = await seenMedia(cms, args, id);
-            409: MediaHeldSchema,
             cms.assertOwnMedia(record, seenLibrary(cms, args));
             assertChangesMedia(cms, args, record);
             const uses = (await cms.mediaUses([id])).get(id) ?? [];
@@ -2892,6 +2907,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             uploadId: z.string(),
         }),
         ...mediaQuery,
+        body: CompleteUploadBodySchema,
         responses: {
             201: MediaSchema,
             404: ProblemDetailsSchema,
@@ -2908,12 +2924,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         }) as never
     );
 
-    const searchItems = route({
-        method: 'GET',
-        path: `${editingBase}/items/:brand`,
-        auth: editor,
-        summary: 'Find the ids a branded field may hold, by brand and an optional search term',
-        description:
     /**
      * Refuses a change to the shared library's folders or images from an
      * editor who is no admin over every site.
@@ -3095,6 +3105,12 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         }) as never
     );
 
+    const searchItems = route({
+        method: 'GET',
+        path: `${editingBase}/items/:brand`,
+        auth: editor,
+        summary: 'Find the ids a branded field may hold, by brand and an optional search term',
+        description:
             "A collection's brand lists its items, and a relationship's brand lists what its options answer. Each result has the id to store and a label to show.",
         tool: true,
         pathParams: z.object({
@@ -3246,6 +3262,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         },
         editing: {
             describe,
+            releaseHold,
             pages: {
                 list: listPages,
                 ...editingRoutes(pageScope),
@@ -3282,6 +3299,10 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 delete: deleteMedia,
                 createUpload,
                 completeUpload,
+                move: moveMedia,
+                createFolder,
+                updateFolder,
+                deleteFolder,
             },
             actions: collectionActionRoutes({
                 collections: options.collections ?? [],
@@ -3289,10 +3310,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 editingBase,
                 guarded,
             }),
-                move: moveMedia,
-                createFolder,
-                updateFolder,
-                deleteFolder,
             ...((options.views ?? []).length === 0
                 ? {}
                 : {
@@ -3341,21 +3358,20 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 list: listReviews,
                 request: requestReview,
                 decide: decideReview,
+                approveAndPublish: approveAndPublishReview,
                 withdraw: withdrawReview,
                 reopen: reopenReview,
                 comment: commentReview,
                 resolveComment: resolveReviewComment,
             },
+            ...scheduleRoutes({
+                editor,
+                editingBase,
+                guarded,
+            }),
         },
         invalidate,
     };
 };
 
 export type CmsRoutes = ReturnType<typeof cmsRoutes>;
-            releaseHold,
-                approveAndPublish: approveAndPublishReview,
-            ...scheduleRoutes({
-                editor,
-                editingBase,
-                guarded,
-            }),

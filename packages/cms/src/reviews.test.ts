@@ -655,9 +655,6 @@ describe('comments on a field', () => {
     });
 });
 
-describe('storage', () => {
-    it('reads a publish past a review recorded as an approval with a note as published past the review, and creates the tables again', async () => {
-        await draft('ada', 'investorRelationsPage', 'Results for Q3');
 describe('approving and publishing in one step', () => {
     const ask = async (page = 'investorRelationsPage') => {
         await draft('ada', page, 'Results for Q3');
@@ -740,6 +737,9 @@ describe('approving and publishing in one step', () => {
     });
 });
 
+describe('storage', () => {
+    it('reads a publish past a review recorded as an approval with a note as published past the review, and creates the tables again', async () => {
+        await draft('ada', 'investorRelationsPage', 'Results for Q3');
         await as('ada', request(app).post('/editing/reviews')).send({
             refs: ['page:investorRelationsPage'],
             reviewers: ['kari'],

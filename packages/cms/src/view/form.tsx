@@ -169,8 +169,8 @@ export function FieldForm({
     pointed,
     missing,
     aside,
-    below,
     before,
+    below,
     controlFor,
     readOnly,
     locales,
@@ -358,6 +358,11 @@ export function FieldForm({
         window.clearTimeout(timer.current);
         timer.current = window.setTimeout(() => void flush(), AUTOSAVE_DELAY);
     };
+    /**
+     * Whether a field is written in this translation's own language.
+     */
+    const translates = (field: DescribedField): boolean =>
+        locales !== undefined && locales.current !== locales.source && field.translated === true && field.parent === undefined;
     const errorFor = (path: string): string | undefined =>
         Object.entries(fieldErrors).find(([errorPath]) => errorPath === path || errorPath.startsWith(`${path}.`))?.[1];
 
@@ -369,11 +374,6 @@ export function FieldForm({
             value: valueOf(field.path),
             onChange: (value) => change(field.path, value),
             disabled: !writable,
-    /**
-     * Whether a field is written in this translation's own language.
-     */
-    const translates = (field: DescribedField): boolean =>
-        locales !== undefined && locales.current !== locales.source && field.translated === true && field.parent === undefined;
         });
         return (
             <>
@@ -462,7 +462,8 @@ export function FieldForm({
 
     /**
      * In a translation with `showSource`, the source's text under a
-     * translated field. A field still empty offers Translate.
+     * translated field, with Translate, which drafts the field again even
+     * when it holds a translation.
      */
     const sourceLine = (field: DescribedField): ReactNode => {
         if (showSource !== true || locales === undefined || !translates(field)) return null;
@@ -471,13 +472,13 @@ export function FieldForm({
                 ? field.sourceValue
                 : (richTextOf(field.sourceValue) ?? readOnlyTextOf(field.schema, field.sourceValue, field.options));
         if (text === undefined || text === '') return null;
-        const own = valueOf(field.path);
-        const empty = own === undefined || own === null || own === '' || (Array.isArray(own) && own.length === 0);
         return (
             <p className="k-source">
                 <span className="k-source__code">{locales.source.toUpperCase()}</span>
-                <span className="k-source__text">{text}</span>
-                {onTranslate === undefined || !field.writable || !empty ? null : (
+                <span className="k-source__text" lang={locales.source}>
+                    {text}
+                </span>
+                {onTranslate === undefined || !field.writable ? null : (
                     <button
                         type="button"
                         className="k-text-button k-source__translate"
@@ -647,10 +648,10 @@ export function FieldForm({
         <div className="k-form">
             <div className="k-form__columns" data-sidebar={hasSidebar}>
                 <div className="k-form__main">
+                    {before}
                     <div className="k-form__fields k-stack">{shown(arranged.main, 'k-stack', section)}</div>
                 </div>
                 {hasSidebar ? (
-                    {before}
                     <aside className="k-form__sidebar k-stack" aria-label="Sidebar">
                         {aside}
                         {shown(arranged.sidebar, 'k-stack', section)}

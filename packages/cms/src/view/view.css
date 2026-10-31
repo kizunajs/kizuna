@@ -877,8 +877,10 @@
 
     /* The source as text above the translation. Only the language being written is a field. */
     .k-translate-mode__source {
-        align-items: flex-start;
+        min-width: 0;
+        font-size: 14px;
         line-height: 22px;
+        color: var(--k-muted);
     }
 
     .k-translate-mode__source > p {
@@ -1758,8 +1760,6 @@
         margin-left: auto;
     }
 
-    /* A field's choices open exactly as wide as the field, long labels wrapping. */
-    .k-menu--select {
     /* A block's menu: Move up and Move down, then the other lists it can move into, each with the field holding it. */
     .k-array__menu {
         min-width: 240px;
@@ -1797,6 +1797,8 @@
         color: var(--k-muted);
     }
 
+    /* A field's choices open exactly as wide as the field, long labels wrapping. */
+    .k-menu--select {
         width: var(--anchor-width);
     }
 
@@ -2113,8 +2115,6 @@
         box-shadow: var(--k-control-elevation);
     }
 
-    .k-image__thumb {
-        display: block;
     /* Locked, like a read-only field: the fainter fill and muted name. */
     .k-image[data-locked] {
         background: var(--k-surface);
@@ -2122,6 +2122,8 @@
         color: var(--k-muted);
     }
 
+    .k-image__thumb {
+        display: block;
         flex-shrink: 0;
         width: 44px;
         height: 44px;
@@ -2423,8 +2425,8 @@
     .k-crop-preview {
         display: flex;
         flex-direction: column;
-        gap: var(--k-label-gap);
-        min-width: 0;
+        gap: 6px;
+        margin: 0;
     }
 
     .k-crop-preview__box {
@@ -2625,8 +2627,6 @@
         border-radius: 6px;
     }
 
-    /* Preview */
-
     /* A block in the text: its name and menu on one line, its fields under them, set like the image beside it. */
     .k-rich__block-card {
         display: flex;
@@ -2666,6 +2666,8 @@
     .k-rich__tools .k-button + .k-button {
         margin-left: 4px;
     }
+
+    /* Preview */
 
     .k-preview {
         display: flex;
@@ -3645,7 +3647,6 @@
     .k-owner:hover {
         color: var(--k-ink);
     }
-}
 
     /* When a publish goes live: now, or at a date and time in the browser's zone. */
     .k-schedule-when {
@@ -3693,3 +3694,4 @@
         font-size: 13px;
         color: var(--k-muted);
     }
+}

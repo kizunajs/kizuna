@@ -17,10 +17,10 @@ import { branchQuestionOf, itemsUnder } from './branch.js';
 
 const ICONS = {
     ask: MessageCircle,
-    unpublish: EyeOff,
     withdraw: Undo2,
     cancelSchedule: CalendarX,
     addToRelease: Layers,
+    unpublish: EyeOff,
     duplicate: Copy,
     delete: Trash2,
     action: Play,
@@ -68,10 +68,10 @@ export function DocumentMore({
     document,
     title,
     askable,
-    onAsk,
     withdrawable = false,
-    onChanged,
+    onAsk,
     onWithdraw,
+    onChanged,
     onProblem,
     ref,
 }: {
@@ -79,14 +79,14 @@ export function DocumentMore({
     document: Description;
     title: string;
     askable: boolean;
-    onAsk: () => void;
     /**
      * Whether the person's review request still waits, so the menu offers
      * Withdraw request in place of Ask for review.
      */
     withdrawable?: boolean;
-    /**
+    onAsk: () => void;
     onWithdraw?: () => void;
+    /**
      * Called after an entry changes the document, so the screen reloads it.
      */
     onChanged: () => void;
@@ -101,14 +101,14 @@ export function DocumentMore({
         kind: document.kind,
         status: document.status,
         askable,
-        actions: document.actions,
-    });
         withdrawable,
         ...(document.schedule === null || document.schedule === undefined
             ? {}
             : {
                   scheduled: document.schedule.release === null ? ('own' as const) : ('release' as const),
               }),
+        actions: document.actions,
+    });
 
     const run = async (entry: MenuEntry): Promise<void> => {
         setConfirming(undefined);
@@ -119,8 +119,6 @@ export function DocumentMore({
             onAsk();
             return;
         }
-        if (entry.kind === 'unpublish' && tools !== undefined) {
-            // Publishing again brings back what was live only when the draft held nothing more, and no review stands in its way.
         if (entry.kind === 'withdraw') {
             onWithdraw?.();
             return;
@@ -146,6 +144,8 @@ export function DocumentMore({
             onChanged();
             return;
         }
+        if (entry.kind === 'unpublish' && tools !== undefined) {
+            // Publishing again brings back what was live only when the draft held nothing more, and no review stands in its way.
             const republishes = document.status === 'published' && (!document.requireReview || document.review?.status === 'approved');
             const answer = await connection.call(`${tools.prefix}_unpublish`, {
                 params: tools.params,

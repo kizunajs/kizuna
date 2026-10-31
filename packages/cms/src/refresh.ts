@@ -238,13 +238,14 @@ const k = new Kizuna();
 
 /**
  * The jobs the CMS declares under `content` once it serves several sites:
- * one refresh per site or partner that shows a document. Without an
- * identity, they run as the app's jobs do.
+ * the one that publishes what is scheduled, and one refresh per site or
+ * partner that shows a document. Without an identity, they run as the app's
+ * jobs do.
  */
 export const refreshJobs = (slug: string, identity: string | undefined) => {
     const definitions = {
-        refreshSite: k
         publishScheduled: publishScheduledJob(slug),
+        refreshSite: k
             .job({
                 summary: "Refresh one site's or partner's pages after a document changed",
                 retry: REFRESH_ATTEMPTS,

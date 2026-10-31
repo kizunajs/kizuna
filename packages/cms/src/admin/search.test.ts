@@ -92,7 +92,7 @@ describe('the admin search', () => {
             places: placesOf(sections),
             documents,
         });
-        expect(empty.places).toHaveLength(7);
+        expect(empty.places).toHaveLength(8);
         expect(empty.documents).toEqual([]);
 
         const found = searchOf({

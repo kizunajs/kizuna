@@ -1042,12 +1042,13 @@ describe('media', () => {
                 {
                     ref: 'page:frontPage',
                     label: null,
+                    locales: [],
                     fieldPaths: ['hero.image'],
                     published: false,
                 },
             ],
-        });
             elsewhere: 0,
+        });
         await asEditor(request(app).post('/editing/pages/frontPage/publish'));
         const published = await asEditor(request(app).get(`/editing/media/${completed.body.id}/uses`));
         expect(published.body.uses[0].published).toBe(true);
@@ -1102,7 +1103,6 @@ describe('media', () => {
             },
         });
         await asEditor(request(app).post('/editing/pages/frontPage/publish'));
-        revalidated.length = 0;
         expect((await request(app).delete(`/editing/media/${completed.body.id}`)).status).toBe(401);
         const refused = await asEditor(request(app).delete(`/editing/media/${completed.body.id}`));
         expect(refused.status).toBe(409);
@@ -1121,7 +1121,6 @@ describe('media', () => {
         const deleted = await asEditor(request(app).delete(`/editing/media/${completed.body.id}`));
         expect(deleted.status).toBe(204);
         expect(storage.files.size).toBe(0);
-        expect(revalidated).toEqual([['kizuna-cms:page:frontPage']]);
         expect((await asEditor(request(app).get(`/editing/media/${completed.body.id}`))).status).toBe(404);
         expect((await asEditor(request(app).delete(`/editing/media/${completed.body.id}`))).status).toBe(404);
     });

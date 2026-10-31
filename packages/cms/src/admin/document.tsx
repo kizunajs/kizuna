@@ -308,14 +308,14 @@ export function DocumentScreen({
     useEffect(() => () => closeRestoreUndo.current?.(), []);
     const [pointed, setPointed] = useState<string | undefined>();
     const [updatedAt, setUpdatedAt] = useState<string | null>(null);
-    const now = useNow();
-    const form = useRef<FieldFormHandle>(null);
-    const seen = useRef<string | null>(null);
-    const busy = useRef(false);
     const [heldBy, setHeldBy] = useState<string | null>(null);
-    const preview = useRef<AdminPreviewHandle>(null);
     // The document this screen holds by saving it, freed when the screen leaves it.
     const holding = useRef<string | undefined>(undefined);
+    const now = useNow();
+    const form = useRef<FieldFormHandle>(null);
+    const preview = useRef<AdminPreviewHandle>(null);
+    const seen = useRef<string | null>(null);
+    const busy = useRef(false);
     const saves = useRef(0);
     const typing = useRef(false);
     const latest = useRef<Description | undefined>(undefined);
@@ -350,12 +350,12 @@ export function DocumentScreen({
             setLoadProblem(undefined);
             setLoadStatus(undefined);
             setDocument(answer.body);
+            setHeldBy(answer.body.heldBy ?? null);
             if (options.remount !== false) setFormKey((key) => key + 1);
             seen.current = null;
             return answer.body;
         },
         [connection]
-            setHeldBy(answer.body.heldBy ?? null);
     );
 
     useEffect(() => {
@@ -363,12 +363,12 @@ export function DocumentScreen({
         setSaveState('idle');
         setUpdatedAt(null);
         setUpdatedBy(null);
+        setHeldBy(null);
         setVersions(undefined);
         setCompared(undefined);
         setDraftChanges(undefined);
         setView('edit');
         void describe(documentRef);
-        setHeldBy(null);
     }, [describe, documentRef]);
 
     // A review waiting for the person opens the document on its Changes tab.
@@ -378,11 +378,6 @@ export function DocumentScreen({
         if (waitsForMe(document.review, people.me)) setView('changes');
     }, [document, people]);
 
-    // Picks up what a model, or another editor, saves while this one is open.
-    useEffect(() => {
-        if (document === undefined) return;
-        const tools = toolsFor(document.ref);
-        if (tools === undefined) return;
     // Leaving a document this screen saved frees it for the next person, without waiting out the hold.
     useEffect(() => {
         const release = (): void => {
@@ -402,6 +397,11 @@ export function DocumentScreen({
         };
     }, [connection, documentRef]);
 
+    // Picks up what a model, or another editor, saves while this one is open.
+    useEffect(() => {
+        if (document === undefined) return;
+        const tools = toolsFor(document.ref);
+        if (tools === undefined) return;
         const check = async (): Promise<void> => {
             if (busy.current || typing.current || window.document.visibilityState !== 'visible') return;
             const savesBefore = saves.current;
@@ -412,12 +412,12 @@ export function DocumentScreen({
             const marker = answer.body.updatedAt;
             setUpdatedAt(marker);
             setUpdatedBy(answer.body.updatedBy);
+            setHeldBy(answer.body.heldBy ?? null);
             if (seen.current === null) {
                 seen.current = marker;
                 return;
             }
             if (marker === seen.current) return;
-            setHeldBy(answer.body.heldBy ?? null);
             seen.current = marker;
             const before = latest.current;
             const after = await describe(document.ref, {
@@ -430,8 +430,9 @@ export function DocumentScreen({
         return () => window.clearInterval(timer);
     }, [connection, describe, document?.ref]);
 
-    // The versions, for their count on the tab and the dates beside the fields.
+    // The versions, for their count on the tab, the dates beside the fields, and who approved what went live.
     const documentVersion = document?.version;
+    const documentStatus = document?.status;
     useEffect(() => {
         const tools = toolsFor(documentRef);
         if (tools === undefined || documentVersion === undefined) return;
@@ -446,7 +447,7 @@ export function DocumentScreen({
         return () => {
             current = false;
         };
-    }, [connection, documentRef, documentVersion]);
+    }, [connection, documentRef, documentVersion, documentStatus]);
 
     // What the draft changes from what is live, for the Changes tab, the dots on the fields, and the request.
     const reviewKey = `${document?.review?.id ?? ''}:${document?.review?.status ?? ''}`;
@@ -568,16 +569,16 @@ export function DocumentScreen({
                     setSaveProblem(undefined);
                     setNoticeOpen(false);
                     seen.current = answer.body.updatedAt;
+                    holding.current = ref;
                     setUpdatedAt(answer.body.updatedAt);
                     setUpdatedBy(answer.body.updatedBy);
+                    setHeldBy(answer.body.heldBy ?? null);
                     setDocument({
                         ...current,
                         status: answer.body.status,
                         version: answer.body.version,
-                    holding.current = ref;
                         complete: answer.body.complete,
                         missing: answer.body.missing,
-                    setHeldBy(answer.body.heldBy ?? null);
                         draft: answer.body.content,
                     });
                 }
@@ -718,7 +719,7 @@ export function DocumentScreen({
         if (current?.review === null || current?.review === undefined) return false;
         setDeciding(true);
         setLinkProblem(undefined);
-        // The person answered on the Review tab, so the route runs without asking again.
+        // The person answered in the header, so the route runs without asking again.
         const answer = await connection.call(
             'editing_reviews_decide',
             {
@@ -793,7 +794,7 @@ export function DocumentScreen({
                 ? {}
                 : {
                       actionProps: {
-                          children: 'Withdraw',
+                          children: 'Undo',
                           onClick: () => {
                               toasts.close(id);
                               void connection
@@ -1182,6 +1183,14 @@ export function DocumentScreen({
     const blocker = document.complete ? undefined : blockerOf(document.missing, document.fields);
     const askable = people !== undefined && people.people.some((person) => person.id !== people.me);
     const updatedByPerson = updatedBy === null ? undefined : people?.people.find((person) => person.id === updatedBy);
+    // Someone else editing the document, which leaves it read only here until they stop.
+    const holder =
+        heldBy === null || me === undefined || heldBy === me
+            ? undefined
+            : (people?.people.find((person) => person.id === heldBy) ?? {
+                  id: heldBy,
+                  name: heldBy,
+              });
     const dates = documentDatesOf(versions ?? []);
     const showBlocker = (): void => {
         const name = document.missing[0];
@@ -1222,14 +1231,6 @@ export function DocumentScreen({
                 <Info {...ICON} />
                 Info
             </Popover.Trigger>
-    // Someone else editing the document, which leaves it read only here until they stop.
-    const holder =
-        heldBy === null || me === undefined || heldBy === me
-            ? undefined
-            : (people?.people.find((person) => person.id === heldBy) ?? {
-                  id: heldBy,
-                  name: heldBy,
-              });
             <Popover.Portal>
                 <Popover.Positioner sideOffset={6} align="end" className="k-positioner">
                     <Popover.Popup className="k-popup k-document-info" aria-label="Document info">
@@ -1286,15 +1287,15 @@ export function DocumentScreen({
             document={document}
             title={title}
             askable={askable}
+            withdrawable={mayWithdraw(document.review, me)}
             onAsk={() => {
                 void form.current?.flush().then(() => setAskOpen(true));
             }}
+            onWithdraw={() => void changeReview('withdraw')}
             onChanged={() =>
-            withdrawable={mayWithdraw(document.review, me)}
                 void describe(document.ref, {
                     remount: false,
                 })
-            onWithdraw={() => void changeReview('withdraw')}
             }
             onProblem={setLinkProblem}
         />
@@ -1339,11 +1340,11 @@ export function DocumentScreen({
             kind: document.kind,
             status: document.status,
             askable,
+            withdrawable: mayWithdraw(document.review, me),
             actions: document.actions,
         });
         const ask = entries.find((entry) => entry.kind === 'ask');
         if (ask !== undefined) {
-            withdrawable: mayWithdraw(document.review, me),
             actions.push({
                 label: ask.label,
                 run: () => moreMenu.current?.choose(ask),
@@ -1601,10 +1602,6 @@ export function DocumentScreen({
                                     <Tabs.Tab value="edit" className="k-tab">
                                         Edit
                                     </Tabs.Tab>
-                                    <Tabs.Tab value="versions" className="k-tab">
-                                        Versions
-                                        {versions === undefined || versions.length === 0 ? null : (
-                                            <span className="k-tab__count">{versions.length}</span>
                                     {reviewing ? (
                                         <Tabs.Tab value="changes" className="k-tab">
                                             Changes
@@ -1613,6 +1610,10 @@ export function DocumentScreen({
                                             )}
                                         </Tabs.Tab>
                                     ) : null}
+                                    <Tabs.Tab value="versions" className="k-tab">
+                                        Versions
+                                        {versions === undefined || versions.length === 0 ? null : (
+                                            <span className="k-tab__count">{versions.length}</span>
                                         )}
                                     </Tabs.Tab>
                                 </Tabs.List>
@@ -1726,15 +1727,6 @@ export function DocumentScreen({
                                         Undo approval
                                     </button>
                                 ) : null}
-                                {reviewer ? (
-                                    <button
-                                        type="button"
-                                        className="k-button k-button--secondary"
-                                        aria-pressed={shownView === 'review'}
-                                        onClick={() => setView(shownView === 'review' ? 'edit' : 'review')}>
-                                        Review
-                                    </button>
-                                ) : null}
                                 {!askShown ? null : (
                                     <button
                                         type="button"
@@ -1760,6 +1752,13 @@ export function DocumentScreen({
                                         }}
                                         onPublished={() => void reportRefreshes(document.ref)}
                                         onAsked={confirmAsked}
+                                        schedulable
+                                        scheduledAt={document.schedule?.release === null ? document.schedule.at : null}
+                                        onScheduled={(titles, at) =>
+                                            toasts.add({
+                                                description: `${titles.length === 1 ? titles[0] : `${titles.length} documents`} publish${titles.length === 1 ? 'es' : ''} ${whenOf(at)}.`,
+                                            })
+                                        }
                                     />
                                 )}
                                 {more}
@@ -1812,6 +1811,7 @@ export function DocumentScreen({
                         <FieldForm
                             key={`${document.ref}:${formKey}`}
                             ref={form}
+                            readOnly={holder !== undefined}
                             fields={document.fields}
                             layout={document.layout}
                             draft={document.draft}
@@ -1887,7 +1887,6 @@ export function DocumentScreen({
                                     setsOwnValue(document.draft, field.path) ? (
                                         <button
                                             type="button"
-                            readOnly={holder !== undefined}
                                             className="k-text-button k-use-shared"
                                             onClick={() => void clearToShared(field.path)}>
                                             <Undo2 {...ICON} />
@@ -1900,8 +1899,8 @@ export function DocumentScreen({
                     </div>
                     {previewOpened && siteUrl !== null && previewPath !== null ? (
                         <div className="k-document__preview" hidden={!previewShown}>
-                                ref={preview}
                             <AdminPreview
+                                ref={preview}
                                 connection={connection}
                                 siteUrl={siteUrl}
                                 path={previewPath}
@@ -1934,16 +1933,14 @@ export function DocumentScreen({
                             changes={draftChanges?.views}
                             fields={document.fields}
                             layout={document.layout}
+                            draft={document.draft}
                             me={me}
                             now={now}
-                            savedAt={updatedAt}
-                            liveSince={dates.published}
-                            onOpenOnSite={siteUrl === null || document.path === null ? undefined : () => void openOnSite(document.path!)}
                             connection={connection}
                             onReviewChanged={reviewChanged}
                         />
                     </Tabs.Panel>
-                )}
+                ) : null}
                 <AskForReview
                     open={askOpen}
                     onOpenChange={setAskOpen}

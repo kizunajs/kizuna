@@ -101,6 +101,7 @@ export const cmsRefs = pgTable(
         brand: text('brand').notNull(),
         refId: text('ref_id').notNull(),
         fieldPath: text('field_path').notNull(),
+        published: boolean('published').notNull().default(false),
     },
     (table) => [index('cms_refs_lookup').on(table.brand, table.refId)]
 );
@@ -114,7 +115,6 @@ export const cmsReviews = pgTable(
     {
         id: text('id').primaryKey(),
         requestId: text('request_id').notNull(),
-        published: boolean('published').notNull().default(false),
         ref: text('ref').notNull(),
         documentId: text('document_id')
             .notNull()

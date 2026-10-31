@@ -490,7 +490,7 @@ describe('a CMS with one site', () => {
         expect(Object.keys((single.api.jobs as Record<string, object>)['content']!)).toEqual(['publishScheduled']);
     });
 
-    it('declares the refresh job with sites, and runs it in process', () => {
+    it('declares the refresh job beside it with sites, and runs both in process', () => {
         const several = defineConfig({
             jobRunner: heldJobs,
             auth: {

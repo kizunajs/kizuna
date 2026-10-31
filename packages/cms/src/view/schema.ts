@@ -469,18 +469,6 @@ export const fieldHolding = (fields: readonly DescribedField[], path: string): D
 export const labelOf = (field: DescribedField): string => field.label ?? humanize(field.name);
 
 /**
- * What the editor's header calls a document.
- */
-export const documentTitle = (document: Description): string => {
-    if (document.kind !== 'item' && document.label !== undefined) return document.label;
-    if (document.kind === 'global') return humanize(document.name);
-    if (document.kind === 'item') {
-        const text = document.fields.map((field) => field.value).find((value) => typeof value === 'string' && value !== '');
-        return typeof text === 'string' ? text : 'Untitled';
-    }
-    return humanize(document.name);
-};
-/**
  * Bokmål names itself Norsk, as people who write it do.
  */
 const NAMED_AS: Readonly<Record<string, string>> = {
@@ -508,3 +496,15 @@ export const languageNameOf = (code: string): string => {
  */
 export const writeInOf = (code: string): string => `Write in ${languageNameOf(code)}…`;
 
+/**
+ * What the editor's header calls a document.
+ */
+export const documentTitle = (document: Description): string => {
+    if (document.kind !== 'item' && document.label !== undefined) return document.label;
+    if (document.kind === 'global') return humanize(document.name);
+    if (document.kind === 'item') {
+        const text = document.fields.map((field) => field.value).find((value) => typeof value === 'string' && value !== '');
+        return typeof text === 'string' ? text : 'Untitled';
+    }
+    return humanize(document.name);
+};

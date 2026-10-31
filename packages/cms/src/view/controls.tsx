@@ -463,12 +463,13 @@ function ImageControl({ schema, root, value, onChange, disabled, required }: Con
     const [record, setRecord] = useState<MediaRecord | undefined>();
     const [editing, setEditing] = useState(false);
     const [sheet, setSheet] = useState<ImageRef>(image);
+    const [active, setActive] = useState(named?.[0]?.[0]);
     const [over, setOver] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [problem, setProblem] = useState<string | undefined>();
-    useEffect(() => {
     const frame = useRef<HTMLDivElement>(null);
     const drag = useRef<{ handle: CropHandle | undefined; start: Crop; x: number; y: number; moved: boolean } | undefined>(undefined);
+    useEffect(() => {
         if (image.id === undefined) {
             setRecord(undefined);
             return;
@@ -489,8 +490,8 @@ function ImageControl({ schema, root, value, onChange, disabled, required }: Con
             id: picked.id,
             alt: image.alt === undefined || image.alt === '' ? (picked.alt ?? '') : image.alt,
             crop: undefined,
-            focalPoint: undefined,
             crops: undefined,
+            focalPoint: undefined,
         });
     const drop = async (file: File | undefined): Promise<void> => {
         setOver(false);
@@ -622,20 +623,19 @@ function ImageControl({ schema, root, value, onChange, disabled, required }: Con
                 current.start,
                 current.handle,
                 {
-                    ...edges,
-                    [edge]: next ?? 0,
+                    x: (event.clientX - current.x) / box.width,
+                    y: (event.clientY - current.y) / box.height,
                 },
-                record.width,
-                record.height
-            ),
-        });
+                ratio === undefined
+                    ? undefined
+                    : {
+                          ratio,
+                          width: record.width,
+                          height: record.height,
+                      }
+            )
+        );
     };
-    return (
-        <div className="k-image">
-            {record === undefined ? (
-                <span className="k-image__thumb" aria-hidden="true" />
-            ) : (
-                <img className="k-image__thumb" src={resolveUrl(`${record.url}?w=640`)} alt={image.alt ?? ''} />
     // A click without a drag sets the focal point where it lands.
     const endDrag = (event: ReactPointerEvent<HTMLElement>): void => {
         const current = drag.current;
@@ -707,7 +707,7 @@ function ImageControl({ schema, root, value, onChange, disabled, required }: Con
                                         <X {...ICON} />
                                     </Dialog.Close>
                                 </div>
-                                {source === undefined ? null : (
+                                {source === undefined || record === undefined ? null : (
                                     <div className="k-sheet__group">
                                         {named === undefined ? null : (
                                             <div className="k-crop-tabs" role="radiogroup" aria-label="Crop">
@@ -774,12 +774,6 @@ function ImageControl({ schema, root, value, onChange, disabled, required }: Con
                                                       />
                                                   ))}
                                         </div>
-                                    </div>
-                                )}
-                                <div className="k-row">
-                                    <label className="k-row__label" htmlFor="k-image-alt">
-                                        Alt text
-                                        {required === true ? <Required /> : null}
                                         {disabled ? null : (
                                             <div className="k-sheet__row k-crop-resets">
                                                 {sheet.focalPoint === undefined ? null : (
@@ -817,6 +811,25 @@ function ImageControl({ schema, root, value, onChange, disabled, required }: Con
                                                 ))}
                                             </div>
                                         )}
+                                    </div>
+                                )}
+                                {shape !== undefined && 'aspectRatio' in shape ? (
+                                    <div className="k-row">
+                                        <span className="k-row__label">Aspect ratio</span>
+                                        <div className="k-row__input">
+                                            <p className="k-read-only">
+                                                <span className="k-read-only__text">{shape.aspectRatio}</span>
+                                                <span className="k-read-only__lock" role="img" aria-label="Set by the field" tabIndex={0}>
+                                                    <Lock {...ICON} />
+                                                </span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : null}
+                                <div className="k-row">
+                                    <label className="k-row__label" htmlFor="k-image-alt">
+                                        Alt text
+                                        {required === true ? <Required /> : null}
                                     </label>
                                     <div className="k-row__input">
                                         <input
@@ -844,9 +857,23 @@ function ImageControl({ schema, root, value, onChange, disabled, required }: Con
                                             type="button"
                                             className="k-button k-button--primary k-button--small"
                                             onClick={() => {
+                                                const { crop: keptCrop, crops, ...rest } = sheet;
+                                                const keptCrops = Object.fromEntries(
+                                                    Object.entries(crops ?? {}).filter(([, each]) => each !== undefined)
+                                                );
                                                 onChange({
-                                                    ...sheet,
+                                                    ...rest,
                                                     alt: sheet.alt ?? '',
+                                                    ...(named === undefined && keptCrop !== undefined
+                                                        ? {
+                                                              crop: keptCrop,
+                                                          }
+                                                        : {}),
+                                                    ...(named !== undefined && Object.keys(keptCrops).length > 0
+                                                        ? {
+                                                              crops: keptCrops,
+                                                          }
+                                                        : {}),
                                                 });
                                                 setEditing(false);
                                             }}>
@@ -863,23 +890,9 @@ function ImageControl({ schema, root, value, onChange, disabled, required }: Con
                                 <X {...ICON} />
                             </button>
                         </Hint>
-                                                const { crop: keptCrop, crops, ...rest } = sheet;
-                                                const keptCrops = Object.fromEntries(
-                                                    Object.entries(crops ?? {}).filter(([, each]) => each !== undefined)
-                                                );
                     )}
                 </span>
             </span>
-                                                    ...(named === undefined && keptCrop !== undefined
-                                                        ? {
-                                                              crop: keptCrop,
-                                                          }
-                                                        : {}),
-                                                    ...(named !== undefined && Object.keys(keptCrops).length > 0
-                                                        ? {
-                                                              crops: keptCrops,
-                                                          }
-                                                        : {}),
         </div>
     );
 }
@@ -998,6 +1011,24 @@ const useDrag = (disabled: boolean, onDrop: (from: number, to: number) => void) 
     };
 };
 
+/**
+ * The outermost list of blocks a nested one sits in, for a block's Move
+ * into, and where the nested list's items sit inside it. `at` is unknown
+ * where something other than a block lies between them.
+ */
+interface BlockListPlace {
+    outer: {
+        value: unknown[];
+        onChange: (value: unknown[]) => void;
+        schema: JsonSchema;
+        root: JsonSchema;
+        title: string;
+    };
+    at: BlockPath | undefined;
+}
+
+const BlockListContext = createContext<BlockListPlace | null>(null);
+
 function ArrayControl(props: ControlProps) {
     const { schema, root, value, onChange, disabled } = props;
     const items = Array.isArray(value) ? value : [];
@@ -1075,6 +1106,86 @@ function ArrayControl(props: ControlProps) {
         setOpen((previous) => new Set([...previous, items.length]));
     };
     const { drag, rows, startDrag } = useDrag(disabled, moveTo);
+
+    // A list of blocks offers each block the other lists of the field that take it.
+    const around = useContext(BlockListContext);
+    const outer =
+        blockOptions === undefined
+            ? undefined
+            : around === null
+              ? {
+                    value: items,
+                    onChange: (next: unknown[]) => onChange(next),
+                    schema,
+                    root,
+                    title: props.label ?? 'Blocks',
+                }
+              : around.outer;
+    const ownPath: BlockPath | undefined =
+        blockOptions === undefined
+            ? undefined
+            : around === null
+              ? []
+              : around.at === undefined || props.name === undefined
+                ? undefined
+                : [...around.at, props.name];
+    const located = outer !== undefined && ownPath !== undefined && (ownPath.length === 0 || valueAtPath(outer.value, ownPath) === value);
+    const blockLists = located ? blockListsIn(outer.value, outer.schema, outer.root, outer.title) : [];
+    const moveInto = (index: number, to: BlockPath): void => {
+        if (outer === undefined || ownPath === undefined) return;
+        setGeneration((current) => current + 1);
+        setOpen((previous) => remapOpen(previous, (at) => (at === index ? undefined : at > index ? at - 1 : at)));
+        outer.onChange(movedBlock(outer.value, ownPath, index, to));
+    };
+    const blockMenu = (index: number, item: unknown) => {
+        if (disabled || blockOptions === undefined) return null;
+        const name = itemBlockName(item);
+        const targets = name === undefined || ownPath === undefined ? [] : moveTargetsOf(blockLists, ownPath, index, name);
+        return (
+            <Menu.Root>
+                <Menu.Trigger className="k-icon-button" aria-label={`More for ${noun} ${index + 1}`}>
+                    <Ellipsis {...ICON} />
+                </Menu.Trigger>
+                <Menu.Portal>
+                    <Menu.Positioner sideOffset={6} align="end" className="k-positioner">
+                        <Menu.Popup className="k-popup k-menu k-array__menu">
+                            <Menu.Item className="k-menu__item" disabled={index === 0} onClick={() => moveTo(index, index - 1)}>
+                                <ArrowUp {...ICON} />
+                                Move up
+                            </Menu.Item>
+                            <Menu.Item
+                                className="k-menu__item"
+                                disabled={index === items.length - 1}
+                                onClick={() => moveTo(index, index + 1)}>
+                                <ArrowDown {...ICON} />
+                                Move down
+                            </Menu.Item>
+                            {targets.length === 0 ? null : (
+                                <>
+                                    <Menu.Separator className="k-array__menu-separator" />
+                                    <Menu.Group>
+                                        <Menu.GroupLabel className="k-array__menu-label">Move into</Menu.GroupLabel>
+                                        {targets.map((target) => (
+                                            <Menu.Item
+                                                key={target.path.join('.')}
+                                                className="k-menu__item"
+                                                onClick={() => moveInto(index, target.path)}>
+                                                <CornerDownRight {...ICON} />
+                                                <span className="k-array__menu-title">{target.title}</span>
+                                                {target.detail === undefined ? null : (
+                                                    <span className="k-array__menu-detail">{target.detail}</span>
+                                                )}
+                                            </Menu.Item>
+                                        ))}
+                                    </Menu.Group>
+                                </>
+                            )}
+                        </Menu.Popup>
+                    </Menu.Positioner>
+                </Menu.Portal>
+            </Menu.Root>
+        );
+    };
 
     const keyMove = (index: number, event: React.KeyboardEvent<HTMLButtonElement>): void => {
         const to = event.key === 'ArrowUp' ? index - 1 : event.key === 'ArrowDown' ? index + 1 : undefined;
@@ -1169,24 +1280,6 @@ function ArrayControl(props: ControlProps) {
                                     style={{
                                         transform: `translateY(${shiftFor(index, drag)}px)`,
                                     }}>
-/**
- * The outermost list of blocks a nested one sits in, for a block's Move
- * into, and where the nested list's items sit inside it. `at` is unknown
- * where something other than a block lies between them.
- */
-interface BlockListPlace {
-    outer: {
-        value: unknown[];
-        onChange: (value: unknown[]) => void;
-        schema: JsonSchema;
-        root: JsonSchema;
-        title: string;
-    };
-    at: BlockPath | undefined;
-}
-
-const BlockListContext = createContext<BlockListPlace | null>(null);
-
                                     <div className="k-array__row">
                                         {grip(index)}
                                         <Collapsible.Trigger className="k-array__summary">
@@ -1195,6 +1288,7 @@ const BlockListContext = createContext<BlockListPlace | null>(null);
                                                 {title ?? 'Untitled'}
                                             </span>
                                         </Collapsible.Trigger>
+                                        {blockMenu(index, item)}
                                         <Collapsible.Trigger
                                             className="k-icon-button k-array__chevron"
                                             aria-label={isOpen ? `Collapse ${noun} ${index + 1}` : `Expand ${noun} ${index + 1}`}>
@@ -1275,86 +1369,6 @@ const BlockListContext = createContext<BlockListPlace | null>(null);
                     />
                 ) : null}
             </div>
-    // A list of blocks offers each block the other lists of the field that take it.
-    const around = useContext(BlockListContext);
-    const outer =
-        blockOptions === undefined
-            ? undefined
-            : around === null
-              ? {
-                    value: items,
-                    onChange: (next: unknown[]) => onChange(next),
-                    schema,
-                    root,
-                    title: props.label ?? 'Blocks',
-                }
-              : around.outer;
-    const ownPath: BlockPath | undefined =
-        blockOptions === undefined
-            ? undefined
-            : around === null
-              ? []
-              : around.at === undefined || props.name === undefined
-                ? undefined
-                : [...around.at, props.name];
-    const located = outer !== undefined && ownPath !== undefined && (ownPath.length === 0 || valueAtPath(outer.value, ownPath) === value);
-    const blockLists = located ? blockListsIn(outer.value, outer.schema, outer.root, outer.title) : [];
-    const moveInto = (index: number, to: BlockPath): void => {
-        if (outer === undefined || ownPath === undefined) return;
-        setGeneration((current) => current + 1);
-        setOpen((previous) => remapOpen(previous, (at) => (at === index ? undefined : at > index ? at - 1 : at)));
-        outer.onChange(movedBlock(outer.value, ownPath, index, to));
-    };
-    const blockMenu = (index: number, item: unknown) => {
-        if (disabled || blockOptions === undefined) return null;
-        const name = itemBlockName(item);
-        const targets = name === undefined || ownPath === undefined ? [] : moveTargetsOf(blockLists, ownPath, index, name);
-        return (
-            <Menu.Root>
-                <Menu.Trigger className="k-icon-button" aria-label={`More for ${noun} ${index + 1}`}>
-                    <Ellipsis {...ICON} />
-                </Menu.Trigger>
-                <Menu.Portal>
-                    <Menu.Positioner sideOffset={6} align="end" className="k-positioner">
-                        <Menu.Popup className="k-popup k-menu k-array__menu">
-                            <Menu.Item className="k-menu__item" disabled={index === 0} onClick={() => moveTo(index, index - 1)}>
-                                <ArrowUp {...ICON} />
-                                Move up
-                            </Menu.Item>
-                            <Menu.Item
-                                className="k-menu__item"
-                                disabled={index === items.length - 1}
-                                onClick={() => moveTo(index, index + 1)}>
-                                <ArrowDown {...ICON} />
-                                Move down
-                            </Menu.Item>
-                            {targets.length === 0 ? null : (
-                                <>
-                                    <Menu.Separator className="k-array__menu-separator" />
-                                    <Menu.Group>
-                                        <Menu.GroupLabel className="k-array__menu-label">Move into</Menu.GroupLabel>
-                                        {targets.map((target) => (
-                                            <Menu.Item
-                                                key={target.path.join('.')}
-                                                className="k-menu__item"
-                                                onClick={() => moveInto(index, target.path)}>
-                                                <CornerDownRight {...ICON} />
-                                                <span className="k-array__menu-title">{target.title}</span>
-                                                {target.detail === undefined ? null : (
-                                                    <span className="k-array__menu-detail">{target.detail}</span>
-                                                )}
-                                            </Menu.Item>
-                                        ))}
-                                    </Menu.Group>
-                                </>
-                            )}
-                        </Menu.Popup>
-                    </Menu.Positioner>
-                </Menu.Portal>
-            </Menu.Root>
-        );
-    };
-
         );
     }
 
@@ -1456,7 +1470,6 @@ function ReferenceListControl(props: ControlProps & { brand: string }) {
         if (to === undefined || to < 0 || to >= ids.length) return;
         event.preventDefault();
         moveTo(index, to);
-                                        {blockMenu(index, item)}
         window.requestAnimationFrame(() => rows.current[to]?.querySelector<HTMLButtonElement>('.k-array__grip')?.focus());
     };
 

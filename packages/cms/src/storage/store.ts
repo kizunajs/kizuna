@@ -923,33 +923,6 @@ export class DocumentStore {
                     publishedAt: now,
                 })
                 .where(and(eq(cmsVersions.documentId, existing.id), eq(cmsVersions.version, latest)));
-            const [row] = await tx.select().from(cmsDocuments).where(eq(cmsDocuments.id, existing.id)).limit(1);
-            return toRow(row!);
-        });
-    }
-
-    /**
-     * Clears the published copy and keeps the draft and every version, so
-     * publishing again brings it back. Answers `undefined` when nothing was
-     * published.
-     */
-    async unpublish(
-        kind: DocumentKind,
-        key: string,
-        author: string,
-        site = SITE,
-        locale = SOURCE_LOCALE
-    ): Promise<DocumentRow | undefined> {
-        return this.db.transaction(async (tx) => {
-            const [existing] = await tx
-                .select()
-                .from(cmsDocuments)
-                .where(identity(kind, key, site, locale))
-                .for('update');
-            if (existing === undefined || existing.published === null) return undefined;
-            const now = new Date();
-            await tx
-                .update(cmsDocuments)
             await this.publishRefsIn(tx, existing.id);
             const [row] = await tx.select().from(cmsDocuments).where(eq(cmsDocuments.id, existing.id)).limit(1);
             return toRow(row!);
@@ -1008,6 +981,33 @@ export class DocumentStore {
                 })
                 .where(and(eq(cmsVersions.documentId, existing.id), eq(cmsVersions.version, latest)));
             await this.publishRefsIn(tx, existing.id);
+            const [row] = await tx.select().from(cmsDocuments).where(eq(cmsDocuments.id, existing.id)).limit(1);
+            return toRow(row!);
+        });
+    }
+
+    /**
+     * Clears the published copy and keeps the draft and every version, so
+     * publishing again brings it back. Answers `undefined` when nothing was
+     * published.
+     */
+    async unpublish(
+        kind: DocumentKind,
+        key: string,
+        author: string,
+        site = SITE,
+        locale = SOURCE_LOCALE
+    ): Promise<DocumentRow | undefined> {
+        return this.db.transaction(async (tx) => {
+            const [existing] = await tx
+                .select()
+                .from(cmsDocuments)
+                .where(identity(kind, key, site, locale))
+                .for('update');
+            if (existing === undefined || existing.published === null) return undefined;
+            const now = new Date();
+            await tx
+                .update(cmsDocuments)
                 .set({
                     draft: existing.draft ?? existing.published,
                     published: null,
@@ -1017,6 +1017,7 @@ export class DocumentStore {
                     updatedBy: author,
                 })
                 .where(eq(cmsDocuments.id, existing.id));
+            await tx.delete(cmsRefs).where(and(eq(cmsRefs.documentId, existing.id), eq(cmsRefs.published, true)));
             const [row] = await tx.select().from(cmsDocuments).where(eq(cmsDocuments.id, existing.id)).limit(1);
             return toRow(row!);
         });
@@ -1044,12 +1045,11 @@ export class DocumentStore {
                 })
                 .where(eq(cmsDocuments.id, id));
             await this.replaceRefsIn(tx, id, refsOf(draft ?? published ?? {}));
+            await this.replaceRefsIn(tx, id, published === null ? [] : refsOf(published), true);
             return true;
         });
     }
 
-    /**
-     * The documents holding one branded id.
     /**
      * Rebuilds a document's refs from its draft and its published content,
      * for content indexed before images were.
@@ -1096,6 +1096,8 @@ export class DocumentStore {
         }));
     }
 
+    /**
+     * The documents holding one branded id.
      */
     async whereUsed(brand: string, refId: string): Promise<Array<DocumentRow & { fieldPaths: string[] }>> {
         const rows = await this.db
@@ -1127,19 +1129,43 @@ export class DocumentStore {
      * is published the moment it exists.
      */
     async saveMedia(key: string, data: Content, author: string, site = SITE): Promise<DocumentRow> {
+        return this.saveRecord('media', key, data, author, site);
+    }
+
+    /**
+     * Writes or replaces a media folder, published the moment it exists like
+     * an image.
+     */
+    async saveFolder(key: string, data: Content, author: string, site = SITE): Promise<DocumentRow> {
+        return this.saveRecord('folder', key, data, author, site);
+    }
+
+    /**
+     * Moves a media document or folder into another library, keeping its key.
+     */
+    async moveToSite(kind: 'media' | 'folder', key: string, site = SITE): Promise<void> {
+        await this.db
+            .update(cmsDocuments)
+            .set({
+                site,
+            })
+            .where(and(eq(cmsDocuments.kind, kind), eq(cmsDocuments.locale, SOURCE_LOCALE), eq(cmsDocuments.key, key)));
+    }
+
+    private async saveRecord(kind: 'media' | 'folder', key: string, data: Content, author: string, site: string): Promise<DocumentRow> {
         return this.db.transaction(async (tx) => {
             const now = new Date();
             const [existing] = await tx
                 .select()
                 .from(cmsDocuments)
-                .where(identity('media', key, site))
+                .where(identity(kind, key, site))
                 .for('update');
             const id = existing?.id ?? randomUUID();
             const latest = existing === undefined ? 0 : await this.latestVersionIn(tx, id);
             if (existing === undefined) {
                 await tx.insert(cmsDocuments).values({
                     id,
-                    kind: 'media',
+                    kind,
                     site,
                     key,
                     published: data,
@@ -1154,7 +1180,6 @@ export class DocumentStore {
                         published: data,
                         publishedVersion: latest + 1,
                         updatedAt: now,
-            await this.replaceRefsIn(tx, id, published === null ? [] : refsOf(published), true);
                         updatedBy: author,
                     })
                     .where(eq(cmsDocuments.id, id));
@@ -1192,30 +1217,6 @@ export class DocumentStore {
                 : input.orderBy === 'updatedAt'
                   ? sql`${cmsDocuments.updatedAt}`
                   : read(input.orderBy);
-        return this.saveRecord('media', key, data, author, site);
-    }
-
-    /**
-     * Writes or replaces a media folder, published the moment it exists like
-     * an image.
-     */
-    async saveFolder(key: string, data: Content, author: string, site = SITE): Promise<DocumentRow> {
-        return this.saveRecord('folder', key, data, author, site);
-    }
-
-    /**
-     * Moves a media document or folder into another library, keeping its key.
-     */
-    async moveToSite(kind: 'media' | 'folder', key: string, site = SITE): Promise<void> {
-        await this.db
-            .update(cmsDocuments)
-            .set({
-                site,
-            })
-            .where(and(eq(cmsDocuments.kind, kind), eq(cmsDocuments.locale, SOURCE_LOCALE), eq(cmsDocuments.key, key)));
-    }
-
-    private async saveRecord(kind: 'media' | 'folder', key: string, data: Content, author: string, site: string): Promise<DocumentRow> {
         const direction = input.direction ?? (input.orderBy === undefined || typeof input.orderBy === 'string' ? 'desc' : 'asc');
         const conditions = [
             eq(cmsDocuments.kind, input.kind),
@@ -1437,10 +1438,10 @@ export class DocumentStore {
                 brand: ref.brand,
                 refId: ref.refId,
                 fieldPath: ref.fieldPath,
+                published,
             }))
         );
     }
-}
 
     /**
      * Publishing makes the draft the published content, so its refs become
@@ -1452,3 +1453,4 @@ export class DocumentStore {
             sql`insert into cms_refs (document_id, brand, ref_id, field_path, published) select document_id, brand, ref_id, field_path, true from cms_refs where document_id = ${documentId} and published = false`
         );
     }
+}

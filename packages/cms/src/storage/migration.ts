@@ -104,12 +104,6 @@ create table if not exists cms_translations (
     document_id text primary key,
     source_versions jsonb not null
 );
-`;
-
-/**
- * How an indexed field is read out of a document for filtering and sorting.
- */
-export type IndexType = 'text' | 'numeric' | 'boolean';
 
 create table if not exists cms_releases (
     id text primary key,
@@ -144,6 +138,12 @@ create unique index if not exists cms_schedules_one on cms_schedules (document_i
 create index if not exists cms_schedules_due on cms_schedules (status, at);
 
 create index if not exists cms_schedules_release on cms_schedules (release_id);
+`;
+
+/**
+ * How an indexed field is read out of a document for filtering and sorting.
+ */
+export type IndexType = 'text' | 'numeric' | 'boolean';
 
 export interface IndexedField {
     kind: string;

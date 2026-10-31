@@ -2,7 +2,7 @@ import { and, count, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { CmsHttpError, collectionCacheTag, documentCacheTag, pageCacheTag, type CmsService } from './cms.js';
 import { DEFAULT_SITE } from './options.js';
 import { formatRef, parseRef } from './refs.js';
-import { cmsDocuments, cmsRefs, cmsReviewComments, cmsReviews, cmsVersions } from './storage/schema.js';
+import { cmsDocuments, cmsRefs, cmsReviewComments, cmsReviews, cmsVersions, cmsSchedules } from './storage/schema.js';
 import type { CmsDatabase } from './storage/store.js';
 
 /**

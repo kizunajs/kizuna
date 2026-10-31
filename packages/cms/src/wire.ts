@@ -31,7 +31,6 @@ export const PageSummarySchema = Kizuna.model({
     }),
 });
 
-/**
 export const CollectionPageSchema = Kizuna.model({
     title: 'CMS.CollectionPage',
     schema: z.object({
@@ -42,6 +41,7 @@ export const CollectionPageSchema = Kizuna.model({
         collection: z.string().describe('The collection whose items the route shows, one per address.'),
     }),
 });
+
 /**
  * An item's place in an orderable collection: a fractional key, sorting in
  * the order editors gave the items. `keyBetween` from `@kizunajs/cms/keys`
@@ -54,7 +54,6 @@ export const PlaceSchema = z.string().meta({
 });
 
 /**
-
  * Where an item sits in a collection with a `tree`, as the editing list and
  * the picker answer it.
  */
@@ -81,10 +80,10 @@ export const EditorItemSchema = Kizuna.model({
         complete: z.boolean(),
         updatedAt: z.string(),
         updatedBy: z.string(),
+        ...TreePlacementShape,
         place: PlaceSchema.optional().describe(
             'Its place, a key that sorts in the order editors gave the items. Only in an orderable collection.'
         ),
-        ...TreePlacementShape,
         values: z
             .record(z.string(), z.unknown())
             .optional()
@@ -96,7 +95,6 @@ export const EditorItemSchema = Kizuna.model({
     }),
 });
 
-export const CreateItemBodySchema = z
 export const PlaceItemBodySchema = z.object({
     after: z.string().optional().describe('Right after this item, as its sibling under the same parent.'),
     before: z.string().optional().describe('Right before this item, as its sibling under the same parent.'),
@@ -108,6 +106,7 @@ export const PlaceItemBodySchema = z.object({
         .describe('In a tree, the item it goes under, null for the top. Alone or with `at`; left out, it keeps its parent.'),
 });
 
+export const CreateItemBodySchema = z
     .object({
         values: z.record(z.string(), z.unknown()).optional().describe('Field values for the new item, keyed by field path.'),
     })
@@ -124,29 +123,6 @@ export const PublishedPageSchema = Kizuna.model({
     }),
 });
 
-export const DraftPageSchema = Kizuna.model({
-    title: 'CMS.Draft',
-    schema: z.object({
-        ref: z.string().describe('The document: page:<name>, page:<site>:<name>, global:<name> or item:<collection>:<id>.'),
-        name: z.string(),
-        path: z
-            .string()
-            .nullable()
-            .describe("Where it is served: a page's path, or an item's address on the page that shows it. Null otherwise."),
-        status: PageStatusSchema,
-        version: z.int(),
-        publishedVersion: z.int().nullable(),
-        content: z.record(z.string(), z.unknown()).nullable(),
-        complete: z.boolean().describe('Whether the draft passes the page schema and may be rendered.'),
-        missing: z.array(z.string()).describe('The fields the draft is missing or fails.'),
-        updatedAt: z.string().nullable(),
-        updatedBy: z.string().nullable(),
-    }),
-});
-
-export const StoredContentSchema = Kizuna.model({
-    title: 'CMS.StoredContent',
-    schema: z.object({
 export const DraftScheduleSchema = z
     .object({
         action: z.enum(['publish', 'unpublish']),
@@ -164,6 +140,12 @@ export const DraftScheduleSchema = z
     .describe('When the document publishes or unpublishes without anyone pressing Publish. Null when nothing is scheduled.');
 
 const HeldBySchema = z
+    .string()
+    .nullable()
+    .describe(
+        'Who edits the document now. One person edits a document at a time: a write from anyone else answers 409 until they stop, or two minutes after their last save. Null when nobody does.'
+    );
+
 export const DraftPageSchema = Kizuna.model({
     title: 'CMS.Draft',
     schema: z.object({
@@ -190,12 +172,6 @@ export const DraftPageSchema = Kizuna.model({
 export const StoredContentSchema = Kizuna.model({
     title: 'CMS.StoredContent',
     schema: z.object({
-    .string()
-    .nullable()
-    .describe(
-        'Who edits the document now. One person edits a document at a time: a write from anyone else answers 409 until they stop, or two minutes after their last save. Null when nobody does.'
-    );
-
         ref: z.string(),
         version: z.int(),
         updatedAt: z.string(),
@@ -430,14 +406,14 @@ export const DescribedPageSchema = Kizuna.model({
             .nullable()
             .describe(
                 "The page the Live Preview opens on: an item's `preview.url`, where the document is served, or the first page that shows it. Null when no page shows it."
-        heldBy: HeldBySchema,
-        schedule: DraftScheduleSchema,
             ),
         usedOn: UsedOnSchema,
         status: PageStatusSchema,
         version: z.int(),
         complete: z.boolean(),
         missing: z.array(z.string()),
+        heldBy: HeldBySchema,
+        schedule: DraftScheduleSchema,
         fields: z.array(DescribedFieldSchema),
         layout: z
             .array(DescribedLayoutSchema)
@@ -596,7 +572,6 @@ const mediaFields = {
     contentType: z.string(),
     size: z.int(),
     width: z.int(),
-    folder: z.string().optional().describe('The folder of its library the image sits in. Left out at the top level.'),
     height: z.int(),
     filename: z.string(),
     alt: z.string().describe('The default alt text, used where a field sets none.'),
@@ -604,6 +579,7 @@ const mediaFields = {
     uploadedAt: z.string(),
     uploadedBy: z.string(),
     site: z.string().optional().describe('The site the image belongs to. Left out for a shared image, which any site may show.'),
+    folder: z.string().optional().describe('The folder of its library the image sits in. Left out at the top level.'),
 };
 
 export const MediaSchema = Kizuna.model({
@@ -612,6 +588,13 @@ export const MediaSchema = Kizuna.model({
 });
 
 export const MediaSummarySchema = Kizuna.model({
+    title: 'CMS.MediaSummary',
+    schema: z.object({
+        ...mediaFields,
+        uses: z.int().describe('How many pages, globals and items hold it, published or in a draft.'),
+    }),
+});
+
 export const MediaFolderSchema = Kizuna.model({
     title: 'CMS.MediaFolder',
     schema: z.object({
@@ -623,18 +606,11 @@ export const MediaFolderSchema = Kizuna.model({
     }),
 });
 
-    title: 'CMS.MediaSummary',
-    schema: z.object({
-        ...mediaFields,
-        uses: z.int().describe('How many pages, globals and items hold it, published or in a draft.'),
-        folders: z.array(MediaFolderSchema).describe("The library's folders, and with `site` the shared ones beside them."),
-    }),
-});
-
 export const MediaListSchema = Kizuna.model({
     title: 'CMS.MediaList',
     schema: z.object({
         media: z.array(MediaSummarySchema),
+        folders: z.array(MediaFolderSchema).describe("The library's folders, and with `site` the shared ones beside them."),
         maxBytes: z.int().describe('The largest file an upload accepts.'),
     }),
 });
@@ -643,12 +619,19 @@ export const MediaUseSchema = Kizuna.model({
     title: 'CMS.MediaUse',
     schema: z.object({
         ref: z.string().describe('The document holding the image, like page:frontPage or item:articles:k3j9x2.'),
+        site: z.string().optional().describe('The site the document belongs to. Left out for shared content.'),
         label: z.string().nullable().describe("An item's title, or the page's or global's label."),
+        locales: z.array(z.string()).describe('The languages the document shows the image in.'),
         fieldPaths: z.array(z.string()).describe('The fields holding it, as dotted paths.'),
         published: z.boolean().describe('Whether the published content shows it. False when only the draft holds it.'),
     }),
 });
 
+export const MediaUsesSchema = Kizuna.model({
+    title: 'CMS.MediaUses',
+    schema: z.object({
+        id: z.string(),
+        uses: z.array(MediaUseSchema),
         elsewhere: z.int().describe('How many more documents hold it in sites the caller does not edit.'),
     }),
 });
@@ -695,19 +678,14 @@ export const MovedMediaSchema = Kizuna.model({
     title: 'CMS.MovedMedia',
     schema: z.object({
         media: z.array(MediaSchema),
-export const MediaUsesSchema = Kizuna.model({
-    title: 'CMS.MediaUses',
-    schema: z.object({
+    }),
+});
+
 export const CompleteUploadBodySchema = z
     .object({
         folder: z.string().optional().describe('The folder of the library the image lands in. Leave it out for the top level.'),
     })
     .optional();
-
-        id: z.string(),
-        uses: z.array(MediaUseSchema),
-    }),
-});
 
 export const UpdateMediaBodySchema = Kizuna.model({
     title: 'CMS.UpdateMedia',

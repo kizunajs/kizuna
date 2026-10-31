@@ -973,7 +973,7 @@ export function PublishReview({
                                 <p key={blocker.text}>
                                     <CircleAlert {...ICON} />
                                     <span>{blocker.text}</span>
-                                    {blocker.publishPast === undefined ? null : (
+                                    {blocker.publishPast === undefined || later ? null : (
                                         <button
                                             type="button"
                                             className="k-button k-button--secondary k-button--small"
