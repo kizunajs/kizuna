@@ -163,6 +163,19 @@ describe('one editor per document', () => {
         expect(described.body.heldBy).toBe('kari@hagen.example.com');
     });
 
+    it('names the holder in the changes Publish reads, so it holds the document back', async () => {
+        await save('kari-token', {
+            heading: 'Planter',
+        });
+        const changes = await request(app).get('/editing/pages/frontPage/changes').set('authorization', 'Bearer nils-token');
+        expect(changes.status).toBe(200);
+        expect(changes.body.heldBy).toBe('kari@hagen.example.com');
+        await request(app).delete('/editing/hold?ref=page:frontPage').set('authorization', 'Bearer kari-token');
+        expect(
+            (await request(app).get('/editing/pages/frontPage/changes').set('authorization', 'Bearer nils-token')).body.heldBy
+        ).toBeNull();
+    });
+
     it('refuses publishing and unpublishing by anyone but the holder', async () => {
         await save('kari-token', {
             heading: 'Planter',

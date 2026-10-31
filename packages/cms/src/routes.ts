@@ -265,6 +265,7 @@ const draftChanges = async (cms: CmsService, ref: DocumentRef, access: EditorAcc
         ...(await reviewFields(cms, state)),
         canPublish,
         canPublishPastReview: canPublish && mayPublishPastReview(cms, caller.role),
+        heldBy: state.heldBy,
     };
 };
 

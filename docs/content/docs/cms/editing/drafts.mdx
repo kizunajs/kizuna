@@ -12,13 +12,13 @@ description: 'How drafts are saved, versioned, protected from overwriting, rolle
 
 ## One editor at a time
 
-The first person to save a document holds it. Everyone else sees it read only, with the holder's face and "Kari is editing" where its status goes, until the holder is done. A write from anyone else, a save, a restore, publishing or unpublishing, answers `409` and names who holds it under `heldBy`.
+The first person to save a document holds it. Everyone else sees it read only, with the holder's face and "Kari is editing" where its status goes, until the holder is done. Publish lists it with "Kari is editing it" and leaves it out. A write from anyone else, a save, a restore, publishing or unpublishing, answers `409` and names who holds it under `heldBy`.
 
 The hold ends when the holder leaves the document, asks for a review of it, or goes two minutes without saving. Nothing else is needed: the next person to save holds it then.
 
 An agent works as the person it acts for, so a model that Mia connected holds a document for Mia, and Mia may keep editing beside it. Between the two of them the later save of a field wins.
 
-`heldBy` on every draft answer and on `editing_describe` says who holds it now, so a model can see it before writing. `editing_release_hold` lets it go once a model is done. A scheduled publish waits while someone holds the document, and goes out once they are done. The app's own writes through the CMS service, like a seed or a migration, take no hold and are never refused by one.
+`heldBy` on every draft answer, on `editing_describe` and on a document's changes says who holds it now, so a model can see it before writing. `editing_release_hold` lets it go once a model is done. A scheduled publish waits while someone holds the document, and goes out once they are done. The app's own writes through the CMS service, like a seed or a migration, take no hold and are never refused by one.
 
 The hold is stored on the document and checked in the same transaction as the save, so it holds across server instances and on a platform that starts a fresh one per request. It needs the `held_by`, `held_since` and `held_until` columns that `kizuna cms migrate` adds to `cms_documents`.
 

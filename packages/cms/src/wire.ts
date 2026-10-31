@@ -465,6 +465,7 @@ export const DraftChangesSchema = Kizuna.model({
         published: z.boolean().describe('Whether anything is published yet. When not, every filled field is a change.'),
         ...ReviewFields,
         canPublishPastReview: z.boolean().describe('Whether the caller may publish it before its review is approved, with `force`.'),
+        heldBy: HeldBySchema,
         changes: z
             .array(
                 z.object({

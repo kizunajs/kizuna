@@ -34,6 +34,7 @@ export interface Changes {
     requireReview: boolean;
     canPublish: boolean;
     canPublishPastReview: boolean;
+    heldBy: string | null;
 }
 
 function Thumbnail({ image }: { image: { id: string } }) {
@@ -189,8 +190,22 @@ interface Pending {
      * Whether the person may publish it before its review is approved.
      */
     canPublishPastReview: boolean;
+    /**
+     * The first name of someone else editing it, who holds it until they stop.
+     */
+    holder?: string;
     problem?: string;
 }
+
+/**
+ * The first name of whoever edits a document when it is someone besides the
+ * person, who may not publish it until they stop.
+ */
+export const holderOf = (heldBy: string | null, people: People | undefined): string | undefined => {
+    if (heldBy === null || people === undefined || heldBy === people.me) return undefined;
+    const name = people.people.find((person) => person.id === heldBy)?.name ?? heldBy;
+    return name.split(' ')[0];
+};
 
 /**
  * Names as a sentence lists them: "Kari", "Kari or Ola", "Kari, Ola or Nils".
@@ -202,6 +217,7 @@ const eitherOf = (names: readonly string[]): string =>
  * Why a document cannot go live yet, or undefined when it can.
  */
 const heldBack = (document: Pending): string | undefined => {
+    if (document.holder !== undefined) return `${document.holder} is editing it.`;
     if (!document.canPublish) return 'Every site shows this, so an admin over every site publishes it. Ask for a review.';
     if (!document.requireReview || document.review?.status === 'approved') return undefined;
     const review = document.review;
@@ -447,6 +463,7 @@ export function PublishReview({
                     params: tools.params,
                 });
                 if (answer.status !== 200 || answer.body.changes.length === 0) return undefined;
+                const holder = holderOf(answer.body.heldBy, people);
                 return {
                     ...candidate,
                     title: answer.body.label,
@@ -458,11 +475,16 @@ export function PublishReview({
                     requireReview: answer.body.requireReview,
                     canPublish: answer.body.canPublish,
                     canPublishPastReview: answer.body.canPublishPastReview,
+                    ...(holder === undefined
+                        ? {}
+                        : {
+                              holder,
+                          }),
                 };
             })
         );
         setPending(found.filter((entry): entry is Pending => entry !== undefined));
-    }, [connection, candidates]);
+    }, [connection, candidates, people]);
     // Lists on opening alone, so a new `candidates` from the editor keeps the documents left out and why a publish failed.
     const latestLoad = useRef(load);
     latestLoad.current = load;
@@ -740,7 +762,7 @@ export function PublishReview({
                       return [
                           {
                               text: several ? `${document.title}: ${reason}` : reason,
-                              ...(document.canPublishPastReview
+                              ...(document.canPublishPastReview && document.holder === undefined
                                   ? {
                                         publishPast: document,
                                     }
