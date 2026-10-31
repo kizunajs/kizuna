@@ -157,6 +157,50 @@ A page keeps its design because its fields refuse what would break it. Designers
 | Sections in any order, up to twelve        | `blocks([StatementBlockSchema, ProductsBlockSchema]).max(12)` | A list editors add sections to by type   |
 | A link that is https                       | `z.url({ protocol: /^https$/ })`                              | A URL input that says https only         |
 | An image with a crop and alt text          | `ImageSchema`                                                 | Upload, crop and alt text                |
+| A hero cropped to 16:9                     | `croppedImage({ aspectRatio: '16:9' })`                       | A crop frame that keeps 16:9             |
 | A field only the client's admin may change | `auth: { roles: 'admin' }`                                    | The field, greyed out                    |
 
 A character limit keeps a heading short, and letters differ in width, so check the design with the longest heading the limit allows. `.describe()` is what the editor and the agent read under the input, so give the reason: `'Under 8 words. No full stop.'`
+
+## Crop to a shape
+
+`croppedImage` declares the shape an image field is cropped to. A hero at 16:9:
+
+```ts title="packages/content/src/pages/countries.ts"
+import { croppedImage } from '@kizunajs/cms/schemas';
+
+{
+    name: 'hero',
+    schema: croppedImage({
+        aspectRatio: '16:9',
+    }).optional(),
+},
+```
+
+The editor crops the hero for this page alone: the frame keeps 16:9 however it is dragged, and the same image keeps its own crop everywhere else. The page reads `hero.url`, `hero.width` and `hero.height` with the crop applied. Until an editor crops it, the hero is the largest 16:9 part of the image around its focal point, so a page never receives a hero of another shape.
+
+A page that shows one image at two shapes names each crop:
+
+```ts
+{
+    name: 'hero',
+    schema: croppedImage({
+        crops: {
+            wide: '16:9',
+            tall: '4:5',
+        },
+    }),
+},
+```
+
+The editor crops each one on its own tab, and the page reads `hero.crops.wide` and `hero.crops.tall`, each `{ url, width, height }`. `hero.url` stays the whole image.
+
+The focal point is the spot a crop keeps in frame. The [library](/docs/cms/editing/admin#an-images-details) sets an image's own, and a field can set its own for that use. Every crop an editor has not set follows it, and a crop the editor set stays where they put it. When a field's shape changes, a crop saved in the old shape reads as unset until an editor crops it again.
+
+A cropped image's URL carries its crop, so ask only for the width the page needs, and the shape stays:
+
+```tsx
+<img src={`${hero.url}&w=1600`} alt={hero.alt} />
+```
+
+`w` and `h` together crop again around the focal point, to a shape the field never declared, so declare the shapes your pages show and the editor sees each one.

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { definePage, definePages } from '@kizunajs/cms';
+import { croppedImage, definePage, definePages } from '@kizunajs/cms';
 
 const frontPage = definePage({
     name: 'frontPage',
@@ -12,6 +12,12 @@ const frontPage = definePage({
         {
             name: 'intro',
             schema: z.string().min(1).max(400),
+        },
+        {
+            name: 'hero',
+            schema: croppedImage({
+                aspectRatio: '16:9',
+            }).optional(),
         },
     ],
 });

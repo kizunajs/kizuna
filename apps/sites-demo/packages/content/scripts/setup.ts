@@ -105,6 +105,8 @@ const main = async (): Promise<void> => {
             .where(eq(user.email, person.email));
     }
     await seedContent(service);
+    // Content saved before the index held images, and before it kept the published refs, gets both.
+    await service.reindexRefs();
 };
 
 main().then(

@@ -240,7 +240,9 @@ people: {
 
 ## Images
 
-Each site has images of its own beside a shared library. Shared content holds shared images, and a site's content holds its own and the shared ones. Every editor may upload to the shared library, and changing or deleting a shared image takes an admin over every site, since every site shows it.
+Each site has images of its own beside a shared library, and each library has its own folders. Shared content holds shared images, and a site's content holds its own and the shared ones. Every editor may upload to the shared library, and changing, moving or deleting a shared image, or its folders, takes an admin over every site, since every site shows it.
+
+An image keeps its id when it [moves](/docs/cms/editing/admin#moving-images) between libraries. A site's image moves into Shared when the group wants every site to use it. A shared image moves into one site only while nothing outside that site holds it, so a page on another site, and shared content, keep what they show. When something does, nothing moves, and the admin lists what holds it.
 
 ## Articles across sites
 
@@ -323,7 +325,7 @@ Each publish records one row per site and partner, with its status and attempts:
 
 ### Running the refreshes
 
-A config with sites gets the CMS's own job, `content.refreshSite`, beside your [jobs](/docs/jobs), so it names a `jobRunner`. With `mode: 'in-process'`, the job runs on its own. With `mode: 'http'`, the job endpoints need an identity. The job runs as the one your own jobs name, and with no jobs of your own, `jobs: { identity: 'scheduler' }` on `cms()` names it. A [transport](/docs/jobs#transports) retries a site or partner that does not answer, up to five attempts. Without one, a refresh that fails is not tried again.
+A config with sites gets the CMS's refresh job, `content.refreshSite`, beside your [jobs](/docs/jobs) and the [scheduling](/docs/cms/editing/scheduling#how-it-runs) job every CMS has. With `mode: 'in-process'`, the job runs on its own. With `mode: 'http'`, the job endpoints need an identity. The job runs as the one your own jobs name, and with no jobs of your own, `jobs: { identity: 'scheduler' }` on `cms()` names it. A [transport](/docs/jobs#transports) retries a site or partner that does not answer, up to five attempts. Without one, a refresh that fails is not tried again.
 
 ## Partners
 

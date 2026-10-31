@@ -5,11 +5,13 @@ description: 'The field schemas the CMS ships: images, files, rich text and site
 
 From `@kizunajs/cms/schemas`:
 
-| Schema           | Stores                                | The page receives                 |
-| ---------------- | ------------------------------------- | --------------------------------- |
-| `ImageSchema`    | Media id, alt text, crop, focal point | `{ id, url, alt, width, height }` |
-| `FileSchema`     | Media id, a label                     | `{ id, url, label, size }`        |
-| `RichTextSchema` | Portable Text                         | Portable Text, for `<RichText>`   |
-| `SiteSchema`     | A site's built-in shape, to `extend`  |                                   |
+| Schema                                    | Stores                                                | The page receives                                                        |
+| ----------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------ |
+| `ImageSchema`                             | Media id, alt text, crop, focal point                 | `{ id, url, alt, width, height }`                                        |
+| `croppedImage({ aspectRatio: '16:9' })`   | Media id, alt text, a crop of that shape, focal point | `{ id, url, alt, width, height }`, always 16:9                           |
+| `croppedImage({ crops: { wide, tall } })` | Media id, alt text, a crop per name, focal point      | The same, with `crops.wide` and `crops.tall` as `{ url, width, height }` |
+| `FileSchema`                              | Media id, a label                                     | `{ id, url, label, size }`                                               |
+| `RichTextSchema`                          | Portable Text                                         | Portable Text, for `<RichText>`                                          |
+| `SiteSchema`                              | A site's built-in shape, to `extend`                  |                                                                          |
 
 `Output<T>` is a block's or field's type with images resolved. `richTextFromPlain(text)` turns a string into rich text, for a `migrate` step.

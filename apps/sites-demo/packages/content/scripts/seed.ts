@@ -37,8 +37,9 @@ const londonOnTheUk = {
 
 /**
  * Photos from Unsplash, free to use under the Unsplash License, the same ones
- * the single-site demo uses. The Oslo shop's photo is shared, and the wreath
- * evening's belongs to the UK's own library.
+ * the single-site demo uses. The Oslo shop's photo is shared, the wreath
+ * evening's belongs to the UK's own library, and the hero of Hagen Norge's
+ * front page to Norway's, in its Kampanjer folder.
  */
 const photos = {
     oslo: {
@@ -48,6 +49,10 @@ const photos = {
     wreathEvening: {
         file: 'forest-trunks.jpg',
         alt: 'Tall spruce trunks above a green understorey',
+    },
+    norwayHero: {
+        file: 'forest-path.jpg',
+        alt: 'En sti gjennom granskogen',
     },
 };
 
@@ -353,9 +358,9 @@ export const seedContent = async (service: CmsService): Promise<void> => {
      * Stores a photo in the shared library, or in a site's own when `site`
      * names one.
      */
-    const upload = async (photo: { file: string; alt: string }, site?: string): Promise<{ id: string; alt: string }> => {
+    const upload = async (photo: { file: string; alt: string }, site?: string, folder?: string): Promise<{ id: string; alt: string }> => {
         const bytes = new Uint8Array(await readFile(join(PHOTOS, photo.file)));
-        const record = await service.media.storeBytes(bytes, photo.file, AUTHOR, undefined, site);
+        const record = await service.media.storeBytes(bytes, photo.file, AUTHOR, undefined, site, folder);
         if (record.alt === '') {
             await service.media.update(
                 record.id,
@@ -374,13 +379,19 @@ export const seedContent = async (service: CmsService): Promise<void> => {
     /**
      * Gives a published document an image it has none of yet.
      */
-    const addImage = async (ref: DocumentRef, field: string, photo: { file: string; alt: string }, site?: string): Promise<void> => {
+    const addImage = async (
+        ref: DocumentRef,
+        field: string,
+        photo: { file: string; alt: string },
+        site?: string,
+        folder?: string
+    ): Promise<void> => {
         const { row } = await service.document(ref);
         if (row === undefined || row.published?.[field] !== undefined) return;
         await service.update({
             ref,
             changes: {
-                [field]: await upload(photo, site),
+                [field]: await upload(photo, site, folder),
             },
             caller,
             author: AUTHOR,
@@ -518,3 +529,38 @@ export const seedContent = async (service: CmsService): Promise<void> => {
         norwayFrontPageInEnglish
     );
 };
+
+    // Hagen Norge's library keeps its photos in folders of its own.
+    const folderNamed = async (name: string, parent?: string): Promise<string> => {
+        const found = (await service.media.folders('norway')).find(
+            (folder) => folder.site === 'norway' && folder.name === name && folder.parent === parent
+        );
+        if (found !== undefined) return found.id;
+        const made = await service.media.createFolder(
+            {
+                name,
+                ...(parent === undefined
+                    ? {}
+                    : {
+                          parent,
+                      }),
+            },
+            'norway',
+            AUTHOR
+        );
+        return made.id;
+    };
+    const campaigns = await folderNamed('Kampanjer');
+    await folderNamed('Jul 2026', campaigns);
+    await folderNamed('Butikkene');
+    await addImage(
+        {
+            type: 'page',
+            name: 'frontPage',
+            site: 'norway',
+        },
+        'hero',
+        photos.norwayHero,
+        'norway',
+        campaigns
+    );

@@ -27,6 +27,10 @@ Published content that fails its schema:
 
 Stores every document at its latest `migrate` step. Reads already run newer steps in memory and the next save stores them, so this is optional: run it after a deploy to stop reads migrating documents nobody edits. It adds no version and publishes nothing.
 
+## `kizuna cms reindex`
+
+Rebuilds the index of the ids and images each document holds, from its draft and its published content. The library's uses, Delete and Move read it, and every save keeps it current, so run it once on a database whose content was saved before the index held images.
+
 ## `kizuna cms pages`
 
 Lists every page's path and name from the `content.ts` files under `src/app` or `app`, without loading the config.

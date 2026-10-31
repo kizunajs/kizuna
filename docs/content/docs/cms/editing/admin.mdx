@@ -95,18 +95,19 @@ With no `basePath`, the route matches the path as the browser sent it, so this f
 
 Every screen has an address of its own, so a link to one opens it, and reloading stays on it:
 
-| Screen                   | Address                               |
-| ------------------------ | ------------------------------------- |
-| The dashboard            | `/admin`, or `/admin?period=30d`      |
-| Pages                    | `/admin/pages`                        |
-| A page                   | `/admin/pages/frontPage`              |
-| A global                 | `/admin/globals/header`               |
-| A collection             | `/admin/collections/employees`        |
-| An item                  | `/admin/collections/employees/k3j9x2` |
-| A view                   | `/admin/views/appUsers`               |
-| A record of a view       | `/admin/views/appUsers/42`            |
-| Media                    | `/admin/media`                        |
-| An image beside the grid | `/admin/media/med_3f2a9c1e`           |
+| Screen                   | Address                                |
+| ------------------------ | -------------------------------------- |
+| The dashboard            | `/admin`, or `/admin?period=30d`       |
+| Pages                    | `/admin/pages`                         |
+| A page                   | `/admin/pages/frontPage`               |
+| A global                 | `/admin/globals/header`                |
+| A collection             | `/admin/collections/employees`         |
+| An item                  | `/admin/collections/employees/k3j9x2`  |
+| A view                   | `/admin/views/appUsers`                |
+| A record of a view       | `/admin/views/appUsers/42`             |
+| Media                    | `/admin/media`                         |
+| A folder of the library  | `/admin/media?folder=fld_8c1e2b7d4a5f` |
+| An image beside the grid | `/admin/media/med_3f2a9c1e`            |
 
 A collection's list keeps its state in the query, as in `/admin/collections/articles?page=2&sort=-updatedAt`: `page`, `limit` for the rows a page holds, `sort` with a `-` before a field sorted newest or last first, `search`, and a `filter` for each condition, like `filter=status:is:draft`. A signed-out editor who opens any of these signs in and comes back to that address, query included.
 
@@ -140,11 +141,11 @@ With [several sites](/docs/cms/sites), the admin has places: each site, **Shared
 
 Under the logo, the sidebar shows the place open, its mark and its name, then that place's screens in one list:
 
-| Place    | Its screens                                                                        |
-| -------- | ---------------------------------------------------------------------------------- |
-| A site   | Dashboard, Pages, the site's own collections and globals, and Media for its images |
-| Shared   | The shared collections, globals and views, then Media for the shared images        |
-| Overview | Dashboard, Pages for every site's pages, and each collection a site has of its own |
+| Place    | Its screens                                                                                                                                      |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A site   | Dashboard, Pages, the site's own collections and globals, Waiting, [Scheduled](/docs/cms/editing/scheduling#scheduled), and Media for its images |
+| Shared   | The shared collections, globals and views, then Media for the shared images                                                                      |
+| Overview | Dashboard, Pages for every site's pages, and each collection a site has of its own                                                               |
 
 The bar across the top of each screen starts with the place, then the way to the screen, as in **Hagen UK / Dashboard / Events**. Shared has no dashboard, so its path starts at the list, as in **Shared / Offices / Harbour Office**. The search sits at the bar's right end, and the bar stands in for the trail in each screen's header.
 
@@ -224,15 +225,33 @@ A view's list shows its `title` and `columns`, a choice by the label of its opti
 
 ## Media
 
-**Media**, under Content, shows every uploaded image with its file name, size and how many pages use it. The header counts the images, the ones nothing uses, and the space they take. **All images** and **Unused** pick which show, and **Grid** and **List** pick how. The search box finds an image by its file name or alt text, **Type** keeps one format, and **Sort** orders them by when they arrived, by name or by size.
+**Media**, under Content, shows the library's folders above its images, each image with its file name, size and how many places use it. The header counts the images, the ones nothing uses, and the space they take. **All images** and **Unused** pick which show, and **Grid** and **List** pick how. The search box finds an image by its file name or alt text, **Type** keeps one format, and **Sort** orders them by when they arrived, by name or by size.
 
-**Upload**, or files dropped on the screen, adds JPEG, PNG, WebP, GIF and AVIF images. Each is checked by its bytes and loses its location metadata, and the same file uploaded twice is one image.
+**Upload**, or files dropped on the screen, adds JPEG, PNG, WebP, GIF and AVIF images to the folder that is open. Each is checked by its bytes and loses its location metadata, and the same file uploaded twice to one library is one image.
 
-A click on an image opens it beside the grid: the image large, its alt text, its type, size and who uploaded it, and every page that uses it, each a link to that page with the field that holds the image. Click the image to set its focal point, the spot a crop keeps in frame, and **Save** keeps both.
+### Folders
+
+A folder holds images and other folders, so `Kampanjer / Jul 2026` is two folders, one inside the other. The library opens at its top level, its folders first and then the images in no folder, and a click on a folder opens it. The path bar leads back. With [several sites](/docs/cms/sites#images), each site's library has folders of its own, and **Shared** comes first in a site's library and opens the shared one.
+
+The search box and **Unused** look in every folder at once, and each image they find names its folder.
+
+**New folder** makes a folder where you are. A folder's `…` menu renames it or deletes it. Deleting takes an empty folder, so move or delete what it holds first.
+
+### Moving images
+
+Tick images to select them, and **Move** in the header moves them into a folder you pick, of this library or of another. An image keeps its id when it moves, so every page, global and item holding it keeps showing it.
+
+### An image's details
+
+A click on an image opens it beside the grid: the image large, the places that use it, its alt text, and its type, size and who uploaded it. Each place is a link to the page, global or item, with the field that holds the image, the languages it shows in, and **Draft** when only a draft holds it. With several sites, the places sit under the site they belong to, shared content last, and an editor sees how many more are in sites they do not edit. Click the image to set its focal point, the spot a crop keeps in frame, and **Save** keeps both.
 
 The library's alt text and focal point are the image's own, and each use can set its own instead. A field that picks the image starts with its alt text, and a page shows it wherever the field's is empty. The focal point holds wherever a field sets none. A crop, focal point or alt text set in a field belongs to that use alone, so a change on one page never moves the image on another. Saving in the library refreshes every page that shows the image.
 
-**Delete**, in the `…` menu, asks first and says how many pages use the image. Those pages lose it, so give each of them another image before deleting one that is in use.
+### Deleting an image
+
+**Delete**, in the `…` menu, deletes an image nothing holds, after asking. While a page, global or item holds it, published or in a draft, nothing is deleted, and a dialog lists each place with a link to it. Give each of them another image, or remove it, and the image can go. **Unused** lists every image you can delete now. Deleting several ticked images deletes none of them while any one is held.
+
+Restoring a version that held a deleted image leaves that field empty.
 
 ## Editing
 
@@ -257,7 +276,7 @@ Each field has its label above it, with an asterisk when the document needs it b
 
 A field made of other fields, like a page's hero block, shows them under its name as a heading, or under its tab when a tab holds it alone. A list shows each item as a row: drag it by the handle or move it with the arrow keys, open it with the chevron to edit its fields, and remove it with the ×, which **Undo** on the message that follows puts back. A row shows the item's first text as its title, and a block's name before it. **Collapse all** and **Expand all** sit beside the list's label, and the add button under the rows names the item, like **Add link** for a list labelled Links.
 
-An image shows its file name and size, and in the sidebar the image itself, large. An empty one takes an image from the library, or a file dropped on it. Edit opens the image at size: click it to set the focus a crop keeps in view, write its alt text, and trim pixels from its edges under **Crop**. **Apply** keeps the changes.
+An image shows its file name and size, and in the sidebar the image itself, large. An empty one takes an image from the library, or a file dropped on it. Edit opens the image at size with its crop as a frame: drag inside the frame to move it and drag a corner to resize it. A [`croppedImage`](/docs/cms/fields#crop-to-a-shape) field keeps the frame to its shape, shows the shape under **Aspect ratio**, and gives each named crop a tab. A click on the image sets the focal point, which every crop not set follows, and each shape shows small under the image. **Apply** keeps the changes.
 
 A field that holds one id of a collection or a [relationship](/docs/cms/relationships) picks it from a search. A list of ids shows a row for each, with its image and detail, in the order you drag them into. **Choose products**, named after the field, opens a sheet that searches as you type, ticks what the list holds, and counts it against the list's maximum. **Use 3 products** puts your choice in the field.
 
