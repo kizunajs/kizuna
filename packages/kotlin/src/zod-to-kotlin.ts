@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 import {
     isBinarySchema,
     isFileSchema,
@@ -99,6 +99,11 @@ export class TypeRegistry {
     private readonly sealedVariantPaths = new Map<string, string>();
     private readonly brands = new Map<string, KotlinBrand>();
     public usesJsonElement = false;
+    /**
+     * Whether a schema holds a fractional key, so the client gets
+     * \`FractionalKey\`.
+     */
+    public usesFractionalKey = false;
 
     constructor(
         public readonly camelCaseProperties = false,
@@ -231,7 +236,15 @@ const stringify = (value: string): string => JSON.stringify(value);
 
 const BRANDABLE_TYPES = new Set(['String', 'Int', 'Long', 'Double', 'Boolean', 'Instant']);
 
+/**
+ * Whether a schema is a fractional key, like an item's place in an orderable
+ * collection, which \`.meta({ fractionalKey: true })\` marks.
+ */
+export const isFractionalKey = (schema: z.core.$ZodType): boolean =>
+    (z.globalRegistry.get(schema as z.ZodType) as { fractionalKey?: unknown } | undefined)?.fractionalKey === true;
+
 export const mapType = (schema: z.core.$ZodType, registry: TypeRegistry, hint: string): MapResult => {
+    if (isFractionalKey(schema)) registry.usesFractionalKey = true;
     const result = mapUnbrandedType(schema, registry, hint);
     const brand = readMetaBrand(schema);
     if (brand === undefined || !BRANDABLE_TYPES.has(result.expression)) return result;

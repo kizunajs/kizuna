@@ -10,7 +10,8 @@ import { defineCollection } from './definitions.js';
 import { cms } from './provider.js';
 import { memoryMediaStorage } from './media/storage.js';
 import { DocumentStore } from './storage/store.js';
-import { byPlace, isKey, keyBetween, keysBetween } from './place.js';
+import { byPlace } from './place.js';
+import { isKey, keyBetween, keysBetween } from './keys.js';
 import vectors from './keys.vectors.json';
 
 const k = new Kizuna();
@@ -329,6 +330,18 @@ describe('an orderable collection', () => {
             },
         });
         expect(await editingNames('employees')).toEqual(['Ingrid Solberg', 'Eleanor Price-Hale', 'Martin Hale', 'Priya Shah']);
+    });
+
+    it('gives editors each place, sorting in the order, and the new place after a move', async () => {
+        const ids = await team();
+        const listed = await asEditor(request(app).get('/editing/collections/employees/items'));
+        const places = (listed.body.items as Array<{ place: string }>).map((item) => item.place);
+        expect(places.every(isKey)).toBe(true);
+        expect([...places].sort()).toEqual(places);
+        const moved = await place('employees', ids['Priya Shah']!, {
+            at: 'first',
+        });
+        expect(moved.body.place < places[0]!).toBe(true);
     });
 
     it('never shows the place to a reader', async () => {

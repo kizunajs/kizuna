@@ -16,9 +16,13 @@ let package = Package(
             name: "OpenEnumAPIClient",
             path: "Sources/OpenEnumAPIClient"
         ),
+        .target(
+            name: "FractionalKey",
+            path: "Sources/FractionalKey"
+        ),
         .testTarget(
             name: "APIClientTests",
-            dependencies: ["APIClient", "OpenEnumAPIClient"],
+            dependencies: ["APIClient", "OpenEnumAPIClient", "FractionalKey"],
             path: "Tests/APIClientTests"
         ),
     ]

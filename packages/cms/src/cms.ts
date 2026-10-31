@@ -64,7 +64,8 @@ import { previewSecret, previewTokenExpiry, signPreviewToken, verifyPreviewToken
 import { DraftNotices } from './draft-notices.js';
 import { DocumentHolds, type Hold } from './holds.js';
 import { depthRefusal, descendantsOf, loadParents, loopRefusal, parentIn, placeInTree } from './tree.js';
-import { byPlace, PLACE, keyBetween, placeIn } from './place.js';
+import { byPlace, PLACE, placeIn } from './place.js';
+import { keyBetween } from './keys.js';
 import { ITEM_STATUSES, type ItemCondition, type ItemListQuery } from './item-list.js';
 import type { PageStatusSchema } from './wire.js';
 import type { CmsRelationship, RelationshipOption } from './relationships.js';
@@ -2034,6 +2035,11 @@ export class CmsService {
                 status: this.statusOf(row, stored.latestVersion),
                 complete: missingFields(definition, row.draft).length === 0 && row.draft !== null,
                 updatedAt: row.updatedAt.toISOString(),
+                ...(definition.orderable === true && placeIn(content) !== undefined
+                    ? {
+                          place: placeIn(content),
+                      }
+                    : {}),
                 updatedBy: row.updatedBy,
                 ...(placement === undefined
                     ? definition.tree === undefined

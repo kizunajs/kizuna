@@ -45,6 +45,7 @@ import {
     type SwiftField,
     type SwiftType,
 } from './zod-to-swift.js';
+import { FRACTIONAL_KEY_SWIFT } from './fractional-key.js';
 
 export interface SwiftConfig {
     namespaceName: string;
@@ -2709,6 +2710,11 @@ const renderSwiftClient = (api: ApiDefinition, partition: RoutesPartition, regis
             emitBrand(writer, brand);
         }
     });
+
+    if (registry.usesFractionalKey) {
+        writer.blank();
+        for (const line of FRACTIONAL_KEY_SWIFT.trimEnd().split('\n')) writer.line(line);
+    }
 
     emitClient(writer, { clientName, anyCodable: registry.usesAnyCodable }, partition, context, typesByOperation);
 

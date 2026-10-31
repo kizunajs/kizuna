@@ -42,6 +42,18 @@ export const CollectionPageSchema = Kizuna.model({
         collection: z.string().describe('The collection whose items the route shows, one per address.'),
     }),
 });
+/**
+ * An item's place in an orderable collection: a fractional key, sorting in
+ * the order editors gave the items. `keyBetween` from `@kizunajs/cms/keys`
+ * makes one between two others, and the Swift and Kotlin clients emit
+ * `FractionalKey` for the same.
+ */
+export const PlaceSchema = z.string().meta({
+    fractionalKey: true,
+    description: "The item's place among the others, a key that sorts in their order.",
+});
+
+/**
 
  * Where an item sits in a collection with a `tree`, as the editing list and
  * the picker answer it.
@@ -69,6 +81,9 @@ export const EditorItemSchema = Kizuna.model({
         complete: z.boolean(),
         updatedAt: z.string(),
         updatedBy: z.string(),
+        place: PlaceSchema.optional().describe(
+            'Its place, a key that sorts in the order editors gave the items. Only in an orderable collection.'
+        ),
         ...TreePlacementShape,
         values: z
             .record(z.string(), z.unknown())

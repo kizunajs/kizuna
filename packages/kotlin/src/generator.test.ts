@@ -2751,3 +2751,46 @@ describe('kotlinClient: groups', () => {
         expect(output).not.toContain('getArticle');
     });
 });
+
+describe('Kotlin generator: fractional keys', () => {
+    const contractWith = (place: z.ZodType) =>
+        defineConfig({
+            routes: [
+                {
+                    listEmployees: {
+                        method: 'GET',
+                        path: '/employees',
+                        responses: {
+                            200: z.array(
+                                z.object({
+                                    id: z.string(),
+                                    place,
+                                })
+                            ),
+                        },
+                    },
+                },
+            ],
+        }).api;
+
+    it('emits FractionalKey once a schema holds a fractional key, and keeps the field a String', () => {
+        const output = generateKotlinClient(
+            contractWith(
+                z
+                    .string()
+                    .meta({
+                        fractionalKey: true,
+                    })
+                    .optional()
+            ),
+            baseConfig
+        );
+        expect(output).toContain('public object FractionalKey {');
+        expect(output).toContain('public fun between(before: String?, after: String?): String {');
+        expect(output).toMatch(/val place: String\? = null/);
+    });
+
+    it('emits none for an API without one', () => {
+        expect(generateKotlinClient(contractWith(z.string()), baseConfig)).not.toContain('FractionalKey');
+    });
+});

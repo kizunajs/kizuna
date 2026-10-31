@@ -2763,3 +2763,47 @@ describe('swiftClient: groups', () => {
         expect(output).not.toContain('getArticle');
     });
 });
+
+describe('Swift generator: fractional keys', () => {
+    const contractWith = (place: z.ZodType) =>
+        defineConfig({
+            ...config,
+            routes: [
+                k.routes({
+                    listEmployees: k.route({
+                        method: 'GET',
+                        path: '/employees',
+                        responses: {
+                            200: z.array(
+                                z.object({
+                                    id: z.string(),
+                                    place,
+                                })
+                            ),
+                        },
+                    }),
+                }),
+            ],
+        }).api;
+
+    it('emits FractionalKey once a schema holds a fractional key, and keeps the field a String', () => {
+        const output = generateSwiftClient(
+            contractWith(
+                z
+                    .string()
+                    .meta({
+                        fractionalKey: true,
+                    })
+                    .optional()
+            ),
+            baseConfig
+        );
+        expect(output).toContain('public enum FractionalKey {');
+        expect(output).toContain('public static func between(_ before: String?, _ after: String?) throws -> String');
+        expect(output).toContain('public let place: String?');
+    });
+
+    it('emits none for an API without one', () => {
+        expect(generateSwiftClient(contractWith(z.string()), baseConfig)).not.toContain('FractionalKey');
+    });
+});

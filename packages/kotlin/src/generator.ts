@@ -43,6 +43,7 @@ import {
     type KotlinField,
     type KotlinType,
 } from './zod-to-kotlin.js';
+import { FRACTIONAL_KEY_KOTLIN } from './fractional-key.js';
 
 export interface KotlinConfig {
     namespaceName: string;
@@ -2245,6 +2246,11 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
             emitBrand(writer, brand);
         }
     });
+
+    if (registry.usesFractionalKey) {
+        writer.blank();
+        for (const line of FRACTIONAL_KEY_KOTLIN.trimEnd().split('\n')) writer.line(line);
+    }
 
     emitClient(writer, { clientName }, partition, context, typesByOperation, registry);
 

@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "generate": "pnpm --filter @kizunajs-demo/express kizuna:generate",
+    "generate": "pnpm --filter @kizunajs-demo/express kizuna:generate && tsx scripts/keys.ts",
     "pretest": "pnpm generate",
     "test": "tsx scripts/test.ts",
     "build": "cd swift && swift build",

@@ -92,6 +92,7 @@ import {
     withdrawReviews,
 } from './reviews.js';
 import { waitingTranslations } from './waiting-translations.js';
+import { placeIn } from './place.js';
 import { changePerson, invitePerson, managedSites, peopleWithSites, siteRoles } from './people.js';
 import type { Person } from './options.js';
 import { collectionActionRoutes, itemActions } from './action-routes.js';
@@ -153,6 +154,13 @@ const scheduleBody = (state: DraftState) =>
     missing: state.missing,
     updatedAt: state.row?.updatedAt.toISOString() ?? null,
     updatedBy: state.row?.updatedBy ?? null,
+    heldBy: state.heldBy,
+    schedule: scheduleBody(state),
+    ...(placeIn(state.row?.draft ?? state.row?.published) === undefined
+        ? {}
+        : {
+              place: placeIn(state.row?.draft ?? state.row?.published),
+          }),
 });
 
 /**
@@ -161,13 +169,6 @@ const scheduleBody = (state: DraftState) =>
 const labelOf = (field: { label?: string; name: string }): string =>
     field.label ??
     field.name
-    heldBy: state.heldBy,
-    schedule: scheduleBody(state),
-    ...(placeIn(state.row?.draft ?? state.row?.published) === undefined
-        ? {}
-        : {
-              place: placeIn(state.row?.draft ?? state.row?.published),
-          }),
         .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
         .replace(/[_-]/g, ' ')
         .toLowerCase()

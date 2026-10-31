@@ -122,6 +122,18 @@ A move is a change to the item. The item reads Changed until it is published, th
 
 Each item keeps its place as a short key that sorts between its neighbours, stored with its draft and its published copy, so moving one employee changes that employee alone. A reader never sees the key. Items saved before the collection said `orderable` have no place yet, and come last until the first move, which gives each of them the place it showed in.
 
+#### Moving items from your own app
+
+The [editing list](/docs/cms/editing/agents#listing-items) gives each item its `place`, and `PUT /editing/collections/employees/items/:id/place` moves one, beside another with `after` or `before`, or first or last with `at`. The route makes the new key and answers with it. To show a move before the answer arrives, make the same key in the browser and sort by it:
+
+```ts
+import { keyBetween } from '@kizunajs/cms/keys';
+
+const place = keyBetween(above?.place, below?.place);
+```
+
+`@kizunajs/cms/keys` imports nothing, so it runs in any browser. The Swift and Kotlin clients emit `FractionalKey` for the same, `FractionalKey.between(above, below)`, once the API holds a place.
+
 ## Trees
 
 A shop's tags nest: Workshop sits under Lighting, and Brushed brass under Brass under Materials. A collection whose items point at one of their own is a tree, and `tree` names the field that points up:
