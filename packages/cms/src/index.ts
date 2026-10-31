@@ -164,7 +164,7 @@ export { memoryMediaStorage, type MediaStorage } from './media/storage.js';
 export { s3MediaStorage, type S3Options } from './media/s3.js';
 export { type MediaRecord } from './media/media.js';
 export { inspectImage, stripMetadata, renderImage, type InspectedImage, type RenderOptions } from './media/inspect.js';
-export { DocumentStore, VersionConflictError, type CmsDatabase, type DocumentRow } from './storage/store.js';
+export { DocumentStore, VersionConflictError, DocumentHeldError, type CmsDatabase, type DocumentRow } from './storage/store.js';
 export { CMS_MIGRATION_SQL, indexSql, type IndexedField, type IndexType } from './storage/migration.js';
 export { discoverPages, renderPagesModule, findAppDir, defaultPagesOutput, routePathOf, type DiscoveredPage } from './discovery.js';
 export { inStoredOrder } from './in-order.js';

@@ -14,14 +14,6 @@ export interface DraftNotice {
      * any of them, as a rollback does.
      */
     paths: string[] | null;
-    /**
-     * Who saved, which makes them the document's holder on every server.
-     */
-    by?: string;
-    /**
-     * Set when `by` stopped editing and the save was not a change at all.
-     */
-    released?: boolean;
 }
 
 type Listener = (notice: DraftNotice) => void;
@@ -128,16 +120,6 @@ const parseNotice = (payload: string): DraftNotice | undefined => {
         return {
             ref: parsed.ref,
             paths: Array.isArray(parsed.paths) ? parsed.paths.filter((path): path is string => typeof path === 'string') : null,
-            ...(typeof parsed.by === 'string'
-                ? {
-                      by: parsed.by,
-                  }
-                : {}),
-            ...(parsed.released === true
-                ? {
-                      released: true,
-                  }
-                : {}),
         };
     } catch {
         return undefined;
@@ -181,11 +163,6 @@ export class DraftNotices {
                 payload = JSON.stringify({
                     ref: notice.ref,
                     paths: null,
-                    ...(notice.by === undefined
-                        ? {}
-                        : {
-                              by: notice.by,
-                          }),
                 } satisfies DraftNotice);
             }
             try {

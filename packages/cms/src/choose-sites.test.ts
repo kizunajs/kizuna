@@ -156,7 +156,7 @@ config.api.mount(app);
 // Each step is someone who saved and left, so the next person finds the document free.
 let lastToken: string | undefined;
 const left = (token: string): string => {
-    if (token !== lastToken) service.holds.clear();
+    if (token !== lastToken) void pglite.exec('update cms_documents set held_by = null, held_since = null, held_until = null');
     lastToken = token;
     return `Bearer ${token}`;
 };
@@ -195,7 +195,6 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-    service.holds.clear();
     queued.length = 0;
     revalidated.length = 0;
     showing.site = 'uk';

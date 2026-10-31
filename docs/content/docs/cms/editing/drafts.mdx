@@ -18,7 +18,7 @@ The hold ends when the holder leaves the document, asks for a review of it, or g
 
 An agent works as the person it acts for, so a model that Mia connected holds a document for Mia, and Mia may keep editing beside it. Between the two of them the later save of a field wins.
 
-`heldBy` on every draft answer and on `editing_describe` says who holds it now, so a model can see it before writing. `editing_release_hold` lets it go once a model is done. A scheduled publish waits while someone holds the document, and goes out once they are done.
+`heldBy` on every draft answer and on `editing_describe` says who holds it now, so a model can see it before writing. `editing_release_hold` lets it go once a model is done. A scheduled publish waits while someone holds the document, and goes out once they are done. The app's own writes through the CMS service, like a seed or a migration, take no hold and are never refused by one.
 
 The hold is stored on the document and checked in the same transaction as the save, so it holds across server instances and on a platform that starts a fresh one per request. It needs the `held_by`, `held_since` and `held_until` columns that `kizuna cms migrate` adds to `cms_documents`.
 

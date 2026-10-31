@@ -62,7 +62,6 @@ import {
 import { ScheduleStore } from './storage/schedule-store.js';
 import { previewSecret, previewTokenExpiry, signPreviewToken, verifyPreviewToken, verifyRefresh } from './preview-token.js';
 import { DraftNotices } from './draft-notices.js';
-import { DocumentHolds, type Hold } from './holds.js';
 import { depthRefusal, descendantsOf, loadParents, loopRefusal, parentIn, placeInTree } from './tree.js';
 import { byPlace, PLACE, placeIn } from './place.js';
 import { keyBetween } from './keys.js';
@@ -111,10 +110,6 @@ export interface MediaUse {
      * neither, so the reader writes out its name.
      */
     label: string | null;
-    fieldPaths: string[];
-    /**
-     * Whether the published content shows it. False when only the draft holds
-     * it.
     /**
      * The languages the document shows the image in: its site's, since an
      * image is the same in every language.
@@ -124,6 +119,10 @@ export interface MediaUse {
     published: boolean;
 }
 
+    fieldPaths: string[];
+    /**
+     * Whether the published content shows it. False when only the draft holds
+     * it.
 /**
  * Published content that fails its schema, for the content overview and
  * `kizuna cms check`.
@@ -200,6 +199,12 @@ const parseIfMatch = (header: string | string[] | undefined): { version: number;
  * How long an editor's autosaves keep folding into the version they started.
  */
 const FOLD_WINDOW = 10 * 60 * 1000;
+/**
+ * How long a document stays held after its holder last saved it. One person
+ * edits a document at a time, and anyone else's write is refused until then.
+ */
+export const HOLD_IDLE_MS = 2 * 60 * 1000;
+
 
 /**
  * The schema of the object holding the last segment of a dotted path, read
@@ -540,12 +545,6 @@ export class CmsService {
     /**
      * The shared collections.
      */
-    /**
-     * Who edits each document now. A document takes writes from one editor
-     * at a time.
-     */
-    readonly holds = new DocumentHolds();
-    private holdsHeard: Promise<unknown> | undefined;
     readonly collections: Record<string, Collection>;
     /**
      * Each site's own globals, keyed by site and then by name.
@@ -1137,6 +1136,10 @@ export class CmsService {
         if (row === undefined || (row.draft === null && row.published === null)) return 'empty';
         if (row.published === null) return 'draft';
         return row.publishedVersion === version ? 'published' : 'changed';
+    /**
+     * Where a document stands. A draft that holds what is published, like
+     * one reverted back to it, reads as published.
+     */
     }
 
     /**
@@ -1179,24 +1182,7 @@ export class CmsService {
             complete: row?.draft !== null && row?.draft !== undefined && missing.length === 0,
             missing,
             etag: etagOf(version, row?.updatedAt),
-        };
-    }
-
-    /**
-     * What the reader hands a component: the content with media resolved, and
-     * an item's id beside its fields.
-     */
-    private async present(target: Target, content: Record<string, unknown>): Promise<Record<string, unknown>> {
-        const resolved = await this.resolve(target.definition, content);
-        return target.ref.type === 'item'
-            ? {
-                  id: target.ref.id,
-                  ...resolved,
-              }
-            : resolved;
-    }
-
-            heldBy: this.holds.holder(formatRef(target.ref))?.by ?? null,
+            heldBy: holderOf(row),
             schedule: row === undefined ? null : await this.scheduleOf(row.id),
         };
     }
@@ -1219,62 +1205,71 @@ export class CmsService {
                           name: release.name,
                       },
             by: release?.scheduledBy ?? pending.createdBy,
-    private passes(target: Target, content: Record<string, unknown> | null): Record<string, unknown> | undefined {
-        if (content === null) return undefined;
-        const parsed = target.definition.schema.safeParse(content);
-    /**
-     * Holds the document for `author`, or renews their hold. Refuses with
-     * `409`, naming the holder, when someone else edits it.
-     */
-    async claimHold(ref: DocumentRef, author: string): Promise<void> {
-        this.hearHolds();
-        const held = this.holds.claim(formatRef(this.target(ref).ref), author);
-        if (held !== undefined) throw await this.heldError(ref, held);
+        };
     }
 
     /**
      * Refuses with `409` when someone other than `author` edits the document.
      */
     async assertNotHeld(ref: DocumentRef, author: string): Promise<void> {
-        const held = this.holds.heldByOther(formatRef(this.target(ref).ref), author);
-        if (held !== undefined) throw await this.heldError(ref, held);
+        const holder = holderOf((await this.document(ref)).row);
+        if (holder !== null && holder !== author) throw await this.heldError(ref, holder);
     }
 
     /**
-     * Ends `author`'s hold on the document, on every server. Answers whether
-     * they held it.
+     * Ends `author`'s hold on the document, so the next person need not wait
+     * it out. Answers whether they held it.
      */
     async releaseHold(ref: DocumentRef, author: string): Promise<boolean> {
-        const key = formatRef(this.target(ref).ref);
-        if (!this.holds.release(key, author)) return false;
-        await this.notices.publish({
-            ref: key,
-            paths: [],
-            by: author,
-            released: true,
-        });
-        return true;
+        const target = this.target(ref);
+        return this.store.releaseHold(target.kind, target.key, author, target.site, target.locale);
     }
 
-    private async heldError(ref: DocumentRef, held: Hold): Promise<CmsHttpError> {
+    private async heldError(ref: DocumentRef, holder: string): Promise<CmsHttpError> {
         const people = (await this.options.auth.people?.list()) ?? [];
-        const name = people.find((person) => person.id === held.by)?.name ?? held.by;
+        const name = people.find((person) => person.id === holder)?.name ?? holder;
         return new CmsHttpError(409, {
             detail: `${name} is editing '${formatRef(ref)}', so nothing was saved. One person edits a document at a time: try again once they are done.`,
-            heldBy: held.by,
+            heldBy: holder,
         });
     }
 
     /**
-     * Follows the saves and departures of other server instances, so a hold
-     * taken on one is kept on all.
+     * Saves a draft as `author`, who then holds the document, or refuses with
+     * `409` when someone else does.
      */
-    private hearHolds(): void {
-        this.holdsHeard ??= this.notices.subscribe((notice) => {
-            if (notice.by === undefined) return;
-            if (notice.released === true) this.holds.release(notice.ref, notice.by);
-            else this.holds.claim(notice.ref, notice.by);
-        });
+    private async saveHeld(
+        ref: DocumentRef,
+        input: Parameters<DocumentStore['saveDraft']>[0],
+        hold: boolean
+    ): ReturnType<DocumentStore['saveDraft']> {
+        try {
+            return await this.store.saveDraft({
+                ...input,
+                ...(hold
+                    ? {
+                          hold: HOLD_IDLE_MS,
+                      }
+                    : {}),
+            });
+        } catch (error) {
+            if (error instanceof DocumentHeldError) throw await this.heldError(ref, error.heldBy);
+            throw error;
+        }
+    }
+
+    /**
+     * What the reader hands a component: the content with media resolved, and
+     * an item's id beside its fields.
+     */
+    private async present(target: Target, content: Record<string, unknown>): Promise<Record<string, unknown>> {
+        const resolved = await this.resolve(target.definition, content);
+        return target.ref.type === 'item'
+            ? {
+                  id: target.ref.id,
+                  ...resolved,
+              }
+            : resolved;
     }
 
         return parsed.success ? (parsed.data as Record<string, unknown>) : undefined;
@@ -3041,6 +3036,18 @@ export class CmsService {
         }
         await this.assertMediaOnSite(target, stored);
         const listing = this.listingOf(input.ref);
+        /**
+         * Whether a person or an agent is editing, so the author holds the
+         * document after saving and a document someone else holds is
+         * refused. The editing routes pass `true`. The app's own writes, like
+         * a seed, a migration or a scheduled publish, leave it out.
+         */
+        hold?: boolean;
+        /**
+         * A new place for an item of an orderable collection. Without it the
+         * item keeps the place it has.
+         */
+        place?: string;
         if (listing !== undefined && paths.some((path) => listing.pathFields.includes(path.split('.')[0]!))) {
             await this.assertFreeAddress(listing, target.key, stored);
         }
@@ -3048,23 +3055,27 @@ export class CmsService {
             await this.assertNoLoop(input.ref, stored, 'latest');
         }
         try {
-            const saved = await this.store.saveDraft({
-                kind: target.kind,
-                key: target.key,
-                site: target.site,
-                locale: target.locale,
-                draft: stored,
-                author: input.author,
-                summary: input.summary,
-                ifMatch: expected,
-                ...(input.autosave === true
-                    ? {
-                          fold: FOLD_WINDOW,
-                      }
-                    : {}),
-                refs: refsOf(target.definition, stored),
-                migration: migrationOf(target.definition),
-            });
+            const saved = await this.saveHeld(
+                input.ref,
+                {
+                    kind: target.kind,
+                    key: target.key,
+                    site: target.site,
+                    locale: target.locale,
+                    draft: stored,
+                    author: input.author,
+                    summary: input.summary,
+                    ifMatch: expected,
+                    ...(input.autosave === true
+                        ? {
+                              fold: FOLD_WINDOW,
+                          }
+                        : {}),
+                    refs: refsOf(target.definition, stored),
+                    migration: migrationOf(target.definition),
+                },
+                input.hold === true
+            );
             if (source !== undefined) {
                 const version = source.publishedVersion ?? (await this.store.latestVersion(source.id));
                 await this.store.recordSourceVersions(
@@ -3383,7 +3394,11 @@ export class CmsService {
         };
     }
 
-    async rollback(ref: DocumentRef, version: number, author: string): Promise<DraftState> {
+    /**
+     * Restores an earlier version as the new draft. With `hold`, as when a
+     * person restores it, they hold the document after.
+     */
+    async rollback(ref: DocumentRef, version: number, author: string, hold = false): Promise<DraftState> {
         const { target } = await this.document(ref);
         const migrated = (await this.versionContent(ref, version)).content;
         await this.assertNoLoop(ref, migrated, 'latest');
@@ -3392,17 +3407,21 @@ export class CmsService {
         const gone = new Set<string>();
         for (const id of held) if ((await this.media.get(id)) === undefined) gone.add(id);
         const restored = gone.size === 0 ? migrated : withoutImages(target.definition, migrated, gone);
-        await this.saveHeld(ref, {
-            kind: target.kind,
-            key: target.key,
-            site: target.site,
-            locale: target.locale,
-            draft: migrated,
-            author,
-            summary: `Restored version ${version}`,
-            refs: refsOf(target.definition, migrated),
-            migration: migrationOf(target.definition),
-        });
+        await this.saveHeld(
+            ref,
+            {
+                kind: target.kind,
+                key: target.key,
+                site: target.site,
+                locale: target.locale,
+                draft: restored,
+                author,
+                summary: `Restored version ${version}`,
+                refs: refsOf(target.definition, restored),
+                migration: migrationOf(target.definition),
+            },
+            hold
+        );
         await this.notices.publish({
             ref: formatRef(ref),
             paths: null,
@@ -3449,7 +3468,6 @@ export class CmsService {
             for (const route of listing.routes) {
                 used.push({
                     name: route.page,
-        await this.claimHold(input.ref, input.author);
                     site: route.site,
                     path: fillPath(route.pattern, row.published ?? row.draft) ?? route.pattern,
                     fieldPaths: row.fieldPaths,
@@ -3500,7 +3518,6 @@ export class CmsService {
                 target.kind === 'item'
                     ? typeof itemLabel === 'string' && itemLabel !== ''
                         ? itemLabel
-            by: input.author,
                         : null
                     : (target.definition.label ?? null);
             found.set(refId, [
@@ -3820,7 +3837,6 @@ export class CmsService {
 
     /**
      * The context an identity's guard answers for a request, or `undefined`
-            by: author,
      * when it denies, for a public route that reads a credential when one
      * comes.
      */

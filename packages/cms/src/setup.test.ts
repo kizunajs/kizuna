@@ -221,7 +221,6 @@ beforeEach(async () => {
     await pglite.exec('delete from cms_refs; delete from cms_versions; delete from cms_documents;');
     revalidated.length = 0;
     storage.files.clear();
-    cms.service.holds.clear();
 });
 
 afterAll(async () => {
@@ -231,7 +230,7 @@ afterAll(async () => {
 // Each step is someone who saved and left, so the next person finds the document free.
 let lastToken: string | undefined;
 const asToken = (token: string) => (call: request.Test) => {
-    if (token !== lastToken) cms.service.holds.clear();
+    if (token !== lastToken) void pglite.exec('update cms_documents set held_by = null, held_since = null, held_until = null');
     lastToken = token;
     return call.set('authorization', `Bearer ${token}`);
 };

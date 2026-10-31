@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, gte, inArray, isNotNull, lt, max, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt, max, ne, sql } from 'drizzle-orm';
 import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
 import { cmsDocuments, cmsRefreshes, cmsRefs, cmsReviewComments, cmsReviews, cmsTranslations, cmsVersions } from './schema.js';
 import { CMS_MIGRATION_SQL, likePrefix, type IndexType } from './migration.js';
@@ -45,6 +45,12 @@ export interface DocumentRow {
      * The person who looks after the document, or `null`.
      */
     owner: string | null;
+    /**
+     * Who edits the document now, while `heldUntil` lies ahead, or `null`.
+     */
+    heldBy: string | null;
+    heldSince: Date | null;
+    heldUntil: Date | null;
 }
 
 /**
@@ -272,6 +278,25 @@ export class VersionConflictError extends Error {
     }
 }
 
+/**
+ * A write from someone other than the person editing the document while
+ * their hold lasts.
+ */
+export class DocumentHeldError extends Error {
+    constructor(
+        readonly heldBy: string,
+        readonly heldUntil: Date
+    ) {
+        super(`${heldBy} is editing the document until ${heldUntil.toISOString()}.`);
+    }
+}
+
+/**
+ * Who holds a document now: its holder while the hold lasts, or `null`.
+ */
+export const holderOf = (row: { heldBy: string | null; heldUntil: Date | null } | undefined, now = new Date()): string | null =>
+    row?.heldBy !== null && row?.heldBy !== undefined && row.heldUntil !== null && row.heldUntil > now ? row.heldBy : null;
+
 const SITE = 'default';
 
 /**
@@ -297,6 +322,9 @@ const toRow = (row: typeof cmsDocuments.$inferSelect): DocumentRow => ({
     updatedAt: row.updatedAt,
     updatedBy: row.updatedBy,
     owner: row.owner,
+    heldBy: row.heldBy,
+    heldSince: row.heldSince,
+    heldUntil: row.heldUntil,
 });
 
 const toReview = (row: typeof cmsReviews.$inferSelect): ReviewRow => ({
@@ -712,12 +740,32 @@ export class DocumentStore {
     }
 
     /**
+     * Ends `by`'s hold on a document. Answers whether they held it.
+     */
+    async releaseHold(kind: DocumentKind, key: string, by: string, site = SITE, locale = SOURCE_LOCALE): Promise<boolean> {
+        const released = await this.db
+            .update(cmsDocuments)
+            .set({
+                heldBy: null,
+                heldSince: null,
+                heldUntil: null,
+            })
+            .where(and(identity(kind, key, site, locale), eq(cmsDocuments.heldBy, by), gt(cmsDocuments.heldUntil, new Date())))
+            .returning({
+                id: cmsDocuments.id,
+            });
+        return released.length > 0;
+    }
+
+    /**
      * Writes the draft and records a version. `ifMatch` is the version and save
      * time the writer read; when either is behind, nothing is written. With
      * `fold`, a save by the same author within that many milliseconds of their
      * own unpublished version rewrites it instead of adding one. With
      * `migration`, the draft is at that step, and a published copy stored at
-     * an older one is brought up to it in the same transaction.
+     * an older one is brought up to it in the same transaction. With `hold`,
+     * the author holds the document for that many milliseconds, and a
+     * document someone else holds is refused with `DocumentHeldError`.
      */
     async saveDraft(input: {
         kind: DocumentKind;
@@ -734,6 +782,7 @@ export class DocumentStore {
         fold?: number;
         refs?: readonly Ref[];
         migration?: Migration;
+        hold?: number;
     }): Promise<{ document: DocumentRow; version: number }> {
         return this.db.transaction(async (tx) => {
             const now = new Date();
@@ -753,6 +802,18 @@ export class DocumentStore {
             if (stale) {
                 throw new VersionConflictError(input.ifMatch!.version, latest);
             }
+            const holder = holderOf(existing, now);
+            if (input.hold !== undefined && holder !== null && holder !== input.author) {
+                throw new DocumentHeldError(holder, existing!.heldUntil!);
+            }
+            const held =
+                input.hold === undefined
+                    ? {}
+                    : {
+                          heldBy: input.author,
+                          heldSince: holder === input.author ? existing!.heldSince : now,
+                          heldUntil: new Date(now.getTime() + input.hold),
+                      };
             const [previous] =
                 input.fold === undefined || existing === undefined || existing.publishedVersion === latest
                     ? []
@@ -777,6 +838,7 @@ export class DocumentStore {
                     migrationVersion: draftStep,
                     updatedAt: now,
                     updatedBy: input.author,
+                    ...held,
                 });
             } else {
                 await tx
@@ -785,6 +847,7 @@ export class DocumentStore {
                         draft: input.draft,
                         updatedAt: now,
                         updatedBy: input.author,
+                        ...held,
                         ...(raises
                             ? {
                                   migrationVersion: input.migration!.version,
@@ -987,6 +1050,52 @@ export class DocumentStore {
 
     /**
      * The documents holding one branded id.
+    /**
+     * Rebuilds a document's refs from its draft and its published content,
+     * for content indexed before images were.
+     */
+    async reindexRefs(id: string, draft: readonly Ref[], published: readonly Ref[]): Promise<void> {
+        await this.db.transaction(async (tx) => {
+            await this.replaceRefsIn(tx, id, draft);
+            await this.replaceRefsIn(tx, id, published, true);
+        });
+    }
+
+    /**
+     * Every source document holding any of these ids of a brand, every id
+     * when `refIds` is left out, with the field and whether the published
+     * content holds it.
+     */
+    async holders(
+        brand: string,
+        refIds?: readonly string[]
+    ): Promise<Array<{ document: DocumentRow; refId: string; fieldPath: string; published: boolean }>> {
+        if (refIds !== undefined && refIds.length === 0) return [];
+        const rows = await this.db
+            .select({
+                document: cmsDocuments,
+                refId: cmsRefs.refId,
+                fieldPath: cmsRefs.fieldPath,
+                published: cmsRefs.published,
+            })
+            .from(cmsRefs)
+            .innerJoin(cmsDocuments, eq(cmsDocuments.id, cmsRefs.documentId))
+            .where(
+                and(
+                    eq(cmsRefs.brand, brand),
+                    eq(cmsDocuments.locale, SOURCE_LOCALE),
+                    ...(refIds === undefined ? [] : [inArray(cmsRefs.refId, [...refIds])])
+                )
+            )
+            .orderBy(asc(cmsDocuments.site), asc(cmsDocuments.key), asc(cmsRefs.fieldPath));
+        return rows.map((row) => ({
+            document: toRow(row.document),
+            refId: row.refId,
+            fieldPath: row.fieldPath,
+            published: row.published,
+        }));
+    }
+
      */
     async whereUsed(brand: string, refId: string): Promise<Array<DocumentRow & { fieldPaths: string[] }>> {
         const rows = await this.db
@@ -1002,7 +1111,7 @@ export class DocumentStore {
         for (const row of rows) {
             const held = byId.get(row.document.id);
             if (held) {
-                held.fieldPaths.push(row.fieldPath);
+                if (!held.fieldPaths.includes(row.fieldPath)) held.fieldPaths.push(row.fieldPath);
                 continue;
             }
             byId.set(row.document.id, {
@@ -1050,52 +1159,6 @@ export class DocumentStore {
                     })
                     .where(eq(cmsDocuments.id, id));
             }
-    /**
-     * Rebuilds a document's refs from its draft and its published content,
-     * for content indexed before images were.
-     */
-    async reindexRefs(id: string, draft: readonly Ref[], published: readonly Ref[]): Promise<void> {
-        await this.db.transaction(async (tx) => {
-            await this.replaceRefsIn(tx, id, draft);
-            await this.replaceRefsIn(tx, id, published, true);
-        });
-    }
-
-    /**
-     * Every source document holding any of these ids of a brand, every id
-     * when `refIds` is left out, with the field and whether the published
-     * content holds it.
-     */
-    async holders(
-        brand: string,
-        refIds?: readonly string[]
-    ): Promise<Array<{ document: DocumentRow; refId: string; fieldPath: string; published: boolean }>> {
-        if (refIds !== undefined && refIds.length === 0) return [];
-        const rows = await this.db
-            .select({
-                document: cmsDocuments,
-                refId: cmsRefs.refId,
-                fieldPath: cmsRefs.fieldPath,
-                published: cmsRefs.published,
-            })
-            .from(cmsRefs)
-            .innerJoin(cmsDocuments, eq(cmsDocuments.id, cmsRefs.documentId))
-            .where(
-                and(
-                    eq(cmsRefs.brand, brand),
-                    eq(cmsDocuments.locale, SOURCE_LOCALE),
-                    ...(refIds === undefined ? [] : [inArray(cmsRefs.refId, [...refIds])])
-                )
-            )
-            .orderBy(asc(cmsDocuments.site), asc(cmsDocuments.key), asc(cmsRefs.fieldPath));
-        return rows.map((row) => ({
-            document: toRow(row.document),
-            refId: row.refId,
-            fieldPath: row.fieldPath,
-            published: row.published,
-        }));
-    }
-
             await tx.insert(cmsVersions).values({
                 documentId: id,
                 version: latest + 1,

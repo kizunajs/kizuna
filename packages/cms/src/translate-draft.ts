@@ -109,6 +109,7 @@ export const translateDraft = async (
         caller: input.caller,
         author: input.author,
         summary: `Translated from ${cms.sourceLocaleOf(target.site)}`,
+        hold: true,
     });
     await cms.store.recordSourceVersions(state.row!.id, Object.fromEntries(written.map((name) => [name, publishedVersion])));
     return {

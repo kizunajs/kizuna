@@ -10,47 +10,8 @@ import { expressAdapter } from '@kizunajs/express';
 import { definePage } from './page.js';
 import type { CmsExports } from './setup.js';
 import { cms } from './provider.js';
-import { DocumentStore } from './storage/store.js';
-import { DocumentHolds, HOLD_IDLE_MS } from './holds.js';
-
-describe('a hold', () => {
-    it('goes to the first to claim it, and refuses anyone else until it ends', () => {
-        let now = 1_000;
-        const holds = new DocumentHolds(() => now);
-        expect(holds.claim('page:frontPage', 'kari')).toBeUndefined();
-        expect(holds.claim('page:frontPage', 'nils')).toMatchObject({
-            by: 'kari',
-        });
-        expect(holds.holder('page:frontPage')?.by).toBe('kari');
-        expect(holds.claim('page:aboutPage', 'nils')).toBeUndefined();
-        now += HOLD_IDLE_MS + 1;
-        expect(holds.holder('page:frontPage')).toBeUndefined();
-        expect(holds.claim('page:frontPage', 'nils')).toBeUndefined();
-    });
-
-    it('is renewed by its holder, keeping when it started', () => {
-        let now = 1_000;
-        const holds = new DocumentHolds(() => now);
-        holds.claim('page:frontPage', 'kari');
-        now += HOLD_IDLE_MS - 10;
-        holds.claim('page:frontPage', 'kari');
-        now += HOLD_IDLE_MS - 10;
-        expect(holds.holder('page:frontPage')).toMatchObject({
-            by: 'kari',
-            since: 1_000,
-        });
-    });
-
-    it('ends when its holder releases it, and only then', () => {
-        const holds = new DocumentHolds();
-        holds.claim('page:frontPage', 'kari');
-        expect(holds.release('page:frontPage', 'nils')).toBe(false);
-        expect(holds.heldByOther('page:frontPage', 'nils')?.by).toBe('kari');
-        expect(holds.heldByOther('page:frontPage', 'kari')).toBeUndefined();
-        expect(holds.release('page:frontPage', 'kari')).toBe(true);
-        expect(holds.holder('page:frontPage')).toBeUndefined();
-    });
-});
+import { DocumentHeldError, DocumentStore } from './storage/store.js';
+import { HOLD_IDLE_MS } from './cms.js';
 
 const k = new Kizuna();
 const TOKENS: Record<string, string> = {
@@ -143,7 +104,6 @@ beforeAll(async () => {
 
 beforeEach(async () => {
     await pglite.exec('delete from cms_refs; delete from cms_versions; delete from cms_documents;');
-    content.service.holds.clear();
 });
 
 afterAll(async () => {
@@ -238,12 +198,62 @@ describe('one editor per document', () => {
         expect(taken.body.heldBy).toBe('nils@hagen.example.com');
     });
 
-    it('lasts two minutes after the holder’s last save', async () => {
+    it('lasts two minutes after the holder’s last save, and then goes to the next person to save', async () => {
         await save('kari-token', {
             heading: 'Planter',
         });
-        const hold = content.service.holds.holder('page:frontPage');
-        expect(hold?.until).toBeGreaterThan(Date.now() + HOLD_IDLE_MS - 5_000);
-        expect(hold?.until).toBeLessThanOrEqual(Date.now() + HOLD_IDLE_MS);
+        const row = await content.service.store.get('page', 'frontPage');
+        expect(row?.heldBy).toBe('kari@hagen.example.com');
+        expect(row!.heldUntil!.getTime()).toBeGreaterThan(Date.now() + HOLD_IDLE_MS - 5_000);
+        expect(row!.heldUntil!.getTime()).toBeLessThanOrEqual(Date.now() + HOLD_IDLE_MS);
+        await pglite.exec(`update cms_documents set held_until = now() - interval '1 second'`);
+        const taken = await save('nils-token', {
+            intro: 'Levert neste dag.',
+        });
+        expect(taken.status).toBe(200);
+        expect(taken.body.heldBy).toBe('nils@hagen.example.com');
+    });
+
+    it('is not taken by the app’s own writes, like a seed', async () => {
+        await content.service.update({
+            ref: {
+                type: 'page',
+                name: 'frontPage',
+            },
+            changes: {
+                heading: 'Planter',
+            },
+            caller: {
+                role: 'admin',
+            },
+            author: 'seed',
+        });
+        expect((await content.service.draftState({ type: 'page', name: 'frontPage' })).heldBy).toBeNull();
+        expect(
+            (
+                await save('nils-token', {
+                    intro: 'Levert neste dag.',
+                })
+            ).status
+        ).toBe(200);
+    });
+
+    it('is kept in the database, so a write through another server instance is refused too', async () => {
+        await save('kari-token', {
+            heading: 'Planter',
+        });
+        const elsewhere = new DocumentStore(db);
+        await expect(
+            elsewhere.saveDraft({
+                kind: 'page',
+                key: 'frontPage',
+                draft: {
+                    heading: 'Planter',
+                    intro: 'Levert neste dag.',
+                },
+                author: 'nils@hagen.example.com',
+                hold: HOLD_IDLE_MS,
+            })
+        ).rejects.toBeInstanceOf(DocumentHeldError);
     });
 });

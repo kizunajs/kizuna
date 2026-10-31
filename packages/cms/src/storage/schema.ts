@@ -30,6 +30,19 @@ export const cmsDocuments = pgTable(
          * The person who looks after the document, by the id `people` gives them.
          */
         owner: text('owner'),
+        /**
+         * Who edits the document now, by the id `author` gives them, until
+         * `heldUntil`. Anyone else's write is refused while it lasts.
+         */
+        heldBy: text('held_by'),
+        heldSince: timestamp('held_since', {
+            withTimezone: true,
+            mode: 'date',
+        }),
+        heldUntil: timestamp('held_until', {
+            withTimezone: true,
+            mode: 'date',
+        }),
     },
     (table) => [unique('cms_documents_identity').on(table.kind, table.site, table.locale, table.key)]
 );

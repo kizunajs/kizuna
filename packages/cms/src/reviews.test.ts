@@ -6,9 +6,6 @@ import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { defineConfig, Kizuna } from 'kizunajs';
 import { expressAdapter } from '@kizunajs/express';
-import { pluginExportsOf } from 'kizunajs/adapter';
-import type { CmsExports } from './index.js';
-import type { DocumentHolds } from './holds.js';
 import { definePage } from './page.js';
 import { cms as cmsContent } from './provider.js';
 import { DocumentStore } from './storage/store.js';
@@ -75,7 +72,6 @@ const InvestorRelationsPage = definePage({
 
 let pglite: PGlite;
 let app: express.Express;
-let holds: DocumentHolds | undefined;
 const requested: ReviewRequest[] = [];
 
 beforeAll(async () => {
@@ -143,7 +139,6 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-    holds = (pluginExportsOf(config.api)['cms'] as CmsExports).service.holds;
     await pglite.exec(
         'delete from cms_review_comments; delete from cms_reviews; delete from cms_refs; delete from cms_versions; delete from cms_documents;'
     );
@@ -151,14 +146,13 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-    holds?.clear();
     await pglite.close();
 });
 
 // Each step is someone who saved and left, so the next person finds the document free.
 let lastWho: string | undefined;
 const as = (who: 'ada' | 'kari' | 'grace', call: request.Test) => {
-    if (who !== lastWho) holds?.clear();
+    if (who !== lastWho) void pglite.exec('update cms_documents set held_by = null, held_since = null, held_until = null');
     lastWho = who;
     return call.set('authorization', `Bearer ${who}-token`);
 };

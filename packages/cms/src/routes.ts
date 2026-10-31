@@ -596,6 +596,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 }) as never
             ),
 
+                        hold: true,
             keepSource: route({
                 method: 'POST',
                 path: `${editingBase}${scope.prefix}/keep`,
@@ -897,6 +898,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             publish: route({
                 method: 'POST',
                 path: `${editingBase}${scope.prefix}/publish`,
+                        hold: true,
                 auth: editor,
                 summary: `Publish the draft of ${scope.noun}`,
                 description:

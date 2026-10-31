@@ -186,8 +186,7 @@ export const draftEventsRoute = (service: CmsService, options: ResolvedCmsOption
                             };
                             continue;
                         }
-                        // Someone leaving a document changes nothing the page shows.
-                        if (notice.released === true || !(await shown(notice))) continue;
+                        if (!(await shown(notice))) continue;
                         yield {
                             event: 'change',
                             data: {

@@ -45,6 +45,10 @@ alter table cms_refs add column if not exists published boolean not null default
 
 alter table cms_documents add column if not exists owner text;
 
+alter table cms_documents add column if not exists held_by text;
+alter table cms_documents add column if not exists held_since timestamptz;
+alter table cms_documents add column if not exists held_until timestamptz;
+
 create table if not exists cms_reviews (
     id text primary key,
     request_id text not null,
