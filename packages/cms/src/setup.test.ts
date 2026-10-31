@@ -218,14 +218,22 @@ beforeEach(async () => {
     await pglite.exec('delete from cms_refs; delete from cms_versions; delete from cms_documents;');
     revalidated.length = 0;
     storage.files.clear();
+    cms.service.holds.clear();
 });
 
 afterAll(async () => {
     await pglite.close();
 });
 
-const asEditor = (call: request.Test) => call.set('authorization', 'Bearer editor-token');
-const asAdmin = (call: request.Test) => call.set('authorization', 'Bearer admin-token');
+// Each step is someone who saved and left, so the next person finds the document free.
+let lastToken: string | undefined;
+const asToken = (token: string) => (call: request.Test) => {
+    if (token !== lastToken) cms.service.holds.clear();
+    lastToken = token;
+    return call.set('authorization', `Bearer ${token}`);
+};
+const asEditor = asToken('editor-token');
+const asAdmin = asToken('admin-token');
 
 const validDraft = {
     'hero.heading': 'Spring is here',

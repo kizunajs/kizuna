@@ -57,7 +57,9 @@ import {
 } from './storage/store.js';
 import { previewSecret, signPreviewToken, verifyPreviewToken, verifyRefresh } from './preview-token.js';
 import { DraftNotices } from './draft-notices.js';
-import { descendantsOf, loadParents, loopRefusal, parentIn, placeInTree } from './tree.js';
+import { DocumentHolds, type Hold } from './holds.js';
+import { depthRefusal, descendantsOf, loadParents, loopRefusal, parentIn, placeInTree } from './tree.js';
+import { byPlace, PLACE, keyBetween, placeIn } from './place.js';
 import { ITEM_STATUSES, type ItemCondition, type ItemListQuery } from './item-list.js';
 import type { PageStatusSchema } from './wire.js';
 import type { CmsRelationship, RelationshipOption } from './relationships.js';
@@ -449,6 +451,28 @@ const unconfiguredMediaStorage = (): MediaStorage => {
     };
     return {
         presignUpload: async () => refuse(),
+    /**
+     * Who edits the document now, the only one whose writes it takes.
+     */
+    heldBy: string | null;
+    /**
+     * When the document publishes or unpublishes on its own, or with its
+     * release, and who set it.
+     */
+    schedule: DraftSchedule | null;
+}
+
+/**
+ * A document's pending schedule, as its draft carries it.
+ */
+export interface DraftSchedule {
+    action: 'publish' | 'unpublish';
+    at: Date | null;
+    release: {
+        id: string;
+        name: string;
+    } | null;
+    by: string;
         head: async () => refuse(),
         get: async () => refuse(),
         put: async () => refuse(),
@@ -501,6 +525,12 @@ export class CmsService {
     /**
      * The shared collections.
      */
+    /**
+     * Who edits each document now. A document takes writes from one editor
+     * at a time.
+     */
+    readonly holds = new DocumentHolds();
+    private holdsHeard: Promise<unknown> | undefined;
     readonly collections: Record<string, Collection>;
     /**
      * Each site's own globals, keyed by site and then by name.
@@ -1150,9 +1180,87 @@ export class CmsService {
             : resolved;
     }
 
+            heldBy: this.holds.holder(formatRef(target.ref))?.by ?? null,
+            schedule: row === undefined ? null : await this.scheduleOf(row.id),
+        };
+    }
+
+    /**
+     * A document's pending schedule: its own time, or its release's.
+     */
+    async scheduleOf(documentId: string): Promise<DraftSchedule | null> {
+        const pending = await this.schedules.pendingFor(documentId);
+        if (pending === undefined) return null;
+        const release = pending.releaseId === null ? undefined : await this.schedules.release(pending.releaseId);
+        return {
+            action: pending.action,
+            at: release === undefined ? pending.at : release.at,
+            release:
+                release === undefined
+                    ? null
+                    : {
+                          id: release.id,
+                          name: release.name,
+                      },
+            by: release?.scheduledBy ?? pending.createdBy,
     private passes(target: Target, content: Record<string, unknown> | null): Record<string, unknown> | undefined {
         if (content === null) return undefined;
         const parsed = target.definition.schema.safeParse(content);
+    /**
+     * Holds the document for `author`, or renews their hold. Refuses with
+     * `409`, naming the holder, when someone else edits it.
+     */
+    async claimHold(ref: DocumentRef, author: string): Promise<void> {
+        this.hearHolds();
+        const held = this.holds.claim(formatRef(this.target(ref).ref), author);
+        if (held !== undefined) throw await this.heldError(ref, held);
+    }
+
+    /**
+     * Refuses with `409` when someone other than `author` edits the document.
+     */
+    async assertNotHeld(ref: DocumentRef, author: string): Promise<void> {
+        const held = this.holds.heldByOther(formatRef(this.target(ref).ref), author);
+        if (held !== undefined) throw await this.heldError(ref, held);
+    }
+
+    /**
+     * Ends `author`'s hold on the document, on every server. Answers whether
+     * they held it.
+     */
+    async releaseHold(ref: DocumentRef, author: string): Promise<boolean> {
+        const key = formatRef(this.target(ref).ref);
+        if (!this.holds.release(key, author)) return false;
+        await this.notices.publish({
+            ref: key,
+            paths: [],
+            by: author,
+            released: true,
+        });
+        return true;
+    }
+
+    private async heldError(ref: DocumentRef, held: Hold): Promise<CmsHttpError> {
+        const people = (await this.options.auth.people?.list()) ?? [];
+        const name = people.find((person) => person.id === held.by)?.name ?? held.by;
+        return new CmsHttpError(409, {
+            detail: `${name} is editing '${formatRef(ref)}', so nothing was saved. One person edits a document at a time: try again once they are done.`,
+            heldBy: held.by,
+        });
+    }
+
+    /**
+     * Follows the saves and departures of other server instances, so a hold
+     * taken on one is kept on all.
+     */
+    private hearHolds(): void {
+        this.holdsHeard ??= this.notices.subscribe((notice) => {
+            if (notice.by === undefined) return;
+            if (notice.released === true) this.holds.release(notice.ref, notice.by);
+            else this.holds.claim(notice.ref, notice.by);
+        });
+    }
+
         return parsed.success ? (parsed.data as Record<string, unknown>) : undefined;
     }
 
@@ -2954,6 +3062,7 @@ export class CmsService {
             for (const route of listing.routes) {
                 used.push({
                     name: route.page,
+        await this.claimHold(input.ref, input.author);
                     site: route.site,
                     path: fillPath(route.pattern, row.published ?? row.draft) ?? route.pattern,
                     fieldPaths: row.fieldPaths,
@@ -2992,6 +3101,7 @@ export class CmsService {
                 target.kind === 'item'
                     ? typeof itemLabel === 'string' && itemLabel !== ''
                         ? itemLabel
+            by: input.author,
                         : null
                     : (target.definition.label ?? null);
             for (const [id, fieldPaths] of byId) {
@@ -3256,6 +3366,12 @@ export class CmsService {
     /**
      * Whether a preview token was signed with this CMS's secret and has not
      * expired.
+        await this.claimHold(ref, author);
+        // An image deleted since the version was saved leaves its field empty.
+        const held = mediaIdsOf(target.definition, migrated);
+        const gone = new Set<string>();
+        for (const id of held) if ((await this.media.get(id)) === undefined) gone.add(id);
+        const restored = gone.size === 0 ? migrated : withoutImages(target.definition, migrated, gone);
      */
     verifiesPreview(token: string): boolean {
         return verifyPreviewToken(previewSecret(this.options.previewSecret), token);
@@ -3270,6 +3386,7 @@ export class CmsService {
 
     /**
      * The context an identity's guard answers for a request, or `undefined`
+            by: author,
      * when it denies, for a public route that reads a credential when one
      * comes.
      */

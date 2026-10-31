@@ -109,6 +109,29 @@ export const DraftPageSchema = Kizuna.model({
 export const StoredContentSchema = Kizuna.model({
     title: 'CMS.StoredContent',
     schema: z.object({
+export const DraftScheduleSchema = z
+    .object({
+        action: z.enum(['publish', 'unpublish']),
+        at: z.iso.datetime().nullable().describe('When it runs, in UTC. Null in a release that has no time yet.'),
+        release: z
+            .object({
+                id: z.string(),
+                name: z.string(),
+            })
+            .nullable()
+            .describe('The release it publishes with, or null when it is scheduled on its own.'),
+        by: z.string().describe('Who set the time, by their id.'),
+    })
+    .nullable()
+    .describe('When the document publishes or unpublishes without anyone pressing Publish. Null when nothing is scheduled.');
+
+const HeldBySchema = z
+    .string()
+    .nullable()
+    .describe(
+        'Who edits the document now. One person edits a document at a time: a write from anyone else answers 409 until they stop, or two minutes after their last save. Null when nobody does.'
+    );
+
         ref: z.string(),
         version: z.int(),
         updatedAt: z.string(),
@@ -126,6 +149,8 @@ const ConditionValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 
 export const FieldConditionSchema = Kizuna.model({
     title: 'CMS.FieldCondition',
+        heldBy: HeldBySchema,
+        schedule: DraftScheduleSchema,
     schema: z
         .object({
             field: z.string().describe('The field beside it whose value decides, in the same page, block or item.'),
@@ -372,6 +397,8 @@ export const MissingFieldsSchema = Kizuna.model({
     }),
 });
 
+        heldBy: HeldBySchema,
+        schedule: DraftScheduleSchema,
 export const VersionSchema = Kizuna.model({
     title: 'CMS.Version',
     schema: z.object({

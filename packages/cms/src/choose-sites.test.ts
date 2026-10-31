@@ -153,10 +153,17 @@ const service = (pluginExportsOf(config.api)['cms'] as CmsExports).service;
 const app = express();
 config.api.mount(app);
 
+// Each step is someone who saved and left, so the next person finds the document free.
+let lastToken: string | undefined;
+const left = (token: string): string => {
+    if (token !== lastToken) service.holds.clear();
+    lastToken = token;
+    return `Bearer ${token}`;
+};
 const as = (token: string) => ({
-    get: (path: string) => request(app).get(path).set('authorization', `Bearer ${token}`),
-    post: (path: string) => request(app).post(path).set('authorization', `Bearer ${token}`),
-    patch: (path: string) => request(app).patch(path).set('authorization', `Bearer ${token}`),
+    get: (path: string) => request(app).get(path).set('authorization', left(token)),
+    post: (path: string) => request(app).post(path).set('authorization', left(token)),
+    patch: (path: string) => request(app).patch(path).set('authorization', left(token)),
 });
 const grace = as('grace-token');
 const sam = as('sam-token');
@@ -188,6 +195,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+    service.holds.clear();
     queued.length = 0;
     revalidated.length = 0;
     showing.site = 'uk';

@@ -43,6 +43,29 @@ const recording = (answer: () => Response) => {
 };
 
 describe('the admin connection', () => {
+    it('lets a request without a body outlive the page, so leaving a document still frees it', async () => {
+        const { sent, connection } = recording(() => new Response(null, { status: 204 }));
+        await connection.call('editing_collections_delete_item', {
+            params: {
+                name: 'articles',
+                id: 'spring',
+            },
+        });
+        await connection.call('editing_collections_update_draft', {
+            params: {
+                name: 'articles',
+                id: 'spring',
+            },
+            body: {
+                changes: {
+                    title: 'Spring',
+                },
+            },
+        });
+        expect(sent[0]!.init.keepalive).toBe(true);
+        expect(sent[1]!.init.keepalive).toBe(false);
+    });
+
     it('calls a tool as its route, with the query in the address', async () => {
         const { sent, connection } = recording(() =>
             Response.json({

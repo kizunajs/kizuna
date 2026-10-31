@@ -187,6 +187,7 @@ describe('draft notices', () => {
                 },
             ]);
         unsubscribe();
+                    by: 'ada',
     });
 
     it('travel on the channel other server instances listen on', async () => {
@@ -202,6 +203,7 @@ describe('draft notices', () => {
                 },
             ]);
         await stop();
+                    by: 'ada',
     });
 
     it('stay in the process when the driver cannot listen', async () => {

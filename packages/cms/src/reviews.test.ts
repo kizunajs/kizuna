@@ -6,6 +6,9 @@ import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { defineConfig, Kizuna } from 'kizunajs';
 import { expressAdapter } from '@kizunajs/express';
+import { pluginExportsOf } from 'kizunajs/adapter';
+import type { CmsExports } from './index.js';
+import type { DocumentHolds } from './holds.js';
 import { definePage } from './page.js';
 import { cms as cmsContent } from './provider.js';
 import { DocumentStore } from './storage/store.js';
@@ -72,6 +75,7 @@ const InvestorRelationsPage = definePage({
 
 let pglite: PGlite;
 let app: express.Express;
+let holds: DocumentHolds | undefined;
 const requested: ReviewRequest[] = [];
 
 beforeAll(async () => {
@@ -136,6 +140,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+    holds = (pluginExportsOf(config.api)['cms'] as CmsExports).service.holds;
     await pglite.exec(
         'delete from cms_review_comments; delete from cms_reviews; delete from cms_refs; delete from cms_versions; delete from cms_documents;'
     );
@@ -143,10 +148,17 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
+    holds?.clear();
     await pglite.close();
 });
 
-const as = (who: 'ada' | 'kari' | 'grace', call: request.Test) => call.set('authorization', `Bearer ${who}-token`);
+// Each step is someone who saved and left, so the next person finds the document free.
+let lastWho: string | undefined;
+const as = (who: 'ada' | 'kari' | 'grace', call: request.Test) => {
+    if (who !== lastWho) holds?.clear();
+    lastWho = who;
+    return call.set('authorization', `Bearer ${who}-token`);
+};
 
 const draft = (who: 'ada' | 'kari' | 'grace', page: string, heading: string) =>
     as(who, request(app).patch(`/editing/pages/${page}/draft`)).send({

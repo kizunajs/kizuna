@@ -6,7 +6,7 @@ import { Check, CircleAlert, ExternalLink, Eye, Info, Languages, PanelRight, Rot
 import { toolsFor, type Connection, type ToolAnswer } from '../view/connection.js';
 import { EditorContext, ICON, type EditorContextValue } from '../view/context.js';
 import { FieldForm, fieldDomId, type FieldFormHandle, type SaveFailure, type SaveState } from '../view/form.js';
-import { OwnerControl, type People } from '../view/people.js';
+import { Avatar, OwnerControl, type People } from '../view/people.js';
 import { PublishReview, changeViewsOf, type AskedReview, type Changes, type PublishReviewHandle } from '../view/review.js';
 import { documentTitle, languageNameOf, valueAt, type Description, type Draft, type ReviewState } from '../view/schema.js';
 import { sameContent } from '../same-content.js';
@@ -116,7 +116,10 @@ const failureOf = (answer: ToolAnswer): SaveFailure => {
     }
     if (answer.status === 409) {
         return {
-            problem: 'Someone else changed this draft. It reloads with their change.',
+            problem:
+                typeof (answer.body as { heldBy?: unknown } | undefined)?.heldBy === 'string'
+                    ? 'Someone else is editing it now.'
+                    : 'Someone else changed this draft. It reloads with their change.',
         };
     }
     if (!retriesSave(answer.status)) {
@@ -305,6 +308,9 @@ export function DocumentScreen({
     const form = useRef<FieldFormHandle>(null);
     const seen = useRef<string | null>(null);
     const busy = useRef(false);
+    const [heldBy, setHeldBy] = useState<string | null>(null);
+    // The document this screen holds by saving it, freed when the screen leaves it.
+    const holding = useRef<string | undefined>(undefined);
     const saves = useRef(0);
     const typing = useRef(false);
     const latest = useRef<Description | undefined>(undefined);
@@ -344,6 +350,7 @@ export function DocumentScreen({
             return answer.body;
         },
         [connection]
+            setHeldBy(answer.body.heldBy ?? null);
     );
 
     useEffect(() => {
@@ -356,6 +363,7 @@ export function DocumentScreen({
         setDraftChanges(undefined);
         setView('edit');
         void describe(documentRef);
+        setHeldBy(null);
     }, [describe, documentRef]);
 
     // A review waiting for the person opens the document on its Review tab.
@@ -370,6 +378,25 @@ export function DocumentScreen({
         if (document === undefined) return;
         const tools = toolsFor(document.ref);
         if (tools === undefined) return;
+    // Leaving a document this screen saved frees it for the next person, without waiting out the hold.
+    useEffect(() => {
+        const release = (): void => {
+            const ref = holding.current;
+            if (ref === undefined) return;
+            holding.current = undefined;
+            void connection.call('editing_release_hold', {
+                query: {
+                    ref,
+                },
+            });
+        };
+        window.addEventListener('pagehide', release);
+        return () => {
+            window.removeEventListener('pagehide', release);
+            release();
+        };
+    }, [connection, documentRef]);
+
         const check = async (): Promise<void> => {
             if (busy.current || typing.current || window.document.visibilityState !== 'visible') return;
             const savesBefore = saves.current;
@@ -385,6 +412,7 @@ export function DocumentScreen({
                 return;
             }
             if (marker === seen.current) return;
+            setHeldBy(answer.body.heldBy ?? null);
             seen.current = marker;
             const before = latest.current;
             const after = await describe(document.ref, {
@@ -541,8 +569,10 @@ export function DocumentScreen({
                         ...current,
                         status: answer.body.status,
                         version: answer.body.version,
+                    holding.current = ref;
                         complete: answer.body.complete,
                         missing: answer.body.missing,
+                    setHeldBy(answer.body.heldBy ?? null);
                         draft: answer.body.content,
                     });
                 }
@@ -1154,6 +1184,14 @@ export function DocumentScreen({
                 <Info {...ICON} />
                 Info
             </Popover.Trigger>
+    // Someone else editing the document, which leaves it read only here until they stop.
+    const holder =
+        heldBy === null || me === undefined || heldBy === me
+            ? undefined
+            : (people?.people.find((person) => person.id === heldBy) ?? {
+                  id: heldBy,
+                  name: heldBy,
+              });
             <Popover.Portal>
                 <Popover.Positioner sideOffset={6} align="end" className="k-positioner">
                     <Popover.Popup className="k-popup k-document-info" aria-label="Document info">
@@ -1233,7 +1271,12 @@ export function DocumentScreen({
         document.review?.status !== 'open' &&
         (document.status === 'draft' || document.status === 'changed');
     const publishDisabled =
-        !online || unsaved || filled.size > 0 || saveState === 'failed' || (blocker !== undefined && waiting.length === 0);
+        !online ||
+        unsaved ||
+        filled.size > 0 ||
+        saveState === 'failed' ||
+        holder !== undefined ||
+        (blocker !== undefined && waiting.length === 0);
     const saveDraftOffered =
         normalHeader && shownView !== 'review' && saveProblem === undefined && (saveState === 'pending' || filled.size > 0);
     offered.current = () => {
@@ -1427,7 +1470,12 @@ export function DocumentScreen({
                                   {
                                       label: 'Status',
                                       value:
-                                          saveProblem !== undefined || filled.size > 0 ? (
+                                          holder !== undefined ? (
+                                              <span className="k-fact-people">
+                                                  <Avatar person={holder} />
+                                                  {`${holder.name.split(' ')[0]} is editing`}
+                                              </span>
+                                          ) : saveProblem !== undefined || filled.size > 0 ? (
                                               'Unsaved changes'
                                           ) : document.review === null ? (
                                               (STATUS_FACT[document.status] ?? document.status)
@@ -1533,19 +1581,27 @@ export function DocumentScreen({
                             </>
                         ) : answering && document.review !== null ? (
                             <>
-                                <RequestChanges
-                                    review={document.review}
-                                    busy={deciding}
-                                    onSend={(note) => decide('requestChanges', note)}
-                                />
-                                <button
-                                    type="button"
-                                    className="k-button k-button--primary"
-                                    disabled={deciding}
-                                    onClick={() => void decide('approve', undefined)}>
-                                    <Check {...ICON} />
-                                    {deciding ? 'Approving' : 'Approve'}
-                                </button>
+                                <SendBack review={document.review} busy={deciding} onSend={(note) => decide('requestChanges', note)} />
+                                {/* Someone who may not publish the document approves it, and someone who may publishes it. */}
+                                {document.canPublish ? (
+                                    <button
+                                        type="button"
+                                        className="k-button k-button--primary"
+                                        disabled={deciding || !online || blocker !== undefined || holder !== undefined}
+                                        onClick={() => void approveAndPublish()}>
+                                        <Check {...ICON} />
+                                        {deciding ? 'Publishing' : 'Approve and publish'}
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        className="k-button k-button--primary"
+                                        disabled={deciding}
+                                        onClick={() => void decide('approve', undefined)}>
+                                        <Check {...ICON} />
+                                        {deciding ? 'Approving' : 'Approve'}
+                                    </button>
+                                )}
                                 {more}
                             </>
                         ) : (
@@ -1561,7 +1617,7 @@ export function DocumentScreen({
                                 {blocker !== undefined || gateNote === undefined ? null : (
                                     <span className="k-document__gate">{gateNote}</span>
                                 )}
-                                {shownView === 'review' ? null : saveProblem === undefined ? (
+                                {shownView === 'changes' || holder !== undefined ? null : saveProblem === undefined ? (
                                     <button
                                         type="button"
                                         className="k-button k-button--secondary k-button--small"
@@ -1619,7 +1675,7 @@ export function DocumentScreen({
                                     <button
                                         type="button"
                                         className="k-button k-button--primary"
-                                        disabled={!online || saveState === 'failed'}
+                                        disabled={!online || saveState === 'failed' || holder !== undefined}
                                         onClick={() => void form.current?.flush().then(() => setAskOpen(true))}>
                                         Ask for review
                                     </button>
@@ -1756,6 +1812,7 @@ export function DocumentScreen({
                                     setsOwnValue(document.draft, field.path) ? (
                                         <button
                                             type="button"
+                            readOnly={holder !== undefined}
                                             className="k-text-button k-use-shared"
                                             onClick={() => void clearToShared(field.path)}>
                                             <Undo2 {...ICON} />

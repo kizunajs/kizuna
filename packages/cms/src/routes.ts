@@ -153,6 +153,8 @@ const reviewFields = async (cms: CmsService, state: DraftState, people?: readonl
                 ? null
                 : {
                       id: owner,
+    heldBy: state.heldBy,
+    schedule: scheduleBody(state),
                       name: person?.name ?? owner,
                       ...(person?.image === undefined
                           ? {}
@@ -912,6 +914,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         status: 200,
                         body: draftBody(await cms.unpublish(ref, authorOf(cms, args))),
                     };
+                    await cms.assertNotHeld(ref, authorOf(cms, args));
                 }) as never
             ),
 
@@ -950,6 +953,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     scope.approveWrites === true
                         ? {
                               needsApproval: true,
+                    await cms.assertNotHeld(ref, authorOf(cms, args));
                               destructiveHint: false,
                           }
                         : {
@@ -1898,13 +1902,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             return {
                 status: 201,
                 body: {
-                    reviews: await requestReviews(cms, {
-                        access,
-                        refs: body.refs,
-                        reviewers: body.reviewers,
-                        note: body.note ?? null,
-                        by: authorOf(cms, args),
-                    }),
+                    reviews,
                 },
             };
         }) as never
@@ -2054,6 +2052,18 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         auth: editor,
         summary: 'Resolve a comment on a review once it is dealt with',
         description: 'The comment folds away under its field. Anyone taking part in the review may resolve it.',
+            const reviews = await requestReviews(cms, {
+                access,
+                refs: body.refs,
+                reviewers: body.reviewers,
+                note: body.note ?? null,
+                by: authorOf(cms, args),
+            });
+            // Asking for a review is done editing, so the reviewer finds the pages free.
+            for (const ref of body.refs) {
+                const parsed = parseRef(ref);
+                if (parsed !== undefined) await cms.releaseHold(cms.canonical(parsed), authorOf(cms, args));
+            }
         tool: {
             destructiveHint: false,
             idempotentHint: true,
@@ -2358,6 +2368,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
      */
     const seenLibrary = (cms: CmsService, args: Args): string | undefined => {
         const site = cms.mediaSiteOf(mediaSiteOf(args));
+                    heldBy: state.heldBy,
+                    schedule: scheduleBody(state),
         cms.access(args.auth).assertSees(site);
         return site;
     };
@@ -2388,6 +2400,32 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     }).handler(
         guarded(async (cms, args) => {
             const site = seenLibrary(cms, args);
+    const releaseHold = route({
+        method: 'DELETE',
+        path: `${editingBase}/hold`,
+        auth: editor,
+        summary: 'Stop editing a document, so someone else may',
+        description:
+            'One person edits a document at a time: the first to save holds it until they stop, or for two minutes after their last save. Call this when you are done, so the next person need not wait. It changes nothing when you do not hold the document.',
+        query: z.object({
+            ref: z.string().describe('The document, as `describe` and every draft answer name it under `ref`.'),
+        }),
+        responses: {
+            204: z.void(),
+            400: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const query = args.query as { ref: string };
+            const ref = parseRef(query.ref);
+            if (ref === undefined) throw new CmsHttpError(400, { detail: `'${query.ref}' is not a ref.` });
+            await cms.releaseHold(cms.canonical(ref), authorOf(cms, args));
+            return {
+                status: 204,
+            };
+        }) as never
+    );
+
             const uses = await cms.mediaUses();
             return {
                 status: 200,
@@ -2438,7 +2476,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         path: `${editingBase}/media/:id`,
         auth: editor,
         summary: 'Delete an image and its stored file',
-        description: 'Pages, globals and items that hold it lose the image, so list its uses first. The person confirms before this runs.',
+        description:
+            'Refused with 409 while a page, global or item holds the image, published or in a draft, listing them under `uses`. The person confirms before this runs.',
         tool: {
             needsApproval: true,
         },
@@ -2863,6 +2902,179 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                       }),
                   }),
             dashboard: dashboardRoute({
+    /**
+     * Refuses a change to the shared library's folders or images from an
+     * editor who is no admin over every site.
+     */
+    const assertChangesLibrary = (cms: CmsService, args: Args, site: string | undefined): void => {
+        if (site !== undefined || cms.access(args.auth).publishesShared) return;
+        throw new CmsHttpError(403, {
+            detail: 'Every site shows the shared library, so an admin over every site changes it.',
+        });
+    };
+
+    const folderOf = async (cms: CmsService, args: Args, id: string) => {
+        const folder = await cms.media.folder(id);
+        if (folder === undefined || !cms.access(args.auth).sees(folder.site)) {
+            throw new CmsHttpError(404, { detail: `No folder '${id}'.` });
+        }
+        return folder;
+    };
+
+    const createFolder = route({
+        method: 'POST',
+        path: `${editingBase}/media/folders`,
+        auth: editor,
+        summary: 'Make a folder in a library, at its top level or inside another folder',
+        tool: true,
+        ...mediaQuery,
+        body: CreateMediaFolderBodySchema,
+        responses: {
+            201: MediaFolderSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const site = seenLibrary(cms, args);
+            assertChangesLibrary(cms, args, site);
+            const folder = await cms.media.createFolder(args.body as z.output<typeof CreateMediaFolderBodySchema>, site, authorOf(cms, args));
+            return {
+                status: 201,
+                body: {
+                    ...folder,
+                    images: 0,
+                },
+            };
+        }) as never
+    );
+
+    const updateFolder = route({
+        method: 'PATCH',
+        path: `${editingBase}/media/folders/:id`,
+        auth: editor,
+        summary: 'Rename a folder, or move it into another folder of its library',
+        tool: true,
+        pathParams: z.object({
+            id: z.string(),
+        }),
+        body: UpdateMediaFolderBodySchema,
+        responses: {
+            200: MediaFolderSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const current = await folderOf(cms, args, args.params['id']!);
+            assertChangesLibrary(cms, args, current.site);
+            const folder = await cms.media.updateFolder(current.id, args.body as z.output<typeof UpdateMediaFolderBodySchema>, authorOf(cms, args));
+            return {
+                status: 200,
+                body: {
+                    ...folder,
+                    images: (await cms.media.inLibrary(folder.site)).filter((record) => record.folder === folder.id).length,
+                },
+            };
+        }) as never
+    );
+
+    const deleteFolder = route({
+        method: 'DELETE',
+        path: `${editingBase}/media/folders/:id`,
+        auth: editor,
+        summary: 'Delete an empty folder',
+        description: 'Refused with 409 while the folder holds images or folders.',
+        tool: true,
+        pathParams: z.object({
+            id: z.string(),
+        }),
+        responses: {
+            204: z.void(),
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const current = await folderOf(cms, args, args.params['id']!);
+            assertChangesLibrary(cms, args, current.site);
+            await cms.media.deleteFolder(current.id);
+            return {
+                status: 204,
+                body: undefined,
+            };
+        }) as never
+    );
+
+    const moveMedia = route({
+        method: 'POST',
+        path: `${editingBase}/media/move`,
+        auth: editor,
+        summary: 'Move images into a folder, or into another library',
+        description:
+            "Images keep their ids, so what holds them keeps showing them. A shared image moves into a site only while nothing outside that site holds it; otherwise nothing moves, and the 409 lists what holds it under `uses`. Moving into or out of the shared library takes an admin over every site.",
+        tool: true,
+        body: MoveMediaBodySchema,
+        responses: {
+            200: MovedMediaSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: MediaHeldSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const body = args.body as z.output<typeof MoveMediaBodySchema>;
+            const target = cms.mediaSiteOf(body.site);
+            cms.access(args.auth).assertSees(target);
+            const records: MediaRecord[] = [];
+            for (const id of new Set(body.ids)) records.push(await seenMedia(cms, args, id));
+            const crossing = records.filter((record) => record.site !== target);
+            if (crossing.some((record) => record.site === undefined) || (crossing.length > 0 && target === undefined)) {
+                assertChangesLibrary(cms, args, undefined);
+            }
+            if (target !== undefined && crossing.length > 0) {
+                const uses = await cms.mediaUses(crossing.map((record) => record.id));
+                const outsideOf = (record: MediaRecord) => (uses.get(record.id) ?? []).filter((use) => use.site !== target);
+                const held = crossing.filter((record) => outsideOf(record).length > 0);
+                if (held.length > 0) {
+                    const label = options.sites?.values[target]?.label ?? target;
+                    throw new CmsHttpError(409, {
+                        detail:
+                            held.length === 1
+                                ? `${held[0]!.filename} is used outside ${label}.`
+                                : `${held.length} of the images are used outside ${label}, so none of them moved.`,
+                        uses: held.flatMap(outsideOf),
+                    });
+                }
+            }
+            const moved = await cms.media.move(
+                records.map((record) => record.id),
+                {
+                    ...(target === undefined
+                        ? {}
+                        : {
+                              site: target,
+                          }),
+                    ...(body.folder === undefined
+                        ? {}
+                        : {
+                              folder: body.folder,
+                          }),
+                },
+                authorOf(cms, args)
+            );
+            return {
+                status: 200,
+                body: {
+                    media: moved.map((record) => withUrl(cms, record)),
+                },
+            };
+        }) as never
+    );
+
                 widgets: options.dashboard,
                 collections: options.collections ?? [],
                 views: options.views ?? [],
@@ -2905,3 +3117,4 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
 };
 
 export type CmsRoutes = ReturnType<typeof cmsRoutes>;
+            releaseHold,

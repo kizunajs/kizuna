@@ -159,6 +159,15 @@ export type DocumentStatus = 'empty' | 'draft' | 'published' | 'changed';
 export interface Description {
     ref: string;
     kind: 'page' | 'global' | 'item';
+    /**
+     * Who edits it now, by id. Anyone else reads it until they stop.
+     */
+    heldBy?: string | null;
+    /**
+     * When it publishes or unpublishes on its own or with a release, or
+     * `null` when nothing is scheduled.
+     */
+    schedule?: DraftSchedule | null;
     name: string;
     label?: string;
     path: string | null;
@@ -268,6 +277,28 @@ export interface Draft {
      * Who saved it last, by id.
      */
     updatedBy: string | null;
+    /**
+     * Who edits it now, by id. Anyone else reads it until they stop.
+     */
+    heldBy?: string | null;
+    /**
+     * When it publishes or unpublishes on its own or with a release.
+     */
+    schedule?: DraftSchedule | null;
+}
+
+/**
+ * A document's pending schedule: the time in UTC, or `null` for a release
+ * with no time yet, and who set it.
+ */
+export interface DraftSchedule {
+    action: 'publish' | 'unpublish';
+    at: string | null;
+    release: {
+        id: string;
+        name: string;
+    } | null;
+    by: string;
 }
 
 /**

@@ -6,8 +6,20 @@ description: 'How drafts are saved, versioned, protected from overwriting, rolle
 - Every save is a version with its author.
 - A draft that fails its schema is kept, but never reaches the page. The editor shows what is missing.
 - A save that sends `null` for an optional field empties it. A field whose schema accepts `null` stores `null`.
-- Two people cannot overwrite each other: a write behind the latest version answers `409`.
+- Two people cannot overwrite each other, since one person edits a document at a time. A client that sends the draft's `ETag` as `If-Match` is also refused with `409` when the draft moved on since it read it.
 - Rollback restores an earlier version as a new draft, which you publish separately.
+
+## One editor at a time
+
+The first person to save a document holds it. Everyone else sees it read only, with the holder's face and "Kari is editing" where its status goes, until the holder is done. A write from anyone else, a save, a restore, publishing or unpublishing, answers `409` and names who holds it under `heldBy`.
+
+The hold ends when the holder leaves the document, asks for a review of it, or goes two minutes without saving. Nothing else is needed: the next person to save holds it then.
+
+An agent works as the person it acts for, so a model that Mia connected holds a document for Mia, and Mia may keep editing beside it. Between the two of them the later save of a field wins.
+
+`heldBy` on every draft answer and on `editing_describe` says who holds it now, so a model can see it before writing. `editing_release_hold` lets it go once a model is done. A scheduled publish waits while someone holds the document, and goes out once they are done.
+
+Holds are kept in memory and passed between server instances with the draft notices, over Postgres `LISTEN` and `NOTIFY`. A driver that cannot listen, like Neon over HTTP, keeps each hold within the instance that took it.
 
 ## Unpublishing
 
