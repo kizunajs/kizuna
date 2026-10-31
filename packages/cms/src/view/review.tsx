@@ -463,6 +463,9 @@ export function PublishReview({
         );
         setPending(found.filter((entry): entry is Pending => entry !== undefined));
     }, [connection, candidates]);
+    // Lists on opening alone, so a new `candidates` from the editor keeps the documents left out and why a publish failed.
+    const latestLoad = useRef(load);
+    latestLoad.current = load;
 
     useEffect(() => {
         if (!open) return;
@@ -475,8 +478,8 @@ export function PublishReview({
         setWhen(scheduledAt === null ? 'now' : 'later');
         setLaterDate(later.date);
         setLaterTime(later.time);
-        void load();
-    }, [open, load]);
+        void latestLoad.current();
+    }, [open]);
 
     const revert = async (entries: Array<{ document: Pending; paths: string[] }>, key: string): Promise<void> => {
         setBusy(key);
@@ -548,7 +551,8 @@ export function PublishReview({
         const published = documents.filter((document) => !failed.some((failure) => failure.ref === document.ref));
         if (published.length > 0) onPublished(published.map((document) => document.title));
         const left = pending.filter((document) => !published.some((done) => done.ref === document.ref));
-        if (left.length === 0) {
+        // What the person left out stays a draft, and the dialog closes once everything they chose is live.
+        if (left.every((document) => skipped.has(document.ref))) {
             setOpen(false);
             return;
         }

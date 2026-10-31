@@ -87,6 +87,11 @@ test('an editor names an owner and asks her to review, and she approves it so it
             })
             .locator('.k-review-badge')
     ).toHaveText('Approved by Kari');
+    // Drafts other tests left may still be held by whoever saved them, which refuses publishing them. Leave them out.
+    const left = editor.locator('.k-review__group').filter({
+        hasNotText: 'Button label',
+    });
+    for (const other of await left.all()) await other.getByRole('checkbox').click();
     await editor.locator('.k-review__actions .k-button--primary').click();
     await expect(editor.locator('.k-review')).toBeHidden();
     await expect(editor.locator('.k-status')).toHaveText('Published');
