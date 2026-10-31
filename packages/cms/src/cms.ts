@@ -30,6 +30,7 @@ import {
 import { blocksForWire, blocksHint, fieldChain, hiddenIn } from './content.js';
 import { conditionText } from './condition.js';
 import { dataFields, objectOf, type Field } from './field.js';
+import { isImageSchema } from './image.js';
 import { randomBytes } from 'node:crypto';
 import { choosesSites, SHOWS_ON, type ContentDefinition, type Collection, type Global } from './definitions.js';
 import { servesCollection } from './page.js';
@@ -274,6 +275,20 @@ export const brandOf = (schema: z.core.$ZodType): string | undefined => {
  */
 const labelFieldOf = (definition: Collection): string | undefined =>
     dataFields(definition.fields).find((field) => readDef(unwrapOptionalWrappers(field.schema).inner).type === 'string')?.name;
+
+/**
+ * The field a picker shows an item's thumbnail from: its first image field.
+ */
+const imageFieldOf = (definition: Collection): string | undefined =>
+    dataFields(definition.fields).find((field) => isImageSchema(field.schema))?.name;
+
+/**
+ * The media id an image field holds, when it holds one.
+ */
+const imageIdOf = (value: unknown): string | undefined => {
+    const id = typeof value === 'object' && value !== null ? (value as { id?: unknown }).id : undefined;
+    return typeof id === 'string' ? id : undefined;
+};
 
 /**
  * What an item is called in lists: its first text field, or Untitled.
@@ -1978,6 +1993,36 @@ export class CmsService {
      * many match in all.
      */
     async editorList(name: string, query: ItemListQuery, site = DEFAULT_SITE): Promise<{ items: EditorItem[]; total: number }> {
+        const { listing, items, total } = await this.editorRows(name, query, site);
+        const fields = query.fields ?? [];
+        const labels = fields.length === 0 ? undefined : await this.columnLabels(listing, fields, items, query.headers ?? {});
+        return {
+            items: items.map(({ content, ...item }) =>
+                fields.length === 0
+                    ? item
+                    : {
+                          ...item,
+                          values: Object.fromEntries(fields.map((field) => [field, content[field] ?? null])),
+                          labels: Object.fromEntries(
+                              fields.flatMap((field) => {
+                                  const label = labels?.get(field)?.(content[field]);
+                                  return label === undefined ? [] : [[field, label]];
+                              })
+                          ),
+                      }
+            ),
+            total,
+        };
+    }
+
+    /**
+     * The items of `editorList`, each with its content.
+     */
+    private async editorRows(
+        name: string,
+        query: ItemListQuery,
+        site: string
+    ): Promise<{ listing: Listing; items: Array<EditorItem & { content: Record<string, unknown> }>; total: number }> {
         const listing = this.listing(name, site);
         const definition = listing.definition;
         const labelField = labelFieldOf(definition);
@@ -2055,23 +2100,9 @@ export class CmsService {
                 content,
             };
         });
-        const fields = query.fields ?? [];
-        const labels = fields.length === 0 ? undefined : await this.columnLabels(listing, fields, items, query.headers ?? {});
         return {
-            items: items.map(({ content, ...item }) =>
-                fields.length === 0
-                    ? item
-                    : {
-                          ...item,
-                          values: Object.fromEntries(fields.map((field) => [field, content[field] ?? null])),
-                          labels: Object.fromEntries(
-                              fields.flatMap((field) => {
-                                  const label = labels?.get(field)?.(content[field]);
-                                  return label === undefined ? [] : [[field, label]];
-                              })
-                          ),
-                      }
-            ),
+            listing,
+            items,
             total: result.total,
         };
     }
@@ -2715,11 +2746,12 @@ export class CmsService {
         const owned = this.listingFor(brand);
         if (owned !== undefined) {
             const site = input.site;
-            const items =
+            const { items } =
                 site === undefined || site === DEFAULT_SITE || owned.site !== DEFAULT_SITE || !choosesSites(owned.definition)
-                    ? await this.editorItems(owned.name, owned.site)
-                    : (
-                          await this.editorList(owned.name, {
+                    ? await this.editorRows(owned.name, {}, owned.site)
+                    : await this.editorRows(
+                          owned.name,
+                          {
                               groups: [
                                   [
                                       {
@@ -2729,8 +2761,10 @@ export class CmsService {
                                       },
                                   ],
                               ],
-                          })
-                      ).items;
+                          },
+                          DEFAULT_SITE
+                      );
+            const imageField = imageFieldOf(owned.definition);
             const term = (input.query ?? '').toLowerCase();
             return items
                 .filter((item) =>
@@ -2739,16 +2773,24 @@ export class CmsService {
                         : input.ids.includes(item.id)
                 )
                 .slice(0, 50)
-                .map((item) => ({
-                    id: item.id,
-                    label: item.label,
-                    ...(item.treeLabel === undefined
-                        ? {}
-                        : {
-                              parent: item.parent ?? null,
-                              treeLabel: item.treeLabel,
-                          }),
-                }));
+                .map((item) => {
+                    const imageId = imageField === undefined ? undefined : imageIdOf(item.content[imageField]);
+                    return {
+                        id: item.id,
+                        label: item.label,
+                        ...(imageId === undefined
+                            ? {}
+                            : {
+                                  image: this.imageUrl(imageId, '?w=160'),
+                              }),
+                        ...(item.treeLabel === undefined
+                            ? {}
+                            : {
+                                  parent: item.parent ?? null,
+                                  treeLabel: item.treeLabel,
+                              }),
+                    };
+                });
         }
         const relationship = this.relationshipFor(brand);
         if (relationship === undefined) {
