@@ -17,3 +17,6 @@ tsconfig.json
 **/*.generated.ts
 packages/*/src/generated/
 apps/sites-demo/uk-content/src/
+
+# The sites demo writes sent emails here when no Resend key is set.
+apps/sites-demo/.outbox/
