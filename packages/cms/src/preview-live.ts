@@ -5,12 +5,37 @@ import { patchTexts, type DraftChange } from './preview-patch.js';
 import { openEnvelope, type EditorMessage } from './preview-messages.js';
 
 /**
+ * Where the page shows text: its body, and the body of each frame on its own
+ * origin, like an email rendered into a frame's `srcdoc`.
+ */
+const shownRoots = (): Element[] => {
+    const roots: Element[] = [document.body];
+    for (const frame of document.querySelectorAll('iframe')) {
+        try {
+            const body = frame.contentDocument?.body;
+            if (body !== undefined && body !== null) roots.push(body);
+        } catch {
+            // A frame on another origin keeps its document to itself.
+        }
+    }
+    return roots;
+};
+
+/**
+ * Patches the change wherever the page shows it, answering whether any part
+ * of the page took it.
+ */
+const patchShown = (change: DraftChange): boolean => shownRoots().filter((root) => patchTexts(root, change)).length > 0;
+
+/**
  * The documents the page marks, as `formatRef` writes them.
  */
-const refsOn = (root: Element): string[] => {
+const refsOn = (): string[] => {
     const refs = new Set<string>();
-    for (const source of markedElements(root).values()) {
-        if (source.ref !== undefined) refs.add(source.ref);
+    for (const root of shownRoots()) {
+        for (const source of markedElements(root).values()) {
+            if (source.ref !== undefined) refs.add(source.ref);
+        }
     }
     return [...refs].sort();
 };
@@ -41,7 +66,7 @@ type Typed = Map<string, Record<string, string>>;
 const showTyped = (typed: Typed): void => {
     for (const [ref, texts] of typed) {
         for (const [path, text] of Object.entries(texts)) {
-            patchTexts(document.body, {
+            patchShown({
                 ref,
                 texts: {
                     [path]: text,
@@ -95,7 +120,7 @@ export const useLiveDraft = (eventsPath: string | undefined): void => {
         };
 
         const connect = (): void => {
-            const refs = refsOn(document.body);
+            const refs = refsOn();
             const key = refs.join(' ');
             if (source !== undefined && key === subscribed) return;
             source?.close();
@@ -115,7 +140,7 @@ export const useLiveDraft = (eventsPath: string | undefined): void => {
             opened.addEventListener('change', (event) => {
                 const change = JSON.parse((event as MessageEvent<string>).data) as DraftChange;
                 confirmTyped(typed, change);
-                if (!patchTexts(document.body, change)) refreshSoon();
+                if (!patchShown(change)) refreshSoon();
                 // A save that left with the text typed so far arrives after the person typed more.
                 showTyped(typed);
             });
@@ -140,6 +165,11 @@ export const useLiveDraft = (eventsPath: string | undefined): void => {
             showTyped(typed);
         };
         window.addEventListener('message', typing);
+        // A frame on the page loads its document again when the page renders again.
+        const frameLoaded = (event: Event): void => {
+            if (event.target instanceof HTMLIFrameElement) showTyped(typed);
+        };
+        document.addEventListener('load', frameLoaded, true);
 
         connect();
         // The documents the page shows change as it renders again, and a stream waiting to reconnect picks them up then.
@@ -159,6 +189,7 @@ export const useLiveDraft = (eventsPath: string | undefined): void => {
         return () => {
             stopped = true;
             window.removeEventListener('message', typing);
+            document.removeEventListener('load', frameLoaded, true);
             observer.disconnect();
             source?.close();
             window.clearTimeout(pending);
