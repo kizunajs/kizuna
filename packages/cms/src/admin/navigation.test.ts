@@ -156,7 +156,7 @@ describe('the admin navigation', () => {
             },
         });
         expect(sections.map((section) => [section.label, section.entries.map((entry) => entry.label)])).toEqual([
-            ['Content', ['Pages', 'Scheduled', 'Media', 'Site', 'Articles']],
+            ['Content', ['Pages', 'Scheduled', 'Media', 'Trash', 'Site', 'Articles']],
             ['People', ['Employees']],
         ]);
     });
@@ -476,11 +476,13 @@ describe('the admin navigation with several sites', () => {
         });
         expect(sections.flatMap((section) => section.entries).map((entry) => [entry.label, hrefOf(entry.screen)])).toEqual([
             ['Pages', '/admin/uk/pages'],
+            ['Map', '/admin/uk/map'],
             ['Events', '/admin/uk/collections/events'],
             ['Settings', '/admin/uk/globals/settings'],
             ['Waiting', '/admin/uk/waiting'],
             ['Scheduled', '/admin/uk/scheduled'],
             ['Media', '/admin/uk/media'],
+            ['Trash', '/admin/uk/trash'],
         ]);
     });
 
@@ -698,7 +700,7 @@ describe('the admin navigation with several sites', () => {
         expect(placeOf(screenOf('/admin/uk/waiting'), true)).toEqual(sitePlace('uk'));
     });
 
-    it('lists Waiting, Sites and People in Overview, and Waiting in a site', () => {
+    it('lists Waiting, Sites, Map and People in Overview, and Waiting in a site', () => {
         expect(
             navigationOf({
                 ...LISTED,
@@ -706,7 +708,7 @@ describe('the admin navigation with several sites', () => {
             })
                 .flatMap((section) => section.entries)
                 .map((entry) => entry.label)
-        ).toEqual(['Waiting', 'Sites', 'People']);
+        ).toEqual(['Waiting', 'Sites', 'Map', 'People']);
         expect(
             navigationOf({
                 ...LISTED,
@@ -715,6 +717,46 @@ describe('the admin navigation with several sites', () => {
                 .flatMap((section) => section.entries)
                 .map((entry) => [entry.label, hrefOf(entry.screen)])
         ).toContainEqual(['Waiting', '/admin/uk/waiting']);
+    });
+
+    it("gives Overview's Map and each site's an address, and keeps the map when the switcher moves", () => {
+        const addresses: Array<[Screen, string]> = [
+            [
+                {
+                    kind: 'map',
+                },
+                '/admin/map',
+            ],
+            [
+                {
+                    kind: 'map',
+                    site: 'uk',
+                },
+                '/admin/uk/map',
+            ],
+        ];
+        for (const [screen, address] of addresses) {
+            expect(hrefOf(screen)).toBe(address);
+            expect(screenOf(address)).toEqual(screen);
+        }
+        expect(placeOf(screenOf('/admin/map'), true)).toEqual(ALL_PLACE);
+        expect(placeOf(screenOf('/admin/uk/map'), true)).toEqual(sitePlace('uk'));
+        expect(screenInPlace(screenOf('/admin/map'), sitePlace('norway'))).toEqual({
+            kind: 'map',
+            site: 'norway',
+        });
+        expect(screenInPlace(screenOf('/admin/uk/map'), ALL_PLACE)).toEqual({
+            kind: 'map',
+        });
+        expect(
+            isCurrent(
+                {
+                    kind: 'map',
+                    site: 'uk',
+                },
+                screenOf('/admin/uk/map')
+            )
+        ).toBe(true);
     });
 
     it('keeps Waiting when the switcher moves between Overview and a site', () => {

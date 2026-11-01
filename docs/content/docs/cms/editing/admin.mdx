@@ -141,11 +141,11 @@ With [several sites](/docs/cms/sites), the admin has places: each site, **Shared
 
 Under the logo, the sidebar shows the place open, its mark and its name, then that place's screens in one list:
 
-| Place    | Its screens                                                                                                                                      |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A site   | Dashboard, Pages, the site's own collections and globals, Waiting, [Scheduled](/docs/cms/editing/scheduling#scheduled), and Media for its images |
-| Shared   | The shared collections, globals and views, then Media for the shared images                                                                      |
-| Overview | Dashboard, Pages for every site's pages, and each collection a site has of its own                                                               |
+| Place    | Its screens                                                                                                                                                                                |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A site   | Dashboard, Pages, its [Map](#the-map), the site's own collections and globals, Waiting, [Scheduled](/docs/cms/editing/scheduling#scheduled), Media for its images, and its [Trash](#trash) |
+| Shared   | The shared collections, globals and views, then Media for the shared images and the shared [Trash](#trash)                                                                                 |
+| Overview | Dashboard, Pages for every site's pages, the [Map](#the-map) of every site, and each collection a site has of its own                                                                      |
 
 The bar across the top of each screen starts with the place, then the way to the screen, as in **Hagen UK / Dashboard / Events**. Shared has no dashboard, so its path starts at the list, as in **Shared / Offices / Harbour Office**. The search sits at the bar's right end, and the bar stands in for the trail in each screen's header.
 
@@ -166,6 +166,9 @@ Each site has its screens under its key, at `/admin/<site>/...`:
 | The UK's events                | `/admin/uk/collections/events`         |
 | The UK's images                | `/admin/uk/media`                      |
 | The UK's scheduled             | `/admin/uk/scheduled`                  |
+| The UK's trash                 | `/admin/uk/trash`                      |
+| The map of every site          | `/admin/map`                           |
+| The UK's map                   | `/admin/uk/map`                        |
 | A release, from the UK         | `/admin/uk/releases/rel_8f2k3j9x2a1b`  |
 | A shared office                | `/admin/collections/offices/k3j9x2`    |
 | The UK's values on that office | `/admin/uk/collections/offices/k3j9x2` |
@@ -175,6 +178,16 @@ A shared global or item with [per-site fields](/docs/cms/fields#per-site) shows 
 Overview's Pages lists every site's pages, with a **Site** column and a filter by it. A site's document opened from Overview names its site under the title, as **Site: Hagen UK**. Everywhere else the path bar names the place, so a document has no Site line.
 
 The browser tab shows the site's icon, and the tab titles and the sign-in screen use the site's label in place of `name`, so an editor with three sites open in three tabs tells them apart.
+
+### The map
+
+**Map** draws every page as a sitemap, so an editor sees at a glance how the sites hang together and where they point at each other. Each site is a column headed by its mark, its label and its domain, and the shared content has a column of its own. Each page sits under the page whose path its own extends, from the front page down, and a part of a path with no page of its own shows in grey. A route that shows a collection, like `/shops/[slug]`, is one card with its count of items, and a click lists the items under it.
+
+The lines between cards are the [content links](/docs/cms/links), from the page or global holding a link to the page or item it names, across sites as well. A link to a page that is not live, never published or in the trash, is dashed. Hovering a card brings out what it links to and what links to it and fades the rest, and hovering a line names the page it goes to, with its site's domain when it crosses to another site. A click on a card opens the document.
+
+The canvas pans with a drag and zooms with a scroll or a pinch, and opens fitted to the window. The sites in the header show or hide their columns, **Find a page** jumps to a page by its title or path, with Enter for the next match, and **Fit to view** fits the map to the window again.
+
+Overview's Map shows every site the editor may open. A site's Map opens on that site and the shared content, and the header adds the others. An editor sees only the sites they may open, so an editor of one site sees its pages, the shared content and the links between them. An agent reads the same map in one call with `editing_pages_map`, which answers each page with its site, path and status, and each link with whether it is broken.
 
 ## Lists
 

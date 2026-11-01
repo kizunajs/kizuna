@@ -68,7 +68,21 @@ export type Screen = (
           key?: string;
       }
     | {
+          /**
+           * Every page as a sitemap, and the content links between them: the
+           * whole group in Overview, or one site's own.
+           */
+          kind: 'map';
+      }
+    | {
           kind: 'people';
+      }
+    | {
+          /**
+           * What was deleted from a site's own collections, or with no site
+           * from the shared ones.
+           */
+          kind: 'trash';
       }
     | {
           /**
@@ -237,6 +251,8 @@ export const hrefIn = (site: string | undefined, screen: Screen): string => {
     if (screen.kind === 'release') return at('releases', screen.id);
     if (screen.kind === 'sites') return screen.key === undefined ? at('sites') : at('sites', screen.key);
     if (screen.kind === 'people') return at('people');
+    if (screen.kind === 'trash') return at('trash');
+    if (screen.kind === 'map') return at('map');
     if (screen.kind === 'media') return screen.id === undefined ? at('media') : at('media', screen.id);
     if (screen.kind === 'collection') return at('collections', screen.name);
     if (screen.kind === 'view') return at('views', screen.name);
@@ -372,6 +388,17 @@ const screenAt = (segments: readonly string[], site: AdminSite | undefined): Scr
             kind: 'scheduled',
         };
     }
+    // The map lays the pages out by site, so it is there only with several.
+    if (section === 'map' && name === undefined && sites.length > 0) {
+        return {
+            kind: 'map',
+        };
+    }
+    if (section === 'trash' && name === undefined) {
+        return {
+            kind: 'trash',
+        };
+    }
     if (section === 'releases' && name !== undefined && id === undefined) {
         return {
             kind: 'release',
@@ -453,9 +480,9 @@ export const screenInSite = (screen: Screen, key: string | undefined): Screen =>
         const { site: _, ...shown } = screen;
         return placed(shown);
     }
-    if (screen.kind === 'pages') {
+    if (screen.kind === 'pages' || screen.kind === 'map' || screen.kind === 'trash') {
         return placed({
-            kind: 'pages',
+            kind: screen.kind,
         });
     }
     const listOf = (name: string): Screen =>
@@ -800,6 +827,7 @@ const siteNavigationOf = (options: Parameters<typeof navigationOf>[0], declared:
                         .map(({ group: _, ...entry }) => entry)
                         .sort((left, right) => kindOrder(left) - kindOrder(right)),
                     media(undefined),
+                    trash(undefined),
                 ],
             },
         ];
@@ -824,6 +852,12 @@ const siteNavigationOf = (options: Parameters<typeof navigationOf>[0], declared:
                         },
                     },
                     {
+                        label: 'Map',
+                        screen: {
+                            kind: 'map',
+                        },
+                    },
+                    {
                         label: 'People',
                         screen: {
                             kind: 'people',
@@ -844,6 +878,13 @@ const siteNavigationOf = (options: Parameters<typeof navigationOf>[0], declared:
                     label: 'Pages',
                     screen: {
                         kind: 'pages',
+                        site: shown.key,
+                    },
+                },
+                {
+                    label: 'Map',
+                    screen: {
+                        kind: 'map',
                         site: shown.key,
                     },
                 },
@@ -952,7 +993,7 @@ export const placeOf = (screen: Screen, allSites: boolean): Place => {
  */
 export const screenInPlace = (screen: Screen, place: Place): Screen => {
     if (place.kind === 'site') {
-        if (screen.kind === 'waiting' || screen.kind === 'scheduled') {
+        if (screen.kind === 'waiting' || screen.kind === 'scheduled' || screen.kind === 'map' || screen.kind === 'trash') {
             return {
                 kind: screen.kind,
                 site: place.site,
@@ -977,13 +1018,18 @@ export const screenInPlace = (screen: Screen, place: Place): Screen => {
             const { site: _, ...shown } = screen;
             return shown;
         }
+        if (screen.kind === 'trash') {
+            return {
+                kind: 'trash',
+            };
+        }
         return {
             kind: 'media',
         };
     }
-    if (screen.kind === 'waiting') {
+    if (screen.kind === 'waiting' || screen.kind === 'map') {
         return {
-            kind: 'waiting',
+            kind: screen.kind,
         };
     }
     if (screen.kind === 'sites' || screen.kind === 'people') return screen;
@@ -1081,6 +1127,8 @@ export const isCurrent = (entry: Screen, shown: Screen): boolean => {
     }
     if (entry.kind === 'media') return shown.kind === 'media' && shown.site === entry.site;
     if (entry.kind === 'waiting') return shown.kind === 'waiting' && shown.site === entry.site;
+    if (entry.kind === 'map') return shown.kind === 'map' && shown.site === entry.site;
+    if (entry.kind === 'trash') return shown.kind === 'trash' && shown.site === entry.site;
     if (entry.kind === 'scheduled') return (shown.kind === 'scheduled' || shown.kind === 'release') && shown.site === entry.site;
     if (entry.kind === 'sites' || entry.kind === 'people') return shown.kind === entry.kind;
     if (entry.kind === 'pages') {

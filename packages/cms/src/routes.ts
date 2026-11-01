@@ -95,16 +95,23 @@ import {
     withdrawReviews,
 } from './reviews.js';
 import { waitingTranslations } from './waiting-translations.js';
+import { addComment, commentsOf, refOfRow, resolveThread, waitingComments } from './comments.js';
+import { actingAgent, agentOf, withAgent } from './agents.js';
+import { checkDocument, checkRelease } from './publish-check.js';
+import { declaredInstructions, instructionsOf, instructionsSection } from './instructions.js';
 import { PLACE, placeIn } from './place.js';
 import { changePerson, invitePerson, managedSites, peopleWithSites, siteRoles } from './people.js';
 import type { Person } from './options.js';
 import { collectionActionRoutes, itemActions } from './action-routes.js';
 import { listViewsRoute, viewRoutes } from './view-routes.js';
 import { dashboardRoute } from './dashboard-routes.js';
+import { pageMapRoute } from './page-map-routes.js';
 import { scheduleRoutes } from './schedule-routes.js';
 import { cancelSchedule, scheduleDocument } from './schedules.js';
 import { TranslateBodySchema, TranslatedDraftSchema, translateDraft } from './translate-draft.js';
 import type { EditorAccess } from './site-access.js';
+import { DocumentTrashedError } from './storage/store.js';
+import { eraseItem, emptyTrash, restoreItem, TRASH_DAYS, TrashSchema, trashOf } from './trash.js';
 
 interface Args {
     params: Record<string, string>;
@@ -3409,8 +3416,14 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         editing: {
             describe,
             releaseHold,
+            check,
             pages: {
                 list: listPages,
+                map: pageMapRoute({
+                    editor,
+                    editingBase,
+                    guarded,
+                }),
                 ...editingRoutes(pageScope),
             },
             ...(siteEntries.length === 0

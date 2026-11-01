@@ -82,7 +82,14 @@ await page({
 await page({
     name: 'admin',
     entry: 'src/admin/main.tsx',
-    stylesheets: ['src/view/view.css', 'src/admin/admin.css'],
+    stylesheets: [
+        {
+            path: 'node_modules/@xyflow/react/dist/base.css',
+            layer: 'xyflow',
+        },
+        'src/view/view.css',
+        'src/admin/admin.css',
+    ],
 });
 await page({
     name: 'sign-in',

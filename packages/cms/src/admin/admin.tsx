@@ -28,7 +28,9 @@ import { Dashboard, type WaitingReview } from './dashboard.js';
 import { DocumentScreen } from './document.js';
 import { EditInChat } from './edit-in-chat.js';
 import { CollectionList, PagesList, createItem } from './list.js';
+import { MapScreen } from './map-screen.js';
 import { MediaLibrary } from './media.js';
+import { TrashScreen } from './trash-screen.js';
 import {
     ALL_PLACE,
     CONTENT_GROUP,
@@ -133,6 +135,8 @@ const entryIconOf = (screen: Screen): LucideIcon | undefined => {
     if (screen.kind === 'scheduled') return CalendarClock;
     if (screen.kind === 'sites') return Globe;
     if (screen.kind === 'people') return Users;
+    if (screen.kind === 'trash') return Trash2;
+    if (screen.kind === 'map') return Network;
     return undefined;
 };
 
@@ -227,7 +231,7 @@ export function Admin({ config }: { config: AdminConfig }) {
             !allSites &&
             place.kind === 'site' &&
             screen.site === undefined &&
-            (screen.kind === 'dashboard' || screen.kind === 'pages' || screen.kind === 'waiting')
+            (screen.kind === 'dashboard' || screen.kind === 'pages' || screen.kind === 'waiting' || screen.kind === 'map')
         ) {
             replaceAddress(hrefIn(place.site, screen));
         }
@@ -274,6 +278,20 @@ export function Admin({ config }: { config: AdminConfig }) {
             return [
                 {
                     label: 'People',
+                },
+            ];
+        }
+        if (screen.kind === 'map') {
+            return [
+                {
+                    label: 'Map',
+                },
+            ];
+        }
+        if (screen.kind === 'trash') {
+            return [
+                {
+                    label: 'Trash',
                 },
             ];
         }
@@ -483,6 +501,18 @@ export function Admin({ config }: { config: AdminConfig }) {
             return <SitesScreen sites={sites} chosen={screen.key} waiting={openWork} people={people} collectionLabel={collectionLabel} />;
         }
         if (screen.kind === 'people') return <People connection={connection} sites={sites} />;
+        if (screen.kind === 'trash') {
+            return (
+                <TrashScreen
+                    key={screen.site ?? ''}
+                    connection={screen.site === undefined ? connection : withSiteCollections(connection, screen.site)}
+                    collectionLabel={(name) =>
+                        collectionLabel(name) ?? siteOfScreen?.collections.find((own) => own.name === name)?.label ?? undefined
+                    }
+                />
+            );
+        }
+        if (screen.kind === 'map') return <MapScreen connection={connection} sites={sites} site={screen.site} />;
         if (screen.kind === 'scheduled') return <ScheduledScreen connection={connection} site={screen.site} sites={sites} />;
         if (screen.kind === 'release') return <ReleaseScreen connection={connection} id={screen.id} site={screen.site} sites={sites} />;
         if (screen.kind === 'pages') {
