@@ -43,7 +43,9 @@ export const GlossaryTermSchema = Kizuna.model({
         forms: z
             .array(z.string().min(1).max(80))
             .min(1)
-            .describe('Every spelling the rule covers, inflections included, like billig, billige, billigste.'),
+            .describe(
+                'Every spelling the rule covers, inflections included, like billig, billige, billigste. Each is matched as a whole word in any case, and a kept one only as written, so nothing is guessed.'
+            ),
         rule: z
             .enum(['keep', 'translate', 'avoid'])
             .describe('keep it as written in every translation, translate it as `use`, or avoid it.'),
@@ -112,7 +114,6 @@ export const voiceGlobal = (options: VoiceOptions): Global => {
                     {
                         name: 'glossary',
                         schema: z.array(GlossaryTermSchema).default([]),
-                        description: 'Checked in every field, by whole words. Spell out each form, since nothing is guessed.',
                         auth,
                         localized: false,
                     },
