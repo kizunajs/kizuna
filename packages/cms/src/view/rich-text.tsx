@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import {
     defineAnnotation,
@@ -15,7 +15,13 @@ import {
     type PortableTextBlock,
 } from '@portabletext/editor';
 import { EventListenerPlugin, NodePlugin } from '@portabletext/editor/plugins';
-import { isActiveAnnotation, isActiveDecorator, isActiveListItem, isActiveStyle } from '@portabletext/editor/selectors';
+import {
+    getActiveAnnotations,
+    isActiveAnnotation,
+    isActiveDecorator,
+    isActiveListItem,
+    isActiveStyle,
+} from '@portabletext/editor/selectors';
 import {
     ArrowDown,
     ArrowUp,

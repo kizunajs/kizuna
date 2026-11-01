@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toolsFor, type Connection } from '../view/connection.js';
 import { Avatar, type People } from '../view/people.js';
 import type { DescribedField, DescribedLayout, PersonView } from '../view/schema.js';
+import { creditOf } from '../credit.js';
 import { CompareVersions } from './compare.js';
 import { savedAtOf, type VersionSummary } from './history.js';
 import { PER_PAGE_CHOICES } from './list-columns.js';
@@ -171,7 +172,7 @@ export function Versions({
                                     <td>
                                         <span className="k-versions__by">
                                             <Avatar person={author} />
-                                            <span className="k-ellipsis">{author.name}</span>
+                                            <span className="k-ellipsis">{creditOf(author.name, entry.via ?? null)}</span>
                                         </span>
                                     </td>
                                     <td className="k-versions__actions">

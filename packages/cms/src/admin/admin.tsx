@@ -249,7 +249,7 @@ export function Admin({ config }: { config: AdminConfig }) {
     const waitingCount =
         openWork === undefined
             ? 0
-            : waitingRowsOf(openWork.reviews, openWork.translations, {
+            : waitingRowsOf(openWork, {
                   collectionLabel: (name) => collections?.find((collection) => collection.name === name)?.label,
                   site: place.kind === 'site' ? place.site : undefined,
                   me: people?.me,

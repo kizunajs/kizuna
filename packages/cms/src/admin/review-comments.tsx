@@ -3,7 +3,7 @@ import { CircleAlert, MessageCircle } from 'lucide-react';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
 import { Avatar } from '../view/people.js';
-import type { PersonView, ReviewComment, ReviewState } from '../view/schema.js';
+import type { PersonView, CommentView, ReviewState } from '../view/schema.js';
 import { problemOf } from './parts.js';
 import { commenterOf, commentsOn, takesPart } from './review-state.js';
 import { relativeTimeOf } from './time.js';
@@ -29,7 +29,7 @@ function CommentLine({
     onReply,
     busy,
 }: {
-    comment: ReviewComment;
+    comment: CommentView;
     me: string | undefined;
     now: Date;
     onResolve: (() => void) | undefined;

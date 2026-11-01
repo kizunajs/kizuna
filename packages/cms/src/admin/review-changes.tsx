@@ -1,19 +1,13 @@
 import { useId, useState } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import { ChevronDown, CircleAlert, Lock } from 'lucide-react';
+import { creditOf } from '../credit.js';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
 import { showValue, type ChangeView } from '../view/change-value.js';
 import { Avatar } from '../view/people.js';
 import { shapeOfField, type DraftChange } from '../view/review.js';
-import {
-    valueAt,
-    type DescribedField,
-    type DescribedLayout,
-    type PersonView,
-    type ReviewComment,
-    type ReviewState,
-} from '../view/schema.js';
+import { valueAt, type DescribedField, type DescribedLayout, type PersonView, type CommentView, type ReviewState } from '../view/schema.js';
 import { ShownValue, SideOf } from './diff.js';
 import { Loading, problemOf } from './parts.js';
 import { CommentButton, FieldComments } from './review-comments.js';
@@ -38,6 +32,7 @@ export function ReviewNote({
     at,
     text,
     now,
+    via = null,
     children,
 }: {
     person: PersonView;
@@ -48,13 +43,17 @@ export function ReviewNote({
     at: string | null;
     text: string | null;
     now: Date;
+    /**
+     * The agent that did it for them, like `Claude`.
+     */
+    via?: string | null;
     children?: React.ReactNode;
 }) {
     return (
         <div className="k-review-note">
             <Avatar person={person} size={26} />
             <span className="k-review-note__head">
-                <span className="k-review-note__who">{person.name}</span>
+                <span className="k-review-note__who">{creditOf(person.name, via)}</span>
                 <span className="k-review-note__when">
                     {action}
                     {at === null ? '' : ` ${relativeTimeOf(at, now)}`}
@@ -161,8 +160,15 @@ export function ChangesScreen({
     const unchanged = fields.filter((field) => field.parent === undefined && !changed.has(field.path));
     return (
         <div className="k-review-changes">
-            {review.note === null ? null : (
-                <ReviewNote person={review.requestedBy} action="asked" at={review.createdAt} text={review.note} now={now} />
+            {review.note === null && (review.requestedVia ?? null) === null ? null : (
+                <ReviewNote
+                    person={review.requestedBy}
+                    action="asked"
+                    at={review.createdAt}
+                    text={review.note}
+                    now={now}
+                    via={review.requestedVia ?? null}
+                />
             )}
             {changes === undefined ? (
                 <Loading />
@@ -225,7 +231,7 @@ export function SentBackNotes({
     by: PersonView;
     at: string | null;
     note: string | null;
-    comments: readonly ReviewComment[];
+    comments: readonly CommentView[];
     labelOf: (path: string) => string;
     now: Date;
     connection: Connection;

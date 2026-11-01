@@ -39,9 +39,12 @@ const page = async ({ name, entry, stylesheets, title = 'Kizuna CMS' }) => {
     const iconIn = (colour) => Buffer.from(icon.replace('FILL', colour)).toString('base64');
     const lightIcon = iconIn('#0c0c0c');
     const darkIcon = iconIn('#ffffff');
-    const styles = (await Promise.all(stylesheets.map((stylesheet) => readFile(`${root}${stylesheet}`, 'utf8'))))
-        .join('\n')
-        .replace('__PLUS_JAKARTA_SANS__', font.toString('base64'));
+    // A stylesheet from a library goes in a layer of its own, named before kizuna's, so the admin's rules win over it.
+    const read = async (stylesheet) =>
+        typeof stylesheet === 'string'
+            ? readFile(`${root}${stylesheet}`, 'utf8')
+            : `@layer ${stylesheet.layer} {\n${await readFile(`${root}${stylesheet.path}`, 'utf8')}\n}`;
+    const styles = (await Promise.all(stylesheets.map(read))).join('\n').replace('__PLUS_JAKARTA_SANS__', font.toString('base64'));
 
     // The server swaps the placeholders for the site's address and the app's own stylesheet when it serves the page.
     const html = `<!doctype html>

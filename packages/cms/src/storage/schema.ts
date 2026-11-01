@@ -27,6 +27,10 @@ export const cmsDocuments = pgTable(
         }).notNull(),
         updatedBy: text('updated_by').notNull(),
         /**
+         * The agent that made the last change for `updatedBy`, like `Claude`.
+         */
+        updatedVia: text('updated_via'),
+        /**
          * The person who looks after the document, by the id `people` gives them.
          */
         owner: text('owner'),
@@ -92,6 +96,10 @@ export const cmsVersions = pgTable(
             mode: 'date',
         }).notNull(),
         createdBy: text('created_by').notNull(),
+        /**
+         * The agent that saved it for `createdBy`, like `Claude`.
+         */
+        via: text('via'),
         migrationVersion: integer('migration_version').notNull().default(0),
         publishedAt: timestamp('published_at', {
             withTimezone: true,
@@ -140,6 +148,10 @@ export const cmsReviews = pgTable(
         version: integer('version').notNull(),
         reviewers: jsonb('reviewers').notNull(),
         requestedBy: text('requested_by').notNull(),
+        /**
+         * The agent that asked for `requestedBy`, like `Claude`.
+         */
+        requestedVia: text('requested_via'),
         note: text('note'),
         createdAt: timestamp('created_at', {
             withTimezone: true,
@@ -157,16 +169,19 @@ export const cmsReviews = pgTable(
 );
 
 /**
- * A comment on one field of a review's draft, by a reviewer or the person who
- * asked, until someone resolves it.
+ * A comment on one field of a document's draft, until someone resolves it.
+ * It may quote a phrase of the field's text, start a thread or answer one,
+ * mention people and name someone to deal with it. A comment left in a
+ * review carries the review.
  */
-export const cmsReviewComments = pgTable(
-    'cms_review_comments',
+export const cmsComments = pgTable(
+    'cms_comments',
     {
         id: text('id').primaryKey(),
-        reviewId: text('review_id')
+        documentId: text('document_id')
             .notNull()
-            .references(() => cmsReviews.id),
+            .references(() => cmsDocuments.id),
+        reviewId: text('review_id').references(() => cmsReviews.id),
         path: text('path').notNull(),
         text: text('text').notNull(),
         createdBy: text('created_by').notNull(),
@@ -179,8 +194,25 @@ export const cmsReviewComments = pgTable(
             withTimezone: true,
             mode: 'date',
         }),
+        /**
+         * The comment that starts the thread this one answers.
+         */
+        replyTo: text('reply_to'),
+        /**
+         * The phrase of the field's text the comment is about.
+         */
+        anchor: text('anchor'),
+        mentions: jsonb('mentions').notNull().default([]),
+        assignee: text('assignee'),
+        /**
+         * The agent that wrote it for `createdBy`, like `Claude`.
+         */
+        via: text('via'),
     },
-    (table) => [index('cms_review_comments_review').on(table.reviewId, table.createdAt)]
+    (table) => [
+        index('cms_comments_review').on(table.reviewId, table.createdAt),
+        index('cms_comments_document').on(table.documentId, table.createdAt),
+    ]
 );
 
 /**
@@ -233,6 +265,10 @@ export const cmsReleases = pgTable('cms_releases', {
     status: text('status').notNull(),
     force: boolean('force').notNull().default(false),
     createdBy: text('created_by').notNull(),
+    /**
+     * The agent that made it for `createdBy`, like `Claude`.
+     */
+    createdVia: text('created_via'),
     createdAt: timestamp('created_at', {
         withTimezone: true,
         mode: 'date',

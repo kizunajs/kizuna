@@ -206,7 +206,8 @@ const askReview = async (documentId: string, ref: string): Promise<string> => {
             createdAt: new Date(),
         },
     ]);
-    await store.addReviewComment({
+    await store.addComment({
+        documentId,
         reviewId: review!.id,
         path: 'heading',
         text: 'Shorter, please.',
@@ -263,7 +264,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
     await pglite.exec(
-        'delete from cms_review_comments; delete from cms_reviews; delete from cms_refs; delete from cms_versions; delete from cms_documents;'
+        'delete from cms_comments; delete from cms_reviews; delete from cms_refs; delete from cms_versions; delete from cms_documents;'
     );
     revalidated.length = 0;
 });
@@ -283,7 +284,7 @@ describe('kizuna cms rename-site', () => {
                 '  cms_versions              3',
                 '  cms_refs                  2',
                 '  cms_reviews               1',
-                '  cms_review_comments       1',
+                '  cms_comments              1',
             ].join('\n'),
         });
         expect(await sitesOf()).toEqual([
@@ -355,7 +356,7 @@ describe('kizuna cms rename-site', () => {
                 cms_versions: 4,
                 cms_refs: 0,
                 cms_reviews: 1,
-                cms_review_comments: 1,
+                cms_comments: 1,
             },
         });
         expect((await sitesOf()).map((row) => `${row.site} ${row.kind} ${row.key}`)).toEqual([
@@ -381,7 +382,7 @@ describe('kizuna cms rename-site', () => {
                 '  cms_versions              3',
                 '  cms_refs                  2',
                 '  cms_reviews               1',
-                '  cms_review_comments       1',
+                '  cms_comments              1',
             ].join('\n'),
         });
         expect(await sitesOf()).toEqual(before);
@@ -450,13 +451,13 @@ describe('kizuna cms orphans', () => {
                 '    cms_versions              3',
                 '    cms_refs                  2',
                 '    cms_reviews               1',
-                '    cms_review_comments       1',
+                '    cms_comments              1',
                 '  uk',
                 '    cms_documents             2',
                 '    cms_versions              2',
                 '    cms_refs                  0',
                 '    cms_reviews               0',
-                '    cms_review_comments       0',
+                '    cms_comments              0',
                 'Move it with kizuna cms rename-site <from> <to>.',
                 'Stored content nothing in the config claims:',
                 '  global:footer',

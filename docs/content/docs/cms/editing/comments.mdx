@@ -1,0 +1,50 @@
+---
+title: Comments
+description: 'Comments on a phrase of a draft, mentioning people and naming who deals with them.'
+---
+
+## Commenting on a phrase
+
+Select a few words in a text or rich text field and **Comment** appears beside the selection. The comment goes under the field, quoting the words, and Enter adds it. Any draft takes comments, whether or not someone was asked to review it.
+
+The words it quotes keep a grey fill and underline in the field. A click on them opens the thread under the field, with **Reply** and **Resolve**. Resolving any comment of a thread resolves the whole thread, and it folds away. A field with open threads shows how many under it, like "2 comments", which opens them all.
+
+When the text changes and the words are gone, the comment stays on the field and its quote reads **Text changed**.
+
+## Mentioning people
+
+Typing `@` in a comment lists the people who open the document, and picking one writes their name, like `@Kari Nordmann`. On a site's document that is the people who hold the site and the admins over every site, as the [people list](/docs/cms/editing/reviews#people) gives them. A mention puts the thread in that person's Waiting until it is resolved.
+
+## Assigning a comment
+
+**Assign**, under a new comment, names the one person who deals with it. The thread shows "Assigned to Kari Nordmann", and it stays in her Waiting until someone resolves it.
+
+## Waiting
+
+A site's Waiting and Overview's list **Mentioned** and **Assigned** rows beside the reviews and translations, each with the comment, who wrote it and when. **Open** opens the document with the thread open at its field.
+
+## Comments in a review
+
+The comments a reviewer leaves on the Changes tab are the same comments, kept with the review. They show at the top of the form when the draft is sent back, and on the Changes tab under each change. See [Reviews](/docs/cms/editing/reviews#comments-on-a-field).
+
+## From a chat
+
+`editing_comments_list` reads every comment on a document, with who wrote each and the agent that wrote it for them. A comment an agent writes reads "Mia Holm via Claude".
+
+> What are the open comments on the winter front page?
+
+`editing_comments_add` comments on a field, and quotes a phrase under `anchor`, exactly as the draft has it. It takes `mentions` and `assignee` by the ids the people list gives, and `replyTo` to answer a thread:
+
+```json
+{
+    "ref": "page:norway:frontPage",
+    "path": "intro",
+    "anchor": "levert neste dag i Oslo, Bergen og Stavanger",
+    "text": "Trondheim opens before Christmas. Should it be here?",
+    "mentions": ["dev@kizunajs.com"]
+}
+```
+
+A phrase the field does not hold answers `422`. `editing_comments_resolve` resolves a thread, and `editing_comments_waiting` lists the threads that mention you or name you.
+
+> Resolve Nils's comment about the phone hours, it is fixed.

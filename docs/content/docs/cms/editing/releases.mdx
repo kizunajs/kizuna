@@ -17,6 +17,14 @@ A document sits in one release at a time, or has a schedule of its own, never bo
 
 A release's page lists its documents under each site, each saying whether it would publish now or what it waits for, and the header counts the documents that wait. **Schedule** picks a time for the whole release, **Publish now** publishes it at once, and both ask first. **Delete release** in the `…` menu removes it and keeps every draft.
 
+When its documents wait for your review, **Send back** asks for changes on all of them with one note. Whoever asked reads the note on each document's review, and saves new drafts into the same release.
+
+## From an agent
+
+An agent that changes several documents for you gathers them in a release named for the task, like **Agent: winter care refresh**, and asks you to review them. The header reads **Made by Mia Holm via Claude**, each document says it waits for your review, and each opens on its Changes tab with the agent's edits word by word. You publish it, schedule it, or send it back. See [Agents and tools](/docs/cms/editing/agents#work-across-several-documents).
+
+`editing_check` with `release` lists what would stop it publishing before anyone tries: a field missing, someone editing, a review it waits for. A link to a page in the same release does not count as broken, since both go live together.
+
 ## Publishing together
 
 A release publishes all its documents in one transaction, so a visitor never sees half of it. When one document would not publish, because it waits for a review, misses a field or someone is editing it, none of them do, and the release is held until it would. The rules are those of [one schedule](/docs/cms/editing/scheduling#when-the-time-comes), and the release's page names the document that holds it.
@@ -29,16 +37,18 @@ A release can hold documents from any site you edit, and shared ones. It shows o
 
 ## The routes
 
-| Route                                | Tool                          | Asks first |
-| ------------------------------------ | ----------------------------- | ---------- |
-| `POST /editing/releases`             | `editing_releases_create`     | No         |
-| `GET /editing/releases/:id`          | `editing_releases_get`        | No         |
-| `PATCH /editing/releases/:id`        | `editing_releases_rename`     | No         |
-| `POST /editing/releases/:id/add`     | `editing_releases_add`        | No         |
-| `POST /editing/releases/:id/remove`  | `editing_releases_remove`     | No         |
-| `PUT /editing/releases/:id/schedule` | `editing_releases_schedule`   | Yes        |
-| `DELETE` the same path               | `editing_releases_unschedule` | No         |
-| `POST /editing/releases/:id/publish` | `editing_releases_publish`    | Yes        |
-| `DELETE /editing/releases/:id`       | `editing_releases_delete`     | No         |
+| Route                                  | Tool                          | Asks first                   |
+| -------------------------------------- | ----------------------------- | ---------------------------- |
+| `POST /editing/releases`               | `editing_releases_create`     | No                           |
+| `GET /editing/releases/:id`            | `editing_releases_get`        | No                           |
+| `PATCH /editing/releases/:id`          | `editing_releases_rename`     | No                           |
+| `POST /editing/releases/:id/add`       | `editing_releases_add`        | No                           |
+| `POST /editing/releases/:id/remove`    | `editing_releases_remove`     | No                           |
+| `PUT /editing/releases/:id/schedule`   | `editing_releases_schedule`   | Yes                          |
+| `DELETE` the same path                 | `editing_releases_unschedule` | No                           |
+| `POST /editing/releases/:id/publish`   | `editing_releases_publish`    | Yes                          |
+| `POST /editing/releases/:id/send-back` | `editing_releases_send_back`  | The person's own button only |
+| `DELETE /editing/releases/:id`         | `editing_releases_delete`     | No                           |
+| `GET /editing/check?release=:id`       | `editing_check`               | No                           |
 
-A release answers with its documents, its `state`, how many documents wait, and `mayPublish`, whether the caller may schedule or publish it. Publishing one that something holds answers `409`, naming each document that waits.
+A release answers with its documents, each with its latest `review`, its `state`, how many documents wait, `mayPublish`, whether the caller may schedule or publish it, and `createdVia`, the agent that made it for `createdBy`. Publishing one that something holds answers `409`, naming each document that waits.

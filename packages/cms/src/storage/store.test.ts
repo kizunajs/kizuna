@@ -293,7 +293,8 @@ describe('DocumentStore', () => {
                 createdAt: new Date(),
             },
         ]);
-        await store.addReviewComment({
+        await store.addComment({
+            documentId: saved.document.id,
             reviewId: review!.id,
             path: 'title',
             text: 'Name the season',
@@ -302,6 +303,60 @@ describe('DocumentStore', () => {
         });
         expect(await store.delete('item', 'articles/first')).toBe(true);
         expect(await store.reviewsOf(saved.document.id)).toEqual([]);
-        expect(await store.reviewComments([review!.id])).toEqual([]);
+        expect(await store.documentComments(saved.document.id)).toEqual([]);
+    });
+});
+
+describe('migration', () => {
+    it('moves the comments of a database from before comments on drafts into cms_comments, each under its document', async () => {
+        const older = new PGlite();
+        const olderStore = new DocumentStore(drizzle(older));
+        await olderStore.createTables();
+        await older.exec(`
+            alter table cms_comments rename to cms_review_comments;
+            alter index cms_comments_review rename to cms_review_comments_review;
+            drop index cms_comments_document;
+            alter table cms_review_comments drop column document_id, drop column reply_to, drop column anchor, drop column mentions, drop column assignee, drop column via;
+            alter table cms_review_comments alter column review_id set not null;
+        `);
+        const saved = await olderStore.saveDraft({
+            kind: 'page',
+            key: 'frontPage',
+            draft: {
+                heading: 'Spring',
+            },
+            author: 'ada',
+        });
+        const [review] = await olderStore.addReviews([
+            {
+                requestId: 'request',
+                ref: 'page:frontPage',
+                documentId: saved.document.id,
+                version: saved.version,
+                reviewers: ['kari'],
+                requestedBy: 'ada',
+                note: null,
+                createdAt: new Date(),
+            },
+        ]);
+        await older.query(
+            `insert into cms_review_comments (id, review_id, path, text, created_by, created_at) values ('comment-1', $1, 'heading', 'Name the season', 'kari', now())`,
+            [review!.id]
+        );
+
+        await olderStore.createTables();
+        await olderStore.createTables();
+
+        expect(await olderStore.documentComments(saved.document.id)).toMatchObject([
+            {
+                id: 'comment-1',
+                reviewId: review!.id,
+                text: 'Name the season',
+                anchor: null,
+                mentions: [],
+                assignee: null,
+            },
+        ]);
+        await older.close();
     });
 });

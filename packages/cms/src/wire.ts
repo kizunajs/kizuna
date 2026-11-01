@@ -139,6 +139,11 @@ export const DraftScheduleSchema = z
     .nullable()
     .describe('When the document publishes or unpublishes without anyone pressing Publish. Null when nothing is scheduled.');
 
+/**
+ * The agent that made a change for a person, as people read it.
+ */
+const AgentSchema = z.string().nullable();
+
 const HeldBySchema = z
     .string()
     .nullable()
@@ -163,6 +168,9 @@ export const DraftPageSchema = Kizuna.model({
         missing: z.array(z.string()).describe('The fields the draft is missing or fails.'),
         updatedAt: z.string().nullable(),
         updatedBy: z.string().nullable(),
+        updatedVia: AgentSchema.describe(
+            'The agent that made the last change for `updatedBy`, like `Claude`. Null when the person made it.'
+        ),
         heldBy: HeldBySchema,
         schedule: DraftScheduleSchema,
         place: PlaceSchema.optional().describe("An item's place, in an orderable collection, once it has one."),
@@ -343,16 +351,28 @@ export const PersonSchema = Kizuna.model({
     }),
 });
 
-export const ReviewCommentSchema = Kizuna.model({
-    title: 'CMS.ReviewComment',
+export const CommentSchema = Kizuna.model({
+    title: 'CMS.Comment',
     schema: z.object({
         id: z.string(),
         path: z.string().describe('The field it is about, as a change to it is keyed.'),
         text: z.string(),
-        by: PersonSchema,
+        by: PersonSchema.describe('Who wrote it.'),
+        via: z.string().nullable().describe('The agent that wrote it for `by`, like Claude, or null when they wrote it themselves.'),
         createdAt: z.iso.datetime(),
         resolvedBy: PersonSchema.nullable().describe('Who resolved it, or null while it is open.'),
         resolvedAt: z.iso.datetime().nullable(),
+        replyTo: z.string().nullable().describe('The comment that starts the thread this one answers, or null when it starts one.'),
+        review: z.string().nullable().describe('The review it was left in, or null for a comment on the draft.'),
+        anchor: z
+            .object({
+                text: z.string(),
+                changed: z.boolean().describe('Whether the field no longer holds the phrase. The comment stays on the field.'),
+            })
+            .nullable()
+            .describe('The phrase of the field it is about, or null for the whole field.'),
+        mentions: z.array(PersonSchema).describe('The people it mentions, who find it under Waiting until it is resolved.'),
+        assignee: PersonSchema.nullable().describe('The person who deals with it, who finds it under Waiting until it is resolved.'),
     }),
 });
 
@@ -368,13 +388,14 @@ export const ReviewStateSchema = Kizuna.model({
         version: z.int().describe('The draft version it was asked about, or the one the reviewer answered.'),
         reviewers: z.array(PersonSchema),
         requestedBy: PersonSchema,
+        requestedVia: AgentSchema.describe('The agent that asked for `requestedBy`, like `Claude`, or null.'),
         note: z.string().nullable(),
         createdAt: z.iso.datetime(),
         decidedBy: PersonSchema.nullable(),
         decisionNote: z.string().nullable(),
         decidedAt: z.iso.datetime().nullable(),
         comments: z
-            .array(ReviewCommentSchema)
+            .array(CommentSchema)
             .describe(
                 'Comments on single fields, on this review and the earlier ones since the document was last published, oldest first.'
             ),
@@ -420,6 +441,12 @@ export const DescribedPageSchema = Kizuna.model({
             .describe(
                 'The tabs, rows and collapsibles that arrange the fields, in the order they are shown. Empty when the fields are listed plainly.'
             ),
+        instructions: z
+            .string()
+            .nullable()
+            .describe(
+                "Markdown on how to write the document, its tone and what never to change: its content's own, then what admins wrote for its site. Null when there are none."
+            ),
         draft: z.record(z.string(), z.unknown()).nullable(),
         actions: z.array(AvailableActionSchema).optional().describe("For an item, the buttons its collection's actions show the caller."),
         locale: DocumentLocalesSchema.optional(),
@@ -444,6 +471,7 @@ export const VersionSchema = Kizuna.model({
         summary: z.string().nullable(),
         createdAt: z.string(),
         createdBy: z.string(),
+        via: AgentSchema.describe('The agent that saved it for `createdBy`, like `Claude`, or null.'),
         published: z.boolean().describe('Whether this is the version readers see.'),
         review: z
             .object({
@@ -557,6 +585,7 @@ export const VersionContentSchema = Kizuna.model({
         summary: z.string().nullable(),
         createdAt: z.iso.datetime(),
         createdBy: z.string(),
+        via: AgentSchema.describe('The agent that saved it for `createdBy`, like `Claude`, or null.'),
         content: z.record(z.string(), z.unknown()).describe('The content as that version saved it, migrated to the current schema.'),
     }),
 });
@@ -946,6 +975,51 @@ export const CommentBodySchema = Kizuna.model({
     }),
 });
 
+export const NewCommentBodySchema = Kizuna.model({
+    title: 'CMS.NewComment',
+    schema: z.object({
+        ref: z.string().describe('The document, like page:frontPage or item:articles:k3j9x2.'),
+        path: z
+            .string()
+            .min(1)
+            .optional()
+            .describe("The field to comment on, as a change to it is keyed, like hero.heading. An answer takes its thread's."),
+        text: z.string().trim().min(1).max(2000),
+        anchor: z
+            .string()
+            .min(1)
+            .max(500)
+            .regex(/^[^\n]*$/, 'A phrase is on one line.')
+            .optional()
+            .describe("A phrase of the field's text the comment is about, quoted exactly as the draft has it."),
+        mentions: z.array(z.string()).max(20).optional().describe('People to mention, by their id from the people list.'),
+        assignee: z.string().nullable().optional().describe('The person to deal with it, by their id from the people list.'),
+        replyTo: z.string().optional().describe('The comment to answer. The answer joins its thread.'),
+    }),
+});
+
+export const CommentListSchema = Kizuna.model({
+    title: 'CMS.CommentList',
+    schema: z.object({
+        comments: z
+            .array(CommentSchema)
+            .describe('Oldest first. A thread is the comment it starts and the answers whose `replyTo` names it.'),
+    }),
+});
+
+export const WaitingCommentsSchema = Kizuna.model({
+    title: 'CMS.WaitingComments',
+    schema: z.object({
+        comments: z.array(
+            CommentSchema.extend({
+                reason: z.enum(['mentioned', 'assigned']),
+                ref: z.string(),
+                label: z.string(),
+            })
+        ),
+    }),
+});
+
 export const WaitingReviewsSchema = Kizuna.model({
     title: 'CMS.WaitingReviews',
     schema: z.object({
@@ -1023,6 +1097,7 @@ export const ScheduleSchema = Kizuna.model({
         waitingFor: z.string().nullable().describe('What stops it, like "Nils Aas to approve" or "Intro".'),
         scheduledBy: PersonSchema,
         createdAt: z.iso.datetime(),
+        review: ReviewStateSchema.nullable().describe('Its latest review since it was last published.'),
     }),
 });
 
@@ -1037,6 +1112,7 @@ export const ReleaseSchema = Kizuna.model({
         documents: z.array(ScheduleSchema).describe('Its documents that you may open.'),
         mayPublish: z.boolean().describe('Whether you may schedule or publish it: you may publish every document in it.'),
         createdBy: PersonSchema,
+        createdVia: AgentSchema.describe('The agent that made it for `createdBy`, like `Claude`, or null.'),
         createdAt: z.iso.datetime(),
         scheduledBy: PersonSchema.nullable(),
         publishedAt: z.iso.datetime().nullable(),
@@ -1073,6 +1149,10 @@ export const ReleaseScheduleBodySchema = z.object({
         .boolean()
         .optional()
         .describe('Publish past reviews that are not approved. Only someone with a role under `reviews.roles` may.'),
+});
+
+export const SendBackReleaseBodySchema = z.object({
+    note: z.string().trim().min(1).max(2000).describe('What to change, for whoever made the release.'),
 });
 
 export const ReleasePublishBodySchema = z

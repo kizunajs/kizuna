@@ -1,4 +1,5 @@
-import type { PersonView, ReviewComment, ReviewState } from '../view/schema.js';
+import { creditOf } from '../credit.js';
+import type { PersonView, CommentView, ReviewState } from '../view/schema.js';
 import type { VersionSummary } from './history.js';
 import { sentenceOf } from './sections.js';
 
@@ -118,15 +119,21 @@ export const gateNoteOf = (requireReview: boolean, review: ReviewState | null): 
 };
 
 /**
+ * Who makes the changes a review is sent back with: the agent that asked,
+ * like Claude, or the person.
+ */
+const askerOf = (review: ReviewState): string => review.requestedVia ?? review.requestedBy.name;
+
+/**
  * What the reviewer is asked when they send a draft back: "What should Kari
  * Nordmann change?"
  */
-export const changeQuestionOf = (review: ReviewState): string => `What should ${review.requestedBy.name} change?`;
+export const changeQuestionOf = (review: ReviewState): string => `What should ${askerOf(review)} change?`;
 
 /**
  * The button that sends the draft back: "Send to Kari Nordmann".
  */
-export const sendBackLabelOf = (review: ReviewState): string => `Send to ${review.requestedBy.name}`;
+export const sendBackLabelOf = (review: ReviewState): string => `Send to ${askerOf(review)}`;
 
 /**
  * Whether the person asked for this review and it still waits, so they can
@@ -158,8 +165,8 @@ export const commentsOn = (
     review: ReviewState | null,
     path: string
 ): {
-    open: ReviewComment[];
-    resolved: ReviewComment[];
+    open: CommentView[];
+    resolved: CommentView[];
 } => {
     const comments = review?.comments.filter((comment) => comment.path === path) ?? [];
     return {
@@ -169,9 +176,11 @@ export const commentsOn = (
 };
 
 /**
- * Who wrote a comment, as its head says it: "Kari Nordmann", or "You".
+ * Who wrote a comment, as its head says it: "Kari Nordmann", "You", or
+ * "Mia Holm via Claude" for one an agent wrote for them.
  */
-export const commenterOf = (comment: ReviewComment, me: string | undefined): string => (comment.by.id === me ? 'You' : comment.by.name);
+export const commenterOf = (comment: CommentView, me: string | undefined): string =>
+    creditOf(comment.by.id === me ? 'You' : comment.by.name, comment.via);
 
 /**
  * Whether the person reviews the draft: they were asked, or they answered.
@@ -213,7 +222,7 @@ export const sentBackOf = (
           by: PersonView;
           at: string | null;
           note: string | null;
-          comments: ReviewComment[];
+          comments: CommentView[];
       }
     | undefined => {
     const by = askAgainOf(review, me);

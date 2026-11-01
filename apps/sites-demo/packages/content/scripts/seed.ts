@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { formatRef, type CmsService, type DocumentRef } from '@kizunajs/cms';
+import { formatRef, withAgent, type CmsService, type DocumentRef } from '@kizunajs/cms';
 import {
     ada,
     articles,
@@ -31,6 +31,7 @@ import {
     sam,
     trondheimOpening,
     una,
+    winterCareRefresh,
     type Edit,
     type SeededPage,
     type Written,
@@ -918,6 +919,49 @@ Book a visit at the shop or by writing to care@hagen.example.co.uk. Visits run o
         });
         console.log('[demo] scheduled the December opening hours for tomorrow');
     }
+
+    // Comments
+
+    /**
+     * Leaves a comment on a phrase of a draft, once: a draft that lost the
+     * phrase, or already has the comment, is left alone.
+     */
+    const commentOn = async (
+        ref: DocumentRef,
+        comment: { path: string; anchor: string; text: string },
+        input: { by: string; at: Date; mentions?: string[]; assignee?: string }
+    ): Promise<void> => {
+        const state = await service.draftState(ref);
+        const text = state.row?.draft?.[comment.path];
+        if (state.row === undefined || typeof text !== 'string' || !text.includes(comment.anchor)) return;
+        if ((await service.store.documentComments(state.row.id)).some((existing) => existing.text === comment.text)) return;
+        const documentId = state.row.id;
+        await asOf(input.at, () =>
+            service.store.addComment({
+                documentId,
+                reviewId: null,
+                path: comment.path,
+                text: comment.text,
+                anchor: comment.anchor,
+                createdBy: input.by,
+                createdAt: new Date(),
+                mentions: input.mentions ?? [],
+                assignee: input.assignee ?? null,
+            })
+        );
+        console.log(`[demo] commented on ${formatRef(ref)}`);
+    };
+
+    await commentOn(norwayFront, norwayComments.winterCities, {
+        by: nils,
+        at: daysAgo(1, 4),
+        mentions: [mia],
+    });
+    await commentOn(customerService, norwayComments.phoneHours, {
+        by: nils,
+        at: daysAgo(1, 3),
+        assignee: kari,
+    });
 
     // The UK's last order dates, in two and a half weeks.
     const delivery = pageRef({

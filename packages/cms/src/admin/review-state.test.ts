@@ -174,6 +174,12 @@ describe('the person who asked', () => {
             createdAt: '2026-10-29T10:05:00.000Z',
             resolvedBy: null,
             resolvedAt: null,
+            via: null,
+            replyTo: null,
+            review: 'review-1',
+            anchor: null,
+            mentions: [],
+            assignee: null,
         };
         const sentBack = review({
             status: 'changes',
@@ -187,6 +193,12 @@ describe('the person who asked', () => {
                     id: 'comment-2',
                     resolvedBy: grace,
                     resolvedAt: '2026-10-29T10:10:00.000Z',
+                    via: null,
+                    replyTo: null,
+                    review: 'review-1',
+                    anchor: null,
+                    mentions: [],
+                    assignee: null,
                 },
             ],
         });
@@ -299,6 +311,12 @@ describe('comments on a field', () => {
                     createdAt: '2026-10-29T10:05:00.000Z',
                     resolvedBy: null,
                     resolvedAt: null,
+                    via: null,
+                    replyTo: null,
+                    review: 'review-1',
+                    anchor: null,
+                    mentions: [],
+                    assignee: null,
                 },
                 {
                     id: 'comment-2',
@@ -308,6 +326,12 @@ describe('comments on a field', () => {
                     createdAt: '2026-10-29T10:06:00.000Z',
                     resolvedBy: grace,
                     resolvedAt: '2026-10-29T10:10:00.000Z',
+                    via: null,
+                    replyTo: null,
+                    review: 'review-1',
+                    anchor: null,
+                    mentions: [],
+                    assignee: null,
                 },
                 {
                     id: 'comment-3',
@@ -317,6 +341,12 @@ describe('comments on a field', () => {
                     createdAt: '2026-10-29T10:07:00.000Z',
                     resolvedBy: null,
                     resolvedAt: null,
+                    via: null,
+                    replyTo: null,
+                    review: 'review-1',
+                    anchor: null,
+                    mentions: [],
+                    assignee: null,
                 },
             ],
         });
@@ -343,10 +373,25 @@ describe('comments on a field', () => {
                     createdAt: '2026-10-29T10:05:00.000Z',
                     resolvedBy: null,
                     resolvedAt: null,
+                    via: null,
+                    replyTo: null,
+                    review: 'review-1',
+                    anchor: null,
+                    mentions: [],
+                    assignee: null,
                 },
             ],
         }).comments;
         expect(commenterOf(comment!, kari.id)).toBe('You');
         expect(commenterOf(comment!, grace.id)).toBe('Kari Nordmann');
+        expect(
+            commenterOf(
+                {
+                    ...comment!,
+                    via: 'Claude',
+                },
+                grace.id
+            )
+        ).toBe('Kari Nordmann via Claude');
     });
 });

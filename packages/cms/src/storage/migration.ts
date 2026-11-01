@@ -75,9 +75,14 @@ create index if not exists cms_reviews_document on cms_reviews (document_id, cre
 
 update cms_reviews set status = 'published-past-review', decision_note = null where status = 'approved' and decision_note like 'Published past the review by %';
 
-create table if not exists cms_review_comments (
+alter table if exists cms_review_comments rename to cms_comments;
+
+alter index if exists cms_review_comments_review rename to cms_comments_review;
+
+create table if not exists cms_comments (
     id text primary key,
-    review_id text not null references cms_reviews (id),
+    document_id text references cms_documents (id),
+    review_id text references cms_reviews (id),
     path text not null,
     text text not null,
     created_by text not null,
@@ -86,7 +91,19 @@ create table if not exists cms_review_comments (
     resolved_at timestamptz
 );
 
-create index if not exists cms_review_comments_review on cms_review_comments (review_id, created_at);
+alter table cms_comments add column if not exists document_id text references cms_documents (id);
+update cms_comments set document_id = (select document_id from cms_reviews where cms_reviews.id = cms_comments.review_id) where document_id is null;
+alter table cms_comments alter column document_id set not null;
+alter table cms_comments alter column review_id drop not null;
+alter table cms_comments add column if not exists reply_to text;
+alter table cms_comments add column if not exists anchor text;
+alter table cms_comments add column if not exists mentions jsonb not null default '[]';
+alter table cms_comments add column if not exists assignee text;
+alter table cms_comments add column if not exists via text;
+
+create index if not exists cms_comments_review on cms_comments (review_id, created_at);
+
+create index if not exists cms_comments_document on cms_comments (document_id, created_at);
 
 create table if not exists cms_refreshes (
     id text primary key,
@@ -144,6 +161,11 @@ create unique index if not exists cms_schedules_one on cms_schedules (document_i
 create index if not exists cms_schedules_due on cms_schedules (status, at);
 
 create index if not exists cms_schedules_release on cms_schedules (release_id);
+
+alter table cms_documents add column if not exists updated_via text;
+alter table cms_versions add column if not exists via text;
+alter table cms_reviews add column if not exists requested_via text;
+alter table cms_releases add column if not exists created_via text;
 `;
 
 /**

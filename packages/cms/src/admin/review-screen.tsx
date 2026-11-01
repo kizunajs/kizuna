@@ -1,3 +1,4 @@
+import { creditOf } from '../credit.js';
 import { Avatar, Avatars } from '../view/people.js';
 import type { PersonView } from '../view/schema.js';
 import { sentenceOf } from './sections.js';
@@ -7,14 +8,14 @@ import { sentenceOf } from './sections.js';
  * as the Owner fact shows its owner: "Waiting for review by", the faces, then
  * "Kari Nordmann and Ola Berg".
  */
-export function PeopleFact({ lead, people }: { lead: string; people: readonly PersonView[] }) {
+export function PeopleFact({ lead, people, via = null }: { lead: string; people: readonly PersonView[]; via?: string | null }) {
     return (
         <span className="k-fact-people">
             {lead}
             {people.length === 0 ? null : (
                 <>
                     {people.length === 1 ? <Avatar person={people[0]!} /> : <Avatars people={people} />}
-                    <span>{sentenceOf(people.map((person) => person.name))}</span>
+                    <span>{creditOf(sentenceOf(people.map((person) => person.name)), via)}</span>
                 </>
             )}
         </span>

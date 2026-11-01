@@ -90,7 +90,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
     await pglite.exec(
-        'delete from cms_review_comments; delete from cms_reviews; delete from cms_refs; delete from cms_versions; delete from cms_documents;'
+        'delete from cms_comments; delete from cms_reviews; delete from cms_refs; delete from cms_versions; delete from cms_documents;'
     );
 });
 

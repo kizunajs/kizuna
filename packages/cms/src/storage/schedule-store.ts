@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { actingAgent } from '../agents.js';
 import { and, asc, eq, inArray, isNull, lte } from 'drizzle-orm';
 import { cmsReleases, cmsSchedules } from './schema.js';
 import type { CmsDatabase } from './store.js';
@@ -31,6 +32,10 @@ export interface ReleaseRow {
     status: ReleaseStatus;
     force: boolean;
     createdBy: string;
+    /**
+     * The agent that made it for `createdBy`, like `Claude`, or `null`.
+     */
+    createdVia: string | null;
     createdAt: Date;
     scheduledBy: string | null;
     publishedAt: Date | null;
@@ -203,6 +208,7 @@ export class ScheduleStore {
                 name,
                 status: 'open',
                 createdBy: by,
+                createdVia: actingAgent(),
                 createdAt: new Date(),
             })
             .returning();

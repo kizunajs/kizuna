@@ -5,7 +5,8 @@ import { dataFields } from './field.js';
 import { DEFAULT_SITE, type Person } from './options.js';
 import type { EditorAccess } from './site-access.js';
 import { formatRef, parseRef, type DocumentRef } from './refs.js';
-import type { DocumentRow, ReviewCommentRow, ReviewRow } from './storage/store.js';
+import type { CommentRow, DocumentRow, ReviewRow } from './storage/store.js';
+import { addComment, commentViewOf, type CommentView } from './comments.js';
 
 /**
  * Someone as the editor shows them: their name and picture.
@@ -14,19 +15,6 @@ export interface PersonView {
     id: string;
     name: string;
     image?: string;
-}
-
-/**
- * A comment on one field of a review's draft.
- */
-export interface ReviewComment {
-    id: string;
-    path: string;
-    text: string;
-    by: PersonView;
-    createdAt: string;
-    resolvedBy: PersonView | null;
-    resolvedAt: string | null;
 }
 
 /**
@@ -39,12 +27,16 @@ export interface ReviewState {
     version: number;
     reviewers: PersonView[];
     requestedBy: PersonView;
+    /**
+     * The agent that asked for `requestedBy`, like `Claude`, or `null`.
+     */
+    requestedVia: string | null;
     note: string | null;
     createdAt: string;
     decidedBy: PersonView | null;
     decisionNote: string | null;
     decidedAt: string | null;
-    comments: ReviewComment[];
+    comments: CommentView[];
 }
 
 const words = (name: string): string =>
@@ -95,7 +87,7 @@ export const peopleFor = async (cms: CmsService, access: EditorAccess, site = DE
     return everyone.filter((person) => admin(person) || held.some((name) => holdsSite(person, name)));
 };
 
-const viewOf = (people: readonly Person[], id: string): PersonView => {
+export const viewOf = (people: readonly Person[], id: string): PersonView => {
     const person = people.find((candidate) => candidate.id === id);
     if (person === undefined) {
         return {
@@ -114,28 +106,25 @@ const viewOf = (people: readonly Person[], id: string): PersonView => {
     };
 };
 
-const commentViewOf = (comment: ReviewCommentRow, people: readonly Person[]): ReviewComment => ({
-    id: comment.id,
-    path: comment.path,
-    text: comment.text,
-    by: viewOf(people, comment.createdBy),
-    createdAt: comment.createdAt.toISOString(),
-    resolvedBy: comment.resolvedBy === null ? null : viewOf(people, comment.resolvedBy),
-    resolvedAt: comment.resolvedAt?.toISOString() ?? null,
-});
-
-const stateOf = (review: ReviewRow, version: number, people: readonly Person[], comments: readonly ReviewCommentRow[]): ReviewState => ({
+const stateOf = (
+    review: ReviewRow,
+    version: number,
+    people: readonly Person[],
+    comments: readonly CommentRow[],
+    row: DocumentRow | undefined
+): ReviewState => ({
     id: review.id,
     status: review.status === 'approved' && review.version !== version ? 'outdated' : review.status,
     version: review.version,
     reviewers: review.reviewers.map((id) => viewOf(people, id)),
     requestedBy: viewOf(people, review.requestedBy),
+    requestedVia: review.requestedVia,
     note: review.note,
     createdAt: review.createdAt.toISOString(),
     decidedBy: review.decidedBy === null ? null : viewOf(people, review.decidedBy),
     decisionNote: review.decisionNote,
     decidedAt: review.decidedAt?.toISOString() ?? null,
-    comments: comments.map((comment) => commentViewOf(comment, people)),
+    comments: comments.map((comment) => commentViewOf(comment, people, row?.draft ?? row?.published ?? null)),
 });
 
 /**
@@ -148,10 +137,10 @@ const reviewsSincePublished = async (cms: CmsService, row: DocumentRow): Promise
 };
 
 /**
- * The comments on a document's draft: on every review since it was last
- * published, so asking again keeps them.
+ * The comments left in a document's reviews: on every review since it was
+ * last published, so asking again keeps them.
  */
-const commentsOf = async (cms: CmsService, row: DocumentRow, reviews?: readonly ReviewRow[]): Promise<ReviewCommentRow[]> =>
+const commentsOf = async (cms: CmsService, row: DocumentRow, reviews?: readonly ReviewRow[]): Promise<CommentRow[]> =>
     cms.store.reviewComments((reviews ?? (await reviewsSincePublished(cms, row))).map((review) => review.id));
 
 /**
@@ -164,17 +153,19 @@ export const reviewOf = async (cms: CmsService, state: DraftState, people?: read
     const reviews = await reviewsSincePublished(cms, state.row);
     const [latest] = reviews;
     if (latest === undefined || latest.status === 'withdrawn' || latest.status === 'published-past-review') return null;
-    return stateOf(latest, state.version, people ?? (await peopleOf(cms)), await commentsOf(cms, state.row, reviews));
+    return stateOf(latest, state.version, people ?? (await peopleOf(cms)), await commentsOf(cms, state.row, reviews), state.row);
 };
 
 /**
- * Who changed the draft since it was last published.
+ * Who changed the draft themselves since it was last published. A version an
+ * agent saved for someone is not their own change, so they may approve the
+ * agent's work, as the person who asked for it.
  */
 const authorsSincePublished = async (cms: CmsService, state: DraftState): Promise<Set<string>> => {
     if (state.row === undefined) return new Set();
     const published = state.row.publishedVersion ?? 0;
     const versions = await cms.store.versions(state.row.id);
-    return new Set(versions.filter((version) => version.version > published).map((version) => version.createdBy));
+    return new Set(versions.filter((version) => version.version > published && version.via === null).map((version) => version.createdBy));
 };
 
 const reviewRoles = (cms: CmsService): readonly string[] => {
@@ -281,7 +272,7 @@ export const requestReviews = async (
     const requested: ReviewState[] = [];
     for (const [index, row] of rows.entries()) {
         const state = states[index]!;
-        requested.push(stateOf(row, state.version, people, await commentsOf(cms, state.row!)));
+        requested.push(stateOf(row, state.version, people, await commentsOf(cms, state.row!), state.row));
     }
     return requested;
 };
@@ -334,7 +325,8 @@ export const decideReviews = async (
                 },
                 state.version,
                 people,
-                await commentsOf(cms, state.row!)
+                await commentsOf(cms, state.row!),
+                state.row
             )
         );
     }
@@ -444,7 +436,8 @@ export const withdrawReviews = async (cms: CmsService, input: { ids: readonly st
                 },
                 state.version,
                 people,
-                await commentsOf(cms, state.row!)
+                await commentsOf(cms, state.row!),
+                state.row
             )
         );
     }
@@ -479,7 +472,8 @@ export const reopenReviews = async (cms: CmsService, input: { ids: readonly stri
                 },
                 state.version,
                 people,
-                await commentsOf(cms, state.row!)
+                await commentsOf(cms, state.row!),
+                state.row
             )
         );
     }
@@ -499,7 +493,7 @@ const takesPart = (cms: CmsService, review: ReviewRow, by: string, roleOn: RoleO
  */
 export const commentOnReview = async (
     cms: CmsService,
-    input: { review: string; path: string; text: string; by: string; roleOn: RoleOn }
+    input: { review: string; path: string; text: string; by: string; via: string | null; roleOn: RoleOn }
 ): Promise<ReviewState> => {
     const [review] = await cms.store.reviews([input.review]);
     if (review === undefined) throw new CmsHttpError(404, { detail: `No review '${input.review}'.` });
@@ -507,16 +501,13 @@ export const commentOnReview = async (
         throw new CmsHttpError(403, { detail: `You were not asked to review '${review.ref}'.` });
     }
     const { state } = await currentReview(cms, review);
-    const name = input.path.split('.')[0];
-    if (!dataFields(state.target.definition.fields).some((field) => field.name === name)) {
-        throw new CmsHttpError(422, { detail: `'${review.ref}' has no field '${input.path}'. Name a field from the changes list.` });
-    }
-    await cms.store.addReviewComment({
-        reviewId: review.id,
+    await addComment(cms, {
+        ref: state.target.ref,
         path: input.path,
         text: input.text,
-        createdBy: input.by,
-        createdAt: new Date(),
+        review: review.id,
+        by: input.by,
+        via: input.via,
     });
     return (await reviewOf(cms, state))!;
 };
@@ -525,8 +516,8 @@ export const commentOnReview = async (
  * Marks a comment dealt with. Resolving one twice changes nothing.
  */
 export const resolveComment = async (cms: CmsService, input: { id: string; by: string; roleOn: RoleOn }): Promise<ReviewState> => {
-    const comment = await cms.store.reviewComment(input.id);
-    if (comment === undefined) throw new CmsHttpError(404, { detail: `No comment '${input.id}'.` });
+    const comment = await cms.store.comment(input.id);
+    if (comment?.reviewId === null || comment?.reviewId === undefined) throw new CmsHttpError(404, { detail: `No comment '${input.id}'.` });
     const [review] = await cms.store.reviews([comment.reviewId]);
     if (review === undefined) throw new CmsHttpError(404, { detail: `No comment '${input.id}'.` });
     if (!takesPart(cms, review, input.by, input.roleOn)) {
@@ -537,7 +528,7 @@ export const resolveComment = async (cms: CmsService, input: { id: string; by: s
     if (current === null || !current.comments.some((candidate) => candidate.id === comment.id)) {
         throw new CmsHttpError(409, { detail: `The review of '${review.ref}' is over, so its comments are too.` });
     }
-    if (comment.resolvedAt === null) await cms.store.resolveReviewComment(comment.id, input.by);
+    if (comment.resolvedAt === null) await cms.store.resolveComment(comment.id, input.by);
     return (await reviewOf(cms, state))!;
 };
 

@@ -204,6 +204,32 @@ When a guard denies the call, or the caller's role is not one the route accepts,
 
 Routes with `auth: false` run without guards, credentials or not.
 
+## Who is calling
+
+A handler a tool call ran finds the MCP client that made it with `mcpCallOf`, and an HTTP request finds nothing there:
+
+```ts title="src/routes/users.ts"
+import { mcpCallOf } from '@kizunajs/mcp';
+
+createUser: k
+    .route({
+        method: 'POST',
+        path: '/users',
+        summary: 'Create a user',
+        tool: true,
+        body: CreateUserSchema,
+        responses: {
+            201: UserSchema,
+        },
+    })
+    .handler(async (args) => {
+        const agent = mcpCallOf(args)?.client?.title;
+        // ...
+    }),
+```
+
+`client` is the client's `clientInfo`: its `name`, like `claude-ai`, its `title` for people, like `Claude`, and its `version`. The 2026-07-28 protocol names the client on every request. The 2025 protocol names it once, in `initialize`, which over HTTP arrives in a request of its own, so `client` is undefined there. A connection that lasts, like stdio, keeps it.
+
 ## Asking before it runs
 
 A route with [`needsApproval`](/docs/tools#say-how-it-behaves) asks the person before the handler is reached, over MCP's elicitation:

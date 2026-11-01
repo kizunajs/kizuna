@@ -53,6 +53,15 @@ export interface PageDefinition<Name extends string, Fields extends FieldList> {
      */
     requireReview?: boolean;
     /**
+     * Markdown an agent reads before it writes the page: how to write it,
+     * its tone, and what never to change. It joins the editing tools'
+     * descriptions and what `describe` answers.
+     *
+     * @example
+     * instructions: 'Keep the hero heading under eight words. Never change the opening hours.',
+     */
+    instructions?: string;
+    /**
      * The sites that have the page, when several share its pages module.
      *
      * @example

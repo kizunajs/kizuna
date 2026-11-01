@@ -8,6 +8,11 @@ export interface VersionSummary {
     summary: string | null;
     createdAt: string;
     createdBy: string;
+    /**
+     * The agent that saved it for `createdBy`, like `Claude`. Older servers
+     * leave it out.
+     */
+    via?: string | null;
     published: boolean;
     /**
      * Who approved the version, or who published it before anyone approved

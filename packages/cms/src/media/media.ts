@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { z } from 'zod';
 import type { FocalPointSchema } from '../image.js';
 import type { DocumentStore } from '../storage/store.js';
+import { IMAGE_BRAND } from '../content.js';
 import type { MediaStorage } from './storage.js';
 import { inspectImage, NotAnImageError, renderImage, stripMetadata, type RenderOptions } from './inspect.js';
 

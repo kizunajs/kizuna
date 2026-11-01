@@ -227,6 +227,7 @@ const grace = as('grace-token');
 const ada = as('ada-token');
 const sam = as('sam-token');
 const uma = as('uma-token');
+const nils = as('nils-token');
 
 /**
  * Saves changes to the draft of the document an editing path names.
@@ -288,7 +289,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
     await pglite.exec(
-        'delete from cms_review_comments; delete from cms_reviews; delete from cms_refs; delete from cms_versions; delete from cms_documents;'
+        'delete from cms_comments; delete from cms_reviews; delete from cms_refs; delete from cms_versions; delete from cms_documents;'
     );
 });
 
@@ -449,6 +450,36 @@ describe("a site's editor", () => {
         const outside = await askReview(sam, 'page:uk:frontPage', 'nils');
         expect(outside.status).toBe(422);
         expect((await askReview(sam, 'page:uk:frontPage', 'uma')).status).toBe(201);
+    });
+
+    it('mentions and assigns only the people who open the document, and lists only their own site in Waiting', async () => {
+        await save(sam, '/sites/uk/pages/frontPage', {
+            heading: 'Welcome',
+        });
+        const comment = (mentions: string[]) =>
+            sam.post('/editing/comments').send({
+                ref: 'page:uk:frontPage',
+                path: 'heading',
+                anchor: 'Welcome',
+                text: 'Warmer, please.',
+                mentions,
+            });
+        expect((await comment(['nils'])).status).toBe(422);
+        expect((await comment(['uma', 'grace'])).status).toBe(201);
+        const assigned = await sam.post('/editing/comments').send({
+            ref: 'page:uk:frontPage',
+            path: 'heading',
+            text: 'Check the tone.',
+            assignee: 'nils',
+        });
+        expect(assigned.status).toBe(422);
+        expect((await uma.get('/editing/comments/waiting')).body.comments).toMatchObject([
+            {
+                reason: 'mentioned',
+                ref: 'page:uk:frontPage',
+            },
+        ]);
+        expect((await nils.get('/editing/comments?ref=page:uk:frontPage')).status).toBe(404);
     });
 
     it('is offered a review in place of Publish on shared content', async () => {

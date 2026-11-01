@@ -2,7 +2,7 @@ import { and, count, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { CmsHttpError, collectionCacheTag, documentCacheTag, pageCacheTag, type CmsService } from './cms.js';
 import { DEFAULT_SITE } from './options.js';
 import { formatRef, parseRef } from './refs.js';
-import { cmsDocuments, cmsRefs, cmsReviewComments, cmsReviews, cmsVersions, cmsSchedules } from './storage/schema.js';
+import { cmsComments, cmsDocuments, cmsRefs, cmsReviews, cmsVersions, cmsSchedules } from './storage/schema.js';
 import type { CmsDatabase } from './storage/store.js';
 
 /**
@@ -13,7 +13,7 @@ export interface TableCounts {
     cms_versions: number;
     cms_refs: number;
     cms_reviews: number;
-    cms_review_comments: number;
+    cms_comments: number;
 }
 
 /**
@@ -30,12 +30,6 @@ const countsOf = async (db: CmsDatabase, owned: SQL): Promise<TableCounts> => {
         })
         .from(cmsDocuments)
         .where(owned);
-    const reviews = db
-        .select({
-            id: cmsReviews.id,
-        })
-        .from(cmsReviews)
-        .where(inArray(cmsReviews.documentId, documents));
     const total = async (rows: Promise<Array<{ total: number }>>): Promise<number> => Number((await rows)[0]?.total ?? 0);
     return {
         cms_documents: await total(
@@ -70,13 +64,13 @@ const countsOf = async (db: CmsDatabase, owned: SQL): Promise<TableCounts> => {
                 .from(cmsReviews)
                 .where(inArray(cmsReviews.documentId, documents))
         ),
-        cms_review_comments: await total(
+        cms_comments: await total(
             db
                 .select({
                     total: count(),
                 })
-                .from(cmsReviewComments)
-                .where(inArray(cmsReviewComments.reviewId, reviews))
+                .from(cmsComments)
+                .where(inArray(cmsComments.documentId, documents))
         ),
     };
 };

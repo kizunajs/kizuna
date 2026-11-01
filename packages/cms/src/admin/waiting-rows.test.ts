@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { waitingRowsOf, type OpenReview, type OpenTranslation } from './waiting-rows.js';
+import { waitingRowsOf, type OpenComment, type OpenReview, type OpenTranslation } from './waiting-rows.js';
 
 const SAM = {
     id: 'sam',
@@ -42,9 +42,16 @@ const collectionLabel = (name: string): string | undefined => (name === 'offices
 
 describe('Waiting', () => {
     it('lists every review, longest waiting first, then the translations to update', () => {
-        const rows = waitingRowsOf(REVIEWS, TRANSLATIONS, {
-            collectionLabel,
-        });
+        const rows = waitingRowsOf(
+            {
+                reviews: REVIEWS,
+                translations: TRANSLATIONS,
+                comments: [],
+            },
+            {
+                collectionLabel,
+            }
+        );
         expect(rows.map((row) => [row.kind, row.ref, row.site, row.detail])).toEqual([
             ['review', 'page:norway:frontPage', 'norway', 'Pages'],
             ['review', 'item:uk:events:e1', 'uk', 'Events'],
@@ -55,14 +62,73 @@ describe('Waiting', () => {
     });
 
     it("lists a site's own and the shared reviews asked of the editor or by them", () => {
-        const rows = waitingRowsOf(REVIEWS, TRANSLATIONS, {
-            collectionLabel,
-            site: 'uk',
-            me: 'sam',
-        });
+        const rows = waitingRowsOf(
+            {
+                reviews: REVIEWS,
+                translations: TRANSLATIONS,
+                comments: [],
+            },
+            {
+                collectionLabel,
+                site: 'uk',
+                me: 'sam',
+            }
+        );
         expect(rows.map((row) => [row.ref, row.group])).toEqual([
             ['item:uk:events:e1', 'mine'],
             ['item:offices:k3', 'mine'],
         ]);
+    });
+
+    it('lists the comments that mention the editor or name them, asked of them in a site, after the reviews and translations', () => {
+        const comments: OpenComment[] = [
+            {
+                id: 'comment-2',
+                replyTo: null,
+                reason: 'assigned',
+                ref: 'item:offices:k3',
+                label: 'Oslo',
+                text: 'Check the phone number.',
+                by: SAM,
+                createdAt: '2026-10-31T10:00:00.000Z',
+            },
+            {
+                id: 'comment-1',
+                replyTo: null,
+                reason: 'mentioned',
+                ref: 'page:norway:frontPage',
+                label: 'Forsiden',
+                text: '@Ingrid Hagen is this the right city?',
+                by: SAM,
+                createdAt: '2026-10-30T10:00:00.000Z',
+            },
+        ];
+        const everywhere = waitingRowsOf(
+            {
+                reviews: [],
+                translations: [],
+                comments,
+            },
+            {
+                collectionLabel,
+            }
+        );
+        expect(everywhere.map((row) => [row.kind, row.ref, row.comment, row.change])).toEqual([
+            ['mentioned', 'page:norway:frontPage', 'comment-1', '@Ingrid Hagen is this the right city?'],
+            ['assigned', 'item:offices:k3', 'comment-2', 'Check the phone number.'],
+        ]);
+        const onSite = waitingRowsOf(
+            {
+                reviews: [],
+                translations: [],
+                comments,
+            },
+            {
+                collectionLabel,
+                site: 'uk',
+                me: 'ingrid',
+            }
+        );
+        expect(onSite.map((row) => [row.kind, row.group])).toEqual([['assigned', 'asked']]);
     });
 });

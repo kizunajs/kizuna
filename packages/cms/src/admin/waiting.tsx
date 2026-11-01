@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Languages, MessageSquare, Search } from 'lucide-react';
+import { AtSign, Languages, MessageSquare, Search, UserRound } from 'lucide-react';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
 import { Avatar } from '../view/people.js';
@@ -9,20 +9,17 @@ import { PageHeader } from './page-header.js';
 import { SiteIcon } from './site-switcher.js';
 import { languageNameOf } from '../view/schema.js';
 import { relativeTimeOf } from './time.js';
-import { waitingRowsOf, type OpenReview, type OpenTranslation, type WaitingRow } from './waiting-rows.js';
+import { waitingRowsOf, type OpenComment, type OpenReview, type OpenTranslation, type Waiting, type WaitingRow } from './waiting-rows.js';
 
 /**
- * Every open review and waiting translation the editor may see, loaded
- * again each time `reload` changes.
+ * Every open review and waiting translation the editor may see, and the
+ * comments that mention them or name them, loaded again each time `reload`
+ * changes.
  */
-export const useWaiting = (
-    connection: Connection,
-    routes: Readonly<Record<string, AdminRoute>>,
-    reload: unknown
-): { reviews: OpenReview[]; translations: OpenTranslation[] } | undefined => {
-    const [waiting, setWaiting] = useState<{ reviews: OpenReview[]; translations: OpenTranslation[] } | undefined>();
+export const useWaiting = (connection: Connection, routes: Readonly<Record<string, AdminRoute>>, reload: unknown): Waiting | undefined => {
+    const [waiting, setWaiting] = useState<Waiting | undefined>();
     const load = useCallback(async () => {
-        const [reviews, translations] = await Promise.all([
+        const [reviews, translations, comments] = await Promise.all([
             connection.call<{ reviews: OpenReview[] }>('editing_reviews_list', {
                 query: {
                     for: 'anyone',
@@ -31,10 +28,12 @@ export const useWaiting = (
             routes['editing_translations_list'] === undefined
                 ? undefined
                 : connection.call<{ translations: OpenTranslation[] }>('editing_translations_list'),
+            connection.call<{ comments: OpenComment[] }>('editing_comments_waiting'),
         ]);
         setWaiting({
             reviews: reviews.status === 200 ? reviews.body.reviews : [],
             translations: translations?.status === 200 ? translations.body.translations : [],
+            comments: comments.status === 200 ? comments.body.comments : [],
         });
     }, [connection, routes]);
     useEffect(() => {
@@ -109,19 +108,20 @@ export function WaitingTable({
                             </tr>
                         ),
                         ...group.rows.map((row) => {
-                            const href = hrefOf({
+                            const document = hrefOf({
                                 kind: 'document',
                                 ref: row.ref,
                             });
+                            const href =
+                                row.comment === undefined
+                                    ? document
+                                    : `${document}${document.includes('?') ? '&' : '?'}comment=${encodeURIComponent(row.comment)}`;
                             const site = siteOf(row.site);
+                            const Icon = KIND_ICONS[row.kind];
                             return (
-                                <tr key={`${row.kind}:${row.ref}`} className="k-table__row">
+                                <tr key={`${row.kind}:${row.ref}:${row.comment ?? ''}`} className="k-table__row">
                                     <td className="k-waiting-table__kind">
-                                        {row.kind === 'review' ? (
-                                            <MessageSquare {...ICON} aria-label="Review" />
-                                        ) : (
-                                            <Languages {...ICON} aria-label="Translation" />
-                                        )}
+                                        <Icon {...ICON} aria-label={KIND_LABELS[row.kind]} />
                                     </td>
                                     <td className="k-table__title">
                                         <a className="k-waiting-table__item" href={href}>
@@ -155,7 +155,7 @@ export function WaitingTable({
                                     <td>{row.since === undefined ? null : relativeTimeOf(row.since, now)}</td>
                                     <td className="k-waiting-table__answer">
                                         <a className="k-button k-button--secondary k-button--small" href={href}>
-                                            {row.kind === 'review' ? 'Review' : 'Update'}
+                                            {ANSWERS[row.kind]}
                                         </a>
                                     </td>
                                 </tr>
@@ -168,7 +168,31 @@ export function WaitingTable({
     );
 }
 
-type Shown = 'all' | 'review' | 'translation';
+const KIND_ICONS = {
+    review: MessageSquare,
+    translation: Languages,
+    mentioned: AtSign,
+    assigned: UserRound,
+};
+
+const KIND_LABELS: Record<WaitingRow['kind'], string> = {
+    review: 'Review',
+    translation: 'Translation',
+    mentioned: 'Mentioned',
+    assigned: 'Assigned',
+};
+
+/**
+ * What a row's button says.
+ */
+const ANSWERS: Record<WaitingRow['kind'], string> = {
+    review: 'Review',
+    translation: 'Update',
+    mentioned: 'Open',
+    assigned: 'Open',
+};
+
+type Shown = 'all' | WaitingRow['kind'];
 
 /**
  * Waiting: the reviews and translations that wait on someone. Overview lists
@@ -182,7 +206,7 @@ export function WaitingScreen({
     me,
     collectionLabel,
 }: {
-    waiting: { reviews: OpenReview[]; translations: OpenTranslation[] } | undefined;
+    waiting: Waiting | undefined;
     sites: readonly AdminSite[];
     /**
      * The site shown, or `undefined` for Overview.
@@ -198,7 +222,7 @@ export function WaitingScreen({
         () =>
             waiting === undefined
                 ? undefined
-                : waitingRowsOf(waiting.reviews, waiting.translations, {
+                : waitingRowsOf(waiting, {
                       collectionLabel,
                       site,
                       me,
@@ -223,6 +247,14 @@ export function WaitingScreen({
                   {
                       label: 'Translations',
                       value: count('translation'),
+                  },
+                  {
+                      label: 'Mentioned',
+                      value: count('mentioned'),
+                  },
+                  {
+                      label: 'Assigned',
+                      value: count('assigned'),
                   },
                   {
                       label: 'On',
@@ -260,6 +292,8 @@ export function WaitingScreen({
                                 ['all', 'All'],
                                 ['review', 'Reviews'],
                                 ['translation', 'Translations'],
+                                ['mentioned', 'Mentioned'],
+                                ['assigned', 'Assigned'],
                             ] satisfies Array<[Shown, string]>
                         ).map(([kind, label]) => (
                             <button

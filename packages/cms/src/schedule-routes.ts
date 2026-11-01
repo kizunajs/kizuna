@@ -15,6 +15,7 @@ import {
     removeFromRelease,
     renameRelease,
     scheduleRelease,
+    sendBackRelease,
     unscheduleRelease,
 } from './schedules.js';
 import {
@@ -26,6 +27,7 @@ import {
     ReleaseSchema,
     RenameReleaseBodySchema,
     ScheduledSchema,
+    SendBackReleaseBodySchema,
 } from './wire.js';
 
 const ReleaseParamsSchema = z.object({
@@ -126,7 +128,7 @@ export const scheduleRoutes = (input: { editor: RouteAuth; editingBase: `/${stri
         auth: editor,
         summary: 'Make a release: a named set of drafts that publish together',
         description:
-            'Name it after what it is for, like "Trondheim opening", and pass the documents by ref. Nothing publishes until someone schedules or publishes the release.',
+            'Name it after what it is for, like "Trondheim opening", and pass the documents by ref. Nothing publishes until someone schedules or publishes the release. An agent changing several documents for someone names it after the task, like "Agent: winter care refresh", puts each document it changes in it, checks it with `editing_check`, then asks that person to review the documents with `editing_reviews_request`. They publish it, schedule it or send it back.',
         tool: true,
         body: CreateReleaseBodySchema,
         responses: {
@@ -325,6 +327,38 @@ export const scheduleRoutes = (input: { editor: RouteAuth; editingBase: `/${stri
         ) as never
     );
 
+    const sendBack = route({
+        method: 'POST',
+        path: `${releasePath}/send-back`,
+        auth: editor,
+        summary: 'Send a release back with changes to make',
+        description:
+            'Asks for changes on each document in it that waits for your review, with one note for them all. Whoever made it, like an agent, reads the note on each review and saves new drafts into the same release. Sending back is up to the reviewer, so only their own button in the editor calls this, never a model.',
+        tool: {
+            visibility: ['app'],
+        },
+        pathParams: ReleaseParamsSchema,
+        body: SendBackReleaseBodySchema,
+        responses: {
+            200: ReleaseSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) =>
+            answer(
+                await sendBackRelease(
+                    cms,
+                    cms.access(args.auth),
+                    args.params['id']!,
+                    (args.body as z.output<typeof SendBackReleaseBodySchema>).note,
+                    by(cms, args)
+                )
+            )
+        ) as never
+    );
+
     const drop = route({
         method: 'DELETE',
         path: releasePath,
@@ -364,6 +398,7 @@ export const scheduleRoutes = (input: { editor: RouteAuth; editingBase: `/${stri
             schedule,
             unschedule,
             publish,
+            sendBack,
             delete: drop,
         },
     };

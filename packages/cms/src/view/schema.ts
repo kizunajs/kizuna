@@ -225,9 +225,10 @@ export interface PersonView {
 }
 
 /**
- * A comment on one field of a review's draft.
+ * A comment on one field of a document's draft, maybe about a phrase of its
+ * text, maybe left in a review.
  */
-export interface ReviewComment {
+export interface CommentView {
     id: string;
     /**
      * The field, as a change to it is keyed.
@@ -235,9 +236,27 @@ export interface ReviewComment {
     path: string;
     text: string;
     by: PersonView;
+    /**
+     * The agent that wrote it for `by`, like `Claude`.
+     */
+    via: string | null;
     createdAt: string;
     resolvedBy: PersonView | null;
     resolvedAt: string | null;
+    /**
+     * The comment that starts the thread this one answers.
+     */
+    replyTo: string | null;
+    review: string | null;
+    anchor: {
+        text: string;
+        /**
+         * Whether the field no longer holds the phrase.
+         */
+        changed: boolean;
+    } | null;
+    mentions: PersonView[];
+    assignee: PersonView | null;
 }
 
 /**
@@ -249,6 +268,11 @@ export interface ReviewState {
     version: number;
     reviewers: PersonView[];
     requestedBy: PersonView;
+    /**
+     * The agent that asked for `requestedBy`, like `Claude`. Older servers
+     * leave it out.
+     */
+    requestedVia?: string | null;
     note: string | null;
     createdAt: string;
     decidedBy: PersonView | null;
@@ -257,7 +281,7 @@ export interface ReviewState {
     /**
      * Comments on single fields, since the document was last published.
      */
-    comments: ReviewComment[];
+    comments: CommentView[];
 }
 
 /**
@@ -277,6 +301,11 @@ export interface Draft {
      * Who saved it last, by id.
      */
     updatedBy: string | null;
+    /**
+     * The agent that made the last change for `updatedBy`, like `Claude`.
+     * Older servers leave it out.
+     */
+    updatedVia?: string | null;
     /**
      * Who edits it now, by id. Anyone else reads it until they stop.
      */

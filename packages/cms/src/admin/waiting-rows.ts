@@ -27,12 +27,38 @@ export interface OpenTranslation {
 }
 
 /**
- * One row of Waiting: a review to answer, or a translation to update.
+ * A comment thread that waits on the editor, as the waiting comments route
+ * lists it: the comment that mentions them, or names them as the assignee.
+ */
+export interface OpenComment {
+    id: string;
+    replyTo: string | null;
+    reason: 'mentioned' | 'assigned';
+    ref: string;
+    label: string;
+    text: string;
+    by: PersonView;
+    createdAt: string;
+}
+
+/**
+ * Everything that waits, as Waiting loads it.
+ */
+export interface Waiting {
+    reviews: OpenReview[];
+    translations: OpenTranslation[];
+    comments: OpenComment[];
+}
+
+/**
+ * One row of Waiting: a review to answer, a translation to update, or a
+ * comment that mentions the editor or names them as the assignee.
  */
 export interface WaitingRow {
-    kind: 'review' | 'translation';
+    kind: 'review' | 'translation' | 'mentioned' | 'assigned';
     /**
-     * The document the row opens: the reviewed one, or the translation.
+     * The document the row opens: the reviewed one, the translation, or the
+     * one the comment is on.
      */
     ref: string;
     label: string;
@@ -45,14 +71,19 @@ export interface WaitingRow {
      */
     site: string | undefined;
     /**
-     * What changed: the reviewer's note, or the fields to update.
+     * What changed: the reviewer's note, the fields to update, or the
+     * comment.
      */
     change: string;
     from?: PersonView;
     /**
-     * When the review was asked for.
+     * When the review was asked for, or the comment left.
      */
     since?: string;
+    /**
+     * The comment the row opens at, by its id.
+     */
+    comment?: string;
     /**
      * The translation's language, like `nb`.
      */
@@ -74,13 +105,13 @@ const detailOf = (ref: string, collectionLabel: (name: string) => string | undef
 };
 
 /**
- * Every review and translation that waits, longest first, as Waiting lists
- * them. In a site, only the site's own and shared content, with each review
- * asked of the editor or by them.
+ * Every review, translation and comment that waits, longest first, as
+ * Waiting lists them. In a site, only the site's own and shared content,
+ * with each review asked of the editor or by them, and each comment asked
+ * of the editor.
  */
 export const waitingRowsOf = (
-    reviews: readonly OpenReview[],
-    translations: readonly OpenTranslation[],
+    { reviews, translations, comments }: Waiting,
     options: {
         collectionLabel: (name: string) => string | undefined;
         /**
@@ -123,7 +154,7 @@ export const waitingRowsOf = (
                 },
             ];
         });
-    // In a site, a translation waits on its editors.
+    // In a site, a translation waits on its editors, and a comment on the editor it names.
     const translationGroup: WaitingRow['group'] = options.site === undefined ? undefined : 'asked';
     const translationRows = translations.flatMap((translation): WaitingRow[] => {
         const site = parseRef(translation.source)?.site;
@@ -145,5 +176,29 @@ export const waitingRowsOf = (
             },
         ];
     });
-    return [...reviewRows, ...translationRows];
+    const commentRows = [...comments]
+        .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+        .flatMap((comment): WaitingRow[] => {
+            const site = parseRef(comment.ref)?.site;
+            if (!inPlace(site)) return [];
+            return [
+                {
+                    kind: comment.reason,
+                    ref: comment.ref,
+                    label: comment.label,
+                    detail: detailOf(comment.ref, options.collectionLabel),
+                    site,
+                    change: comment.text,
+                    from: comment.by,
+                    since: comment.createdAt,
+                    comment: comment.id,
+                    ...(translationGroup === undefined
+                        ? {}
+                        : {
+                              group: translationGroup,
+                          }),
+                },
+            ];
+        });
+    return [...reviewRows, ...translationRows, ...commentRows];
 };

@@ -38,7 +38,7 @@ Someone who may not publish the page, like a site's editor on [shared content](/
 
 ## Comments on a field
 
-**Comment** beside a change on the Changes tab leaves a note on that one field, under the change. Enter adds it. The person who asked reads it at the top of the form once the draft is sent back. Either of them can comment, and **Resolve** clears a comment once it is dealt with. Comments stay with the draft when Kari is asked again, and publishing clears them.
+**Comment** beside a change on the Changes tab leaves a note on that one field, under the change. Enter adds it. The person who asked reads it at the top of the form once the draft is sent back. Either of them can comment, and **Resolve** clears a comment once it is dealt with. Comments stay with the draft when Kari is asked again, and publishing clears them. A draft takes [comments on a phrase](/docs/cms/editing/comments) outside a review too.
 
 > What did Kari say about the products?
 
@@ -54,7 +54,7 @@ export default definePage({
 });
 ```
 
-Publishing waits for an approval from someone other than the person who changed it. Anyone with a role under `reviews.roles` may approve without being asked. The rule holds in the routes, so the model gets the same answer.
+Publishing waits for an approval from someone other than the person who changed it. A change an [agent](/docs/cms/editing/agents#credit) made for you is not your own, so you may approve it. Anyone with a role under `reviews.roles` may approve without being asked. The rule holds in the routes, so the model gets the same answer, and approving or sending back is never the model's: only the person's own buttons do either.
 
 A page that requires a review can be [scheduled](/docs/cms/editing/scheduling#scheduling-a-page-that-requires-a-review) before anyone approves it. The schedule waits for the approval.
 

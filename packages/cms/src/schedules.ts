@@ -4,6 +4,7 @@ import { CmsHttpError, showsOnOf, type CmsService, type DraftState } from './cms
 import { DEFAULT_SITE, type Person } from './options.js';
 import { formatRef, parseRef, type DocumentRef } from './refs.js';
 import {
+    decideReviews,
     documentLabel,
     mayPublishPastReview,
     peopleOf,
@@ -11,6 +12,7 @@ import {
     reviewOf,
     type PastReview,
     type PersonView,
+    type ReviewState,
 } from './reviews.js';
 import type { EditorAccess } from './site-access.js';
 import type { ReleaseRow, ScheduleAction, ScheduleRow } from './storage/schedule-store.js';
@@ -47,6 +49,10 @@ export interface ScheduleView {
     waitingFor: string | null;
     scheduledBy: PersonView;
     createdAt: string;
+    /**
+     * Its latest review since it was last published, or `null`.
+     */
+    review: ReviewState | null;
 }
 
 /**
@@ -61,6 +67,10 @@ export interface ReleaseView {
     documents: ScheduleView[];
     mayPublish: boolean;
     createdBy: PersonView;
+    /**
+     * The agent that made it for `createdBy`, like `Claude`, or `null`.
+     */
+    createdVia: string | null;
     createdAt: string;
     scheduledBy: PersonView | null;
     publishedAt: string | null;
@@ -179,6 +189,7 @@ const scheduleView = async (
         waitingFor: block,
         scheduledBy: personOf(people, release?.scheduledBy ?? row.createdBy),
         createdAt: row.createdAt.toISOString(),
+        review: await reviewOf(cms, state, people),
         block,
         draft: state,
     };
@@ -219,6 +230,7 @@ const releaseView = async (
         documents: seen.map(plain),
         mayPublish: publishesAll(cms, access, refs),
         createdBy: personOf(people, release.createdBy),
+        createdVia: release.createdVia,
         createdAt: release.createdAt.toISOString(),
         scheduledBy: release.scheduledBy === null ? null : personOf(people, release.scheduledBy),
         publishedAt: release.publishedAt?.toISOString() ?? null,
@@ -531,6 +543,36 @@ export const deleteRelease = async (cms: CmsService, access: EditorAccess, id: s
     assertOpen(release);
     if (release.createdBy !== by) assertPublishesAll(cms, access, release, view.refs);
     await cms.schedules.deleteRelease(id);
+};
+
+/**
+ * Sends a release back to whoever made it, like an agent's: asks for changes
+ * on each of its documents that waits for the editor's review, with one note
+ * for them all. The release stays open for the new drafts.
+ */
+export const sendBackRelease = async (
+    cms: CmsService,
+    access: EditorAccess,
+    id: string,
+    note: string,
+    by: string
+): Promise<ReleaseView> => {
+    const { release, view } = await releaseOrMissing(cms, access, id, by);
+    assertOpen(release);
+    const open = view.seen.flatMap((document) => (document.review?.status === 'open' ? [document.review.id] : []));
+    if (open.length === 0) {
+        throw new CmsHttpError(409, {
+            detail: `Nothing in ${release.name} waits for a review, so there is nothing to send back.`,
+        });
+    }
+    await decideReviews(cms, {
+        ids: open,
+        decision: 'requestChanges',
+        note,
+        by,
+        roleOn: (ref) => access.callerFor(ref).role,
+    });
+    return getRelease(cms, access, id, by);
 };
 
 const pastReviewOf = async (

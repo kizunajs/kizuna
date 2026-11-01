@@ -1690,6 +1690,23 @@ Alle butikkene kjøper fortsatt fra de samme gartnerne, og alle stellekort skriv
 };
 
 /**
+ * Comments on Hagen Norge's drafts, each on a phrase: Nils asks Mia about the
+ * winter front page, and leaves the December phone hours to Kari.
+ */
+export const norwayComments = {
+    winterCities: {
+        path: 'intro',
+        anchor: 'levert neste dag i Oslo, Bergen og Stavanger',
+        text: '@Mia Holm Trondheim åpner før jul. Skal byen med her?',
+    },
+    phoneHours: {
+        path: 'intro',
+        anchor: 'fra 10 til 16 på hverdager',
+        text: 'Planteklinikken har kortere telefontid i romjula. Kan du sjekke og rette det?',
+    },
+};
+
+/**
  * Christmas opening hours on the customer service page, which Nils schedules
  * to publish tomorrow morning.
  */

@@ -242,7 +242,7 @@ const missingRelationshipIds = async (service: CmsService, refs: ReturnType<type
     return missing;
 };
 
-const TABLES: ReadonlyArray<keyof TableCounts> = ['cms_documents', 'cms_versions', 'cms_refs', 'cms_reviews', 'cms_review_comments'];
+const TABLES: ReadonlyArray<keyof TableCounts> = ['cms_documents', 'cms_versions', 'cms_refs', 'cms_reviews', 'cms_comments'];
 
 const tableLines = (counts: TableCounts, indent: string): string[] =>
     TABLES.map((table) => `${indent}${table.padEnd(21)}${String(counts[table]).padStart(6)}`);

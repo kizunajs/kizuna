@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt, max, ne, sql } from 'drizzle-orm';
+import { actingAgent } from '../agents.js';
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, max, ne, notInArray, or, sql } from 'drizzle-orm';
 import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
-import { cmsDocuments, cmsRefreshes, cmsRefs, cmsReviewComments, cmsReviews, cmsTranslations, cmsVersions } from './schema.js';
+import { cmsComments, cmsDocuments, cmsRefreshes, cmsRefs, cmsReviews, cmsTranslations, cmsVersions } from './schema.js';
 import { CMS_MIGRATION_SQL, likePrefix, type IndexType } from './migration.js';
 import { PLACE } from '../place.js';
 
@@ -41,6 +42,11 @@ export interface DocumentRow {
     migrationVersion: number;
     updatedAt: Date;
     updatedBy: string;
+    /**
+     * The agent that made the last change for `updatedBy`, like `Claude`, or
+     * `null` when the person made it.
+     */
+    updatedVia: string | null;
     /**
      * The person who looks after the document, or `null`.
      */
@@ -92,6 +98,10 @@ export interface ReviewRow {
     version: number;
     reviewers: string[];
     requestedBy: string;
+    /**
+     * The agent that asked for `requestedBy`, or `null`.
+     */
+    requestedVia: string | null;
     note: string | null;
     createdAt: Date;
     status: ReviewStatus;
@@ -100,9 +110,6 @@ export interface ReviewRow {
     decidedAt: Date | null;
 }
 
-/**
- * A comment on one field of a review's draft.
- */
 /**
  * Where one refresh stands: waiting to run, answered, failed and waiting to
  * be tried again, or failed for good.
@@ -131,9 +138,16 @@ export interface RefreshRecord {
     at: Date;
 }
 
-export interface ReviewCommentRow {
+/**
+ * A comment on one field of a document's draft.
+ */
+export interface CommentRow {
     id: string;
-    reviewId: string;
+    documentId: string;
+    /**
+     * The review it was left in, or `null` for a comment on the draft.
+     */
+    reviewId: string | null;
     /**
      * The field, as a change to it is keyed.
      */
@@ -143,6 +157,20 @@ export interface ReviewCommentRow {
     createdAt: Date;
     resolvedBy: string | null;
     resolvedAt: Date | null;
+    /**
+     * The comment that starts the thread this one answers.
+     */
+    replyTo: string | null;
+    /**
+     * The phrase of the field's text the comment is about.
+     */
+    anchor: string | null;
+    mentions: string[];
+    assignee: string | null;
+    /**
+     * The agent that wrote it for `createdBy`, like `Claude`.
+     */
+    via: string | null;
 }
 
 /**
@@ -255,6 +283,10 @@ export interface VersionRow {
     summary: string | null;
     createdAt: Date;
     createdBy: string;
+    /**
+     * The agent that saved it for `createdBy`, or `null`.
+     */
+    via: string | null;
 }
 
 export interface VersionWithData extends VersionRow {
@@ -413,7 +445,7 @@ export class DocumentStore {
         const [row] = await this.db
             .select()
             .from(cmsDocuments)
-            .where(and(eq(cmsDocuments.kind, 'media'), eq(cmsDocuments.locale, SOURCE_LOCALE), eq(cmsDocuments.key, key)))
+            .where(and(eq(cmsDocuments.kind, 'media'), eq(cmsDocuments.locale, SOURCE_LOCALE), eq(cmsDocuments.key, key), live))
             .limit(1);
         return row === undefined ? undefined : toRow(row);
     }
@@ -460,6 +492,7 @@ export class DocumentStore {
                 and(
                     eq(cmsDocuments.kind, kind),
                     eq(cmsDocuments.locale, SOURCE_LOCALE),
+                    live,
                     ...(site === undefined ? [] : [eq(cmsDocuments.site, site)])
                 )
             )
@@ -479,7 +512,8 @@ export class DocumentStore {
                     eq(cmsDocuments.kind, kind),
                     eq(cmsDocuments.site, site),
                     eq(cmsDocuments.key, key),
-                    ne(cmsDocuments.locale, SOURCE_LOCALE)
+                    ne(cmsDocuments.locale, SOURCE_LOCALE),
+                    live
                 )
             )
             .orderBy(asc(cmsDocuments.locale));
@@ -528,7 +562,7 @@ export class DocumentStore {
     }
 
     async addReviews(
-        reviews: ReadonlyArray<Omit<ReviewRow, 'id' | 'status' | 'decidedBy' | 'decisionNote' | 'decidedAt'>>
+        reviews: ReadonlyArray<Omit<ReviewRow, 'id' | 'requestedVia' | 'status' | 'decidedBy' | 'decisionNote' | 'decidedAt'>>
     ): Promise<ReviewRow[]> {
         if (reviews.length === 0) return [];
         const rows = await this.db
@@ -537,6 +571,7 @@ export class DocumentStore {
                 reviews.map((review) => ({
                     ...review,
                     id: randomUUID(),
+                    requestedVia: actingAgent(),
                     status: 'open',
                 }))
             )
@@ -569,8 +604,15 @@ export class DocumentStore {
      * Every review still waiting for an answer, oldest first.
      */
     async openReviews(): Promise<ReviewRow[]> {
-        const rows = await this.db.select().from(cmsReviews).where(eq(cmsReviews.status, 'open')).orderBy(asc(cmsReviews.createdAt));
-        return rows.map(toReview);
+        const rows = await this.db
+            .select({
+                review: cmsReviews,
+            })
+            .from(cmsReviews)
+            .innerJoin(cmsDocuments, eq(cmsDocuments.id, cmsReviews.documentId))
+            .where(and(eq(cmsReviews.status, 'open'), live))
+            .orderBy(asc(cmsReviews.createdAt));
+        return rows.map((row) => toReview(row.review));
     }
 
     /**
@@ -773,6 +815,7 @@ export class DocumentStore {
                 summary: cmsVersions.summary,
                 createdAt: cmsVersions.createdAt,
                 createdBy: cmsVersions.createdBy,
+                via: cmsVersions.via,
             })
             .from(cmsVersions)
             .where(eq(cmsVersions.documentId, documentId))
@@ -791,6 +834,7 @@ export class DocumentStore {
             summary: row.summary,
             createdAt: row.createdAt,
             createdBy: row.createdBy,
+            via: row.via,
             data: row.data as Content,
             migrationVersion: row.migrationVersion,
             publishedAt: row.publishedAt,
@@ -811,6 +855,7 @@ export class DocumentStore {
             summary: row.summary,
             createdAt: row.createdAt,
             createdBy: row.createdBy,
+            via: row.via,
             data: row.data as Content,
             migrationVersion: row.migrationVersion,
             publishedAt: row.publishedAt,
@@ -908,8 +953,12 @@ export class DocumentStore {
                           .from(cmsVersions)
                           .where(and(eq(cmsVersions.documentId, id), eq(cmsVersions.version, latest)))
                           .limit(1);
+            const via = actingAgent();
             const folds =
-                previous !== undefined && previous.createdBy === input.author && now.getTime() - previous.createdAt.getTime() < input.fold!;
+                previous !== undefined &&
+                previous.createdBy === input.author &&
+                previous.via === via &&
+                now.getTime() - previous.createdAt.getTime() < input.fold!;
             const version = folds ? latest : latest + 1;
             const raises = existing !== undefined && input.migration !== undefined && input.migration.version > existing.migrationVersion;
             const draftStep = input.migration?.version ?? existing?.migrationVersion ?? 0;
@@ -924,6 +973,7 @@ export class DocumentStore {
                     migrationVersion: draftStep,
                     updatedAt: now,
                     updatedBy: input.author,
+                    updatedVia: actingAgent(),
                     ...held,
                 });
             } else {
@@ -933,6 +983,7 @@ export class DocumentStore {
                         draft: input.draft,
                         updatedAt: now,
                         updatedBy: input.author,
+                        updatedVia: actingAgent(),
                         ...held,
                         ...(raises
                             ? {
@@ -968,6 +1019,7 @@ export class DocumentStore {
                     summary: input.summary ?? null,
                     createdAt: now,
                     createdBy: input.author,
+                    via,
                     migrationVersion: draftStep,
                 });
             }
@@ -1001,6 +1053,7 @@ export class DocumentStore {
                     publishedAt: now,
                     updatedAt: now,
                     updatedBy: author,
+                    updatedVia: actingAgent(),
                 })
                 .where(eq(cmsDocuments.id, existing.id));
             await tx
@@ -1058,6 +1111,7 @@ export class DocumentStore {
                     publishedAt: now,
                     updatedAt: now,
                     updatedBy: approval.by,
+                    updatedVia: actingAgent(),
                 })
                 .where(eq(cmsDocuments.id, existing.id));
             await tx
@@ -1101,6 +1155,7 @@ export class DocumentStore {
                     publishedAt: null,
                     updatedAt: now,
                     updatedBy: author,
+                    updatedVia: actingAgent(),
                 })
                 .where(eq(cmsDocuments.id, existing.id));
             await tx.delete(cmsRefs).where(and(eq(cmsRefs.documentId, existing.id), eq(cmsRefs.published, true)));
@@ -1128,6 +1183,7 @@ export class DocumentStore {
                     migrationVersion: migration.version,
                     updatedAt: new Date(),
                     updatedBy: author,
+                    updatedVia: actingAgent(),
                 })
                 .where(eq(cmsDocuments.id, id));
             await this.replaceRefsIn(tx, id, refsOf(draft ?? published ?? {}));
@@ -1170,6 +1226,7 @@ export class DocumentStore {
                 and(
                     eq(cmsRefs.brand, brand),
                     eq(cmsDocuments.locale, SOURCE_LOCALE),
+                    live,
                     ...(refIds === undefined ? [] : [inArray(cmsRefs.refId, [...refIds])])
                 )
             )
@@ -1193,7 +1250,7 @@ export class DocumentStore {
             })
             .from(cmsRefs)
             .innerJoin(cmsDocuments, eq(cmsDocuments.id, cmsRefs.documentId))
-            .where(and(eq(cmsRefs.brand, brand), eq(cmsRefs.refId, refId)))
+            .where(and(eq(cmsRefs.brand, brand), eq(cmsRefs.refId, refId), live))
             .orderBy(asc(cmsDocuments.key), asc(cmsRefs.fieldPath));
         const byId = new Map<string, DocumentRow & { fieldPaths: string[] }>();
         for (const row of rows) {
@@ -1258,6 +1315,7 @@ export class DocumentStore {
                     publishedVersion: latest + 1,
                     updatedAt: now,
                     updatedBy: author,
+                    updatedVia: actingAgent(),
                 });
             } else {
                 await tx
@@ -1267,6 +1325,7 @@ export class DocumentStore {
                         publishedVersion: latest + 1,
                         updatedAt: now,
                         updatedBy: author,
+                        updatedVia: actingAgent(),
                     })
                     .where(eq(cmsDocuments.id, id));
             }
@@ -1308,6 +1367,7 @@ export class DocumentStore {
             eq(cmsDocuments.kind, input.kind),
             eq(cmsDocuments.site, input.site ?? SITE),
             eq(cmsDocuments.locale, SOURCE_LOCALE),
+            live,
             sql`${cmsDocuments.key} like ${likePrefix(input.keyPrefix)}`,
             input.copy === 'published'
                 ? sql`${cmsDocuments.published} is not null`
@@ -1384,6 +1444,7 @@ export class DocumentStore {
             eq(cmsDocuments.kind, input.kind),
             eq(cmsDocuments.site, input.site ?? SITE),
             eq(cmsDocuments.locale, SOURCE_LOCALE),
+            live,
             sql`${cmsDocuments.key} like ${likePrefix(input.keyPrefix)}`,
             ...(groups.length === 0
                 ? []

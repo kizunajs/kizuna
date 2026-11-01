@@ -42,6 +42,7 @@ import {
     MissingFieldsSchema,
     PageSummarySchema,
     PublishBodySchema,
+    PublishCheckSchema,
     UnpublishBodySchema,
     RollbackBodySchema,
     StoredContentSchema,
@@ -164,6 +165,7 @@ const draftBody = (state: DraftState) => ({
     missing: state.missing,
     updatedAt: state.row?.updatedAt.toISOString() ?? null,
     updatedBy: state.row?.updatedBy ?? null,
+    updatedVia: state.row?.updatedVia ?? null,
     heldBy: state.heldBy,
     schedule: scheduleBody(state),
     ...(placeIn(state.row?.draft ?? state.row?.published) === undefined
@@ -317,6 +319,11 @@ interface Scope {
     params: z.ZodObject;
     refOf: (params: Record<string, string>) => DocumentRef;
     noun: string;
+    /**
+     * The instructions of the content this scope edits, for the tools that
+     * write it.
+     */
+    instructions?: string;
     /**
      * Whether an agent's draft writes wait for the person's approval. Content
      * an agent reads is written by other people, so an instruction hidden in
@@ -482,7 +489,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         async (args) => {
             const cms = serviceOf(args);
             try {
-                return await fn(cms, args);
+                // A call over MCP runs as its agent, so every write it makes credits the agent beside the person.
+                return await withAgent(agentOf(args), () => fn(cms, args));
             } catch (error) {
                 if (error instanceof CmsHttpError) {
                     return args.throwError({
@@ -603,8 +611,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 path: `${editingBase}${scope.prefix}/draft`,
                 auth: editor,
                 summary: `Change fields on the draft of ${scope.noun}`,
-                description:
-                    'Changes are keyed by field path and merged into the draft, which is then checked against the whole schema. Describe the document first to learn the paths, the schemas and which fields you may write. Nothing goes live until it is published.',
+                description: `Changes are keyed by field path and merged into the draft, which is then checked against the whole schema. Describe the document first to learn the paths, the schemas, which fields you may write and its \`instructions\`. Nothing goes live until it is published.${scope.instructions ?? ''}`,
                 tool:
                     scope.approveWrites === true
                         ? {
@@ -874,6 +881,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                             summary: found.summary,
                             createdAt: found.createdAt.toISOString(),
                             createdBy: found.createdBy,
+                            via: found.via,
                             content: found.content,
                         },
                     };
@@ -1563,6 +1571,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
               ) as never,
           };
 
+    const instructed = declaredInstructions(options);
     const pageScope: Scope = {
         prefix: '/pages/:name',
         params: z.object({
@@ -1573,6 +1582,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             name: params['name']!,
         }),
         noun: 'a page',
+        instructions: instructionsSection(instructed.pages),
     };
     const sitePageScope: Scope = {
         prefix: '/sites/:site/pages/:name',
@@ -1586,6 +1596,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             site: params['site']!,
         }),
         noun: 'a page of one site, when several apps share the CMS',
+        instructions: instructionsSection(instructed.pages),
     };
     const globalScope: Scope = {
         prefix: '/globals/:name',
@@ -1597,6 +1608,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             name: params['name']!,
         }),
         noun: 'a global, which every page may show',
+        instructions: instructionsSection(instructed.globals),
         approveWrites: true,
     };
     /**
@@ -2026,6 +2038,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             site: params['site']!,
         }),
         noun: "a site's own global",
+        instructions: instructionsSection(instructed.globals),
         approveWrites: true,
     };
     const siteItemScope: Scope = {
@@ -2042,6 +2055,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             site: params['site']!,
         }),
         noun: "an item of a site's own collection",
+        instructions: instructionsSection(instructed.collections),
     };
     const itemScope: Scope = {
         prefix: '/collections/:name/items/:id',
@@ -2055,6 +2069,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             id: params['id']!,
         }),
         noun: 'an item of a collection',
+        instructions: instructionsSection(instructed.collections),
     };
 
     const listPeople = route({
@@ -2304,8 +2319,9 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         auth: editor,
         summary: 'Approve reviews, or send them back with changes to make',
         description:
-            "An approval is the person's own judgement of what goes live, so they confirm first: in a host that cannot ask, such as Claude, they answer in the editor instead. An approval can be undone until the draft is published, with the reopen route.",
+            "An approval is the person's own judgement of what goes live, so only their own button in the editor calls this, never a model. An approval can be undone until the draft is published, with the reopen route.",
         tool: {
+            visibility: ['app'],
             needsApproval: true,
             destructiveHint: false,
         },
@@ -2341,8 +2357,9 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         auth: editor,
         summary: 'Approve a review and publish its draft in one step',
         description:
-            'The approval and the publish happen together, or neither does. It is refused when the person may not publish the document, when the review was already answered, and when the draft changed since they looked. The person confirms first: in a host that cannot ask, such as Claude, they answer in the editor instead.',
+            'The approval and the publish happen together, or neither does. It is refused when the person may not publish the document, when the review was already answered, and when the draft changed since they looked. Only their own button in the editor calls this, never a model.',
         tool: {
+            visibility: ['app'],
             needsApproval: true,
             destructiveHint: false,
         },
@@ -2467,6 +2484,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     path: body.path,
                     text: body.text,
                     by: authorOf(cms, args),
+                    via: actingAgent(),
                     roleOn: (ref) => access.callerFor(ref).role,
                 }),
             };
@@ -2495,8 +2513,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     }).handler(
         guarded(async (cms, args) => {
             const access = cms.access(args.auth);
-            const comment = await cms.store.reviewComment(args.params['id']!);
-            if (comment !== undefined) await seenReviews(cms, args, [comment.reviewId]);
+            const comment = await cms.store.comment(args.params['id']!);
+            if (comment?.reviewId !== null && comment?.reviewId !== undefined) await seenReviews(cms, args, [comment.reviewId]);
             return {
                 status: 200,
                 body: await resolveComment(cms, {
@@ -2508,13 +2526,152 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         }) as never
     );
 
+    /**
+     * The document a ref names, refused as if it did not exist when the
+     * editor may not open it.
+     */
+    const seenRef = (cms: CmsService, args: Args, value: string): DocumentRef => {
+        const ref = parseRef(value);
+        if (ref === undefined) throw new CmsHttpError(400, { detail: `'${value}' is not a ref.` });
+        return cms.access(args.auth).assertSeesRef(cms.canonical(ref));
+    };
+
+    const listComments = route({
+        method: 'GET',
+        path: `${editingBase}/comments`,
+        auth: editor,
+        summary: "List the comments on a document's draft, with who wrote each",
+        description:
+            'Each comment is on one field, and may quote a phrase of its text under `anchor`. A thread is the comment that starts it and the answers whose `replyTo` names it. `by` says who wrote it, and `via` the agent that wrote it for them. Comments left in a review since the last publish are listed too.',
+        tool: true,
+        query: z.object({
+            ref: z.string().describe('The document, as `describe` names it under `ref`.'),
+        }),
+        responses: {
+            200: {
+                body: CommentListSchema,
+                cache: 'no-store',
+            },
+            400: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const ref = seenRef(cms, args, (args.query as { ref: string }).ref);
+            return {
+                status: 200,
+                body: {
+                    comments: await commentsOf(cms, await cms.draftState(ref)),
+                },
+            };
+        }) as never
+    );
+
+    const addCommentRoute = route({
+        method: 'POST',
+        path: `${editingBase}/comments`,
+        auth: editor,
+        summary: "Comment on a field of a document's draft, or on a phrase of its text",
+        description:
+            'Quote the phrase under `anchor` exactly as the draft has it, and the editor marks it in the field. Mention people, or name one as the assignee, by their id from the people list: they find the comment under Waiting until it is resolved. Only people who open the document can be named. Pass `replyTo` to answer a thread. Answers with the comment.',
+        tool: true,
+        body: NewCommentBodySchema,
+        responses: {
+            201: CommentSchema,
+            400: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+            422: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const body = args.body as z.output<typeof NewCommentBodySchema>;
+            return {
+                status: 201,
+                body: await addComment(cms, {
+                    ref: seenRef(cms, args, body.ref),
+                    path: body.path,
+                    text: body.text,
+                    anchor: body.anchor,
+                    mentions: body.mentions,
+                    assignee: body.assignee,
+                    replyTo: body.replyTo,
+                    by: authorOf(cms, args),
+                    via: actingAgent(),
+                    access: cms.access(args.auth),
+                }),
+            };
+        }) as never
+    );
+
+    const resolveCommentRoute = route({
+        method: 'POST',
+        path: `${editingBase}/comments/:id/resolve`,
+        auth: editor,
+        summary: 'Resolve a comment thread once it is dealt with',
+        description:
+            'Resolving any comment of a thread resolves the whole thread, which folds away under its field and leaves Waiting. Anyone who opens the document may resolve it. Answers with the comment that starts the thread.',
+        tool: {
+            destructiveHint: false,
+            idempotentHint: true,
+        },
+        pathParams: z.object({
+            id: z.string(),
+        }),
+        responses: {
+            200: CommentSchema,
+            404: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const id = args.params['id']!;
+            const comment = await cms.store.comment(id);
+            const row = comment === undefined ? undefined : await cms.store.getById(comment.documentId);
+            const ref = row === undefined ? undefined : refOfRow(cms, row);
+            if (ref === undefined || !cms.access(args.auth).seesRef(ref)) throw new CmsHttpError(404, { detail: `No comment '${id}'.` });
+            return {
+                status: 200,
+                body: await resolveThread(cms, {
+                    id,
+                    by: authorOf(cms, args),
+                }),
+            };
+        }) as never
+    );
+
+    const listWaitingComments = route({
+        method: 'GET',
+        path: `${editingBase}/comments/waiting`,
+        auth: editor,
+        summary: 'List the open comments that mention you or name you as the assignee',
+        description:
+            'One entry per open thread, with the document it is on: the comment that names you as the assignee, or the latest that mentions you. It leaves the list once the thread is resolved.',
+        tool: true,
+        responses: {
+            200: {
+                body: WaitingCommentsSchema,
+                cache: 'no-store',
+            },
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const access = cms.access(args.auth);
+            return {
+                status: 200,
+                body: {
+                    comments: await waitingComments(cms, authorOf(cms, args), (ref) => access.seesRef(ref)),
+                },
+            };
+        }) as never
+    );
+
     const describe = route({
         method: 'GET',
         path: `${editingBase}/describe`,
         auth: editor,
         summary: 'Describe what is shown at a URL, or any document by its ref: its fields, what the caller may write, and the draft',
         description:
-            'Start here when working from the page someone is looking at, or from a ref a source path or another tool gave you. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it. `usedOn` says where else shared content appears; say so before changing it. A document in several languages lists them under `locale`: to translate it, describe `<ref>@<code>` and write each field from its `sourceValue` with that `locale`. A field whose `sourceChanged` is true is updated, or kept as it is.',
+            'Start here when working from the page someone is looking at, or from a ref a source path or another tool gave you. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it. `instructions` says how to write the document, its tone and what never to change: follow it. `usedOn` says where else shared content appears; say so before changing it. A document in several languages lists them under `locale`: to translate it, describe `<ref>@<code>` and write each field from its `sourceValue` with that `locale`. A field whose `sourceChanged` is true is updated, or kept as it is.',
         tool: {
             ui: documentView,
         },
@@ -2592,6 +2749,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     schedule: scheduleBody(state),
                     fields: cms.describe(ref, draft, caller, await sharedContentOf(cms, state), translation),
                     layout: cms.describeLayout(ref),
+                    instructions: await instructionsOf(cms, state, query.site),
                     draft,
                     ...(await reviewFields(cms, state)),
                     canPublish: cms.mayPublish(access, ref),
@@ -2976,7 +3134,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     uses,
                 });
             }
-            if (!(await cms.media.delete(id))) throw new CmsHttpError(404, { detail: `No media item '${id}'.` });
+            if (!(await cms.media.delete(id, authorOf(cms, args)))) throw new CmsHttpError(404, { detail: `No media item '${id}'.` });
             return {
                 status: 204,
                 body: undefined,
@@ -3683,6 +3841,12 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 reopen: reopenReview,
                 comment: commentReview,
                 resolveComment: resolveReviewComment,
+            },
+            comments: {
+                list: listComments,
+                add: addCommentRoute,
+                resolve: resolveCommentRoute,
+                waiting: listWaitingComments,
             },
             ...scheduleRoutes({
                 editor,

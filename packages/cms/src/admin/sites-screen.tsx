@@ -8,7 +8,7 @@ import { hrefOf, SHARED_GROUP, siteGroupsOf } from './navigation.js';
 import { PageHeader } from './page-header.js';
 import { SiteIcon } from './site-switcher.js';
 import { WaitingTable } from './waiting.js';
-import { waitingRowsOf, type OpenReview, type OpenTranslation } from './waiting-rows.js';
+import { waitingRowsOf, type Waiting } from './waiting-rows.js';
 
 /**
  * The key Sites gives the shared content beside the sites.
@@ -63,7 +63,7 @@ export function SitesScreen({
      * The site chosen, `shared`, or `undefined` for the first site.
      */
     chosen: string | undefined;
-    waiting: { reviews: OpenReview[]; translations: OpenTranslation[] } | undefined;
+    waiting: Waiting | undefined;
     people: People | undefined;
     collectionLabel: (name: string) => string | undefined;
 }) {
@@ -73,7 +73,7 @@ export function SitesScreen({
         () =>
             waiting === undefined
                 ? []
-                : waitingRowsOf(waiting.reviews, waiting.translations, {
+                : waitingRowsOf(waiting, {
                       collectionLabel,
                   }),
         [waiting, collectionLabel]

@@ -25,6 +25,7 @@ export interface ContentDefinition {
     readonly migrate?: Readonly<Record<number, PageMigration>>;
     readonly group?: string;
     readonly requireReview?: boolean;
+    readonly instructions?: string;
     readonly schema: z.ZodType;
 }
 
@@ -57,6 +58,15 @@ interface SharedOptions<Name extends string, Fields extends FieldList> {
      * approve the draft. For a collection, each item's.
      */
     requireReview?: boolean;
+    /**
+     * Markdown an agent reads before it writes this content: how to write
+     * it, its tone, and what never to change. It joins the editing tools'
+     * descriptions and what `describe` answers.
+     *
+     * @example
+     * instructions: 'Write in plain British English. Never change a name or a job title.',
+     */
+    instructions?: string;
 }
 
 // Registry-global: discovery and the reader check them on modules another copy of this package may have made.

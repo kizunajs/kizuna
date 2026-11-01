@@ -10,7 +10,7 @@ import { Avatar, OwnerControl, type People } from '../view/people.js';
 import { PublishReview, changeViewsOf, type AskedReview, type Changes, type PublishReviewHandle } from '../view/review.js';
 import { documentTitle, languageNameOf, valueAt, type Description, type Draft, type ReviewState } from '../view/schema.js';
 import { sameContent } from '../same-content.js';
-import { parseRef } from '../refs.js';
+import { formatRef, parseRef, sourceRefOf } from '../refs.js';
 import { withMediaSite } from './connection.js';
 import { ConfirmDialog } from './confirm.js';
 import { blockerOf, documentDatesOf, hasSomethingToPublish, menuEntriesOf } from './document-menu.js';
@@ -386,6 +386,7 @@ export function DocumentScreen({
         setSaveState('idle');
         setUpdatedAt(null);
         setUpdatedBy(null);
+        setUpdatedVia(null);
         setHeldBy(null);
         setVersions(undefined);
         setCompared(undefined);
@@ -435,6 +436,7 @@ export function DocumentScreen({
             const marker = answer.body.updatedAt;
             setUpdatedAt(marker);
             setUpdatedBy(answer.body.updatedBy);
+            setUpdatedVia(answer.body.updatedVia ?? null);
             setHeldBy(answer.body.heldBy ?? null);
             if (seen.current === null) {
                 seen.current = marker;
@@ -595,6 +597,7 @@ export function DocumentScreen({
                     holding.current = ref;
                     setUpdatedAt(answer.body.updatedAt);
                     setUpdatedBy(answer.body.updatedBy);
+                    setUpdatedVia(answer.body.updatedVia ?? null);
                     setHeldBy(answer.body.heldBy ?? null);
                     setDocument({
                         ...current,
@@ -1519,6 +1522,9 @@ export function DocumentScreen({
             />
         );
     const dotted = dottedFieldsOf(document.review, draftChanges?.views);
+    const threads = threadsOf(comments);
+    const commentPeople = peopleWhoOpen(people, document.ref);
+    const meAsPerson = people?.people.find((person) => person.id === me);
 
     const locales = document.locale;
     const inTranslation = locales !== undefined && locales.current !== locales.source;
@@ -1677,6 +1683,7 @@ export function DocumentScreen({
                                                 <PeopleFact
                                                     lead={`${relativeTimeOf(document.review.createdAt, now)} by`}
                                                     people={[document.review.requestedBy]}
+                                                    via={document.review.requestedVia ?? null}
                                                 />
                                             ),
                                         }
@@ -1703,6 +1710,7 @@ export function DocumentScreen({
                                                           <PeopleFact
                                                               lead={`${relativeTimeOf(updatedAt, now)} by`}
                                                               people={[updatedByPerson]}
+                                                              via={updatedVia}
                                                           />
                                                       ),
                                               },
@@ -1940,7 +1948,7 @@ export function DocumentScreen({
                     </p>
                 )}
                 <Tabs.Panel value="edit" keepMounted className="k-document__body">
-                    <div className="k-document__fields">
+                    <div className="k-document__fields" ref={setFieldsElement}>
                         <FieldForm
                             key={`${document.ref}:${formKey}`}
                             ref={form}
@@ -2014,6 +2022,32 @@ export function DocumentScreen({
                                             </div>
                                         </div>
                                     )}
+                                    <CommentMarks
+                                        path={field.path}
+                                        threads={openThreadsOn(threads, field.path)}
+                                        active={openThread}
+                                        onOpen={(thread) => {
+                                            setComposing(undefined);
+                                            setOpenThread(thread);
+                                        }}
+                                    />
+                                    <FieldThreads
+                                        documentRef={document.ref}
+                                        label={fieldLabelOf(field.path)}
+                                        threads={openThreadsOn(threads, field.path)}
+                                        open={openThread}
+                                        composing={composing?.path === field.path ? composing : undefined}
+                                        people={commentPeople}
+                                        me={meAsPerson}
+                                        now={now}
+                                        connection={connection}
+                                        beforeSend={async () => {
+                                            await form.current?.flush();
+                                        }}
+                                        onOpen={setOpenThread}
+                                        onComposingEnd={() => setComposing(undefined)}
+                                        onChanged={reloadComments}
+                                    />
                                     {onSiteTab &&
                                     field.parent === undefined &&
                                     field.writable &&
@@ -2030,6 +2064,19 @@ export function DocumentScreen({
                             )}
                         />
                     </div>
+                    {shownView === 'edit' && languageView === 'edit' ? (
+                        <SelectionComment
+                            paths={document.fields.map((field) => field.path)}
+                            container={fieldsElement}
+                            onComment={(path, phrase) => {
+                                setOpenThread(undefined);
+                                setComposing({
+                                    path,
+                                    phrase,
+                                });
+                            }}
+                        />
+                    ) : null}
                     {previewOpened && siteUrl !== null && previewPath !== null ? (
                         <div className="k-document__preview" hidden={!previewShown}>
                             <AdminPreview

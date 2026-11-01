@@ -15,6 +15,7 @@ import { ConfirmDialog, type Confirmation } from './confirm.js';
 import { hrefIn, hrefOf, navigate, SHARED_GROUP } from './navigation.js';
 import { PageHeader, type MetaPair } from './page-header.js';
 import { problemOf } from './parts.js';
+import { SendBack } from './review-changes.js';
 import { SiteIcon } from './site-switcher.js';
 
 /**
@@ -35,6 +36,11 @@ export interface ScheduleView {
     state: 'scheduled' | 'waiting' | 'held' | 'late';
     waitingFor: string | null;
     scheduledBy: PersonView;
+    /**
+     * Its latest review since it was last published. Older servers leave it
+     * out.
+     */
+    review?: ReviewState | null;
 }
 
 /**
@@ -49,6 +55,11 @@ export interface ReleaseView {
     documents: ScheduleView[];
     mayPublish: boolean;
     createdBy: PersonView;
+    /**
+     * The agent that made it for `createdBy`, like `Claude`. Older servers
+     * leave it out.
+     */
+    createdVia?: string | null;
     scheduledBy: PersonView | null;
     publishedAt: string | null;
 }
@@ -156,6 +167,20 @@ const stateOf = (view: { state: string; waitingFor: string | null }): { text: st
     if (view.state === 'waiting') return said(`Waiting for ${view.waitingFor ?? 'a change'}`);
     if (view.state === 'late') return said('Late');
     return said('Ready', true);
+};
+
+/**
+ * A document's state in a release: what stops it, else where its review
+ * stands, which an agent's release waits on before anyone publishes it.
+ */
+export const releaseDocumentStateOf = (view: Pick<ScheduleView, 'state' | 'waitingFor' | 'review'>): { text: string; quiet: boolean } => {
+    const state = stateOf(view);
+    if (!state.quiet) return state;
+    if (view.review?.status === 'open')
+        return said(`Waiting for ${view.review.reviewers.map((reviewer) => reviewer.name).join(' or ')} to review`);
+    if (view.review?.status === 'changes') return said(`Sent back by ${view.review.decidedBy?.name ?? 'the reviewer'}`);
+    if (view.review?.status === 'approved') return said('Approved', true);
+    return state;
 };
 
 const releaseStateOf = (release: ReleaseView): { text: string; quiet: boolean } => {
@@ -708,6 +733,7 @@ export function ReleaseScreen({
     const [scheduling, setScheduling] = useState(false);
     const [confirming, setConfirming] = useState<ReleaseConfirm | undefined>();
     const [problem, setProblem] = useState<string | undefined>();
+    const [sending, setSending] = useState(false);
     const toasts = Toast.useToastManager();
     const load = useCallback(async () => {
         const answer = await connection.call<ReleaseView>('editing_releases_get', {
@@ -736,6 +762,30 @@ export function ReleaseScreen({
     }
 
     const open = release.state !== 'published';
+    // An agent's release waits on the person it asked, who sends it all back with one note.
+    const waitingReview = release.documents.find((document) => document.review?.status === 'open')?.review ?? undefined;
+    const sendBack = async (note: string): Promise<boolean> => {
+        setProblem(undefined);
+        setSending(true);
+        const answer = await connection.call<ReleaseView>('editing_releases_send_back', {
+            params: {
+                id,
+            },
+            body: {
+                note,
+            },
+        });
+        setSending(false);
+        if (answer.status !== 200) {
+            setProblem(problemOf(answer, 'It was not sent back'));
+            return false;
+        }
+        toasts.add({
+            description: `Sent ${release.name} back.`,
+        });
+        setRelease(answer.body);
+        return true;
+    };
     const remove = async (ref: string): Promise<void> => {
         setProblem(undefined);
         const answer = await connection.call<ReleaseView>('editing_releases_remove', {
@@ -866,12 +916,13 @@ export function ReleaseScreen({
                           },
                     {
                         label: 'Made by',
-                        value: peopleLine('', release.createdBy),
+                        value: peopleLine('', release.createdBy, release.createdVia == null ? '' : ` via ${release.createdVia}`),
                     },
                 ]}
                 actions={
                     open ? (
                         <>
+                            {waitingReview === undefined ? null : <SendBack review={waitingReview} busy={sending} onSend={sendBack} />}
                             <button type="button" className="k-button k-button--secondary k-button--small" onClick={() => setAdding(true)}>
                                 <Plus {...ICON} />
                                 Add documents
@@ -953,7 +1004,7 @@ export function ReleaseScreen({
                             <div className="k-scheduled__rows">
                                 {group.documents.map((document) => {
                                     const Icon = iconOf(document.ref);
-                                    const state = open ? stateOf(document) : said('Published', true);
+                                    const state = open ? releaseDocumentStateOf(document) : said('Published', true);
                                     return (
                                         <div key={document.ref} className="k-scheduled__row k-scheduled__row--document">
                                             <Icon {...ICON} className="k-scheduled__icon" />

@@ -40,7 +40,7 @@ const confirmationOf = (entry: MenuEntry, title: string): Confirmation | undefin
     if (entry.kind === 'delete') {
         return {
             label: 'Delete',
-            question: `Delete ${title}, with its history? Pages that show it stop showing it.`,
+            question: deleteQuestionOf(title),
         };
     }
     if (entry.kind === 'action' && entry.action.confirm !== undefined) {

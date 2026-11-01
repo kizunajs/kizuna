@@ -1,9 +1,8 @@
-import { memo, useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import {
     Background,
     BackgroundVariant,
     BaseEdge,
-    EdgeLabelRenderer,
     getBezierPath,
     Handle,
     Position,
@@ -50,17 +49,11 @@ interface HeadData extends Record<string, unknown> {
 interface CardData extends Record<string, unknown> {
     card: MapCard;
     site: AdminSite | undefined;
-    dim: boolean;
-    found: boolean;
     onToggle: (id: string) => void;
 }
 
 interface LinkData extends Record<string, unknown> {
     broken: boolean;
-    lit: boolean;
-    dim: boolean;
-    hovered: boolean;
-    label: string;
 }
 
 /**
@@ -120,8 +113,6 @@ const PageCard = memo(function PageCard({ data }: NodeProps<Node<CardData>>) {
     const attributes = {
         className: 'k-map__card',
         'data-kind': node.kind,
-        'data-dim': data.dim ? '' : undefined,
-        'data-found': data.found ? '' : undefined,
         style: {
             width: CARD_WIDTH,
             height: CARD_HEIGHT,
@@ -175,34 +166,12 @@ const PageCard = memo(function PageCard({ data }: NodeProps<Node<CardData>>) {
 
 /**
  * A content link: a curve from the holder to the page it links to, dashed
- * when the target is not live, naming the target while the pointer is on
- * it.
+ * when the target is not live.
  */
 const LinkLine = memo(function LinkLine(props: EdgeProps<Edge<LinkData>>) {
-    const [path, labelX, labelY] = getBezierPath(props);
-    const data = props.data!;
+    const [path] = getBezierPath(props);
     return (
-        <>
-            <BaseEdge
-                path={path}
-                interactionWidth={14}
-                className="k-map__link"
-                data-broken={data.broken ? '' : undefined}
-                data-lit={data.lit ? '' : undefined}
-                data-dim={data.dim ? '' : undefined}
-            />
-            {data.hovered ? (
-                <EdgeLabelRenderer>
-                    <div
-                        className="k-map__link-label"
-                        style={{
-                            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-                        }}>
-                        {data.label}
-                    </div>
-                </EdgeLabelRenderer>
-            ) : null}
-        </>
+        <BaseEdge path={path} interactionWidth={14} className="k-map__link" data-broken={props.data?.broken === true ? '' : undefined} />
     );
 });
 
@@ -220,10 +189,22 @@ const FIT = {
     maxZoom: 1,
 };
 
+/**
+ * A value for an attribute selector, in quotes.
+ */
+const quoted = (value: string): string => `"${value.replace(/["\\]/g, '\\$&')}"`;
+
+/**
+ * How long the highlight stays after the pointer leaves a card, so moving
+ * from one card to the next does not flash the whole map.
+ */
+const HOVER_GRACE_MS = 120;
+
 function MapCanvas({
     map,
     sites,
     shown,
+    filters,
 }: {
     map: PageMap;
     sites: readonly AdminSite[];
@@ -231,18 +212,24 @@ function MapCanvas({
      * The columns shown, by site key, `''` for the shared content.
      */
     shown: ReadonlySet<string>;
+    filters: ReactNode;
 }) {
     const flow = useReactFlow();
+    const canvas = useRef<HTMLDivElement>(null);
     const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
     const [hoveredCard, setHoveredCard] = useState<string | undefined>();
-    const [hoveredLink, setHoveredLink] = useState<string | undefined>();
+    const leaving = useRef<number | undefined>(undefined);
+    const [tip, setTip] = useState<{ label: string; x: number; y: number } | undefined>();
     const [search, setSearch] = useState('');
     const [foundIndex, setFoundIndex] = useState(0);
     const siteNamed = useCallback((key: string | null) => sites.find((site) => site.key === key), [sites]);
     const layout = useMemo(
         () =>
             mapLayoutOf(map, {
-                columns: [...sites.map((site) => site.key), null].filter((site) => shown.has(keyOf(site))),
+                // The shared content has a column only when something in it holds or receives a link.
+                columns: [...sites.map((site) => site.key), ...(map.nodes.some((node) => node.site === null) ? [null] : [])].filter(
+                    (site) => shown.has(keyOf(site))
+                ),
                 expanded,
             }),
         [map, sites, shown, expanded]
@@ -260,6 +247,7 @@ function MapCanvas({
         []
     );
 
+    // Nodes and edges change only with the layout. Hovering and finding restyle them through the stylesheet below, so React Flow never lays them out again.
     const nodes = useMemo<Node[]>(
         () => [
             ...layout.columns.map(
@@ -270,6 +258,8 @@ function MapCanvas({
                         x: column.x,
                         y: column.y,
                     },
+                    width: column.width,
+                    height: 44,
                     data: {
                         column,
                         site: siteNamed(column.site),
@@ -286,11 +276,11 @@ function MapCanvas({
                         x: card.x,
                         y: card.y,
                     },
+                    width: CARD_WIDTH,
+                    height: CARD_HEIGHT,
                     data: {
                         card,
                         site: siteNamed(card.node.site),
-                        dim: lit !== undefined && !lit.cards.has(card.id),
-                        found: foundCard?.id === card.id,
                         onToggle: toggle,
                     },
                     selectable: false,
@@ -298,10 +288,9 @@ function MapCanvas({
                 })
             ),
         ],
-        [layout, lit, foundCard, siteNamed, toggle]
+        [layout, siteNamed, toggle]
     );
 
-    const titleOf = useMemo(() => new Map(layout.cards.map((card) => [card.id, card])), [layout]);
     const edges = useMemo<Edge[]>(
         () => [
             ...layout.treeLines.map(
@@ -322,10 +311,8 @@ function MapCanvas({
                         },
                     }) as Edge
             ),
-            ...layout.links.map((line): Edge<LinkData> => {
-                const target = titleOf.get(line.to);
-                const domain = line.crossSite ? hostOf(siteNamed(target?.node.site ?? null)?.url) : undefined;
-                return {
+            ...layout.links.map(
+                (line): Edge<LinkData> => ({
                     id: line.id,
                     source: line.from,
                     target: line.to,
@@ -336,24 +323,62 @@ function MapCanvas({
                     focusable: false,
                     data: {
                         broken: line.broken,
-                        lit: lit?.links.has(line.id) === true,
-                        dim: lit !== undefined && !lit.links.has(line.id),
-                        hovered: hoveredLink === line.id,
-                        label: [`To ${target?.node.title ?? ''}`, domain, line.broken ? 'Not live' : undefined]
-                            .filter((part) => part !== undefined)
-                            .join(' · '),
                     },
-                };
-            }),
+                })
+            ),
         ],
-        [layout, lit, hoveredLink, titleOf, siteNamed]
+        [layout]
     );
 
-    // A new set of columns lays out afresh, so the map fits it again.
-    useEffect(() => {
-        const frame = window.requestAnimationFrame(() => void flow.fitView(FIT));
-        return () => window.cancelAnimationFrame(frame);
-    }, [flow, shown]);
+    const labels = useMemo(() => {
+        const cards = new Map(layout.cards.map((card) => [card.id, card]));
+        return new Map(
+            layout.links.map((line) => {
+                const target = cards.get(line.to);
+                const domain = line.crossSite ? hostOf(siteNamed(target?.node.site ?? null)?.url) : undefined;
+                return [
+                    line.id,
+                    [`To ${target?.node.title ?? ''}`, domain, line.broken ? 'Not live' : undefined]
+                        .filter((part) => part !== undefined)
+                        .join(' · '),
+                ];
+            })
+        );
+    }, [layout, siteNamed]);
+
+    // The highlight as rules over the elements React Flow already drew: the hovered card's links and the cards they join, and the page found.
+    const highlight = [
+        lit === undefined
+            ? ''
+            : `.k-map__canvas[data-hovering] :is(${[...lit.cards].map((id) => `.react-flow__node[data-id=${quoted(id)}]`).join(', ')}) { opacity: 1; }`,
+        lit === undefined || lit.links.size === 0
+            ? ''
+            : `.k-map__canvas[data-hovering] :is(${[...lit.links].map((id) => `.react-flow__edge[data-id=${quoted(id)}]`).join(', ')}) .k-map__link { stroke: var(--k-ink); stroke-width: 1.75; opacity: 1; }`,
+        foundCard === undefined
+            ? ''
+            : `.react-flow__node[data-id=${quoted(foundCard.id)}] .k-map__card { box-shadow: inset 0 0 0 1.5px var(--k-ink); }`,
+    ].join('\n');
+
+    const enterCard = (id: string | undefined): void => {
+        window.clearTimeout(leaving.current);
+        setHoveredCard(id);
+    };
+    const leaveCard = (): void => {
+        window.clearTimeout(leaving.current);
+        leaving.current = window.setTimeout(() => setHoveredCard(undefined), HOVER_GRACE_MS);
+    };
+    useEffect(() => () => window.clearTimeout(leaving.current), []);
+
+    const showTip = (event: MouseEvent, id: string): void => {
+        const label = labels.get(id);
+        const box = canvas.current?.getBoundingClientRect();
+        if (label === undefined || box === undefined) return;
+        setTip({
+            label,
+            x: event.clientX - box.left,
+            y: event.clientY - box.top,
+        });
+    };
 
     const jumpTo = (card: MapCard | undefined): void => {
         if (card === undefined) return;
@@ -372,38 +397,43 @@ function MapCanvas({
 
     return (
         <>
-            <div className="k-map__tools">
-                <label className="k-list-toolbar__search k-map__search">
-                    <Search {...ICON} />
-                    <span className="k-visually-hidden">Find a page</span>
-                    <input
-                        type="search"
-                        value={search}
-                        placeholder="Find a page"
-                        onChange={(event) => {
-                            setSearch(event.target.value);
-                            setFoundIndex(0);
-                            jumpTo(cardsMatching(layout, event.target.value)[0]);
-                        }}
-                        onKeyDown={onSearchKey}
-                    />
-                </label>
-                {search.trim() === '' ? null : (
-                    <span className="k-map__found" role="status">
-                        {found.length === 0 ? 'No pages' : `${(foundIndex % found.length) + 1} of ${found.length}`}
-                    </span>
-                )}
-                <span className="k-spacer" />
-                <button
-                    type="button"
-                    className="k-icon-button"
-                    aria-label="Fit to view"
-                    title="Fit to view"
-                    onClick={() => void flow.fitView(FIT)}>
-                    <Maximize {...ICON} />
-                </button>
+            <div className="k-admin__body k-list-screen k-map__tools">
+                <div className="k-list-toolbar">
+                    <label className="k-list-toolbar__search">
+                        <Search {...ICON} />
+                        <span className="k-visually-hidden">Find a page</span>
+                        <input
+                            type="search"
+                            value={search}
+                            placeholder="Find a page"
+                            onChange={(event) => {
+                                setSearch(event.target.value);
+                                setFoundIndex(0);
+                                jumpTo(cardsMatching(layout, event.target.value)[0]);
+                            }}
+                            onKeyDown={onSearchKey}
+                        />
+                    </label>
+                    {search.trim() === '' ? null : (
+                        <span className="k-map__found" role="status">
+                            {found.length === 0 ? 'No pages' : `${(foundIndex % found.length) + 1} of ${found.length}`}
+                        </span>
+                    )}
+                    <div className="k-list-toolbar__buttons k-map__filters">
+                        {filters}
+                        <button
+                            type="button"
+                            className="k-icon-button"
+                            aria-label="Fit to view"
+                            title="Fit to view"
+                            onClick={() => void flow.fitView(FIT)}>
+                            <Maximize {...ICON} />
+                        </button>
+                    </div>
+                </div>
             </div>
-            <div className="k-map__canvas">
+            <div ref={canvas} className="k-map__canvas" data-hovering={lit === undefined ? undefined : ''}>
+                <style>{highlight}</style>
                 <ReactFlow
                     nodes={nodes}
                     edges={edges}
@@ -418,15 +448,26 @@ function MapCanvas({
                     maxZoom={1.75}
                     fitView
                     fitViewOptions={FIT}
-                    onNodeMouseEnter={(_, node) => setHoveredCard(node.type === 'card' ? node.id : undefined)}
-                    onNodeMouseLeave={() => setHoveredCard(undefined)}
-                    onEdgeMouseEnter={(_, edge) => setHoveredLink(edge.type === 'link' ? edge.id : undefined)}
-                    onEdgeMouseLeave={() => setHoveredLink(undefined)}
+                    onNodeMouseEnter={(_, node) => enterCard(node.type === 'card' ? node.id : undefined)}
+                    onNodeMouseLeave={leaveCard}
+                    onEdgeMouseEnter={(event, edge) => showTip(event, edge.id)}
+                    onEdgeMouseMove={(event, edge) => showTip(event, edge.id)}
+                    onEdgeMouseLeave={() => setTip(undefined)}
                     proOptions={{
                         hideAttribution: true,
                     }}>
-                    <Background variant={BackgroundVariant.Dots} gap={20} size={1.25} className="k-map__dots" />
+                    <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
                 </ReactFlow>
+                {tip === undefined ? null : (
+                    <div
+                        className="k-map__link-label"
+                        style={{
+                            left: tip.x + 12,
+                            top: tip.y + 12,
+                        }}>
+                        {tip.label}
+                    </div>
+                )}
             </div>
         </>
     );
@@ -434,9 +475,9 @@ function MapCanvas({
 
 /**
  * Map: every page as a sitemap, one column per site and one for the shared
- * content, each page under the page whose path its own extends, and the
- * content links between them across sites. In a site it opens on that site
- * and the shared content.
+ * content when it holds or receives a link, each page under the page whose
+ * path its own extends, and the content links between them across sites. In
+ * a site it opens on that site and the shared content.
  */
 export function MapScreen({ connection, sites, site }: { connection: Connection; sites: readonly AdminSite[]; site: string | undefined }) {
     const [map, setMap] = useState<PageMap | undefined>();
@@ -462,11 +503,18 @@ export function MapScreen({ connection, sites, site }: { connection: Connection;
     };
     const pages = map?.nodes.filter((node) => node.kind === 'page' && (site === undefined || node.site === site)).length ?? 0;
     const links = map?.links.length ?? 0;
+    const hasShared = map?.nodes.some((node) => node.site === null) === true;
     const filterButton = (key: string, label: string, mark: AdminSite | undefined) => (
-        <button key={key} type="button" className="k-map__site" aria-pressed={shown.has(key)} onClick={() => toggle(key)}>
+        <button key={key} type="button" className="k-tab k-map__site" aria-pressed={shown.has(key)} onClick={() => toggle(key)}>
             <SiteIcon site={mark} />
             <span className="k-ellipsis">{label}</span>
         </button>
+    );
+    const filters = (
+        <div className="k-map__sites" role="group" aria-label="Sites shown">
+            {sites.map((candidate) => filterButton(candidate.key, candidate.label, candidate))}
+            {hasShared ? filterButton(SHARED, SHARED_GROUP, undefined) : null}
+        </div>
     );
     return (
         <div className="k-map">
@@ -486,12 +534,6 @@ export function MapScreen({ connection, sites, site }: { connection: Connection;
                               },
                           ]
                 }
-                actions={
-                    <div className="k-map__sites" role="group" aria-label="Sites shown">
-                        {sites.map((candidate) => filterButton(candidate.key, candidate.label, candidate))}
-                        {filterButton(SHARED, SHARED_GROUP, undefined)}
-                    </div>
-                }
             />
             {map === undefined ? (
                 <div className="k-admin__body">
@@ -499,7 +541,7 @@ export function MapScreen({ connection, sites, site }: { connection: Connection;
                 </div>
             ) : (
                 <ReactFlowProvider>
-                    <MapCanvas map={map} sites={sites} shown={shown} />
+                    <MapCanvas map={map} sites={sites} shown={shown} filters={filters} />
                 </ReactFlowProvider>
             )}
         </div>

@@ -846,7 +846,7 @@ export class CmsService {
      * The listing items stored under a site and a collection belong to, if
      * the config still declares it.
      */
-    private storedListing(collection: string, site: string): Listing | undefined {
+    storedListing(collection: string, site: string): Listing | undefined {
         const declared = site === DEFAULT_SITE ? this.collections[collection] : this.siteCollections[site]?.[collection];
         return declared === undefined ? undefined : this.listing(collection, site);
     }
@@ -1490,7 +1490,7 @@ export class CmsService {
      * The sites a shared item that chooses its sites shows on in the copies
      * given. `undefined` for anything else, which every site reads.
      */
-    private async sitesShowing(ref: DocumentRef, copies: ReadonlyArray<'draft' | 'published'>): Promise<string[] | undefined> {
+    async sitesShowing(ref: DocumentRef, copies: ReadonlyArray<'draft' | 'published'>): Promise<string[] | undefined> {
         const source = sourceRefOf(ref);
         if (!this.choosesSitesFor(source)) return undefined;
         const row = await this.store.get('item', this.target(source).key, DEFAULT_SITE);
@@ -3390,7 +3390,7 @@ export class CmsService {
      * Refuses an address another item of the collection already has, in its
      * draft or its published copy.
      */
-    private async assertFreeAddress(listing: Listing, key: string, content: Record<string, unknown>): Promise<void> {
+    async assertFreeAddress(listing: Listing, key: string, content: Record<string, unknown>): Promise<void> {
         for (const route of listing.routes) {
             const values = route.params.map((field) => content[field]);
             if (values.some((value) => typeof value !== 'string' || value === '')) continue;
@@ -3555,7 +3555,7 @@ export class CmsService {
     async versionContent(
         ref: DocumentRef,
         version: number
-    ): Promise<{ content: Record<string, unknown>; summary: string | null; createdAt: Date; createdBy: string }> {
+    ): Promise<{ content: Record<string, unknown>; summary: string | null; createdAt: Date; createdBy: string; via: string | null }> {
         const { target, row } = await this.document(ref);
         if (row === undefined) throw new CmsHttpError(404, { detail: `'${formatRef(ref)}' has no versions.` });
         const found = await this.store.version(row.id, version);
@@ -3565,6 +3565,7 @@ export class CmsService {
             summary: found.summary,
             createdAt: found.createdAt,
             createdBy: found.createdBy,
+            via: found.via,
         };
     }
 
@@ -3605,7 +3606,9 @@ export class CmsService {
 
     async history(
         ref: DocumentRef
-    ): Promise<Array<{ version: number; summary: string | null; createdAt: string; createdBy: string; published: boolean }>> {
+    ): Promise<
+        Array<{ version: number; summary: string | null; createdAt: string; createdBy: string; via: string | null; published: boolean }>
+    > {
         const { row } = await this.document(ref);
         if (row === undefined) return [];
         const versions = await this.store.versions(row.id);
@@ -3614,6 +3617,7 @@ export class CmsService {
             summary: version.summary,
             createdAt: version.createdAt.toISOString(),
             createdBy: version.createdBy,
+            via: version.via,
             published: row.publishedVersion === version.version,
         }));
     }

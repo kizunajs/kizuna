@@ -7,15 +7,16 @@ description: 'Content every page shows, kept as one copy.'
 defineGlobal(definition: GlobalDefinition): Global
 ```
 
-| Option          | Type                                     | Description                                     |
-| --------------- | ---------------------------------------- | ----------------------------------------------- |
-| `name`          | `string`                                 | How it is read: `kizuna.content.globals.<name>` |
-| `label`         | `string`                                 | What editors see it called                      |
-| `fields`        | `Field[]`                                | What editors may change                         |
-| `group`         | `string`                                 | A heading it is listed under in the editor      |
-| `requireReview` | `boolean`                                | Publishing waits for an approval                |
-| `migrate`       | `Record<number, (document) => document>` | Steps for stored content                        |
-| `on`            | `{ published, unpublished, deleted }`    | Functions that run after the fact               |
+| Option          | Type                                     | Description                                                                                          |
+| --------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `name`          | `string`                                 | How it is read: `kizuna.content.globals.<name>`                                                      |
+| `label`         | `string`                                 | What editors see it called                                                                           |
+| `fields`        | `Field[]`                                | What editors may change                                                                              |
+| `group`         | `string`                                 | A heading it is listed under in the editor                                                           |
+| `requireReview` | `boolean`                                | Publishing waits for an approval                                                                     |
+| `instructions`  | `string`                                 | Markdown an agent reads before writing it. See [Instructions](/docs/cms/editing/agents#instructions) |
+| `migrate`       | `Record<number, (document) => document>` | Steps for stored content                                                                             |
+| `on`            | `{ published, unpublished, deleted }`    | Functions that run after the fact                                                                    |
 
 ```ts
 export const Site = defineGlobal({

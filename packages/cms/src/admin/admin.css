@@ -333,31 +333,16 @@
     .k-map__sites {
         display: flex;
         flex-wrap: wrap;
-        justify-content: flex-end;
         gap: 2px;
     }
 
     .k-map__site {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
         max-width: 180px;
-        height: 30px;
-        padding: 0 10px 0 6px;
-        border: 0;
-        border-radius: 8px;
-        background: none;
-        font: inherit;
-        font-size: 13px;
-        color: var(--k-muted);
-        cursor: pointer;
-    }
-
-    .k-map__site:hover {
-        background: var(--k-tint);
     }
 
     .k-map__site[aria-pressed='true'] {
+        background: var(--k-control);
+        box-shadow: var(--k-control-elevation);
         color: var(--k-ink);
     }
 
@@ -366,16 +351,18 @@
     }
 
     .k-map__site .k-site-icon {
-        width: 18px;
-        height: 18px;
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
     }
 
-    .k-map__tools {
-        display: flex;
-        flex-wrap: wrap;
+    .k-map__filters {
         align-items: center;
-        gap: 12px;
-        padding: 0 var(--k-gutter) 12px;
+    }
+
+    .k-admin__body.k-map__tools {
+        flex: none;
+        padding-bottom: 16px;
     }
 
     .k-map__found {
@@ -384,11 +371,10 @@
     }
 
     .k-map__canvas {
-        --xy-background-pattern-dots-color: var(--k-line-strong);
+        --xy-background-pattern-dots-color: var(--k-line);
         position: relative;
         flex: 1;
         min-height: 480px;
-        border-top: 1px solid var(--k-line);
     }
 
     .k-map__canvas > .react-flow {
@@ -464,21 +450,21 @@
         text-decoration: none;
         color: var(--k-ink);
         cursor: pointer;
+    }
+
+    .k-map .react-flow__node-card {
         transition: opacity 120ms ease;
+    }
+
+    /* While a card is hovered, everything fades but its links and the cards they join, which the screen names in a rule of its own. */
+    .k-map__canvas[data-hovering] .react-flow__node-card {
+        opacity: 0.22;
     }
 
     .k-map__card:hover,
     .k-map__card:focus-visible {
         box-shadow: inset 0 0 0 1px var(--k-muted);
         outline: none;
-    }
-
-    .k-map__card[data-found] {
-        box-shadow: inset 0 0 0 1.5px var(--k-ink);
-    }
-
-    .k-map__card[data-dim] {
-        opacity: 0.22;
     }
 
     /* A part of a path no page sits at reads in grey, with no card of its own. */
@@ -570,18 +556,13 @@
         stroke-dasharray: 4 4;
     }
 
-    .k-map .k-map__link[data-lit] {
-        stroke: var(--k-ink);
-        stroke-width: 1.75;
-        opacity: 1;
-    }
-
-    .k-map .k-map__link[data-dim] {
+    .k-map__canvas[data-hovering] .k-map__link {
         opacity: 0.08;
     }
 
     .k-map__link-label {
         position: absolute;
+        z-index: 5;
         padding: 4px 8px;
         border-radius: 6px;
         background: var(--k-popup);
@@ -5016,6 +4997,152 @@
         padding-bottom: 6px;
         font-size: 13.5px;
         resize: none;
+    }
+
+    /* A phrase a comment quotes: a grey fill with a grey underline, darker for the thread that is open. */
+    ::highlight(k-comment) {
+        background-color: var(--k-tint);
+        text-decoration: underline 1.5px var(--k-line-strong);
+        text-underline-offset: 3px;
+    }
+
+    ::highlight(k-comment-active) {
+        background-color: var(--k-control-hover);
+        text-decoration: underline 1.5px var(--k-muted);
+        text-underline-offset: 3px;
+    }
+
+    /* An input's marks: a clear copy of its text laid over it, each phrase filled. */
+    .k-comment-layer {
+        position: absolute;
+        z-index: 1;
+        margin: 0;
+        overflow: hidden;
+        background: none;
+        color: transparent;
+        pointer-events: none;
+    }
+
+    .k-comment-mark {
+        border-radius: 2px;
+        background: var(--k-tint);
+        color: transparent;
+        text-decoration: underline 1.5px var(--k-line-strong);
+        text-underline-offset: 3px;
+    }
+
+    .k-comment-mark[data-active] {
+        background: var(--k-control-hover);
+        text-decoration-color: var(--k-muted);
+    }
+
+    /* Comment, beside text selected in a field. */
+    .k-selection-comment {
+        position: fixed;
+        z-index: 50;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 30px;
+        padding: 0 10px;
+        border: 0;
+        border-radius: 8px;
+        background: var(--k-popup);
+        box-shadow: var(--k-popup-shadow);
+        font: inherit;
+        font-size: 12.5px;
+        font-weight: 500;
+        color: var(--k-ink);
+        cursor: pointer;
+    }
+
+    /* A field's threads, under it in plain type. */
+    .k-threads {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 18px;
+        padding-top: 2px;
+    }
+
+    .k-thread {
+        display: flex;
+        flex-direction: column;
+        align-self: stretch;
+        gap: 12px;
+    }
+
+    .k-thread__quote {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 8px;
+        margin: 0;
+        font-size: 13px;
+        color: var(--k-muted);
+        overflow-wrap: anywhere;
+    }
+
+    .k-thread__phrase::before {
+        content: '“';
+    }
+
+    .k-thread__phrase::after {
+        content: '”';
+    }
+
+    .k-thread__changed {
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .k-thread__assignee {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+        padding-left: 32px;
+        font-size: 12.5px;
+        color: var(--k-muted);
+    }
+
+    .k-thread__actions {
+        margin-top: -4px;
+        padding-left: 32px;
+    }
+
+    .k-threads__toggle {
+        font-size: 12.5px;
+    }
+
+    .k-comment-composer--thread {
+        align-items: flex-start;
+    }
+
+    .k-comment-composer--thread > .k-avatar {
+        margin-top: 6px;
+    }
+
+    .k-comment-composer__box {
+        position: relative;
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .k-comment-composer__box > .k-comment-composer__input.k-textarea {
+        align-self: stretch;
+    }
+
+    .k-mention-menu {
+        position: absolute;
+        top: 40px;
+        left: 0;
+        z-index: 20;
+        min-width: 220px;
     }
 
     /* A note on a review: the face a little larger, and what they said in body type. */
