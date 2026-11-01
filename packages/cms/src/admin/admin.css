@@ -360,9 +360,9 @@
         align-items: center;
     }
 
-    .k-admin__body.k-map__tools {
-        flex: none;
-        padding-bottom: 16px;
+    .k-map__toolbar {
+        flex: 1;
+        min-width: 0;
     }
 
     .k-map__found {
@@ -543,6 +543,11 @@
     .k-map__tree .react-flow__edge-path {
         stroke: var(--k-line-strong);
         stroke-width: 1;
+    }
+
+    /* React Flow takes pointer events from edges nobody selects, and a link names its target on hover. */
+    .k-map .react-flow__edge-link.inactive {
+        pointer-events: visibleStroke;
     }
 
     .k-map .k-map__link {

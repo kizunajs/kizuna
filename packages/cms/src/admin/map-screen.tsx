@@ -205,6 +205,7 @@ function MapCanvas({
     sites,
     shown,
     filters,
+    header,
 }: {
     map: PageMap;
     sites: readonly AdminSite[];
@@ -213,6 +214,11 @@ function MapCanvas({
      */
     shown: ReadonlySet<string>;
     filters: ReactNode;
+    /**
+     * The screen's header, given the search and the buttons to show in its
+     * bar.
+     */
+    header: (tools: ReactNode) => ReactNode;
 }) {
     const flow = useReactFlow();
     const canvas = useRef<HTMLDivElement>(null);
@@ -397,8 +403,8 @@ function MapCanvas({
 
     return (
         <>
-            <div className="k-admin__body k-list-screen k-map__tools">
-                <div className="k-list-toolbar">
+            {header(
+                <div className="k-list-toolbar k-map__toolbar">
                     <label className="k-list-toolbar__search">
                         <Search {...ICON} />
                         <span className="k-visually-hidden">Find a page</span>
@@ -431,7 +437,7 @@ function MapCanvas({
                         </button>
                     </div>
                 </div>
-            </div>
+            )}
             <div ref={canvas} className="k-map__canvas" data-hovering={lit === undefined ? undefined : ''}>
                 <style>{highlight}</style>
                 <ReactFlow
@@ -516,32 +522,39 @@ export function MapScreen({ connection, sites, site }: { connection: Connection;
             {hasShared ? filterButton(SHARED, SHARED_GROUP, undefined) : null}
         </div>
     );
+    // The search and the site buttons sit in the header's bar, above its hairline, as tabs do on other screens.
+    const header = (tools?: ReactNode) => (
+        <PageHeader
+            title="Map"
+            meta={
+                map === undefined
+                    ? []
+                    : [
+                          {
+                              label: 'Pages',
+                              value: String(pages),
+                          },
+                          {
+                              label: 'Links',
+                              value: String(links),
+                          },
+                      ]
+            }
+            tabs={tools}
+        />
+    );
     return (
         <div className="k-map">
-            <PageHeader
-                title="Map"
-                meta={
-                    map === undefined
-                        ? []
-                        : [
-                              {
-                                  label: 'Pages',
-                                  value: String(pages),
-                              },
-                              {
-                                  label: 'Links',
-                                  value: String(links),
-                              },
-                          ]
-                }
-            />
             {map === undefined ? (
-                <div className="k-admin__body">
-                    <Loading problem={problem} />
-                </div>
+                <>
+                    {header()}
+                    <div className="k-admin__body">
+                        <Loading problem={problem} />
+                    </div>
+                </>
             ) : (
                 <ReactFlowProvider>
-                    <MapCanvas map={map} sites={sites} shown={shown} filters={filters} />
+                    <MapCanvas map={map} sites={sites} shown={shown} filters={filters} header={header} />
                 </ReactFlowProvider>
             )}
         </div>
