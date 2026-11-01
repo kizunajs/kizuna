@@ -1,4 +1,4 @@
-import { humanize, resolveRef, typeOf, type JsonSchema } from './schema.js';
+import { humanize, optionLabelsOf, resolveRef, typeOf, type JsonSchema } from './schema.js';
 
 /**
  * What one item of a list is called, from the list's label: "Links" adds a
@@ -67,7 +67,7 @@ export const tagPropertyOf = (item: JsonSchema, root: JsonSchema): string | unde
 
 /**
  * An item's title and tag as its folded row shows them: the first text it
- * holds, and the first choice.
+ * holds, and the first choice, by its label.
  */
 export const rowLabelsOf = (item: JsonSchema, root: JsonSchema, value: unknown): { title: string | undefined; tag: string | undefined } => {
     const record = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
@@ -79,9 +79,15 @@ export const rowLabelsOf = (item: JsonSchema, root: JsonSchema, value: unknown):
         .find((value): value is string => typeof value === 'string' && value.trim() !== '');
     const tagProperty = tagPropertyOf(item, root);
     const tag = tagProperty === undefined ? undefined : record[tagProperty];
+    if (typeof tag !== 'string' || tag === '') {
+        return {
+            title,
+            tag: undefined,
+        };
+    }
     return {
         title,
-        tag: typeof tag === 'string' && tag !== '' ? humanize(tag) : undefined,
+        tag: optionLabelsOf(resolveRef(item.properties![tagProperty!]!, root))?.[tag] ?? humanize(tag),
     };
 };
 

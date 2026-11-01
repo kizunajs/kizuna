@@ -78,6 +78,7 @@ export { resolvedSchema, ResolvedImageSchema } from './content-schema.js';
 export {
     dataFields,
     fieldDescription,
+    labelOptions,
     isLayoutItem,
     undeclaredFieldRoles,
     type Collapsible,

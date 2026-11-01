@@ -528,6 +528,31 @@ export const objectOf = <Fields extends FieldList>(
     return schema as unknown as z.ZodObject<ShapeOf<Fields>, z.core.$strip>;
 };
 
+/**
+ * Labels an enum's values in the editor wherever the enum sits, like inside
+ * a list's items, where no field's `options` reaches. The stored value stays
+ * what code compares against.
+ *
+ * @example
+ * schema: z.array(
+ *     z.object({
+ *         category: labelOptions(z.enum(['news', 'guide']), {
+ *             news: 'News',
+ *             guide: 'Guide',
+ *         }),
+ *         title: z.string(),
+ *     })
+ * ),
+ */
+export const labelOptions = <Schema extends z.ZodEnum>(
+    schema: Schema,
+    labels: { readonly [Value in z.output<Schema> & string]?: string }
+): Schema =>
+    schema.meta({
+        ...schema.meta(),
+        'x-kizuna-options': labels,
+    });
+
 const agentFacingSchemas = new WeakSet<z.core.$ZodType>();
 
 /**

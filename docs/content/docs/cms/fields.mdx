@@ -160,6 +160,27 @@ A page keeps its design because its fields refuse what would break it. Designers
 | A hero cropped to 16:9                     | `croppedImage({ aspectRatio: '16:9' })`                       | A crop frame that keeps 16:9             |
 | A field only the client's admin may change | `auth: { roles: 'admin' }`                                    | The field, greyed out                    |
 
+An enum inside a list's items takes no field `options`, so `labelOptions` labels its values on the schema itself:
+
+```ts
+import { labelOptions } from '@kizunajs/cms/schemas';
+
+{
+    name: 'contacts',
+    schema: z.array(
+        z.object({
+            role: labelOptions(z.enum(['sales', 'support']), {
+                sales: 'Sales',
+                support: 'Customer support',
+            }),
+            name: z.string(),
+        })
+    ),
+},
+```
+
+The select in each item and the tag on its folded row show the label, and the stored value stays `support`.
+
 A character limit keeps a heading short, and letters differ in width, so check the design with the longest heading the limit allows. `.describe()` is what the editor and the agent read under the input, so give the reason: `'Under 8 words. No full stop.'`
 
 ## Crop to a shape

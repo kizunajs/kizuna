@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
+import { VoiceRuleSchema } from '../voice.js';
 import { itemNounOf, movedIndex, remapOpen, rowLabelsOf, singularOf } from './array-rows.js';
-import type { JsonSchema } from './schema.js';
+import { resolveRef, type JsonSchema } from './schema.js';
 
 const contact: JsonSchema = {
     type: 'object',
@@ -98,6 +100,23 @@ describe('a list item row', () => {
         ).toEqual({
             title: 'billig, billige, billigste',
             tag: 'Avoid',
+        });
+    });
+
+    it("tags an item by its choice's label", () => {
+        const root = z.toJSONSchema(z.array(VoiceRuleSchema), {
+            io: 'input',
+            unrepresentable: 'any',
+        }) as JsonSchema;
+        const item = resolveRef(root.items!, root);
+        expect(
+            rowLabelsOf(item, root, {
+                kind: 'dont',
+                text: 'Promise delivery dates.',
+            })
+        ).toEqual({
+            title: 'Promise delivery dates.',
+            tag: "Don't",
         });
     });
 

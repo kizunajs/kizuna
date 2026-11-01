@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
 import type { CmsService, DraftState } from './cms.js';
 import { defineGlobal, type Global } from './definitions.js';
-import { dataFields, type FieldAuth } from './field.js';
+import { dataFields, labelOptions, type FieldAuth } from './field.js';
 import {
     glossaryIssues,
     holdsIn,
@@ -61,7 +61,10 @@ export const GlossaryTermSchema = Kizuna.model({
 export const VoiceRuleSchema = Kizuna.model({
     title: 'CMS.VoiceRule',
     schema: z.object({
-        kind: z.enum(['do', 'dont']),
+        kind: labelOptions(z.enum(['do', 'dont']), {
+            do: 'Do',
+            dont: "Don't",
+        }),
         text: z.string().min(1).max(300),
         language: z.string().max(20).optional().describe('The language the rule holds in. Every language when left out.'),
     }),

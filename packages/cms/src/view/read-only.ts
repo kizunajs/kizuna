@@ -1,4 +1,4 @@
-import { isRichText, resolveRef, typeOf, type JsonSchema } from './schema.js';
+import { isRichText, optionLabelsOf, resolveRef, typeOf, type JsonSchema } from './schema.js';
 
 const SCALARS = ['string', 'number', 'integer', 'boolean'];
 
@@ -42,7 +42,8 @@ export const readOnlyTextOf = (
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
     if (typeof value === 'number') return value.toLocaleString(locale);
     const text = String(value);
-    if (labels?.[text] !== undefined) return labels[text];
+    const label = (labels ?? optionLabelsOf(resolved))?.[text];
+    if (label !== undefined) return label;
     const date = new Date(text);
     if (resolved.format === 'date-time' && !Number.isNaN(date.getTime())) {
         return date.toLocaleString(locale, {

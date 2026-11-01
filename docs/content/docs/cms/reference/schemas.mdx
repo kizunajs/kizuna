@@ -16,4 +16,6 @@ From `@kizunajs/cms/schemas`:
 | `link()`                                  | A page or an item by `ref`, or a URL, and a label     | `{ href, label }`, `href` `null` while the target is not published       |
 | `SiteSchema`                              | A site's built-in shape, to `extend`                  |                                                                          |
 
+`labelOptions(z.enum([...]), labels)` labels an enum's values in the editor where no field's `options` reaches, like inside a list's items. See [Fields](/docs/cms/fields#limits-that-keep-the-design).
+
 `Output<T>` is a block's or field's type with images and links resolved. `richTextFromPlain(text)` turns a string into rich text, for a `migrate` step.

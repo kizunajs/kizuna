@@ -23,5 +23,6 @@ export {
     type RichTextWithBlocksSchema,
 } from './rich-text.js';
 export { link, type LinkRef, type ResolvedLink } from './links.js';
+export { labelOptions } from './field.js';
 export { SeoSchema, SEO_GOALS, type SeoValue } from './seo.js';
 export { SiteSchema, type SiteValues } from './site.js';

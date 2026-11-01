@@ -51,6 +51,7 @@ import {
     isLink,
     isRichText,
     itemBlockName,
+    optionLabelsOf,
     resolveRef,
     typeOf,
     type DescribedBlock,
@@ -203,7 +204,7 @@ function StringControl(props: ControlProps) {
         return (
             <SelectControl
                 options={schema.enum.map(String)}
-                labels={labels}
+                labels={labels ?? optionLabelsOf(schema)}
                 value={text}
                 onChange={onChange}
                 disabled={disabled}

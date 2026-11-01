@@ -359,6 +359,14 @@ export interface DraftSchedule {
  */
 export const SAFE_HREF = /^(?:https?:\/\/|mailto:|tel:|\/(?!\/)|#)/i;
 
+/**
+ * The labels an enum gives its values with `labelOptions`.
+ */
+export const optionLabelsOf = (schema: JsonSchema): Record<string, string> | undefined => {
+    const labels = schema['x-kizuna-options'];
+    return typeof labels === 'object' && labels !== null ? (labels as Record<string, string>) : undefined;
+};
+
 export const isRichText = (schema: JsonSchema): boolean => schema['x-kizuna'] === 'rich-text';
 
 /**
