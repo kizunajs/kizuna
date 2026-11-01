@@ -224,7 +224,7 @@ A choice shows the label of its option, like Plant care, and an id shows the tit
 
 A long list comes in pages, 25 rows to a page until you pick another number.
 
-Tick rows and their actions take the header's place: **Publish**, **Unpublish** and, for items, **Delete**, each asking first, as a single publish does. **Select all** ticks every row the search and filters keep, across pages. An item that refuses stays ticked, with the reason under the header.
+Tick rows and their actions take the header's place: **Publish**, **Unpublish** and, for items, **Delete**, which moves them to the [trash](#trash), each asking first, as a single publish does. **Select all** ticks every row the search and filters keep, across pages. An item that refuses stays ticked, with the reason under the header.
 
 A collection with [`orderable`](/docs/cms/collections#items-in-an-order) lists its items in their order, with a grip at the start of each row. Drag a row by its grip and the rows it passes slide aside to show where it lands. Dropping it saves the move to its draft. The grips stay while you search or filter, and a drop lands the row between the two it sits between. Sorting by a column hides them until you pick **Order** again.
 
@@ -266,11 +266,35 @@ The library's alt text and focal point are the image's own, and each use can set
 
 **Delete**, in the `…` menu, deletes an image nothing holds, after asking. While a page, global or item holds it, published or in a draft, nothing is deleted, and a dialog lists each place with a link to it. Give each of them another image, or remove it, and the image can go. **Unused** lists every image you can delete now. Deleting several ticked images deletes none of them while any one is held.
 
+An item in the [trash](#trash) does not count as a place, so an image only trashed items hold reads as unused. Deleting it takes it off the library and keeps its file: restoring an item that holds it brings it back, and it goes for good with the last item in the trash that holds it.
+
 Restoring a version that held a deleted image leaves that field empty.
+
+## Trash
+
+Deleting an item moves it to the trash, with every item under it in a [tree](/docs/cms/collections#trees), its translations and each site's values on it. It is gone from every list, search, read and tool, its address stops answering, and the sites that showed it refresh. It keeps its versions and references, and its id stays its own.
+
+**Trash** sits last in the sidebar: in each site for the site's own collections, and under Shared for the shared ones. It lists what was deleted, newest first, with who deleted it, when, and how many items went with it.
+
+- **Restore** brings an item back as it was, with what went with it. A published item comes back published, so a mistaken delete puts the page back where visitors left it, and a draft comes back as a draft. An item under a parent in the trash waits for the parent, and an item whose address another item has taken stays until one of them moves.
+- **Delete forever** deletes it now, with its history.
+- **Empty trash** deletes everything in it for good. The shared trash takes an admin over every site.
+
+Each takes the same permission as publishing the item, and Delete forever and Empty trash ask first. A daily job, `content.emptyTrash`, deletes for good what has been in the trash for 30 days.
+
+| Route                                         | Tool                               | Asks first |
+| --------------------------------------------- | ---------------------------------- | ---------- |
+| `DELETE /editing/collections/:name/items/:id` | `editing_collections_delete_item`  | Yes        |
+| `GET /editing/trash`                          | `editing_collections_list_trash`   | No         |
+| `POST /editing/trash/:name/:id/restore`       | `editing_collections_restore_item` | Yes        |
+| `DELETE /editing/trash/:name/:id`             | `editing_collections_erase_item`   | Yes        |
+| `DELETE /editing/trash`                       | `editing_collections_empty_trash`  | Yes        |
+
+A site's own collections have the same under `/editing/sites/:site`, as `editing_sites_collections_`. Reading an item in the trash answers `404` with `trashed`, when it went there and who deleted it, and a write to it answers `404` too.
 
 ## Editing
 
-A document opens with its title large and its actions on the right: **Save draft**, **Publish**, and a `…` menu. Someone asked to review it also gets **Review**, which puts what is live beside the draft, field by field, with the request's note and each reviewer's answer, as in [Reviews](/docs/cms/editing/reviews). Under the title a line says where it stands, and when it last changed and who saved it. The menu holds **Ask for review**, which sends it to someone to look at first as in [Reviews](/docs/cms/editing/reviews), **Cancel schedule** while it is [scheduled](/docs/cms/editing/scheduling), **Add to release** while its draft has changes, as in [Releases](/docs/cms/editing/releases), **Unpublish** once it is live, whose message offers **Undo** to publish it again when the draft held no changes, and for an item **Duplicate**, the collection's own [actions](/docs/cms/collections#actions) and **Delete**.
+A document opens with its title large and its actions on the right: **Save draft**, **Publish**, and a `…` menu. Someone asked to review it also gets **Review**, which puts what is live beside the draft, field by field, with the request's note and each reviewer's answer, as in [Reviews](/docs/cms/editing/reviews). Under the title a line says where it stands, and when it last changed and who saved it. The menu holds **Ask for review**, which sends it to someone to look at first as in [Reviews](/docs/cms/editing/reviews), **Cancel schedule** while it is [scheduled](/docs/cms/editing/scheduling), **Add to release** while its draft has changes, as in [Releases](/docs/cms/editing/releases), **Unpublish** once it is live, whose message offers **Undo** to publish it again when the draft held no changes, and for an item **Duplicate**, the collection's own [actions](/docs/cms/collections#actions) and **Delete**, which moves it to the [trash](#trash) and offers **Undo**.
 
 One person edits a document at a time. While someone else does, the fields are read only and the status reads "Kari is editing" beside their face, until they leave it or stop for two minutes. See [Drafts and versions](/docs/cms/editing/drafts#one-editor-at-a-time).
 
@@ -278,7 +302,7 @@ The draft saves a moment after you stop typing, and the header says when it last
 
 When a save does not reach the CMS, **Save draft** reads **Not saved**, with why beside it, and **Offline** shows while the browser has no connection. Your changes stay on the screen. **Retry now** sends them again, and the draft saves on its own once you are back online. Publish waits until it has.
 
-A document your role may not change says so, with the way back to its list, and an address that names no document, like a deleted article, offers its list and the search.
+A document your role may not change says so, with the way back to its list. An item in the trash reads **In trash**, with who deleted it and when, **Restore** and the way to the trash. An address that names no document, like an article deleted for good, offers its list and the search.
 
 Under the title, **Edit** shows the fields and **Versions** counts the saved versions. At the other end of that row, **Live Preview** puts the site beside the fields and **Info** lists the document's owner, where you can pick another, its page, and when it was created, last updated and last published.
 

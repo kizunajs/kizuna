@@ -17,6 +17,7 @@ import { stripPaths } from './source-path.js';
 import type { CmsExports } from './setup.js';
 import type { DocumentRef } from './refs.js';
 import { heldJobs } from './held-jobs.fixture.js';
+import { restoreItem } from './trash.js';
 
 const k = new Kizuna();
 const editor = k.identity
@@ -359,6 +360,36 @@ describe('a perSite field', () => {
                 author: 'ada',
             })
         ).rejects.toThrow('Save the shared item first');
+    });
+
+    it("takes each site's values to the trash with the shared item, and brings them back with it", async () => {
+        const id = await office();
+        await publish(
+            {
+                type: 'item',
+                collection: 'offices',
+                id,
+                site: 'uk',
+            },
+            {
+                phone: '+44 20 7000 1111',
+            }
+        );
+        await service.deleteItem('offices', id, 'default', 'ada');
+        expect((await request(app).get(`/content/sites/uk/collections/offices/${id}`)).status).toBe(404);
+        expect((await pglite.query('select site from cms_documents where trashed_at is null')).rows).toEqual([]);
+        expect(
+            await service.trashed({
+                type: 'item',
+                collection: 'offices',
+                id,
+                site: 'uk',
+            })
+        ).toMatchObject({
+            by: 'ada',
+        });
+        await restoreItem(service, 'offices', id, 'default');
+        expect((await request(app).get(`/content/sites/uk/collections/offices/${id}`)).body.phone).toBe('+44 20 7000 1111');
     });
 });
 

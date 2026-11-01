@@ -1,3 +1,5 @@
+import { TRASH_DAYS } from '../trash-window.js';
+
 /**
  * What Delete asks first when the items going have items under them, which go
  * with them: the titles of the ticked items, and of what sits under them.
@@ -11,8 +13,8 @@ export const branchQuestionOf = (going: readonly string[], under: readonly strin
             ? `${new Intl.ListFormat('en').format(under)} go${under.length === 1 ? 'es' : ''} with ${going.length === 1 ? 'it' : 'them'}. `
             : '';
     return going.length === 1
-        ? `Delete ${going[0]} and the ${items(under.length)} under it, with their history? ${named}Pages that show them stop showing them.`
-        : `Delete ${items(going.length)} and the ${items(under.length)} under them, with their history? ${named}Pages that show them stop showing them.`;
+        ? `Delete ${going[0]} and the ${items(under.length)} under it? ${named}They go to the trash for ${TRASH_DAYS} days, and pages that show them stop showing them.`
+        : `Delete ${items(going.length)} and the ${items(under.length)} under them? ${named}They go to the trash for ${TRASH_DAYS} days, and pages that show them stop showing them.`;
 };
 
 /**

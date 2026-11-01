@@ -2439,25 +2439,35 @@ export class CmsService {
     }
 
     /**
-     * Deletes an item, and in a tree everything under it.
+     * Moves an item to the trash, and in a tree everything under it, as
+     * `by`.
      */
-    async deleteItem(name: string, id: string, site = DEFAULT_SITE): Promise<void> {
-        const listing = this.listing(name, site);
-        const under =
-            listing.definition.tree === undefined
-                ? []
-                : [...descendantsOf(await loadParents(this, listing, 'latest'), id)].filter((each) => each !== id);
-        for (const each of [id, ...under]) {
-            const ref = listing.refOf(each);
-            const target = this.target(ref);
-            const sites = await this.sitesShowing(ref, ['published']);
-            if (!(await this.store.delete('item', target.key, target.site))) {
-                if (each !== id) continue;
-                throw new CmsHttpError(404, { detail: `There is no item '${id}' in '${listing.name}'.` });
+    async deleteItem(name: string, id: string, site = DEFAULT_SITE, by = MIGRATION_AUTHOR): Promise<void> {
+        await trashItem(this, name, id, site, by);
+    }
+
+    /**
+     * When a document went to the trash and who put it there, or
+     * `undefined` when it is live or gone. A translation or a site's values
+     * are in the trash with the item they belong to.
+     */
+    async trashed(ref: DocumentRef): Promise<{ at: Date; by: string } | undefined> {
+        const target = this.target(ref);
+        for (const each of [
+            target,
+            target.shared === undefined ? undefined : this.target(target.shared),
+            target.source === undefined ? undefined : this.target(target.source),
+        ]) {
+            if (each === undefined) continue;
+            const row = await this.store.trashed(each.kind, each.key, each.site, each.locale);
+            if (row !== undefined) {
+                return {
+                    at: row.trashedAt!,
+                    by: row.trashedBy ?? '',
+                };
             }
-            await this.revalidateDocument(ref, sites);
-            await queueRefreshes(this, ref, sites);
         }
+        return undefined;
     }
 
     /**

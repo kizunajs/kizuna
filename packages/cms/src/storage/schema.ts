@@ -43,8 +43,26 @@ export const cmsDocuments = pgTable(
             withTimezone: true,
             mode: 'date',
         }),
+        /**
+         * When the document went to the trash, or `null` while it is live.
+         * A trashed document keeps its key, so nothing else takes it.
+         */
+        trashedAt: timestamp('trashed_at', {
+            withTimezone: true,
+            mode: 'date',
+        }),
+        trashedBy: text('trashed_by'),
+        /**
+         * The id of the document whose delete took this one to the trash:
+         * its own for the one deleted, and that one's for the items under it
+         * in a tree, its translations and each site's values on it.
+         */
+        trashedWith: text('trashed_with'),
     },
-    (table) => [unique('cms_documents_identity').on(table.kind, table.site, table.locale, table.key)]
+    (table) => [
+        unique('cms_documents_identity').on(table.kind, table.site, table.locale, table.key),
+        index('cms_documents_trash').on(table.trashedWith),
+    ]
 );
 
 /**

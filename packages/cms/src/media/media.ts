@@ -416,15 +416,35 @@ export class MediaService {
     }
 
     /**
-     * Removes the media document and its stored file. Answers false when
-     * there was no such item.
+     * Removes the media document and its stored file. An image a document in
+     * the trash still holds goes to the trash instead, with its file, so
+     * restoring that document brings it back, and it is erased once no
+     * document holds it. Answers false when there was no such item.
      */
-    async delete(id: string): Promise<boolean> {
+    async delete(id: string, by: string): Promise<boolean> {
         const current = await this.get(id);
         if (current === undefined) return false;
+        if (await this.options.store.heldInTrash(IMAGE_BRAND, id)) {
+            await this.options.store.trashMedia(id, by);
+            return true;
+        }
         await this.options.store.delete('media', id, current.site);
         await this.options.storage.delete(current.key);
         return true;
+    }
+
+    /**
+     * Erases the images in the trash that no document holds any longer,
+     * with their stored files. Answers how many went.
+     */
+    async eraseUnheld(): Promise<number> {
+        const unheld = await this.options.store.unheldTrashedMedia(IMAGE_BRAND);
+        for (const row of unheld) {
+            await this.options.store.delete('media', row.key, row.site);
+            const record = row.published as unknown as MediaRecord | null;
+            if (record !== null) await this.options.storage.delete(record.key);
+        }
+        return unheld.length;
     }
 
     /**

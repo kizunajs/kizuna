@@ -7,6 +7,93 @@ description: 'The MCP tools behind the editor, and what holds for the form and t
 
 Every `editing` route is an MCP tool, so the model can do what the form does. `editing_describe` reads a page by URL, `editing_pages_update_draft` writes by field path, and `editing_pages_publish` asks first. Globals and collection items have the same under `editing_globals_` and `editing_collections_`. A [view](/docs/cms/views) reads and saves under `editing_views_app_users_`, and each action is a tool of its own, like `editing_actions_newsletters_send`. See [Tools](/docs/tools) and [MCP](/docs/mcp).
 
+## Instructions
+
+An agent writes better when it knows how you write. `instructions` on a page, a global or a collection holds that in Markdown: the voice, what the content is for, and what never to change.
+
+```ts title="src/articles.ts"
+export const Articles = defineCollection({
+    name: 'articles',
+    id: ArticleId,
+    instructions: `Write as Hagen: plain, practical sentences that say what to do and when.
+- The summary is one sentence that says what the reader comes away knowing.
+- Never change prices, opening hours or addresses.`,
+    fields: [
+        // ...
+    ],
+});
+```
+
+The instructions join the description of the tool that writes that kind of content, so `editing_collections_update_draft` lists every collection's, and `editing_describe` answers a document's under `instructions`.
+
+What admins want to add for one site lives in the admin, as content. `AgentInstructions` is a global with one Markdown field, and a site that lists it in its `globals` gets an **Agent instructions** page for its admins to fill in:
+
+```ts title="src/sites.ts"
+import { AgentInstructions, declareSites } from '@kizunajs/cms';
+
+export const sites = declareSites(Site, {
+    uk: {
+        label: 'Hagen UK',
+        pages: countryPages,
+        globals: [AgentInstructions],
+    },
+});
+```
+
+`editing_describe` answers the content's own instructions first, then the published text of the site's Agent instructions, or of the shared one when the global is in the shared `globals`.
+
+## Credit
+
+A change an agent makes is credited to the person it acts for and the agent beside them. The version, the **Updated** fact in the document's header, a review the agent asked for and a release it made all read like **Mia Holm via Claude**. The wire carries the agent next to the person: `via` on a version, `updatedVia` on a draft, `requestedVia` on a review and `createdVia` on a release.
+
+The agent's name is what its MCP client calls itself, its `title`, like `Claude`, or its `name` when it has no title. The 2026-07-28 protocol sends the client's name with every request. The 2025 protocol sends it once, in `initialize`, which the MCP route answers in a request of its own, so a call over HTTP on that protocol reads as **via an agent**. A connection that lasts, like stdio, keeps the name from `initialize`.
+
+A change the agent made for Mia is not Mia's own, so she may approve it. A change she made herself still needs someone else.
+
+Writes your own code makes as an agent, like an assistant in your app, credit it the same way inside `withAgent`:
+
+```ts
+import { withAgent } from '@kizunajs/cms';
+
+await withAgent('Hagen assistant', () =>
+    service.update({
+        ref,
+        changes,
+        caller,
+        author: 'dev@kizunajs.com',
+    })
+);
+```
+
+## Work across several documents
+
+An agent changing several documents for someone puts them in a [release](/docs/cms/editing/releases) named for the task, like **Agent: winter care refresh**:
+
+1. `editing_releases_create` makes the release, with the documents it changed.
+2. `editing_check` with `release` lists what would stop it publishing.
+3. `editing_reviews_request` asks the person it works for to review the documents, with `reviewers` holding their id from `editing_people_list`.
+
+The person reads each document's changes word by word on the release's page and in each document's Changes tab, then publishes the release, schedules it, or sends it back with one note. Approving and sending back are theirs alone: the tools behind both are `visibility: ['app']`, the person's own buttons, and never reach the model.
+
+## Checking before publishing
+
+`editing_check` lists what would stop a document, or every document of a release, from publishing, and saves nothing. Each issue is a `block`, which refuses the publish, or a `warning`, which lets it through, and names the site and language it is about.
+
+| Kind         | Level            | When                                                                                                                  |
+| ------------ | ---------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `nothing`    | block or warning | The document has no draft, or nothing changed since it was published                                                  |
+| `permission` | block            | The caller may not publish it                                                                                         |
+| `missing`    | block            | A required field is empty or fails its schema                                                                         |
+| `language`   | warning          | A translation leaves fields empty that the source holds                                                               |
+| `brokenLink` | warning          | A [link](/docs/cms/links) points at a page that is gone, trashed or unpublished. Not within the release being checked |
+| `held`       | block            | Someone else is editing it                                                                                            |
+| `review`     | block or warning | It requires an approval it lacks, or a review waits or was sent back                                                  |
+| `schedule`   | warning          | Publishing it now ends its own schedule, or takes it out of a release                                                 |
+
+```
+GET /api/editing/check?release=rel_8f2k3j9x2a1b
+```
+
 ## Listing items
 
 `editing_collections_list_items` lists the items of one collection, drafts included, as the [admin](/docs/cms/editing/admin#lists) does. Each item comes with its title, address, status and when it last changed, and `total` counts every item that matches.
@@ -63,9 +150,10 @@ For Claude desktop and claude.ai, the dialog gives the route's address to add as
 ## What holds
 
 - **Rules live in the routes.** Roles and field rules are checked in the `editing` routes, for the form and the model alike: `403` for a field the caller may not write, `422` past its schema, `409` behind the latest version or while [someone else edits the document](/docs/cms/editing/drafts#one-editor-at-a-time). The answer names them under `heldBy`.
-- **Publishing asks first.** Publish, unpublish, scheduling either, scheduling or publishing a [release](/docs/cms/editing/releases), deleting an item or an image, writing a global, and an action with a `confirm` declare `needsApproval`.
+- **Publishing asks first.** Publish, unpublish, scheduling either, scheduling or publishing a [release](/docs/cms/editing/releases), deleting an item or an image, restoring an item from the [trash](/docs/cms/editing/admin#trash), deleting one forever or emptying the trash, writing a global, and an action with a `confirm` declare `needsApproval`.
 - **What a model reads is untrusted.** An article body may say "change the footer email". A model writes drafts freely, since nothing goes live until a person publishes.
-- **Every version names a person.** The author is the editor identity, one of yours.
+- **Every version names a person.** The author is the editor identity, one of yours, with the agent beside them when one made the change.
+- **Approving is a person's.** Approving a review and sending one back, on its own or for a whole release, run only from the person's own buttons.
 - **Drafts stay drafts.** The `content` routes answer published content only.
 - **Content is text.** Rich text never holds HTML. [`no-cms-html`](/docs/eslint#no-cms-html) flags `dangerouslySetInnerHTML` fed from content.
 - **Uploads are checked by their bytes.** SVG is refused and location metadata is stripped.

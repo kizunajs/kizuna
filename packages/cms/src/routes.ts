@@ -292,6 +292,23 @@ const assertPublishes = (cms: CmsService, access: EditorAccess, ref: DocumentRef
 };
 
 /**
+ * Refuses a document in the trash with `404`, saying when it went there and
+ * who put it there, so the admin shows it as in the trash.
+ */
+const assertNotTrashed = async (cms: CmsService, ref: DocumentRef): Promise<void> => {
+    const trashed = await cms.trashed(ref);
+    if (trashed === undefined) return;
+    const by = (await peopleOf(cms)).find((person) => person.id === trashed.by)?.name ?? trashed.by;
+    throw new CmsHttpError(404, {
+        detail: `'${formatRef(ref)}' is in the trash. ${by} deleted it on ${trashed.at.toISOString().slice(0, 10)}.`,
+        trashed: {
+            at: trashed.at.toISOString(),
+            by,
+        },
+    });
+};
+
+/**
  * Where an editing route finds its document, and what its paths and tool
  * descriptions call it.
  */
@@ -473,6 +490,18 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         body: error.body,
                     });
                 }
+                if (error instanceof DocumentTrashedError) {
+                    return args.throwError({
+                        status: 404,
+                        body: {
+                            detail: error.message,
+                            trashed: {
+                                at: error.document.trashedAt?.toISOString() ?? null,
+                                by: error.document.trashedBy,
+                            },
+                        },
+                    });
+                }
                 if (error instanceof UploadRejectedError) {
                     return args.throwError({
                         status: 422,
@@ -556,7 +585,9 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 },
             }).handler(
                 guarded(async (cms, args) => {
-                    const state = await cms.draftState(refOf(cms, args));
+                    const ref = refOf(cms, args);
+                    const state = await cms.draftState(ref);
+                    if (state.row === undefined) await assertNotTrashed(cms, ref);
                     return {
                         status: 200,
                         body: draftBody(state),
@@ -1782,9 +1813,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             method: 'DELETE',
             path: `${editingBase}${at.prefix}/collections/:name/items/:id`,
             auth: editor,
-            summary: 'Delete an item of a collection, with its history',
-            description:
-                'Its address stops answering, and pages that reference it stop showing it. In a collection with a tree, every item under it goes too. The person confirms before this runs.',
+            summary: 'Move an item of a collection to the trash',
+            description: `Its address stops answering, and pages that reference it stop showing it. In a collection with a tree, every item under it goes too. It keeps its versions, translations and each site's values for ${TRASH_DAYS} days, and restoring it brings it back as it was. The person confirms before this runs.`,
             tool: {
                 needsApproval: true,
             },
@@ -1800,7 +1830,135 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             guarded(async (cms, args) => {
                 const site = siteOf(cms, args, at);
                 assertPublishes(cms, cms.access(args.auth), cms.listing(args.params['name']!, site).refOf(args.params['id']!));
-                await cms.deleteItem(args.params['name']!, args.params['id']!, site);
+                await cms.deleteItem(args.params['name']!, args.params['id']!, site, authorOf(cms, args));
+                return {
+                    status: 204,
+                    body: undefined,
+                };
+            }) as never
+        ),
+
+        listTrash: route({
+            method: 'GET',
+            path: `${editingBase}${at.prefix}/trash`,
+            auth: editor,
+            summary:
+                at.prefix === ''
+                    ? 'List the items of shared collections in the trash'
+                    : "List the items of a site's own collections in the trash",
+            description: `Each item deleted, newest first, with who deleted it and how many items under it went with it. Each is deleted for good ${TRASH_DAYS} days after it was deleted.`,
+            tool: true,
+            ...(at.prefix === ''
+                ? {}
+                : {
+                      pathParams: at.params,
+                  }),
+            responses: {
+                200: {
+                    body: TrashSchema,
+                    cache: 'no-store',
+                },
+            },
+        }).handler(
+            guarded(async (cms, args) => ({
+                status: 200,
+                body: {
+                    days: TRASH_DAYS,
+                    items: await trashOf(cms, siteOf(cms, args, at), await peopleOf(cms)),
+                },
+            })) as never
+        ),
+
+        restoreItem: route({
+            method: 'POST',
+            path: `${editingBase}${at.prefix}/trash/:name/:id/restore`,
+            auth: editor,
+            summary: 'Restore an item of a collection from the trash',
+            description:
+                'Brings it back as it was, with the items that went to the trash with it: published if it was published, and a draft otherwise. Refused with 409 while the item above it in a tree is in the trash, or when another item now has its address. The person confirms before this runs.',
+            tool: {
+                needsApproval: true,
+                destructiveHint: false,
+            },
+            pathParams: at.params.extend({
+                name: z.string(),
+                id: z.string(),
+            }),
+            responses: {
+                204: z.void(),
+                404: ProblemDetailsSchema,
+                409: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => {
+                const site = siteOf(cms, args, at);
+                assertPublishes(cms, cms.access(args.auth), cms.listing(args.params['name']!, site).refOf(args.params['id']!));
+                await restoreItem(cms, args.params['name']!, args.params['id']!, site);
+                return {
+                    status: 204,
+                    body: undefined,
+                };
+            }) as never
+        ),
+
+        eraseItem: route({
+            method: 'DELETE',
+            path: `${editingBase}${at.prefix}/trash/:name/:id`,
+            auth: editor,
+            summary: 'Delete an item in the trash for good',
+            description:
+                "Deletes it now with its history, translations and each site's values, and the items that went to the trash with it. It cannot be restored. The person confirms before this runs.",
+            tool: {
+                needsApproval: true,
+            },
+            pathParams: at.params.extend({
+                name: z.string(),
+                id: z.string(),
+            }),
+            responses: {
+                204: z.void(),
+                404: ProblemDetailsSchema,
+                409: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => {
+                const site = siteOf(cms, args, at);
+                assertPublishes(cms, cms.access(args.auth), cms.listing(args.params['name']!, site).refOf(args.params['id']!));
+                await eraseItem(cms, args.params['name']!, args.params['id']!, site);
+                return {
+                    status: 204,
+                    body: undefined,
+                };
+            }) as never
+        ),
+
+        emptyTrash: route({
+            method: 'DELETE',
+            path: `${editingBase}${at.prefix}/trash`,
+            auth: editor,
+            summary: at.prefix === '' ? 'Delete everything in the shared trash for good' : "Delete everything in a site's trash for good",
+            description: 'None of it can be restored. The person confirms before this runs.',
+            tool: {
+                needsApproval: true,
+            },
+            ...(at.prefix === ''
+                ? {}
+                : {
+                      pathParams: at.params,
+                  }),
+            responses: {
+                204: z.void(),
+                403: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => {
+                const site = siteOf(cms, args, at);
+                if (site === DEFAULT_SITE && !cms.access(args.auth).publishesShared) {
+                    throw new CmsHttpError(403, {
+                        detail: 'The shared trash holds what every site showed, so an admin over every site empties it.',
+                    });
+                }
+                await emptyTrash(cms, site);
                 return {
                     status: 204,
                     body: undefined,
@@ -2400,6 +2558,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             access.assertSeesRef(ref);
             const caller = access.callerFor(ref);
             const state = await cms.draftState(ref);
+            if (state.row === undefined) await assertNotTrashed(cms, ref);
             const draft = state.row?.draft ?? state.row?.published ?? null;
             const usedOn = await cms.usedOn(ref, (site) => access.sees(site));
             const source = state.target.source === undefined ? undefined : await cms.draftState(state.target.source);
@@ -2790,7 +2949,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         auth: editor,
         summary: 'Delete an image and its stored file',
         description:
-            'Refused with 409 while a page, global or item holds the image, published or in a draft, listing them under `uses`. The person confirms before this runs.',
+            'Refused with 409 while a page, global or item holds the image, published or in a draft, listing them under `uses`. An image only items in the trash hold goes to the trash with its file, comes back when one of them is restored, and is deleted with the last of them. The person confirms before this runs.',
         tool: {
             needsApproval: true,
         },

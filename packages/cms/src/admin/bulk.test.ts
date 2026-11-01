@@ -59,7 +59,9 @@ describe('the bulk bar', () => {
 
     it('asks first, counting the items', () => {
         expect(bulkQuestionOf('publish', 1)).toBe('Publish 1 item? Every visitor sees them at once.');
-        expect(bulkQuestionOf('delete', 3)).toBe('Delete 3 items, with their history? Pages that show them stop showing them.');
+        expect(bulkQuestionOf('delete', 3)).toBe(
+            'Delete 3 items? They go to the trash for 30 days, and pages that show them stop showing them.'
+        );
     });
 
     it('runs on every item, and reports each one the server refused', async () => {

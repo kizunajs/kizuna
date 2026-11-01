@@ -48,8 +48,11 @@ import {
 import { Loading, SaveIndicator, problemOf } from './parts.js';
 import { documentNounOf, documentStateOf, roleSubjectOf, titleOfRef } from './access.js';
 import { OfflineBadge, SaveFailedNotice, retriesSave, useOnline, useRetry, type SaveProblem } from './save-failed.js';
-import { NoAccess, NotFound, shownAddress, type Way } from './states.js';
+import { InTrash, NoAccess, NotFound, shownAddress, type Way } from './states.js';
+import { restoreCallOf, trashedOf, type Trashed } from './trash.js';
 import { relativeTimeOf } from './time.js';
+import { CommentMarks, FieldThreads, SelectionComment, peopleWhoOpen, useComments } from './comments.js';
+import { openThreadsOn, threadsOf } from './comment-threads.js';
 import { AdminPreview, type AdminPreviewHandle } from './preview-pane.js';
 import { AskForReview } from './review-ask.js';
 import { ChangesScreen, SendBack, SentBackNotes, type ViewedChange } from './review-changes.js';
@@ -277,6 +280,7 @@ export function DocumentScreen({
     const [document, setDocument] = useState<Description | undefined>();
     const [loadProblem, setLoadProblem] = useState<string | undefined>();
     const [loadStatus, setLoadStatus] = useState<number | undefined>();
+    const [trashed, setTrashed] = useState<Trashed | undefined>();
     const [saveProblem, setSaveProblem] = useState<SaveProblem | undefined>();
     const [noticeOpen, setNoticeOpen] = useState(false);
     const online = useOnline();
@@ -290,6 +294,7 @@ export function DocumentScreen({
     const [previewOpened, setPreviewOpened] = useState(false);
     const [versions, setVersions] = useState<VersionSummary[] | undefined>();
     const [updatedBy, setUpdatedBy] = useState<string | null>(null);
+    const [updatedVia, setUpdatedVia] = useState<string | null>(null);
     const [askOpen, setAskOpen] = useState(false);
     // The version shown beside the draft under Versions, and the one about to be restored.
     const [compared, setCompared] = useState<number | undefined>();
@@ -318,6 +323,11 @@ export function DocumentScreen({
     const closeRestoreUndo = useRef<(() => void) | undefined>(undefined);
     useEffect(() => () => closeRestoreUndo.current?.(), []);
     const [pointed, setPointed] = useState<string | undefined>();
+    // The thread opened from its phrase, and the phrase a new thread is being written on.
+    const [openThread, setOpenThread] = useState<string | undefined>();
+    const [composing, setComposing] = useState<{ path: string; phrase: string } | undefined>();
+    const [fieldsElement, setFieldsElement] = useState<HTMLDivElement | null>(null);
+    const { comments, reload: reloadComments } = useComments(connection, document?.ref);
     const [updatedAt, setUpdatedAt] = useState<string | null>(null);
     const [heldBy, setHeldBy] = useState<string | null>(null);
     // The document this screen holds by saving it, freed when the screen leaves it.
@@ -356,10 +366,12 @@ export function DocumentScreen({
             if (answer.status !== 200) {
                 setLoadProblem(problemOf(answer, 'The CMS answered'));
                 setLoadStatus(answer.status);
+                setTrashed(trashedOf(answer.body));
                 return undefined;
             }
             setLoadProblem(undefined);
             setLoadStatus(undefined);
+            setTrashed(undefined);
             setDocument(answer.body);
             setHeldBy(answer.body.heldBy ?? null);
             if (options.remount !== false) setFormKey((key) => key + 1);
@@ -1151,6 +1163,52 @@ export function DocumentScreen({
                 : siteTabs?.current !== undefined
                   ? 'open'
                   : documentStateOf(document);
+    if (state === 'not-found' && trashed !== undefined) {
+        const item = parseRef(siteTabs?.sharedRef ?? documentRef);
+        const restore = async (): Promise<void> => {
+            if (item?.type !== 'item') return;
+            const call = restoreCallOf(formatRef(sourceRefOf(item)));
+            if (call === undefined) return;
+            const answer = await connection.call(call.name, call.input);
+            if (answer.status >= 300) {
+                toasts.add({
+                    description: problemOf(answer, 'It was not restored'),
+                });
+                return;
+            }
+            await describe(documentRef);
+        };
+        return (
+            <div className="k-document">
+                <PageHeader
+                    crumbs={crumbs}
+                    title="In trash"
+                    meta={[
+                        {
+                            label: 'Address',
+                            value: shownAddress(),
+                        },
+                    ]}
+                />
+                <InTrash
+                    by={trashed.by}
+                    at={trashed.at}
+                    onRestore={() => void restore()}
+                    trash={{
+                        label: 'Go to Trash',
+                        href: hrefOf({
+                            kind: 'trash',
+                            ...(item?.site === undefined || siteTabs !== undefined
+                                ? {}
+                                : {
+                                      site: item.site,
+                                  }),
+                        }),
+                    }}
+                />
+            </div>
+        );
+    }
     if (state === 'not-found') {
         const capitalised = `${noun.charAt(0).toUpperCase()}${noun.slice(1)}`;
         return (

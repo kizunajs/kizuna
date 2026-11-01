@@ -5649,6 +5649,71 @@
         text-align: left;
     }
 
+    /* Trash: one row per delete, split by hairlines like Scheduled, with no fill behind them. */
+    .k-trash__rows {
+        display: flex;
+        flex-direction: column;
+        box-shadow: inset 0 1px 0 var(--k-line);
+    }
+
+    .k-trash__row {
+        display: grid;
+        grid-template-columns: 18px minmax(0, 1.6fr) minmax(0, 1fr) 112px auto;
+        align-items: center;
+        gap: 16px;
+        min-height: 58px;
+        padding: 8px 0;
+        box-shadow: inset 0 -1px 0 var(--k-line);
+        font-size: 13.5px;
+        color: var(--k-ink);
+    }
+
+    .k-trash__icon {
+        color: var(--k-muted);
+    }
+
+    .k-trash__title {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .k-trash__detail {
+        font-size: 12.5px;
+        color: var(--k-muted);
+    }
+
+    .k-trash__by {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        color: var(--k-muted);
+    }
+
+    .k-trash__when {
+        color: var(--k-muted);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .k-trash__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+
+    @media (max-width: 720px) {
+        .k-trash__row {
+            grid-template-columns: minmax(0, 1fr) auto;
+        }
+
+        .k-trash__icon,
+        .k-trash__by,
+        .k-trash__when {
+            display: none;
+        }
+    }
+
     .k-release-dialog {
         width: min(560px, calc(100vw - 32px));
     }

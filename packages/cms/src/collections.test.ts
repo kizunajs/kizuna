@@ -378,7 +378,7 @@ describe('collections', () => {
         expect((await request(app).get('/content/globals/site')).status).toBe(404);
     });
 
-    it('deletes an item with its history', async () => {
+    it('moves an item to the trash', async () => {
         const id = await createEmployee('Ada', 'Engineering', 1);
         expect((await asEditor(request(app).delete(`/editing/collections/employees/items/${id}`))).status).toBe(204);
         expect((await request(app).get(`/content/collections/employees/${id}`)).status).toBe(404);

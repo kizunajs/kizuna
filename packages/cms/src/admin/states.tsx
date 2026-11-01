@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { FileQuestionMark, Lock } from 'lucide-react';
+import { FileQuestionMark, Lock, Trash2 } from 'lucide-react';
 import { ICON } from '../view/context.js';
 import { onApple } from './command-palette.js';
+import { relativeTimeOf } from './time.js';
 
 /**
  * Where a state screen sends the editor instead.
@@ -64,6 +65,23 @@ export function NotFound({ noun, back, onSearch }: { noun: string; back: Way; on
                     {onApple() ? '⌘K' : 'Ctrl K'}
                 </kbd>
             </button>
+        </StateScreen>
+    );
+}
+
+/**
+ * A document in the trash: who deleted it and when, with Restore and the
+ * way to the trash it is in.
+ */
+export function InTrash({ by, at, onRestore, trash }: { by: string; at: string; onRestore: () => void; trash: Way }) {
+    return (
+        <StateScreen icon={<Trash2 {...ICON} />} heading="In trash" text={`${by} deleted it ${relativeTimeOf(at)}.`}>
+            <button type="button" className="k-button k-button--primary" onClick={onRestore}>
+                Restore
+            </button>
+            <a className="k-button k-button--secondary" href={trash.href}>
+                {trash.label}
+            </a>
         </StateScreen>
     );
 }

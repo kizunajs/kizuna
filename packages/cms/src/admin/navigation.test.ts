@@ -496,6 +496,7 @@ describe('the admin navigation with several sites', () => {
             ['Offices', '/admin/collections/offices'],
             ['Privacy policy', '/admin/globals/privacyPolicy'],
             ['Media', '/admin/media'],
+            ['Trash', '/admin/trash'],
         ]);
     });
 
@@ -507,6 +508,8 @@ describe('the admin navigation with several sites', () => {
         expect(placeOf(screenOf('/admin/uk/collections/events/e1'), true)).toEqual(sitePlace('uk'));
         expect(placeOf(screenOf('/admin/group'), true)).toEqual(sitePlace('group'));
         expect(placeOf(screenOf('/admin/uk/media'), true)).toEqual(sitePlace('uk'));
+        expect(placeOf(screenOf('/admin/trash'), true)).toEqual(SHARED_PLACE);
+        expect(placeOf(screenOf('/admin/uk/trash'), true)).toEqual(sitePlace('uk'));
         expect(placeOf(screenOf('/admin'), true)).toEqual(ALL_PLACE);
         expect(placeOf(screenOf('/admin/pages'), true)).toEqual(ALL_PLACE);
         expect(placeOf(screenOf('/admin/collections/events'), true)).toEqual(ALL_PLACE);

@@ -69,6 +69,7 @@ describe('the admin search', () => {
             ['Pages', 'Content'],
             ['Scheduled', 'Content'],
             ['Media', 'Content'],
+            ['Trash', 'Content'],
             ['Site', 'Content'],
             ['Articles', 'Content'],
             ['Employees', 'Team'],

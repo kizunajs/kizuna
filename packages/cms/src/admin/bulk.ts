@@ -1,6 +1,7 @@
 import { parseRef } from '../refs.js';
 import { toolsFor, type ToolAnswer } from '../view/connection.js';
 import { outcomeOf, type AdminCall } from './actions.js';
+import { TRASH_DAYS } from '../trash-window.js';
 
 export type BulkAction = 'publish' | 'unpublish' | 'delete';
 
@@ -24,7 +25,7 @@ const WORDS: Record<BulkAction, BulkWords> = {
     delete: {
         label: 'Delete',
         done: 'Deleted',
-        question: (count) => `Delete ${count}, with their history? Pages that show them stop showing them.`,
+        question: (count) => `Delete ${count}? They go to the trash for ${TRASH_DAYS} days, and pages that show them stop showing them.`,
     },
 };
 

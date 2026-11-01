@@ -14,6 +14,7 @@ import { problemOf } from './parts.js';
 import { useOfferUndo } from './toasts.js';
 import { AddToReleaseDialog } from './schedule-ui.js';
 import { branchQuestionOf, itemsUnder } from './branch.js';
+import { deleteQuestionOf, restoreCallOf } from './trash.js';
 
 const ICONS = {
     ask: MessageCircle,
@@ -215,8 +216,23 @@ export function DocumentMore({
                 onProblem(problemOf(answer, 'It was not deleted'));
                 return;
             }
-            toasts.add({
-                description: `Deleted ${title}.`,
+            offerUndo(`Moved ${title} to the trash.`, () => {
+                const restore = restoreCallOf(document.ref);
+                if (restore === undefined) return;
+                void connection.call(restore.name, restore.input).then((restored) => {
+                    if (restored.status >= 300) {
+                        toasts.add({
+                            description: problemOf(restored, 'It was not restored'),
+                        });
+                        return;
+                    }
+                    navigate(
+                        hrefOf({
+                            kind: 'document',
+                            ref: document.ref,
+                        })
+                    );
+                });
             });
             navigate(
                 hrefOf({

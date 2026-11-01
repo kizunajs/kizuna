@@ -507,12 +507,12 @@ describe('reading a content link', () => {
         expect(changes.body.brokenLinks).toHaveLength(2);
     });
 
-    it('reads as plain text once its item is deleted', async () => {
+    it('reads as plain text once its item is in the trash, and says so', async () => {
         const id = await shop('oslo');
         await linkFromNorway(`item:shops:${id}`);
         await service.deleteItem('shops', id);
         expect((await readNorway()).body).toBeUndefined();
-        expect((await service.brokenLinksOf(page('norway', 'frontPage'))).map((broken) => broken.reason)).toEqual(['missing', 'missing']);
+        expect((await service.brokenLinksOf(page('norway', 'frontPage'))).map((broken) => broken.reason)).toEqual(['trashed', 'trashed']);
     });
 
     it('shows a draft target in draft mode', async () => {

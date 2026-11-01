@@ -732,6 +732,12 @@ export const navigationOf = (options: {
                         kind: 'media',
                     },
                 },
+                {
+                    label: 'Trash',
+                    screen: {
+                        kind: 'trash',
+                    },
+                },
             ],
         ],
     ]);
@@ -810,6 +816,17 @@ const siteNavigationOf = (options: Parameters<typeof navigationOf>[0], declared:
         label: 'Media',
         screen: {
             kind: 'media',
+            ...(site === undefined
+                ? {}
+                : {
+                      site,
+                  }),
+        },
+    });
+    const trash = (site: string | undefined): NavigationEntry => ({
+        label: 'Trash',
+        screen: {
+            kind: 'trash',
             ...(site === undefined
                 ? {}
                 : {
@@ -924,6 +941,7 @@ const siteNavigationOf = (options: Parameters<typeof navigationOf>[0], declared:
                     },
                 },
                 media(shown.key),
+                trash(shown.key),
             ],
         },
     ];
@@ -982,7 +1000,7 @@ const showsShared = (screen: Screen): boolean => {
  * first one.
  */
 export const placeOf = (screen: Screen, allSites: boolean): Place => {
-    if (showsShared(screen) || (screen.kind === 'media' && screen.site === undefined)) return SHARED_PLACE;
+    if (showsShared(screen) || ((screen.kind === 'media' || screen.kind === 'trash') && screen.site === undefined)) return SHARED_PLACE;
     if (screen.site !== undefined) return sitePlace(screen.site);
     return allSites ? ALL_PLACE : sitePlace(sites[0]?.key ?? '');
 };

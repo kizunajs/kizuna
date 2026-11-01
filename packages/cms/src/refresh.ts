@@ -288,13 +288,14 @@ const k = new Kizuna();
 
 /**
  * The jobs the CMS declares under `content` once it serves several sites:
- * the one that publishes what is scheduled, and one refresh per site or
- * partner that shows a document. Without an identity, they run as the app's
+ * the one that publishes what is scheduled, the one that empties the trash,
+ * and one refresh per site or partner that shows a document. Without an identity, they run as the app's
  * jobs do.
  */
 export const refreshJobs = (slug: string, identity: string | undefined) => {
     const definitions = {
         publishScheduled: publishScheduledJob(slug),
+        emptyTrash: emptyTrashJob(slug),
         refreshSite: k
             .job({
                 summary: "Refresh one site's or partner's pages after a document changed",
@@ -322,12 +323,14 @@ export const refreshJobs = (slug: string, identity: string | undefined) => {
 };
 
 /**
- * The job every CMS declares under `content`: the one that publishes what is
- * scheduled. Without an identity, it runs as the app's jobs do.
+ * The jobs every CMS declares under `content`: the one that publishes what
+ * is scheduled, and the one that empties the trash. Without an identity,
+ * they run as the app's jobs do.
  */
 export const scheduleJobs = (slug: string, identity: string | undefined) => {
     const definitions = {
         publishScheduled: publishScheduledJob(slug),
+        emptyTrash: emptyTrashJob(slug),
     };
     return identity === undefined ? k.jobs(definitions) : k.jobs(identity, definitions);
 };

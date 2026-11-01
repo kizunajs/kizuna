@@ -530,7 +530,7 @@ describe('a CMS with one site', () => {
                 },
             }),
         });
-        expect(Object.keys((single.api.jobs as Record<string, object>)['content']!)).toEqual(['publishScheduled']);
+        expect(Object.keys((single.api.jobs as Record<string, object>)['content']!)).toEqual(['publishScheduled', 'emptyTrash']);
     });
 
     it('declares the refresh job beside it with sites, and runs both in process', () => {
@@ -549,7 +549,11 @@ describe('a CMS with one site', () => {
                 },
             }),
         });
-        expect(Object.keys((several.api.jobs as Record<string, object>)['content']!)).toEqual(['publishScheduled', 'refreshSite']);
+        expect(Object.keys((several.api.jobs as Record<string, object>)['content']!)).toEqual([
+            'publishScheduled',
+            'emptyTrash',
+            'refreshSite',
+        ]);
     });
 });
 

@@ -49,6 +49,12 @@ alter table cms_documents add column if not exists held_by text;
 alter table cms_documents add column if not exists held_since timestamptz;
 alter table cms_documents add column if not exists held_until timestamptz;
 
+alter table cms_documents add column if not exists trashed_at timestamptz;
+alter table cms_documents add column if not exists trashed_by text;
+alter table cms_documents add column if not exists trashed_with text;
+
+create index if not exists cms_documents_trash on cms_documents (trashed_with);
+
 create table if not exists cms_reviews (
     id text primary key,
     request_id text not null,

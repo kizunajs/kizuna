@@ -51,6 +51,24 @@ export interface DocumentRow {
     heldBy: string | null;
     heldSince: Date | null;
     heldUntil: Date | null;
+    /**
+     * When the document went to the trash, or `null` while it is live.
+     */
+    trashedAt: Date | null;
+    trashedBy: string | null;
+    /**
+     * The id of the document whose delete took this one to the trash.
+     */
+    trashedWith: string | null;
+}
+
+/**
+ * One delete in the trash: the document deleted, and how many went with it,
+ * the items under it in a tree.
+ */
+export interface TrashEntry {
+    document: DocumentRow;
+    under: number;
 }
 
 /**
@@ -297,6 +315,16 @@ export class DocumentHeldError extends Error {
 export const holderOf = (row: { heldBy: string | null; heldUntil: Date | null } | undefined, now = new Date()): string | null =>
     row?.heldBy !== null && row?.heldBy !== undefined && row.heldUntil !== null && row.heldUntil > now ? row.heldBy : null;
 
+/**
+ * A write to a document in the trash, whose key it keeps until it is
+ * restored or deleted for good.
+ */
+export class DocumentTrashedError extends Error {
+    constructor(readonly document: DocumentRow) {
+        super(`'${document.key}' is in the trash. Restore it before writing to it.`);
+    }
+}
+
 const SITE = 'default';
 
 /**
@@ -305,8 +333,15 @@ const SITE = 'default';
  */
 export const SOURCE_LOCALE = 'default';
 
-const identity = (kind: DocumentKind, key: string, site = SITE, locale = SOURCE_LOCALE) =>
+/**
+ * Leaves out the documents in the trash, which no read sees.
+ */
+const live = isNull(cmsDocuments.trashedAt);
+
+const stored = (kind: DocumentKind, key: string, site = SITE, locale = SOURCE_LOCALE) =>
     and(eq(cmsDocuments.kind, kind), eq(cmsDocuments.site, site), eq(cmsDocuments.locale, locale), eq(cmsDocuments.key, key));
+
+const identity = (kind: DocumentKind, key: string, site = SITE, locale = SOURCE_LOCALE) => and(stored(kind, key, site, locale), live);
 
 const toRow = (row: typeof cmsDocuments.$inferSelect): DocumentRow => ({
     id: row.id,
@@ -321,10 +356,19 @@ const toRow = (row: typeof cmsDocuments.$inferSelect): DocumentRow => ({
     migrationVersion: row.migrationVersion,
     updatedAt: row.updatedAt,
     updatedBy: row.updatedBy,
+    updatedVia: row.updatedVia,
     owner: row.owner,
     heldBy: row.heldBy,
     heldSince: row.heldSince,
     heldUntil: row.heldUntil,
+    trashedAt: row.trashedAt,
+    trashedBy: row.trashedBy,
+    trashedWith: row.trashedWith,
+});
+
+const toComment = (row: typeof cmsComments.$inferSelect): CommentRow => ({
+    ...row,
+    mentions: row.mentions as string[],
 });
 
 const toReview = (row: typeof cmsReviews.$inferSelect): ReviewRow => ({
@@ -564,42 +608,76 @@ export class DocumentStore {
             .where(eq(cmsReviews.id, id));
     }
 
-    async addReviewComment(comment: Omit<ReviewCommentRow, 'id' | 'resolvedBy' | 'resolvedAt'>): Promise<ReviewCommentRow> {
+    async addComment(
+        comment: Omit<CommentRow, 'id' | 'resolvedBy' | 'resolvedAt' | 'replyTo' | 'anchor' | 'mentions' | 'assignee' | 'via'> &
+            Partial<Pick<CommentRow, 'replyTo' | 'anchor' | 'mentions' | 'assignee' | 'via'>>
+    ): Promise<CommentRow> {
         const [row] = await this.db
-            .insert(cmsReviewComments)
+            .insert(cmsComments)
             .values({
                 ...comment,
                 id: randomUUID(),
             })
             .returning();
-        return row!;
+        return toComment(row!);
     }
 
     /**
-     * The comments on these reviews, oldest first.
+     * The comments left in these reviews, oldest first.
      */
-    async reviewComments(reviewIds: readonly string[]): Promise<ReviewCommentRow[]> {
+    async reviewComments(reviewIds: readonly string[]): Promise<CommentRow[]> {
         if (reviewIds.length === 0) return [];
-        return this.db
+        const rows = await this.db
             .select()
-            .from(cmsReviewComments)
-            .where(inArray(cmsReviewComments.reviewId, [...reviewIds]))
-            .orderBy(asc(cmsReviewComments.createdAt));
+            .from(cmsComments)
+            .where(inArray(cmsComments.reviewId, [...reviewIds]))
+            .orderBy(asc(cmsComments.createdAt));
+        return rows.map(toComment);
     }
 
-    async reviewComment(id: string): Promise<ReviewCommentRow | undefined> {
-        const [row] = await this.db.select().from(cmsReviewComments).where(eq(cmsReviewComments.id, id)).limit(1);
-        return row;
+    /**
+     * Every comment on a document, oldest first.
+     */
+    async documentComments(documentId: string): Promise<CommentRow[]> {
+        const rows = await this.db
+            .select()
+            .from(cmsComments)
+            .where(eq(cmsComments.documentId, documentId))
+            .orderBy(asc(cmsComments.createdAt));
+        return rows.map(toComment);
     }
 
-    async resolveReviewComment(id: string, by: string): Promise<void> {
+    /**
+     * Every open comment on a document outside the trash, oldest first.
+     */
+    async openComments(): Promise<CommentRow[]> {
+        const rows = await this.db
+            .select({
+                comment: cmsComments,
+            })
+            .from(cmsComments)
+            .innerJoin(cmsDocuments, eq(cmsDocuments.id, cmsComments.documentId))
+            .where(and(isNull(cmsComments.resolvedAt), live))
+            .orderBy(asc(cmsComments.createdAt));
+        return rows.map((row) => toComment(row.comment));
+    }
+
+    async comment(id: string): Promise<CommentRow | undefined> {
+        const [row] = await this.db.select().from(cmsComments).where(eq(cmsComments.id, id)).limit(1);
+        return row === undefined ? undefined : toComment(row);
+    }
+
+    /**
+     * Resolves a comment with every answer in its thread.
+     */
+    async resolveComment(id: string, by: string): Promise<void> {
         await this.db
-            .update(cmsReviewComments)
+            .update(cmsComments)
             .set({
                 resolvedBy: by,
                 resolvedAt: new Date(),
             })
-            .where(eq(cmsReviewComments.id, id));
+            .where(and(isNull(cmsComments.resolvedAt), or(eq(cmsComments.id, id), eq(cmsComments.replyTo, id))));
     }
 
     async addRefreshes(rows: ReadonlyArray<Pick<RefreshRow, 'batch' | 'ref' | 'target' | 'subject'>>): Promise<void> {
@@ -791,6 +869,14 @@ export class DocumentStore {
                 .from(cmsDocuments)
                 .where(identity(input.kind, input.key, input.site, input.locale))
                 .for('update');
+            if (existing === undefined) {
+                const [trashed] = await tx
+                    .select()
+                    .from(cmsDocuments)
+                    .where(stored(input.kind, input.key, input.site, input.locale))
+                    .limit(1);
+                if (trashed !== undefined) throw new DocumentTrashedError(toRow(trashed));
+            }
             const id = existing?.id ?? randomUUID();
             const latest = existing === undefined ? 0 : await this.latestVersionIn(tx, id);
             const stale =
@@ -1402,17 +1488,244 @@ export class DocumentStore {
                 .where(and(eq(cmsDocuments.kind, kind), eq(cmsDocuments.site, site), eq(cmsDocuments.key, key)))
                 .for('update');
             if (!found.some((row) => row.locale === SOURCE_LOCALE)) return false;
-            for (const existing of found) {
-                await tx.delete(cmsRefs).where(eq(cmsRefs.documentId, existing.id));
-                await tx.delete(cmsVersions).where(eq(cmsVersions.documentId, existing.id));
-                const reviews = tx.select({ id: cmsReviews.id }).from(cmsReviews).where(eq(cmsReviews.documentId, existing.id));
-                await tx.delete(cmsReviewComments).where(inArray(cmsReviewComments.reviewId, reviews));
-                await tx.delete(cmsReviews).where(eq(cmsReviews.documentId, existing.id));
-                if (existing.locale !== SOURCE_LOCALE) await tx.delete(cmsTranslations).where(eq(cmsTranslations.documentId, existing.id));
-                await tx.delete(cmsDocuments).where(eq(cmsDocuments.id, existing.id));
-            }
+            await this.eraseIn(tx, found);
             return true;
         });
+    }
+
+    /**
+     * Moves documents to the trash with `root`, the one deleted: each key's
+     * source and translations and, with `everySite`, each site's values on
+     * it. Nothing reads them there, and each keeps its key, versions and
+     * references for a restore to bring back. Answers the root as it went,
+     * or `undefined` when it is not there to delete.
+     */
+    async trash(input: {
+        kind: DocumentKind;
+        root: string;
+        keys: readonly string[];
+        site: string;
+        everySite: boolean;
+        by: string;
+    }): Promise<DocumentRow | undefined> {
+        return this.db.transaction(async (tx) => {
+            const found = await tx
+                .select()
+                .from(cmsDocuments)
+                .where(
+                    and(
+                        eq(cmsDocuments.kind, input.kind),
+                        inArray(cmsDocuments.key, [...new Set([input.root, ...input.keys])]),
+                        live,
+                        ...(input.everySite ? [] : [eq(cmsDocuments.site, input.site)])
+                    )
+                )
+                .for('update');
+            const root = found.find((row) => row.key === input.root && row.site === input.site && row.locale === SOURCE_LOCALE);
+            if (root === undefined) return undefined;
+            await tx
+                .update(cmsDocuments)
+                .set({
+                    trashedAt: new Date(),
+                    trashedBy: input.by,
+                    trashedWith: root.id,
+                    heldBy: null,
+                    heldSince: null,
+                    heldUntil: null,
+                })
+                .where(
+                    inArray(
+                        cmsDocuments.id,
+                        found.map((row) => row.id)
+                    )
+                );
+            const [row] = await tx.select().from(cmsDocuments).where(eq(cmsDocuments.id, root.id)).limit(1);
+            return toRow(row!);
+        });
+    }
+
+    /**
+     * A document in the trash, by where it was stored, or `undefined` when
+     * it is live or gone.
+     */
+    async trashed(kind: DocumentKind, key: string, site = SITE, locale = SOURCE_LOCALE): Promise<DocumentRow | undefined> {
+        const [row] = await this.db
+            .select()
+            .from(cmsDocuments)
+            .where(and(stored(kind, key, site, locale), isNotNull(cmsDocuments.trashedAt)))
+            .limit(1);
+        return row === undefined ? undefined : toRow(row);
+    }
+
+    /**
+     * Each delete in one site's trash, or the shared content's, newest
+     * first: the document deleted, with how many went with it.
+     */
+    async trashEntries(kind: DocumentKind, site = SITE): Promise<TrashEntry[]> {
+        const rows = await this.db
+            .select({
+                document: cmsDocuments,
+                under: sql<number>`(select count(*) from cms_documents as branch where branch.trashed_with = cms_documents.id and branch.id <> cms_documents.id and branch.site = cms_documents.site and branch.locale = ${SOURCE_LOCALE})`,
+            })
+            .from(cmsDocuments)
+            .where(
+                and(
+                    eq(cmsDocuments.kind, kind),
+                    eq(cmsDocuments.site, site),
+                    eq(cmsDocuments.locale, SOURCE_LOCALE),
+                    isNotNull(cmsDocuments.trashedAt),
+                    eq(cmsDocuments.trashedWith, cmsDocuments.id)
+                )
+            )
+            .orderBy(desc(cmsDocuments.trashedAt), asc(cmsDocuments.key));
+        return rows.map((row) => ({
+            document: toRow(row.document),
+            under: Number(row.under),
+        }));
+    }
+
+    /**
+     * Every document one delete took to the trash, the deleted one among
+     * them: in every language and on every site.
+     */
+    async trashedWith(root: string): Promise<DocumentRow[]> {
+        const rows = await this.db
+            .select()
+            .from(cmsDocuments)
+            .where(and(eq(cmsDocuments.trashedWith, root), isNotNull(cmsDocuments.trashedAt)))
+            .orderBy(asc(cmsDocuments.site), asc(cmsDocuments.key), asc(cmsDocuments.locale));
+        return rows.map(toRow);
+    }
+
+    /**
+     * Brings back every document one delete took to the trash, as it was,
+     * and the images they hold that went to the trash after them, which
+     * `mediaBrand` names. Answers what came back.
+     */
+    async restore(root: string, mediaBrand: string): Promise<DocumentRow[]> {
+        return this.db.transaction(async (tx) => {
+            const found = await tx
+                .select()
+                .from(cmsDocuments)
+                .where(and(eq(cmsDocuments.trashedWith, root), isNotNull(cmsDocuments.trashedAt)))
+                .for('update');
+            if (found.length === 0) return [];
+            const ids = found.map((row) => row.id);
+            const held = tx
+                .select({
+                    refId: cmsRefs.refId,
+                })
+                .from(cmsRefs)
+                .where(and(eq(cmsRefs.brand, mediaBrand), inArray(cmsRefs.documentId, ids)));
+            const back = {
+                trashedAt: null,
+                trashedBy: null,
+                trashedWith: null,
+            };
+            await tx
+                .update(cmsDocuments)
+                .set(back)
+                .where(and(eq(cmsDocuments.kind, 'media'), isNotNull(cmsDocuments.trashedAt), inArray(cmsDocuments.key, held)));
+            await tx.update(cmsDocuments).set(back).where(inArray(cmsDocuments.id, ids));
+            return found.map((row) => ({
+                ...toRow(row),
+                ...back,
+            }));
+        });
+    }
+
+    /**
+     * Deletes for good every document one delete took to the trash, with
+     * their versions, references, reviews and comments. Answers what went.
+     */
+    async erase(root: string): Promise<DocumentRow[]> {
+        return this.db.transaction(async (tx) => {
+            const found = await tx
+                .select()
+                .from(cmsDocuments)
+                .where(and(eq(cmsDocuments.trashedWith, root), isNotNull(cmsDocuments.trashedAt)))
+                .for('update');
+            await this.eraseIn(tx, found);
+            return found.map(toRow);
+        });
+    }
+
+    /**
+     * The deletes in the trash since before `before`, by the id of the
+     * document each deleted. Images are left to `unheldTrashedMedia`.
+     */
+    async trashedBefore(before: Date): Promise<string[]> {
+        const rows = await this.db
+            .select({
+                id: cmsDocuments.id,
+            })
+            .from(cmsDocuments)
+            .where(and(ne(cmsDocuments.kind, 'media'), lt(cmsDocuments.trashedAt, before), eq(cmsDocuments.trashedWith, cmsDocuments.id)));
+        return rows.map((row) => row.id);
+    }
+
+    /**
+     * Whether a document in the trash holds a branded id, in its draft or
+     * its published content.
+     */
+    async heldInTrash(brand: string, refId: string): Promise<boolean> {
+        const [row] = await this.db
+            .select({
+                id: cmsRefs.documentId,
+            })
+            .from(cmsRefs)
+            .innerJoin(cmsDocuments, eq(cmsDocuments.id, cmsRefs.documentId))
+            .where(and(eq(cmsRefs.brand, brand), eq(cmsRefs.refId, refId), isNotNull(cmsDocuments.trashedAt)))
+            .limit(1);
+        return row !== undefined;
+    }
+
+    /**
+     * Moves an image to the trash, keeping its stored file for a document
+     * in the trash that holds it.
+     */
+    async trashMedia(key: string, by: string): Promise<void> {
+        await this.db
+            .update(cmsDocuments)
+            .set({
+                trashedAt: new Date(),
+                trashedBy: by,
+                trashedWith: sql`${cmsDocuments.id}`,
+            })
+            .where(and(eq(cmsDocuments.kind, 'media'), eq(cmsDocuments.key, key), live));
+    }
+
+    /**
+     * The images in the trash that no document holds any longer, live or in
+     * the trash, which `mediaBrand` names.
+     */
+    async unheldTrashedMedia(mediaBrand: string): Promise<DocumentRow[]> {
+        const held = this.db
+            .select({
+                refId: cmsRefs.refId,
+            })
+            .from(cmsRefs)
+            .where(eq(cmsRefs.brand, mediaBrand));
+        const rows = await this.db
+            .select()
+            .from(cmsDocuments)
+            .where(and(eq(cmsDocuments.kind, 'media'), isNotNull(cmsDocuments.trashedAt), notInArray(cmsDocuments.key, held)));
+        return rows.map(toRow);
+    }
+
+    /**
+     * Deletes stored documents with their translations' source versions,
+     * versions, references, reviews and comments.
+     */
+    private async eraseIn(tx: CmsDatabase, documents: ReadonlyArray<typeof cmsDocuments.$inferSelect>): Promise<void> {
+        for (const existing of documents) {
+            await tx.delete(cmsRefs).where(eq(cmsRefs.documentId, existing.id));
+            await tx.delete(cmsVersions).where(eq(cmsVersions.documentId, existing.id));
+            await tx.delete(cmsComments).where(eq(cmsComments.documentId, existing.id));
+            await tx.delete(cmsReviews).where(eq(cmsReviews.documentId, existing.id));
+            if (existing.locale !== SOURCE_LOCALE) await tx.delete(cmsTranslations).where(eq(cmsTranslations.documentId, existing.id));
+            await tx.delete(cmsDocuments).where(eq(cmsDocuments.id, existing.id));
+        }
     }
 
     private async latestVersionIn(tx: CmsDatabase, documentId: string): Promise<number> {

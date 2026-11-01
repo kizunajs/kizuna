@@ -232,10 +232,11 @@ export const brokenLinksOf = async (cms: CmsService, ref: DocumentRef): Promise<
         if (!statuses.has(link.ref)) statuses.set(link.ref, await linkTargetStatus(cms, link.ref));
         const status = statuses.get(link.ref)!;
         if (status === 'published') continue;
+        const linked = status === 'missing' ? linkedRef(cms, link.ref) : undefined;
         broken.push({
             path: link.path,
             target: link.ref,
-            reason: status,
+            reason: linked?.type === 'item' && (await cms.trashed(linked)) !== undefined ? 'trashed' : status,
         });
     }
     return broken;

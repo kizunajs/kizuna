@@ -58,7 +58,7 @@ const words = (name: string): string =>
  * What editors call a document: its label, an item's title, or its name
  * written out.
  */
-export const documentLabel = (state: DraftState): string => {
+export const documentLabel = (state: Pick<DraftState, 'target' | 'row'>): string => {
     const { ref, definition } = state.target;
     if (ref.type === 'item') {
         const content = state.row?.draft ?? state.row?.published ?? {};

@@ -19,6 +19,7 @@ import { dataFields } from './field.js';
 import type { CmsExports } from './setup.js';
 import type { DocumentRef } from './refs.js';
 import { heldJobs } from './held-jobs.fixture.js';
+import { eraseItem } from './trash.js';
 
 const k = new Kizuna();
 const editor = k.identity
@@ -288,12 +289,15 @@ describe('storage', () => {
         });
     });
 
-    it('deletes the translations with the item', async () => {
+    it('takes the translations to the trash with the item, and deletes them with it for good', async () => {
         const id = await office();
         await write(officeRef(id, 'nb'), {
             description: 'Vår største butikk.',
         });
         await service.deleteItem('offices', id);
+        expect((await pglite.query('select id from cms_documents where trashed_at is null')).rows).toEqual([]);
+        expect((await pglite.query('select id from cms_documents where trashed_at is not null')).rows).toHaveLength(2);
+        await eraseItem(service, 'offices', id, 'default');
         expect((await pglite.query('select id from cms_documents')).rows).toEqual([]);
         expect((await pglite.query('select document_id from cms_translations')).rows).toEqual([]);
     });

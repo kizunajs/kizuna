@@ -37,10 +37,10 @@ describe('deleting a parent', () => {
 
     it('names what goes with it, or asks as any delete does', () => {
         expect(branchQuestionOf(['Om oss'], ['Jobb hos oss', 'Kontakt'])).toBe(
-            'Delete Om oss and the 2 items under it, with their history? Jobb hos oss and Kontakt go with it. Pages that show them stop showing them.'
+            'Delete Om oss and the 2 items under it? Jobb hos oss and Kontakt go with it. They go to the trash for 30 days, and pages that show them stop showing them.'
         );
         expect(branchQuestionOf(['Om oss', 'Butikker'], ['Oslo', 'Bergen', 'Jobb hos oss', 'Kontakt'])).toBe(
-            'Delete 2 items and the 4 items under them, with their history? Pages that show them stop showing them.'
+            'Delete 2 items and the 4 items under them? They go to the trash for 30 days, and pages that show them stop showing them.'
         );
         expect(branchQuestionOf(['Personvern'], [])).toBeUndefined();
     });
