@@ -449,4 +449,15 @@ describe('glossary issues', () => {
         expect(described.body.voice).toBeNull();
         expect(described.body.glossary).toEqual([]);
     });
+
+    it('shows no help line in its form, and tells an agent how to write it', async () => {
+        const described = await mia.get('/editing/describe?ref=global:norway:voice');
+        expect(described.body.fields.map((field: { path: string; help?: string }) => [field.path, field.help])).toEqual([
+            ['tone', undefined],
+            ['audience', undefined],
+            ['rules', undefined],
+            ['glossary', undefined],
+        ]);
+        expect(described.body.instructions).toContain('- Tone says how the writing sounds, like warm, practical, no hype.');
+    });
 });

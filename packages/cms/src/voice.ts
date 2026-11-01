@@ -79,6 +79,13 @@ export const voiceGlobal = (options: VoiceOptions): Global => {
     return defineGlobal({
         name: VOICE_GLOBAL,
         label: 'Voice',
+        // Guidance for an agent writing the voice, which `describe` answers. The form shows none.
+        instructions: [
+            '- Tone says how the writing sounds, like warm, practical, no hype.',
+            '- Audience says who reads it, and what they already know.',
+            "- Do and don't hold one rule each, with a language when a rule holds in one.",
+            '- A glossary term lists every form it covers, inflections included, since each is matched as a whole word and nothing is guessed.',
+        ].join('\n'),
         fields: [
             {
                 type: 'tab',
@@ -87,14 +94,12 @@ export const voiceGlobal = (options: VoiceOptions): Global => {
                     {
                         name: 'tone',
                         schema: z.string().max(2000).default(''),
-                        description: 'How the writing sounds, like warm, practical, no hype.',
                         auth,
                         localized: false,
                     },
                     {
                         name: 'audience',
                         schema: z.string().max(2000).default(''),
-                        description: 'Who reads it, and what they already know.',
                         auth,
                         localized: false,
                     },
