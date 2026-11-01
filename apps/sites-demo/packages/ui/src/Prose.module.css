@@ -5,23 +5,23 @@
     font-size: 1.0625rem;
 }
 
-.prose :where(h2) {
+.prose > h2 {
     margin-top: 20px;
     font-size: var(--display-s);
 }
 
-.prose :where(h3) {
+.prose > h3 {
     font-size: 1.25rem;
 }
 
-.prose :where(ul, ol) {
+.prose > :is(ul, ol) {
     display: grid;
     gap: 6px;
     margin: 0;
     padding-left: 1.25em;
 }
 
-.prose :where(blockquote) {
+.prose > blockquote {
     margin: 0;
     padding-left: 22px;
     border-left: 2px solid var(--sage);

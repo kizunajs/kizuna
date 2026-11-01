@@ -73,9 +73,7 @@
     grid-template-columns: 176px minmax(0, 1fr);
     gap: 28px;
     align-items: start;
-    margin-block: 12px;
-    padding-block: 24px;
-    border-block: 1px solid var(--sage);
+    margin-block: 16px;
 }
 
 .plantPhoto {
@@ -190,9 +188,7 @@
     grid-template-columns: 210px minmax(0, 1fr);
     gap: 24px;
     align-items: center;
-    margin-block: 12px;
-    padding-block: 24px;
-    border-block: 1px solid var(--sage);
+    margin-block: 16px;
     text-decoration: none;
 }
 
