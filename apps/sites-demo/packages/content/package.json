@@ -8,6 +8,7 @@
     "./config": "./kizuna.cms.config.ts",
     "./auth": "./src/auth/index.ts",
     "./media": "./src/media-storage.ts",
+    "./body-links": "./src/body-links.ts",
     "./newsletter-email": "./src/newsletter-email.tsx",
     "./outbox": "./src/outbox.ts"
   },

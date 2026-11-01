@@ -1,5 +1,6 @@
 import kizuna from '@kizunajs-demo/sites-content/config';
-import { PageIntro, Prose } from '@kizunajs-demo/sites-ui';
+import { PageIntro } from '@kizunajs-demo/sites-ui';
+import { BodyText } from '../../components/BodyText';
 
 export const metadata = {
     title: 'About',
@@ -10,7 +11,7 @@ export default async function AboutPage() {
     return (
         <main>
             <PageIntro eyebrow="About" heading={page.heading} />
-            <Prose text={page.body} />
+            <BodyText value={page.body} />
         </main>
     );
 }

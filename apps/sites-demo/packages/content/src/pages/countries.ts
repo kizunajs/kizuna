@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { pageInstructions } from '../voice';
+import { pageInstructions } from '../instructions';
+import { BodyTextSchema, bodyAsRichText } from '../text-blocks';
 import { croppedImage, definePage, definePages } from '@kizunajs/cms';
 import { ImageSchema, link, RichTextSchema } from '@kizunajs/cms/schemas';
 
@@ -55,6 +56,9 @@ const textPage = <const Name extends string, const Sites extends readonly string
     definePage({
         ...page,
         instructions: pageInstructions,
+        migrate: {
+            1: bodyAsRichText,
+        },
         fields: [
             {
                 name: 'heading',
@@ -66,7 +70,7 @@ const textPage = <const Name extends string, const Sites extends readonly string
             },
             {
                 name: 'body',
-                schema: z.string().min(1).max(4000).describe('Paragraphs, with a blank line between each.'),
+                schema: BodyTextSchema,
             },
             {
                 name: 'image',

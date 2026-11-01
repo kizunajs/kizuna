@@ -36,6 +36,8 @@ import {
     type SeededPage,
     type Written,
 } from './seed-content';
+import { holdsBlocks, textBlocks, withSeededBlocks } from './seed-blocks';
+import { seedVoice } from './seed-voice';
 
 const PHOTOS = join(process.cwd(), 'seed/photos');
 
@@ -136,11 +138,20 @@ export const seedContent = async (service: CmsService): Promise<void> => {
 
     const exists = async (ref: DocumentRef): Promise<boolean> => (await service.document(ref)).row !== undefined;
 
+    // A page's or an article's body is rich text, which the seed writes as plain paragraphs.
+    const withRichBody = (ref: DocumentRef, changes: Record<string, unknown>): Record<string, unknown> =>
+        typeof changes['body'] === 'string' && (ref.type === 'page' || (ref.type === 'item' && ref.collection === 'articles'))
+            ? {
+                  ...changes,
+                  body: richText(changes['body']),
+              }
+            : changes;
+
     const save = (ref: DocumentRef, changes: Record<string, unknown>, by: string, at: Date, summary?: string) =>
         asOf(at, () =>
             service.update({
                 ref,
-                changes,
+                changes: withRichBody(ref, changes),
                 caller,
                 author: by,
                 ...(summary === undefined
@@ -527,6 +538,7 @@ export const seedContent = async (service: CmsService): Promise<void> => {
                 'articles',
                 {
                     ...article.values,
+                    body: richText(String(article.values['body'])),
                     date: dateIn(-article.dated),
                     ...image,
                 },
@@ -1256,6 +1268,70 @@ Book a visit at the shop or by writing to care@hagen.example.co.uk. Visits run o
                 },
             }
         );
+    }
+
+    // Blocks in the text of two articles and three pages, put in once after the paragraphs they follow.
+    const idsByLabel = async (collection: string) => new Map((await service.editorItems(collection)).map((item) => [item.label, item.id]));
+    const plantIds = await idsByLabel('products');
+    const personIds = await idsByLabel('employees');
+    const articleIds = await idsByLabel('articles');
+    const named = (ids: ReadonlyMap<string, string>, label: string): string => {
+        const id = ids.get(label);
+        if (id === undefined) throw new Error(`The seed has nothing called '${label}' to put in a text.`);
+        return id;
+    };
+    for (const entry of textBlocks) {
+        const ref: DocumentRef =
+            'article' in entry.target
+                ? {
+                      type: 'item',
+                      collection: 'articles',
+                      id: named(articleIds, entry.target.article),
+                      ...(entry.locale === undefined
+                          ? {}
+                          : {
+                                locale: entry.locale,
+                            }),
+                  }
+                : pageRef(
+                      {
+                          site: entry.target.site,
+                          name: entry.target.page,
+                      },
+                      entry.locale
+                  );
+        if (!(await exists(ref))) continue;
+        // Only a published text with no changes waiting, so publishing the blocks publishes nothing else.
+        const state = await service.draftState(ref);
+        if (state.status !== 'published') continue;
+        const stored = state.row?.published?.['body'];
+        if (holdsBlocks(stored)) continue;
+        const at = daysAgo(3);
+        const body = await withSeededBlocks(
+            typeof stored === 'string' ? richText(stored) : Array.isArray(stored) ? (stored as Array<Record<string, unknown>>) : [],
+            entry.after,
+            {
+                text: (markup) => richText(markup),
+                plant: (name) => named(plantIds, name),
+                person: (name) => named(personIds, name),
+                article: (title) => named(articleIds, title),
+                photo: (photo) =>
+                    upload(photos[photo], entry.by, at, {
+                        folder: journal.id,
+                    }),
+            }
+        );
+        await save(
+            ref,
+            {
+                body,
+            },
+            entry.by,
+            at,
+            entry.summary
+        );
+        await publish(ref, entry.publishedBy, daysAgo(3, 1));
+        console.log(`[demo] put blocks in ${formatRef(ref)}`);
     }
 };
 

@@ -1,9 +1,11 @@
-import { CmsImage, PageIntro, Prose, RelatedLinks, type Image, type RelatedLink } from '@kizunajs-demo/sites-ui';
+import type { BodyText as BodyTextValue } from '@kizunajs-demo/sites-content/body-links';
+import { CmsImage, PageIntro, RelatedLinks, type Image, type RelatedLink } from '@kizunajs-demo/sites-ui';
+import { BodyText } from './BodyText';
 import styles from './TextPage.module.css';
 
 /**
- * A page of text: its heading and intro, the photo beside it, its
- * paragraphs, and links to read more.
+ * A page of text: its heading and intro, the photo beside it, its text
+ * with its blocks, and links to read more.
  */
 export function TextPage({
     eyebrow,
@@ -14,7 +16,7 @@ export function TextPage({
     page: {
         heading: string;
         intro: string;
-        body: string;
+        body: BodyTextValue;
         image?: Image | undefined;
         related?: RelatedLink[] | undefined;
     };
@@ -24,7 +26,7 @@ export function TextPage({
         <main>
             <PageIntro eyebrow={eyebrow} heading={page.heading} text={page.intro} />
             {page.image === undefined ? null : <CmsImage className={styles.image} image={page.image} width={1200} height={800} />}
-            <Prose text={page.body} />
+            <BodyText value={page.body} />
             <RelatedLinks heading={readMore} links={page.related ?? []} />
         </main>
     );

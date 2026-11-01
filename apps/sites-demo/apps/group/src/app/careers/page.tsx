@@ -1,5 +1,6 @@
 import kizuna from '@kizunajs-demo/sites-content/config';
-import { PageIntro, Prose, RelatedLinks } from '@kizunajs-demo/sites-ui';
+import { PageIntro, RelatedLinks } from '@kizunajs-demo/sites-ui';
+import { BodyText } from '../../components/BodyText';
 
 const read = () => kizuna.content.of(['group']).pages.careersPage.get();
 
@@ -14,7 +15,7 @@ export default async function CareersPage() {
     return (
         <main>
             <PageIntro eyebrow="Careers" heading={page.heading} text={page.intro} />
-            <Prose text={page.body} />
+            <BodyText value={page.body} />
             <RelatedLinks heading="Read more" links={page.related ?? []} />
         </main>
     );

@@ -1,0 +1,231 @@
+/*
+ * The blocks an article or a page puts between its paragraphs. Each sits in
+ * the text column on whitespace and rules, in the type scale of the prose.
+ */
+.eyebrow {
+    color: var(--ink-faint);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.muted {
+    color: var(--ink-muted);
+}
+
+.more {
+    font-weight: 500;
+}
+
+.callout {
+    display: grid;
+    gap: 6px;
+    margin-block: 12px;
+    padding: 4px 0 4px 22px;
+    border-left: 2px solid var(--ink-muted);
+}
+
+.callout[data-tone='note'] {
+    border-left-color: var(--ink-faint);
+}
+
+.callout[data-tone='warning'] {
+    border-left-color: var(--ink);
+}
+
+.callout[data-tone='warning'] .eyebrow {
+    color: var(--ink);
+}
+
+.calloutText {
+    font-size: 1.125rem;
+}
+
+.quote {
+    display: grid;
+    gap: 16px;
+    margin: 28px 0;
+}
+
+.quoteText {
+    margin: 0;
+    font-family: var(--serif);
+    font-size: clamp(1.5rem, 2.4vw, 2rem);
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+}
+
+.quoteBy {
+    display: grid;
+    color: var(--ink-muted);
+    font-size: 0.9375rem;
+}
+
+.quoteName {
+    color: var(--ink);
+    font-weight: 600;
+}
+
+.plant {
+    display: grid;
+    grid-template-columns: 176px minmax(0, 1fr);
+    gap: 28px;
+    align-items: start;
+    margin-block: 12px;
+    padding-block: 24px;
+    border-block: 1px solid var(--sage);
+}
+
+.plantPhoto {
+    width: 176px;
+    height: 176px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.plantText {
+    display: grid;
+    gap: 6px;
+}
+
+.plantName {
+    font-size: var(--display-s);
+}
+
+.plantPrice {
+    font-weight: 600;
+}
+
+.figure {
+    display: grid;
+    gap: 12px;
+    margin: 16px 0;
+}
+
+.figureImage {
+    width: 100%;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.caption {
+    color: var(--ink-muted);
+    font-size: 0.9375rem;
+}
+
+.faq {
+    border-bottom: 1px solid var(--sage);
+}
+
+.faqItem {
+    border-top: 1px solid var(--sage);
+}
+
+.faqItem > p {
+    padding-bottom: 20px;
+}
+
+.faqQuestion {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    padding-block: 18px;
+    font-weight: 600;
+    list-style: none;
+    cursor: pointer;
+}
+
+.faqQuestion::-webkit-details-marker {
+    display: none;
+}
+
+.faqQuestion::after {
+    flex-shrink: 0;
+    color: var(--ink-faint);
+    font-weight: 400;
+    content: '+';
+}
+
+.faqItem[open] > .faqQuestion::after {
+    content: '\2212';
+}
+
+.buttonRow {
+    margin-block: 8px;
+}
+
+.button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+    padding: 0 26px;
+    border-radius: 999px;
+    background: var(--forest);
+    color: var(--forest-ink);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+@media (hover: hover) {
+    .button:hover {
+        background: var(--ink);
+        color: var(--paper);
+    }
+
+    .related:hover .relatedTitle {
+        text-decoration: underline;
+    }
+}
+
+.related {
+    display: grid;
+    grid-template-columns: 210px minmax(0, 1fr);
+    gap: 24px;
+    align-items: center;
+    margin-block: 12px;
+    padding-block: 24px;
+    border-block: 1px solid var(--sage);
+    text-decoration: none;
+}
+
+.relatedImage {
+    width: 210px;
+    border-radius: 4px;
+    object-fit: cover;
+    aspect-ratio: 3 / 2;
+}
+
+.relatedText {
+    display: grid;
+    gap: 6px;
+}
+
+.relatedTitle {
+    font-family: var(--serif);
+    font-size: var(--display-s);
+    line-height: 1.15;
+    text-underline-offset: 4px;
+    text-decoration-thickness: 1px;
+}
+
+@media (max-width: 767px) {
+    .plant,
+    .related {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .plantPhoto,
+    .relatedImage {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 3 / 2;
+    }
+}

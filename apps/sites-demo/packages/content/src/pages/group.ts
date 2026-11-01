@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { pageInstructions } from '../voice';
+import { pageInstructions } from '../instructions';
+import { BodyTextSchema, bodyAsRichText } from '../text-blocks';
 import { definePage, definePages } from '@kizunajs/cms';
 import { link } from '@kizunajs/cms/schemas';
 
@@ -30,9 +31,12 @@ const aboutPage = definePage({
         },
         {
             name: 'body',
-            schema: z.string().min(1).max(2000).describe('Paragraphs, with a blank line between each.'),
+            schema: BodyTextSchema,
         },
     ],
+    migrate: {
+        1: bodyAsRichText,
+    },
 });
 
 /**
@@ -42,6 +46,9 @@ const textPage = <const Name extends string>(page: { name: Name; label: string }
     definePage({
         ...page,
         instructions: pageInstructions,
+        migrate: {
+            1: bodyAsRichText,
+        },
         fields: [
             {
                 name: 'heading',
@@ -53,7 +60,7 @@ const textPage = <const Name extends string>(page: { name: Name; label: string }
             },
             {
                 name: 'body',
-                schema: z.string().min(1).max(4000).describe('Paragraphs, with a blank line between each.'),
+                schema: BodyTextSchema,
             },
             {
                 name: 'related',

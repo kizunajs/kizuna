@@ -20,6 +20,12 @@ export const words = {
         help: 'Delivery',
         care: 'Plant care',
         visit: 'Visit the shop',
+        tip: 'Tip',
+        warning: 'Warning',
+        note: 'Note',
+        fromTheShop: 'In the shop',
+        findInShops: 'Find it in our shops',
+        fromTheJournal: 'From the journal',
     },
     norway: {
         shops: 'Butikker',
@@ -38,6 +44,12 @@ export const words = {
         help: 'Kundeservice',
         care: '',
         visit: '',
+        tip: 'Tips',
+        warning: 'Advarsel',
+        note: 'Merk',
+        fromTheShop: 'I butikken',
+        findInShops: 'Finn den i butikkene våre',
+        fromTheJournal: 'Fra journalen',
     },
     'norway:en': {
         shops: 'Shops',
@@ -56,6 +68,12 @@ export const words = {
         help: 'Customer service',
         care: '',
         visit: '',
+        tip: 'Tip',
+        warning: 'Warning',
+        note: 'Note',
+        fromTheShop: 'In the shops',
+        findInShops: 'Find it in our shops',
+        fromTheJournal: 'From the journal',
     },
 };
 

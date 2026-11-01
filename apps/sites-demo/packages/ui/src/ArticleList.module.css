@@ -24,6 +24,16 @@
     font-size: var(--display-s);
 }
 
+.title a {
+    text-decoration: none;
+}
+
+@media (hover: hover) {
+    .title a:hover {
+        text-decoration: underline;
+    }
+}
+
 .summary {
     color: var(--ink-muted);
 }
