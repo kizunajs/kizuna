@@ -41,8 +41,7 @@ export const Articles = defineCollection({
             schema: croppedImage({
                 aspectRatio: '3:2',
             })
-                .optional()
-                .describe('Shown where the article is linked, like a card in the newsletter.'),
+                .optional(),
             position: 'sidebar',
         },
     ],
