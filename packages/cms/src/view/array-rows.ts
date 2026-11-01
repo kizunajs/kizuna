@@ -37,12 +37,22 @@ const isText = (property: JsonSchema, root: JsonSchema): boolean => {
 };
 
 /**
- * The properties that may name an item in its row: those holding text, the
- * required ones first, so a heading reads before an optional eyebrow.
+ * A list of text, like a glossary term's spellings, which names its item
+ * read together.
+ */
+const isTextList = (property: JsonSchema, root: JsonSchema): boolean => {
+    const resolved = resolveRef(property, root);
+    return typeOf(resolved) === 'array' && resolved.items !== undefined && !Array.isArray(resolved.items) && isText(resolved.items, root);
+};
+
+/**
+ * The properties that may name an item in its row: those holding text or a
+ * list of it, the required ones first, so a heading reads before an optional
+ * eyebrow.
  */
 export const titlePropertiesOf = (item: JsonSchema, root: JsonSchema): string[] => {
     const text = Object.entries(item.properties ?? {})
-        .filter(([, property]) => isText(property, root))
+        .filter(([, property]) => isText(property, root) || isTextList(property, root))
         .map(([name]) => name);
     const required = item.required ?? [];
     return [...text.filter((name) => required.includes(name)), ...text.filter((name) => !required.includes(name))];
@@ -62,7 +72,10 @@ export const tagPropertyOf = (item: JsonSchema, root: JsonSchema): string | unde
 export const rowLabelsOf = (item: JsonSchema, root: JsonSchema, value: unknown): { title: string | undefined; tag: string | undefined } => {
     const record = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
     const title = titlePropertiesOf(item, root)
-        .map((name) => record[name])
+        .map((name) => {
+            const held = record[name];
+            return Array.isArray(held) ? held.filter((entry) => typeof entry === 'string' && entry.trim() !== '').join(', ') : held;
+        })
         .find((value): value is string => typeof value === 'string' && value.trim() !== '');
     const tagProperty = tagPropertyOf(item, root);
     const tag = tagProperty === undefined ? undefined : record[tagProperty];

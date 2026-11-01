@@ -69,6 +69,38 @@ describe('a list item row', () => {
         ).toBe('22 33 44 55');
     });
 
+    it('reads a required list of text as its title', () => {
+        const term = {
+            type: 'object',
+            properties: {
+                forms: {
+                    type: 'array',
+                    items: {
+                        type: 'string',
+                    },
+                },
+                rule: {
+                    type: 'string',
+                    enum: ['keep', 'translate', 'avoid'],
+                },
+                language: {
+                    type: 'string',
+                },
+            },
+            required: ['forms', 'rule'],
+        };
+        expect(
+            rowLabelsOf(term, term, {
+                forms: ['billig', 'billige', 'billigste'],
+                rule: 'avoid',
+                language: 'nb',
+            })
+        ).toEqual({
+            title: 'billig, billige, billigste',
+            tag: 'Avoid',
+        });
+    });
+
     it('has no title while the text is empty', () => {
         expect(
             rowLabelsOf(contact, contact, {
