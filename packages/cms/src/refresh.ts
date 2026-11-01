@@ -8,6 +8,8 @@ import { servesCollection } from './page.js';
 import { previewSecret, REFRESH_SIGNATURE_HEADER, signRefresh } from './preview-token.js';
 import { InvalidateBodySchema, type InvalidateBody } from './wire.js';
 import { publishScheduledJob } from './schedules.js';
+import { emptyTrashJob } from './trash.js';
+import { linkHolderTags, linkingSites } from './link-targets.js';
 
 /**
  * How many times the transport tries a site or partner that does not answer.
@@ -108,11 +110,22 @@ const subjectOf = (body: InvalidateBody): string =>
     'brand' in body ? `${body.brand}:${body.id}` : 'global' in body ? `global:${body.global}` : `page:${body.page}`;
 
 /**
- * Queues one refresh per site and partner that shows a document, after it
- * published, unpublished or was deleted, and records each as queued.
+ * Queues one refresh per site and partner that shows a document, and per
+ * site holding a content link to it, after it published, unpublished or was
+ * deleted, and records each as queued.
  */
 export const queueRefreshes = async (cms: CmsService, ref: DocumentRef, sites?: readonly string[]): Promise<void> => {
-    const targets = refreshTargets(cms, ref, sites);
+    const shown = refreshTargets(cms, ref, sites);
+    const linking = (await linkingSites(cms, ref))
+        .filter((site) => !shown.some((target) => target.kind === 'site' && target.key === site))
+        .map(
+            (key): RefreshTarget => ({
+                key,
+                kind: 'site',
+                label: String(cms.siteInfo(key)['label']),
+            })
+        );
+    const targets = [...shown, ...linking];
     const job = cms.refreshJob();
     if (targets.length === 0 || job === undefined) return;
     const body = invalidateBodyOf(cms, ref);
@@ -249,7 +262,25 @@ export const invalidate = async (cms: CmsService, body: InvalidateBody): Promise
         .filter(([, pages]) => pages[body.page] !== undefined && !servesCollection(pages[body.page]!.page))
         .map(([site]) => site);
     if (sites.length === 0) throw new CmsHttpError(404, { detail: `There is no page named '${body.page}'.` });
-    await cms.revalidateTags(sites.map((site) => pageCacheTag(body.page, site)));
+    const linking: string[] = [];
+    for (const site of sites) {
+        linking.push(
+            ...(await linkHolderTags(
+                cms,
+                {
+                    type: 'page',
+                    name: body.page,
+                    ...(site === DEFAULT_SITE
+                        ? {}
+                        : {
+                              site,
+                          }),
+                },
+                (holder) => cms.ownTags(holder)
+            ))
+        );
+    }
+    await cms.revalidateTags([...sites.map((site) => pageCacheTag(body.page, site)), ...linking]);
     return sites.map((site) => (site === DEFAULT_SITE ? body.page : `${site}:${body.page}`));
 };
 

@@ -70,6 +70,9 @@ import {
 import { FolderConflictError, FolderNotFoundError, UploadRejectedError, type MediaRecord } from './media/media.js';
 import { parseFields, parseFilter } from './item-list.js';
 import { ImageQuerySchema, InvalidateBodySchema, KeepSourceBodySchema, RefreshListSchema, type InvalidateBody } from './wire.js';
+import { CommentListSchema, CommentSchema, NewCommentBodySchema, WaitingCommentsSchema } from './wire.js';
+import { LinkedFromSchema, LinkTargetsSchema } from './wire.js';
+import { linkedFrom } from './link-targets.js';
 import { invalidate as invalidateDocument, refreshTargets } from './refresh.js';
 import { REFRESH_SIGNATURE_HEADER } from './preview-token.js';
 import { sameContent } from './same-content.js';
@@ -266,6 +269,7 @@ const draftChanges = async (cms: CmsService, ref: DocumentRef, access: EditorAcc
         canPublish,
         canPublishPastReview: canPublish && mayPublishPastReview(cms, caller.role),
         heldBy: state.heldBy,
+        brokenLinks: await cms.brokenLinksOf(ref),
     };
 };
 
@@ -2476,6 +2480,49 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         }) as never
     );
 
+    const check = route({
+        method: 'GET',
+        path: `${editingBase}/check`,
+        auth: editor,
+        summary: 'Check what would stop a document or a release from publishing, saving nothing',
+        description:
+            'Pass a document by `ref` or a release by `release`. Each document lists its issues: a `block` refuses the publish, like a required field missing, someone editing it or a review it waits for, and a `warning` lets it through, like a link to an unpublished page, a translation with empty fields or a schedule the publish ends. Check before asking someone to review or publish your work.',
+        tool: true,
+        query: z.object({
+            ref: z.string().optional().describe('A document, as `describe` names it under `ref`.'),
+            release: z.string().optional().describe('A release, like rel_8f2k3j9x2a1b.'),
+        }),
+        responses: {
+            200: {
+                body: PublishCheckSchema,
+                cache: 'no-store',
+            },
+            400: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const query = (args.query ?? {}) as { ref?: string; release?: string };
+            const access = cms.access(args.auth);
+            if ((query.ref === undefined) === (query.release === undefined)) {
+                throw new CmsHttpError(400, { detail: 'Pass a ref or a release, one of them.' });
+            }
+            if (query.release !== undefined) {
+                return {
+                    status: 200,
+                    body: await checkRelease(cms, access, query.release, authorOf(cms, args)),
+                };
+            }
+            const ref = parseRef(query.ref!);
+            if (ref === undefined) throw new CmsHttpError(400, { detail: `'${query.ref}' is not a ref.` });
+            return {
+                status: 200,
+                body: await checkDocument(cms, access, ref, authorOf(cms, args)),
+            };
+        }) as never
+    );
+
     const listPages = route({
         method: 'GET',
         path: `${editingBase}/pages`,
@@ -3182,6 +3229,77 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         }) as never
     );
 
+    const linkTargetsRoute = route({
+        method: 'GET',
+        path: `${editingBase}/link-targets`,
+        auth: editor,
+        summary: 'Find the pages and items a content link may point at, on any site, or name the ones given by ref',
+        description:
+            'Each target has the ref a link stores under `ref`, in rich text or a link field, with its label, site (default for shared content), path and whether it is published. The reader turns the ref into the address for the site and language being read, so a link to another site goes to that site.',
+        tool: true,
+        query: z.object({
+            q: z.string().optional().describe('Words in the label or the path.'),
+            refs: z.array(z.string()).optional().describe('Name these refs instead of searching, gone ones included.'),
+        }),
+        responses: {
+            200: LinkTargetsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const query = (args.query ?? {}) as { q?: string; refs?: string[] };
+            const access = cms.access(args.auth);
+            return {
+                status: 200,
+                body: {
+                    targets: await cms.linkTargets({
+                        ...(query.q === undefined
+                            ? {}
+                            : {
+                                  query: query.q,
+                              }),
+                        ...(query.refs === undefined
+                            ? {}
+                            : {
+                                  refs: query.refs,
+                              }),
+                        sees: (site) => access.sees(site),
+                    }),
+                },
+            };
+        }) as never
+    );
+
+    const linkedFromRoute = route({
+        method: 'GET',
+        path: `${editingBase}/linked-from`,
+        auth: editor,
+        summary: 'List every document, on any site, holding a content link to a page or an item',
+        description:
+            'What links here, read from the refs index: each document by ref, with its label, site and path, and the fields holding the link. Moving or unpublishing the target changes what these show.',
+        tool: true,
+        query: z.object({
+            ref: z.string().describe('The page or item linked to, like page:uk:plantCarePage or item:offices:k3j9x2.'),
+        }),
+        responses: {
+            200: LinkedFromSchema,
+            400: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const value = (args.query as { ref: string }).ref;
+            const ref = parseRef(value);
+            if (ref === undefined || ref.locale !== undefined)
+                throw new CmsHttpError(400, { detail: `'${value}' is not the ref of a page or an item.` });
+            const access = cms.access(args.auth);
+            return {
+                status: 200,
+                body: {
+                    documents: await linkedFrom(cms, ref, (site) => access.sees(site)),
+                },
+            };
+        }) as never
+    );
+
     const createPreview = route({
         method: 'POST',
         path: `${editingBase}/preview`,
@@ -3369,6 +3487,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                       refreshes: listRefreshes,
                   }),
             searchItems,
+            linkTargets: linkTargetsRoute,
+            linkedFrom: linkedFromRoute,
             createPreview,
             people: {
                 list: listPeople,

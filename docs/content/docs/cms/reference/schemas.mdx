@@ -1,6 +1,6 @@
 ---
 title: Schemas
-description: 'The field schemas the CMS ships: images, files, rich text and sites.'
+description: 'The field schemas the CMS ships: images, files, rich text, links and sites.'
 ---
 
 From `@kizunajs/cms/schemas`:
@@ -13,6 +13,7 @@ From `@kizunajs/cms/schemas`:
 | `FileSchema`                              | Media id, a label                                     | `{ id, url, label, size }`                                               |
 | `RichTextSchema`                          | Portable Text                                         | Portable Text, for `<RichText>`                                          |
 | `richText({ blocks: [...] })`             | Portable Text with those blocks between paragraphs    | The same, with each block's images resolved                              |
+| `link()`                                  | A page or an item by `ref`, or a URL, and a label     | `{ href, label }`, `href` `null` while the target is not published       |
 | `SiteSchema`                              | A site's built-in shape, to `extend`                  |                                                                          |
 
-`Output<T>` is a block's or field's type with images resolved. `richTextFromPlain(text)` turns a string into rich text, for a `migrate` step.
+`Output<T>` is a block's or field's type with images and links resolved. `richTextFromPlain(text)` turns a string into rich text, for a `migrate` step.

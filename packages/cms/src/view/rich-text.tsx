@@ -39,6 +39,7 @@ import { ICON, useEditorContext } from './context.js';
 import { BlockFields, BlockPicker, type ControlProps } from './controls.js';
 import { Hint } from './hint.js';
 import { MediaPicker, type MediaRecord } from './media.js';
+import { brokenNoteOf, LinkTargetRow, LinkTargetSheet, useDescribedTargets, type LinkTarget } from './link-picker.js';
 import { humanize, richTextBlockOptionsOf, SAFE_HREF, typeOf, type DescribedBlock, type JsonSchema } from './schema.js';
 
 /**
@@ -109,6 +110,10 @@ const richTextSchemaOf = (choices: readonly RichTextBlockChoice[]) =>
             {
                 name: 'link',
                 fields: [
+                    {
+                        name: 'ref',
+                        type: 'string',
+                    },
                     {
                         name: 'href',
                         type: 'string',
@@ -286,6 +291,35 @@ function RichTextBlock({ props, choice, root }: { props: BlockObjectRenderProps;
     );
 }
 
+/**
+ * The page or item behind each content link the text holds, for the links to
+ * mark the ones a reader cannot show.
+ */
+const LinkTargetsContext = createContext<ReadonlyMap<string, LinkTarget>>(new Map());
+
+/**
+ * A link in the text, marked when its page or item is unpublished or gone.
+ */
+function LinkMark({ annotation, children }: { annotation: { _type: string; ref?: unknown }; children: ReactNode }) {
+    const targets = useContext(LinkTargetsContext);
+    const target = typeof annotation.ref === 'string' ? targets.get(annotation.ref) : undefined;
+    return (
+        <span className="k-rich__link" data-broken={target !== undefined && target.status !== 'published' ? true : undefined}>
+            {children}
+        </span>
+    );
+}
+
+/**
+ * The refs of every content link in rich text.
+ */
+export const linkRefsOf = (value: unknown): string[] =>
+    Array.isArray(value)
+        ? value.flatMap((node: { markDefs?: Array<{ ref?: unknown }> }) =>
+              (node.markDefs ?? []).flatMap((mark) => (typeof mark.ref === 'string' ? [mark.ref] : []))
+          )
+        : [];
+
 const RICH_TEXT_NODES = [
     defineTextBlock({
         type: 'block',
@@ -319,7 +353,7 @@ const RICH_TEXT_NODES = [
     }),
     defineAnnotation({
         type: 'link',
-        render: ({ children }) => <span className="k-rich__link">{children}</span>,
+        render: ({ annotation, children }) => <LinkMark annotation={annotation}>{children}</LinkMark>,
     }),
     defineBlockObject({
         type: 'image',
@@ -433,29 +467,42 @@ function Toolbar({ choices }: { choices: readonly RichTextBlockChoice[] }) {
     const bullet = useEditorSelector(editor, isActiveListItem('bullet'));
     const number = useEditorSelector(editor, isActiveListItem('number'));
     const linked = useEditorSelector(editor, isActiveAnnotation('link'));
-    const [linking, setLinking] = useState(false);
+    const active = useEditorSelector(editor, getActiveAnnotations).find((annotation) => annotation._type === 'link') as
+        | {
+              ref?: string;
+              href?: string;
+          }
+        | undefined;
+    const targets = useContext(LinkTargetsContext);
+    const [linking, setLinking] = useState<'page' | 'url' | undefined>();
+    const [picking, setPicking] = useState(false);
     const [href, setHref] = useState('');
     const [problem, setProblem] = useState<string | undefined>();
 
-    const addLink = (): void => {
-        if (!SAFE_HREF.test(href)) {
-            setProblem('A link goes to https://, http://, mailto:, tel:, a path like /blog, or an #anchor.');
-            return;
-        }
+    const addLink = (value: { ref: string } | { href: string }): void => {
         editor.send({
             type: 'annotation.add',
             annotation: {
                 name: 'link',
-                value: {
-                    href,
-                },
+                value,
             },
         });
         focus();
-        setLinking(false);
+        setLinking(undefined);
         setHref('');
         setProblem(undefined);
     };
+
+    const addUrl = (): void => {
+        if (!SAFE_HREF.test(href)) {
+            setProblem('A link goes to https://, http://, mailto:, tel:, a path like /blog, or an #anchor.');
+            return;
+        }
+        addLink({
+            href,
+        });
+    };
+    const activeTarget = active?.ref === undefined ? undefined : targets.get(active.ref);
 
     return (
         <div className="k-rich__toolbar">
@@ -508,7 +555,10 @@ function Toolbar({ choices }: { choices: readonly RichTextBlockChoice[] }) {
                         <Unlink {...ICON} />
                     </ToolbarButton>
                 ) : (
-                    <ToolbarButton label="Link" active={linking} onPress={() => setLinking(!linking)}>
+                    <ToolbarButton
+                        label="Link"
+                        active={linking !== undefined}
+                        onPress={() => setLinking(linking === undefined ? 'page' : undefined)}>
                         <Link {...ICON} />
                     </ToolbarButton>
                 )}
@@ -534,21 +584,72 @@ function Toolbar({ choices }: { choices: readonly RichTextBlockChoice[] }) {
                 />
                 {choices.length === 0 ? null : <InsertBlock choices={choices} />}
             </div>
-            {linking ? (
-                <input
-                    className="k-input"
-                    autoFocus
-                    placeholder="https://, /path or mailto:"
-                    value={href}
-                    onChange={(event) => setHref(event.target.value)}
-                    onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                            event.preventDefault();
-                            addLink();
-                        }
-                        if (event.key === 'Escape') setLinking(false);
-                    }}
-                />
+            {linking === undefined ? null : (
+                <div className="k-rich__link-panel">
+                    <div className="k-segmented" role="radiogroup" aria-label="Link to">
+                        {(
+                            [
+                                ['page', 'Page'],
+                                ['url', 'URL'],
+                            ] satisfies Array<[typeof linking, string]>
+                        ).map(([choice, label]) => (
+                            <button
+                                key={choice}
+                                type="button"
+                                role="radio"
+                                className="k-tab"
+                                aria-checked={linking === choice}
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => setLinking(choice)}>
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                    {linking === 'page' ? (
+                        <button
+                            type="button"
+                            className="k-button k-button--secondary k-button--small"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => setPicking(true)}>
+                            Choose a page
+                        </button>
+                    ) : (
+                        <input
+                            className="k-input"
+                            autoFocus
+                            aria-label="URL"
+                            placeholder="https://, /path or mailto:"
+                            value={href}
+                            onChange={(event) => setHref(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    addUrl();
+                                }
+                                if (event.key === 'Escape') setLinking(undefined);
+                            }}
+                        />
+                    )}
+                </div>
+            )}
+            <LinkTargetSheet
+                open={picking}
+                onOpenChange={setPicking}
+                onPick={(target) =>
+                    addLink({
+                        ref: target.ref,
+                    })
+                }
+            />
+            {linked && active !== undefined ? (
+                <div className="k-rich__link-bar">
+                    {activeTarget !== undefined ? (
+                        <LinkTargetRow target={activeTarget} />
+                    ) : (
+                        <span className="k-ellipsis">{active.href ?? active.ref}</span>
+                    )}
+                    {brokenNoteOf(activeTarget) === undefined ? null : <span className="k-help">{brokenNoteOf(activeTarget)}</span>}
+                </div>
             ) : null}
             {problem !== undefined ? (
                 <p className="k-error" role="alert">
@@ -578,6 +679,12 @@ export function RichTextControl({ schema, root, value, onChange, disabled, block
     );
     const [schemaDefinition] = useState(() => richTextSchemaOf(choices));
     const nodes = useMemo(() => richTextNodesOf(choices, root), [choices, root]);
+    const [current, setCurrent] = useState<unknown>(value);
+    const targets = useDescribedTargets(linkRefsOf(current));
+    const broken = [...new Set(linkRefsOf(current))].flatMap((ref) => {
+        const note = brokenNoteOf(targets.get(ref));
+        return note === undefined ? [] : [note];
+    });
     return (
         <EditorProvider
             initialConfig={{
@@ -587,14 +694,23 @@ export function RichTextControl({ schema, root, value, onChange, disabled, block
             }}>
             <EventListenerPlugin
                 on={(event) => {
-                    if (event.type === 'mutation') onChange(event.value);
+                    if (event.type !== 'mutation') return;
+                    setCurrent(event.value);
+                    onChange(event.value);
                 }}
             />
             <NodePlugin nodes={nodes} />
-            <div className="k-rich">
-                {disabled ? null : <Toolbar choices={choices} />}
-                <PortableTextEditable className="k-rich__editable" />
-            </div>
+            <LinkTargetsContext.Provider value={targets}>
+                <div className="k-rich">
+                    {disabled ? null : <Toolbar choices={choices} />}
+                    <PortableTextEditable className="k-rich__editable" />
+                </div>
+                {broken.map((note) => (
+                    <p key={note} className="k-help k-rich__broken">
+                        {note}
+                    </p>
+                ))}
+            </LinkTargetsContext.Provider>
         </EditorProvider>
     );
 }

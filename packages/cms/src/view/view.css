@@ -2610,6 +2610,162 @@
         text-underline-offset: 2px;
     }
 
+    /* A link whose page is unpublished or gone reads as plain text on the site, so the editor greys it with a dotted underline. */
+    .k-rich__link[data-broken] {
+        text-decoration-style: dotted;
+        color: var(--k-muted);
+    }
+
+    .k-rich__link-panel,
+    .k-rich__link-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .k-rich__link-panel .k-input {
+        flex: 1;
+    }
+
+    .k-rich__link-bar {
+        font-size: 13px;
+    }
+
+    .k-rich__broken {
+        margin: 6px 0 0;
+    }
+
+    /* A page or an item a link points at: thumbnail, site mark, title and address on one line. */
+    .k-link-target {
+        display: flex;
+        flex: 1;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .k-link-target__thumb {
+        flex-shrink: 0;
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        object-fit: cover;
+    }
+
+    .k-link-target__mark {
+        display: inline-flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        color: var(--k-muted);
+    }
+
+    .k-link-target__label {
+        min-width: 0;
+        font-weight: 500;
+    }
+
+    .k-link-target__path {
+        min-width: 0;
+        margin-left: auto;
+        font-size: 12.5px;
+        color: var(--k-muted);
+    }
+
+    .k-link-sheet__sites {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding: 0 24px;
+    }
+
+    .k-link-field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .k-link-field__row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .k-link-field__row > .k-input {
+        flex: 1;
+    }
+
+    .k-link-field__target {
+        display: flex;
+        flex: 1;
+        align-items: center;
+        min-width: 0;
+        height: 36px;
+        padding: 0 12px;
+        border: 0;
+        border-radius: var(--k-radius-control);
+        background: var(--k-control);
+        font: inherit;
+        font-size: 13px;
+        color: var(--k-ink);
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .k-link-field__target:hover {
+        background: var(--k-control-hover);
+    }
+
+    .k-link-field__empty {
+        color: var(--k-muted);
+    }
+
+    /* The documents holding a link to this one, under the Info popover's facts. */
+    .k-linked-from {
+        margin-top: 14px;
+    }
+
+    .k-linked-from__title {
+        margin: 0 0 8px;
+        font-size: 13px;
+        color: var(--k-muted);
+    }
+
+    .k-linked-from__list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .k-linked-from__link {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        font-size: 13px;
+        color: var(--k-ink);
+        text-decoration: none;
+    }
+
+    .k-linked-from__link:hover {
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+
+    .k-review__warning {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+    }
+
     .k-rich__image {
         padding: 8px;
         border-radius: 8px;

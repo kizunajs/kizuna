@@ -48,6 +48,7 @@ import {
     emptyFor,
     humanize,
     isImage,
+    isLink,
     isRichText,
     itemBlockName,
     resolveRef,
@@ -57,6 +58,7 @@ import {
 } from './schema.js';
 import { ReferenceSheet, useItemSearch, type SearchResult } from './reference-sheet.js';
 import { RichTextControl } from './rich-text.js';
+import { LinkControl } from './link-picker.js';
 import { isSeo, SeoControl } from './seo.js';
 import { counterShown, stringInputOf } from './string-input.js';
 
@@ -934,7 +936,7 @@ export const foldsItems = (schema: JsonSchema, root: JsonSchema): boolean => {
     if (isRichText(schema) || isRichText(resolved) || typeOf(resolved) !== 'array') return false;
     const itemSchema = resolved.items ?? {};
     const item = resolveRef(itemSchema, root);
-    return typeOf(item) === 'object' && !isImage(itemSchema, root) && !isRichText(item) && !isSeo(item);
+    return typeOf(item) === 'object' && !isImage(itemSchema, root) && !isRichText(item) && !isSeo(item) && !isLink(item);
 };
 
 /**
@@ -1776,6 +1778,7 @@ export function Control(props: ControlProps) {
     if (isSeo(props.schema) || isSeo(resolved)) return <SeoControl {...props} schema={resolved} />;
     const brand = props.brand ?? resolved.brand;
     if (isImage(props.schema, props.root)) return <ImageControl {...props} schema={resolved} />;
+    if (isLink(props.schema) || isLink(resolved)) return <LinkControl {...props} schema={resolved} />;
     if (brand !== undefined && typeOf(resolved) !== 'array') return <ReferenceControl {...props} schema={resolved} brand={brand} />;
     const listed = typeOf(resolved) === 'array' ? resolveRef(resolved.items ?? {}, props.root) : undefined;
     const listedBrand = brand ?? listed?.brand;

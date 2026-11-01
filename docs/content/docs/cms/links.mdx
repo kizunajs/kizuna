@@ -1,0 +1,92 @@
+---
+title: Links
+description: 'Links to pages and items by id, which follow them when they move and go to the right site and language.'
+---
+
+A link in rich text, or in a `link()` field, goes to a page or an item picked in the CMS, or to a URL typed by hand. A link to a page holds the page's id, so it follows the page when its address changes, and the reader turns it into the address for the site and language being read.
+
+## A link field
+
+`link()` is a field for one link, like a button, or a list of them, like a menu:
+
+```ts
+import { z } from 'zod';
+import { link } from '@kizunajs/cms/schemas';
+
+{
+    name: 'menu',
+    schema: z.array(link()).max(6),
+},
+```
+
+It stores a page or an item under `ref`, or a URL under `href`, and the words it shows under `label`:
+
+```json
+[
+    {
+        "ref": "page:norway:shopsPage",
+        "label": "Butikker"
+    },
+    {
+        "href": "https://www.instagram.com/hagen",
+        "label": "Instagram"
+    }
+]
+```
+
+The component receives each link's address and label:
+
+```tsx title="src/components/menu.tsx"
+export function Menu({ menu }: { menu: Output<typeof Navigation>['menu'] }) {
+    return (
+        <ul>
+            {menu.map((item) => (
+                <li key={item.label}>{item.href === null ? item.label : <a href={item.href}>{item.label}</a>}</li>
+            ))}
+        </ul>
+    );
+}
+```
+
+`href` is `null` while the page or item is unpublished or deleted, so the label shows as plain text.
+
+## In rich text
+
+Rich text stores a link the same way, as a mark in the block's `markDefs`:
+
+```json
+{
+    "_type": "link",
+    "_key": "k2c9e1a7",
+    "ref": "page:uk:plantCarePage"
+}
+```
+
+`<RichText>` renders it as `<a href="https://hagen.example.co.uk/plant-care">`. A link whose page or item is unpublished or deleted is taken out of the text before it renders, so its words read as plain text and the page never shows a link that goes nowhere.
+
+## Picking a page
+
+The link control offers two choices. **Page** opens a search over every page, and every item a page shows, on each site and in Shared, with their thumbnail, site mark and address. **URL** takes an address typed by hand: `https://`, `http://`, `mailto:`, `tel:`, a path on the site or an `#anchor`.
+
+The control shows the page's title and site mark. A link to a page that is not published says so on the field, as Link target unpublished, and in the Publish dialog, which publishes the document all the same.
+
+Agents set a link by ref. `GET /editing/link-targets?q=plant` finds the refs to use, and `?refs=` names the ones a document holds.
+
+## Where a link goes
+
+| The link goes to                     | It becomes                                                                          |
+| ------------------------------------ | ----------------------------------------------------------------------------------- |
+| A page on the site being read        | A path in the reader's language, like `/en/butikker`                                |
+| A page on another site               | An absolute URL on that site's `url`, like `https://hagen.example.co.uk/plant-care` |
+| An item                              | The address of the page that shows it, like `/shops/oslo`                           |
+| A page or item that is not published | Nothing. Rich text drops the link, and a link field's `href` is `null`              |
+
+The language is the reader's when the target's site serves it and the target is published in it, and otherwise the site's first. A site's first language sits at the root and each other under its code, as in [several languages](/docs/cms/localization).
+
+An item goes to the page that shows it on the site being read, when that site shows it, and otherwise on the first site that does. A collection with no page at an address goes to its `preview.url`. In draft mode, links go to drafts too.
+
+## When the target changes
+
+Every link is recorded in the refs index beside the document's other references. Publishing, unpublishing or deleting the target, or changing its address, refreshes every document that links to it, on every site.
+
+**Linked from**, in a document's Info, lists the documents on any site that link to it. Agents ask the same with `GET /editing/linked-from?ref=page:uk:plantCarePage`.

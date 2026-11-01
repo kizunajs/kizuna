@@ -302,12 +302,17 @@ export interface DraftSchedule {
 }
 
 /**
- * Same rule as the CMS's rich-text links: a web or mail link, a phone number,
- * a path on the site or an anchor.
+ * Same rule as the CMS's URL links: a web or mail link, a phone number, a
+ * path on the site or an anchor.
  */
 export const SAFE_HREF = /^(?:https?:\/\/|mailto:|tel:|\/(?!\/)|#)/i;
 
 export const isRichText = (schema: JsonSchema): boolean => schema['x-kizuna'] === 'rich-text';
+
+/**
+ * Whether a field is a link, made with `link()`.
+ */
+export const isLink = (schema: JsonSchema): boolean => schema['x-kizuna'] === 'link';
 
 export const resolveRef = (schema: JsonSchema, root: JsonSchema): JsonSchema => {
     if (schema.$ref === undefined) return schema;

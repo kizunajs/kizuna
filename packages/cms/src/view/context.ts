@@ -20,6 +20,12 @@ export interface EditorContextValue {
      * shows toasts. Answers what closes the toast.
      */
     offerUndo?: (message: string, undo: () => void) => () => void;
+    /**
+     * Draws a site's mark, by its key or `default` for shared content, where
+     * the editor knows its sites. Without it, a control draws the icon the
+     * CMS answers.
+     */
+    siteMark?: (site: string) => ReactNode;
 }
 
 export const EditorContext = createContext<EditorContextValue | null>(null);

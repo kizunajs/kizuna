@@ -3,6 +3,7 @@ import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { assertWholeItem, readBlock, type Block, type BLOCK, type BlockSchema } from './block.js';
 import { dataFields, describedForAgents, objectOf } from './field.js';
 import { ImageSchema } from './image.js';
+import { richTextLinkSchema } from './links.js';
 
 const KEY = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 
@@ -12,21 +13,13 @@ const KEY = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
  */
 export const RichTextDecoratorSchema = z.enum(['strong', 'em', 'code', 'underline']);
 
-/**
- * What a link may point at: an http or https URL, `mailto:`, `tel:`, a path on
- * this site, or an anchor. Never `javascript:` or `data:`.
- */
-export const SAFE_HREF = /^(?:https?:\/\/|mailto:|tel:|\/(?!\/)|#)/i;
+export { SAFE_HREF } from './links.js';
 
-export const RichTextLinkSchema = z.object({
-    _type: z.literal('link'),
-    _key: KEY,
-    href: z
-        .string()
-        .max(2048)
-        .regex(SAFE_HREF)
-        .describe('An https or http URL, mailto:, tel:, a path on this site like /blog, or an #anchor.'),
-});
+/**
+ * A link in rich text: a page or an item picked in the CMS, by `ref`, or a
+ * URL typed by hand, under `href`.
+ */
+export const RichTextLinkSchema = richTextLinkSchema(KEY);
 
 export const RichTextSpanSchema = z.object({
     _type: z.literal('span'),
@@ -66,12 +59,12 @@ export const RichTextImageSchema = z.object({
 });
 
 const RICH_TEXT_DESCRIPTION =
-    'Portable Text: an array of blocks. A text block has _type "block", a unique _key, a style (normal, h2, h3, h4, blockquote), an optional listItem (bullet, number) and level, markDefs holding links, and children spans with text and marks. An image block has _type "image", a _key and an image.';
+    'Portable Text: an array of blocks. A text block has _type "block", a unique _key, a style (normal, h2, h3, h4, blockquote), an optional listItem (bullet, number) and level, markDefs holding links, and children spans with text and marks. A link holds a page or an item by ref, like page:uk:plantCarePage, or a URL under href. An image block has _type "image", a _key and an image.';
 
 /**
  * Rich text, stored as Portable Text and checked by Zod like every other
  * field: paragraphs, headings, quotes, lists, bold, italic, code and
- * underline, links to safe URLs, and images. Never HTML.
+ * underline, links to pages, items and safe URLs, and images. Never HTML.
  *
  * @example
  * {

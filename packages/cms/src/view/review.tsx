@@ -35,7 +35,32 @@ export interface Changes {
     canPublish: boolean;
     canPublishPastReview: boolean;
     heldBy: string | null;
+    brokenLinks?: BrokenLink[];
 }
+
+/**
+ * A content link whose page or item a reader cannot show, as the changes
+ * route answers it.
+ */
+export interface BrokenLink {
+    path: string;
+    target: string;
+    reason: 'missing' | 'unpublished' | 'trashed';
+}
+
+/**
+ * What the Publish dialog warns of a document's broken links, which publish
+ * all the same and read as plain text: "1 link goes to a page that is not
+ * published."
+ */
+export const brokenLinksWarningOf = (links: readonly BrokenLink[]): string | undefined => {
+    if (links.length === 0) return undefined;
+    const unpublished = links.every((link) => link.reason === 'unpublished');
+    const what = unpublished ? 'not published' : 'not published or deleted';
+    return links.length === 1
+        ? `1 link goes to a page that is ${what}. It shows as plain text until that page is published.`
+        : `${links.length} links go to pages that are ${what}. They show as plain text until those pages are published.`;
+};
 
 function Thumbnail({ image }: { image: { id: string } }) {
     const { connection, resolveUrl } = useEditorContext();
@@ -194,6 +219,7 @@ interface Pending {
      * The first name of someone else editing it, who holds it until they stop.
      */
     holder?: string;
+    brokenLinks: BrokenLink[];
     problem?: string;
 }
 
@@ -475,6 +501,7 @@ export function PublishReview({
                     requireReview: answer.body.requireReview,
                     canPublish: answer.body.canPublish,
                     canPublishPastReview: answer.body.canPublishPastReview,
+                    brokenLinks: answer.body.brokenLinks ?? [],
                     ...(holder === undefined
                         ? {}
                         : {
@@ -888,6 +915,12 @@ export function PublishReview({
                                             {document.problem}
                                         </p>
                                     ) : null}
+                                    {brokenLinksWarningOf(document.brokenLinks) === undefined ? null : (
+                                        <p className="k-help k-review__warning">
+                                            <CircleAlert {...ICON} />
+                                            {brokenLinksWarningOf(document.brokenLinks)}
+                                        </p>
+                                    )}
                                     {document.changes.map((change) => (
                                         <div key={change.path} className="k-review__row">
                                             <div className="k-review__body">

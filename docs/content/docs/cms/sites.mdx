@@ -275,11 +275,17 @@ It adds a `showsOn` field to the form's sidebar, **Shows on**, with a toggle for
 
 `perSite` fields hold what differs by shop, like a note about the local shop, and each language is a [translation](/docs/cms/localization#translating) of the same article. `showsOn` decides which items appear on a site, and `sites` on a field decides which fields exist there, independently of each other.
 
+## Links across sites
+
+A link picked in the CMS goes to its page on that page's own site. Hagen Norge's front page links to Hagen UK's plant care page, and reads `https://hagen.example.co.uk/plant-care`, while a link to its own shops reads `/butikker`. A shared global's link to a site's page goes to that site from every site that shows it.
+
+The address is in the reader's language when the other site serves it, and otherwise in that site's first. A link holds the page's id, so moving a page changes every link to it, and unpublishing it turns every link to it into plain text, on every site. [Links](/docs/cms/links) has the rest.
+
 ## Publishing
 
 Before a shared document publishes, the editor shows where it appears on each site: the pages whose content holds it, and the pages that listed it when they last rendered.
 
-The list names the partners that read the document too, under their label. Publishing then refreshes every site and partner that shows the document, and unpublishing and deleting do the same. Each one gets a job of its own, which calls its `invalidate` with what changed:
+The list names the partners that read the document too, under their label. Publishing then refreshes every site and partner that shows the document, and every site with a page that links to it, and unpublishing and deleting do the same. Each one gets a job of its own, which calls its `invalidate` with what changed:
 
 | Body            | Refreshes                                |
 | --------------- | ---------------------------------------- |

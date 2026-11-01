@@ -456,6 +456,57 @@ export const VersionSchema = Kizuna.model({
     }),
 });
 
+/**
+ * A content link whose page or item a reader cannot show.
+ */
+export const BrokenLinkSchema = z.object({
+    path: z.string().describe('Where the link sits, like body.2.markDefs.0.'),
+    target: z.string().describe('The ref it points at, like page:uk:plantCarePage.'),
+    reason: z.enum(['missing', 'unpublished', 'trashed']).describe('Deleted or never written, saved but not published, or in the trash.'),
+});
+
+/**
+ * Where a link's page or item stands.
+ */
+const LinkTargetStatusSchema = z
+    .enum(['published', 'unpublished', 'missing'])
+    .describe('Published, saved but not published, or deleted and never written.');
+
+export const LinkTargetsSchema = Kizuna.model({
+    title: 'CMS.LinkTargets',
+    schema: z.object({
+        targets: z.array(
+            z.object({
+                ref: z.string().describe('What a content link stores under ref.'),
+                label: z.string(),
+                site: z.string().describe('The site it belongs to, or default for shared content.'),
+                siteLabel: z.string().nullable().describe('What editors call its site, Shared for shared content, or null without sites.'),
+                siteIcon: z.string().nullable().describe("Its site's icon as a full URL, or null for shared content."),
+                path: z.string().nullable().describe("Its address on its site, in the site's first language."),
+                status: LinkTargetStatusSchema,
+                image: z.string().optional().describe('A thumbnail, for an item with an image.'),
+            })
+        ),
+    }),
+});
+
+export const LinkedFromSchema = Kizuna.model({
+    title: 'CMS.LinkedFrom',
+    schema: z.object({
+        documents: z.array(
+            z.object({
+                ref: z.string(),
+                label: z.string(),
+                site: z.string().describe('The site it belongs to, or default for shared content.'),
+                siteLabel: z.string().nullable().describe('What editors call its site, Shared for shared content, or null without sites.'),
+                siteIcon: z.string().nullable().describe("Its site's icon as a full URL, or null for shared content."),
+                path: z.string().nullable().describe('Where it is served, when it is a page or an item a page shows.'),
+                fieldPaths: z.array(z.string()).describe('The fields holding the link.'),
+            })
+        ),
+    }),
+});
+
 export const DraftChangesSchema = Kizuna.model({
     title: 'CMS.DraftChanges',
     schema: z.object({
@@ -466,6 +517,9 @@ export const DraftChangesSchema = Kizuna.model({
         ...ReviewFields,
         canPublishPastReview: z.boolean().describe('Whether the caller may publish it before its review is approved, with `force`.'),
         heldBy: HeldBySchema,
+        brokenLinks: z
+            .array(BrokenLinkSchema)
+            .describe('Content links whose page or item is not published or is gone. They read as plain text, and publishing goes ahead.'),
         changes: z
             .array(
                 z.object({
@@ -1042,6 +1096,36 @@ export const DraftCandidatesSchema = Kizuna.model({
                 updatedAt: z.iso.datetime(),
                 updatedBy: PersonSchema,
                 scheduled: z.boolean().describe('Whether it is scheduled already, on its own or in a release.'),
+            })
+        ),
+    }),
+});
+
+export const PublishIssueSchema = Kizuna.model({
+    title: 'CMS.PublishIssue',
+    schema: z.object({
+        level: z.enum(['block', 'warning']).describe('A `block` refuses the publish. A `warning` lets it through.'),
+        kind: z
+            .enum(['nothing', 'permission', 'missing', 'language', 'brokenLink', 'held', 'review', 'schedule'])
+            .describe(
+                'Nothing to publish, a publish you may not make, a required field missing, a translation with empty fields, a link to a page that is gone or unpublished, someone editing it, a review it waits for, or a schedule publishing ends.'
+            ),
+        detail: z.string(),
+        path: z.string().nullable().describe('The field it is about, by path, when it is about one.'),
+        site: z.string().nullable().describe('The site the document belongs to, or null for shared content.'),
+        locale: z.string().nullable().describe('The language it is about, or null for the source.'),
+    }),
+});
+
+export const PublishCheckSchema = Kizuna.model({
+    title: 'CMS.PublishCheck',
+    schema: z.object({
+        ready: z.boolean().describe('Whether it would publish now: no issue blocks.'),
+        documents: z.array(
+            z.object({
+                ref: z.string(),
+                title: z.string(),
+                issues: z.array(PublishIssueSchema),
             })
         ),
     }),

@@ -18,9 +18,20 @@ import { DocumentMore, type DocumentMoreHandle } from './document-more.js';
 import { scheduleFactOf } from './schedule-ui.js';
 import { whenOf } from '../view/schedule-time.js';
 import { savedAtOf, type VersionSummary } from './history.js';
-import { addressSite, hasSites, hrefOf, navigate, siteOf } from './navigation.js';
-import { SiteFact, SiteTabs } from './site-switcher.js';
+import { addressSite, hasSites, hrefOf, navigate, replaceQuery, siteOf } from './navigation.js';
+import { SiteFact, SiteIcon, SiteTabs } from './site-switcher.js';
 import type { AdminSite } from './config.js';
+
+/**
+ * A document holding a content link to the open one, as the Info popover
+ * lists it.
+ */
+interface LinkedFrom {
+    ref: string;
+    label: string;
+    site: string;
+    siteLabel: string | null;
+}
 import { ShowsOn } from './shows-on.js';
 import { PageHeader, type Crumb } from './page-header.js';
 import { refInLocale } from './translation.js';
@@ -672,6 +683,18 @@ export function DocumentScreen({
         [siteUrl]
     );
     const documentPath = document?.path ?? undefined;
+    const [linkedFrom, setLinkedFrom] = useState<LinkedFrom[] | undefined>();
+    const loadLinkedFrom = useCallback(
+        async (ref: string): Promise<void> => {
+            const answer = await connection.call<{ documents: LinkedFrom[] }>('editing_linked_from', {
+                query: {
+                    ref,
+                },
+            });
+            setLinkedFrom(answer.status === 200 ? answer.body.documents : []);
+        },
+        [connection]
+    );
     const editorContext = useMemo<EditorContextValue>(
         () => ({
             // A site's own document picks among the site's images and the shared ones, and shared content among shared images alone.
@@ -679,6 +702,7 @@ export function DocumentScreen({
             resolveUrl,
             pageUrl: siteUrl === null || documentPath === undefined ? undefined : new URL(documentPath, siteUrl).toString(),
             offerUndo,
+            siteMark: (site) => <SiteIcon site={siteOf(site)} />,
         }),
         [connection, documentRef, resolveUrl, siteUrl, documentPath, offerUndo]
     );
@@ -1024,7 +1048,22 @@ export function DocumentScreen({
         setLanguageView('edit');
         setOpenChange(undefined);
         setFilled(new Set());
+        setOpenThread(undefined);
+        setComposing(undefined);
     }, [documentRef]);
+
+    // Waiting links a comment as `?comment=<id>`, which opens its thread at its field once the comments load.
+    useEffect(() => {
+        const linked = new URL(window.location.href).searchParams.get('comment');
+        if (linked === null) return;
+        const found = comments.find((comment) => comment.id === linked);
+        if (found === undefined) return;
+        setOpenThread(found.replyTo ?? found.id);
+        setPointed(found.path);
+        replaceQuery({
+            comment: undefined,
+        });
+    }, [comments]);
 
     // The languages grid opens a translation straight in translate mode.
     useEffect(() => {
@@ -1226,7 +1265,10 @@ export function DocumentScreen({
         );
 
     const info = (
-        <Popover.Root>
+        <Popover.Root
+            onOpenChange={(open) => {
+                if (open) void loadLinkedFrom(document.ref);
+            }}>
             <Popover.Trigger className="k-tab k-document__info-toggle">
                 <Info {...ICON} />
                 Info
@@ -1274,6 +1316,37 @@ export function DocumentScreen({
                                 </>
                             )}
                         </dl>
+                        {linkedFrom === undefined || linkedFrom.length === 0 ? null : (
+                            <div className="k-linked-from">
+                                <p className="k-linked-from__title">Linked from</p>
+                                <ul className="k-linked-from__list">
+                                    {linkedFrom.map((holder) => (
+                                        <li key={holder.ref}>
+                                            <a
+                                                className="k-linked-from__link"
+                                                href={hrefOf({
+                                                    kind: 'document',
+                                                    ref: holder.ref,
+                                                })}
+                                                onClick={(event) => {
+                                                    event.preventDefault();
+                                                    navigate(
+                                                        hrefOf({
+                                                            kind: 'document',
+                                                            ref: holder.ref,
+                                                        })
+                                                    );
+                                                }}>
+                                                {holder.siteLabel === null ? null : (
+                                                    <SiteIcon site={holder.site === 'default' ? undefined : siteOf(holder.site)} />
+                                                )}
+                                                <span className="k-ellipsis">{holder.label}</span>
+                                            </a>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                     </Popover.Popup>
                 </Popover.Positioner>
             </Popover.Portal>

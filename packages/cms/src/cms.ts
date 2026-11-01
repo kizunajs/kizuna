@@ -47,6 +47,18 @@ import { pathRefusal, type Caller } from './rules.js';
 import { EditorAccess } from './site-access.js';
 import { queueRefreshes, refreshTargets, REFRESH_JOB } from './refresh.js';
 import {
+    brokenLinksOf,
+    contentLinks,
+    linkHolderTags,
+    linkTargets,
+    resolveLinks,
+    type BrokenLink,
+    type ContentLinkEdge,
+    type LinkCopy,
+    type LinkTarget,
+} from './link-targets.js';
+import { trashItem } from './trash.js';
+import {
     DocumentStore,
     SOURCE_LOCALE,
     VersionConflictError,
@@ -1376,13 +1388,59 @@ export class CmsService {
         site: string,
         locale?: string
     ): Promise<{ content: Record<string, unknown>; version: number; updatedAt: Date } | undefined> {
-        const shared = await this.inLocale(ref, this.readLocale(site, locale), (copy) => this.published(copy));
+        const reading = this.readLocale(site, locale);
+        const shared = await this.inLocale(ref, reading, (copy) => this.published(copy));
         if (shared === undefined || this.hidesOn(ref, site, shared.content)) return undefined;
-        if (!this.readsSiteValues(ref, site)) return shared;
+        const definition = this.target(ref).definition;
+        const content = this.readsSiteValues(ref, site)
+            ? this.withSiteValues(definition, shared.content, await this.siteValues(ref, site, 'published'), site)
+            : shared.content;
         return {
             ...shared,
-            content: this.withSiteValues(this.target(ref).definition, shared.content, await this.siteValues(ref, site, 'published'), site),
+            content: await this.withLinks(definition, content, site, reading, 'published'),
         };
+    }
+
+    /**
+     * Content with each content link turned into its address for the site and
+     * language being read.
+     */
+    private withLinks(
+        definition: ContentDefinition,
+        content: Record<string, unknown>,
+        site: string,
+        locale: string | undefined,
+        copy: LinkCopy
+    ): Promise<Record<string, unknown>> {
+        return resolveLinks(
+            this,
+            definition,
+            content,
+            {
+                site,
+                locale,
+            },
+            copy
+        );
+    }
+
+    /**
+     * A document's content as stored, in a language, with a translation over
+     * its source: the published copy, or with `draft` the draft and else the
+     * published copy. `undefined` when it has none in that language or a
+     * language it falls back to.
+     */
+    async storedIn(ref: DocumentRef, locale: string | undefined, copy: LinkCopy): Promise<Record<string, unknown> | undefined> {
+        const found = await this.inLocale(ref, locale, async (each) => {
+            const { row } = await this.document(each);
+            const content = copy === 'draft' ? (row?.draft ?? row?.published) : row?.publishedVersion === null ? null : row?.published;
+            return content === null || content === undefined
+                ? undefined
+                : {
+                      content,
+                  };
+        });
+        return found?.content;
     }
 
     /**
@@ -1392,7 +1450,8 @@ export class CmsService {
      * its published copy.
      */
     async draftOn(ref: DocumentRef, site: string, fallBack: boolean, locale?: string): Promise<Record<string, unknown> | undefined> {
-        const shown = await this.inLocale(ref, this.readLocale(site, locale), async (copy) => {
+        const reading = this.readLocale(site, locale);
+        const shown = await this.inLocale(ref, reading, async (copy) => {
             const content =
                 (await this.draft(copy))?.content ??
                 (fallBack || copy.locale !== undefined ? (await this.published(copy))?.content : undefined);
@@ -1403,8 +1462,11 @@ export class CmsService {
                   };
         });
         if (shown === undefined || this.hidesOn(ref, site, shown.content)) return undefined;
-        if (!this.readsSiteValues(ref, site)) return shown.content;
-        return this.withSiteValues(this.target(ref).definition, shown.content, await this.siteValues(ref, site, 'draft'), site);
+        const definition = this.target(ref).definition;
+        const content = this.readsSiteValues(ref, site)
+            ? this.withSiteValues(definition, shown.content, await this.siteValues(ref, site, 'draft'), site)
+            : shown.content;
+        return this.withLinks(definition, content, site, reading, 'draft');
     }
 
     /**
@@ -1920,14 +1982,20 @@ export class CmsService {
             )?.content;
             if (presented === undefined) continue;
             items.push(
-                this.readsSiteValues(target.ref, readingSite)
-                    ? this.withSiteValues(
-                          listing.definition,
-                          presented,
-                          await this.siteValues(target.ref, readingSite, query.draft ? 'draft' : 'published'),
-                          readingSite
-                      )
-                    : presented
+                await this.withLinks(
+                    listing.definition,
+                    this.readsSiteValues(target.ref, readingSite)
+                        ? this.withSiteValues(
+                              listing.definition,
+                              presented,
+                              await this.siteValues(target.ref, readingSite, query.draft ? 'draft' : 'published'),
+                              readingSite
+                          )
+                        : presented,
+                    readingSite,
+                    reading,
+                    query.draft ? 'draft' : 'published'
+                )
             );
         }
         return {
@@ -3676,7 +3744,7 @@ export class CmsService {
      * The target of a stored source document something in code still
      * declares, or `undefined` for an orphan.
      */
-    private declaredTarget(row: DocumentRow, listings: ReturnType<CmsService['listings']>): Target | undefined {
+    declaredTarget(row: DocumentRow, listings: ReturnType<CmsService['listings']>): Target | undefined {
         const site =
             row.site === DEFAULT_SITE
                 ? {}
@@ -3849,10 +3917,9 @@ export class CmsService {
     async revalidateDocument(translated: DocumentRef, sites?: readonly string[]): Promise<void> {
         const ref = sourceRefOf(translated);
         const readers = this.readersOf(ref).filter((site) => sites === undefined || sites.includes(site));
-        const tags = readers.flatMap((site) => [
-            ref.type === 'page' ? pageCacheTag(ref.name, ref.site) : documentCacheTag(ref, site),
-            ...(ref.type === 'item' ? [collectionCacheTag(ref.collection, site)] : []),
-        ]);
+        const tags = this.ownTags(ref, readers);
+        // A content link reads the page or item's address and whether it is live, so the documents holding one refresh too.
+        tags.push(...(await linkHolderTags(this, ref, (holder) => this.ownTags(holder))));
         const brand = ref.type === 'item' ? this.servedListing(ref.collection, ref.site ?? DEFAULT_SITE).brand : undefined;
         if (brand !== undefined && ref.type === 'item') {
             tags.push(
@@ -3869,6 +3936,45 @@ export class CmsService {
         // A language that falls back to this one shows it too.
         const shown = this.locales().filter((candidate) => candidate === locale || this.options.fallback?.[candidate]?.includes(locale));
         await this.revalidateTags([...new Set(tags.flatMap((tag) => shown.map((each) => localeCacheTag(tag, each))))]);
+    }
+
+    /**
+     * The cache tags of a document's own reads on the sites given, by default
+     * every site that reads it: a page's, or an item's and its collection's
+     * lists, or a global's.
+     */
+    ownTags(ref: DocumentRef, readers: readonly string[] = this.readersOf(ref)): string[] {
+        return readers.flatMap((site) => [
+            ref.type === 'page' ? pageCacheTag(ref.name, ref.site) : documentCacheTag(ref, site),
+            ...(ref.type === 'item' ? [collectionCacheTag(ref.collection, site)] : []),
+        ]);
+    }
+
+    /**
+     * The content links in a document's draft, or its published copy, whose
+     * page or item a reader cannot show, for the Publish dialog to warn of.
+     */
+    brokenLinksOf(ref: DocumentRef): Promise<BrokenLink[]> {
+        return brokenLinksOf(this, ref);
+    }
+
+    /**
+     * Every document holding a content link, with what it links to, read from
+     * the refs index.
+     */
+    contentLinks(): Promise<ContentLinkEdge[]> {
+        return contentLinks(this);
+    }
+
+    /**
+     * The pages and items a content link may point at, found by a search
+     * term on the sites `sees` allows, or the ones `refs` names.
+     */
+    linkTargets(input: { query?: string; refs?: readonly string[]; sees?: (site: string) => boolean }): Promise<LinkTarget[]> {
+        return linkTargets(this, {
+            ...input,
+            sees: input.sees ?? (() => true),
+        });
     }
 
     /**

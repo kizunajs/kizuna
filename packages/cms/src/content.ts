@@ -4,6 +4,7 @@ import { readBlock, readBlocks } from './block.js';
 import { optionOf } from './union.js';
 import { readRichTextBlocks } from './rich-text.js';
 import { isImageSchema } from './image.js';
+import { LINK_BRAND, linkKindOf } from './links.js';
 import { conditionForWire, conditionHolds, type WireCondition } from './condition.js';
 import {
     comparedValue,
@@ -307,6 +308,17 @@ export const IMAGE_BRAND = 'CMS.Image';
 
 const collectRefs = (schema: z.core.$ZodType, value: unknown, path: string, into: Ref[]): void => {
     if (value === undefined || value === null) return;
+    if (linkKindOf(schema) !== undefined) {
+        const ref = typeof value === 'object' ? (value as { ref?: unknown }).ref : undefined;
+        if (typeof ref === 'string') {
+            into.push({
+                brand: LINK_BRAND,
+                refId: ref,
+                fieldPath: path,
+            });
+        }
+        return;
+    }
     if (isImageSchema(schema)) {
         // A translation's image field holds its alt text, so only the source's object names the image.
         const id = typeof value === 'object' ? (value as { id?: unknown }).id : undefined;
@@ -351,8 +363,9 @@ const collectRefs = (schema: z.core.$ZodType, value: unknown, path: string, into
 };
 
 /**
- * Every branded id a document holds, and every image, with the field path it
- * sits at. Rebuilt on every save, so `cms_refs` always mirrors the content.
+ * Every branded id a document holds, every image, and every page or item a
+ * content link points at, with the field path it sits at. Rebuilt on every
+ * save, so `cms_refs` always mirrors the content.
  */
 export const refsOf = (page: ContentDefinition, content: Record<string, unknown>): Ref[] => {
     const refs: Ref[] = [];

@@ -102,7 +102,12 @@ export {
     type ResolvedImage,
 } from './image.js';
 export { type Output, type Resolved } from './output.js';
+export { link, LINK_BRAND, type LinkRef, type ResolvedLink } from './links.js';
+export { type BrokenLink, type ContentLinkEdge, type LinkTarget } from './link-targets.js';
 export { cms } from './provider.js';
+export { AgentInstructions } from './instructions.js';
+export { withAgent } from './agents.js';
+export { type PublishCheck, type PublishIssue } from './publish-check.js';
 export {
     SiteSchema,
     declareSites,
