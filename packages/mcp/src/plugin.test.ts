@@ -9,6 +9,7 @@ import { definePlugin } from 'kizunajs/plugin';
 import { Client } from '@modelcontextprotocol/client';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { mcpPlugin } from './plugin.js';
+import { mcpCallOf } from './mcp-server.js';
 
 interface Config {
     groups: typeof kGroups;
@@ -34,6 +35,11 @@ const greetingPlugin = definePlugin({
 });
 
 const deleted: string[] = [];
+
+/**
+ * The client each call to `whoAmI` came from, as its handler read it.
+ */
+const callers: unknown[] = [];
 
 const routes = k.routes({
     deleteUser: k
@@ -77,6 +83,27 @@ const routes = k.routes({
                 greeting: plugins.greeting.greet(params.name),
             },
         })),
+    whoAmI: k
+        .route({
+            method: 'GET',
+            path: '/me',
+            tool: true,
+            summary: 'Say who is calling',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        })
+        .handler((args) => {
+            callers.push(mcpCallOf(args));
+            return {
+                status: 200,
+                body: {
+                    ok: true,
+                },
+            };
+        }),
     getUser: k
         .route({
             method: 'GET',
@@ -157,6 +184,62 @@ describe('mcpPlugin', () => {
         const connected = await connect();
         const { tools } = await connected.listTools();
         expect(tools.map((tool) => tool.name)).toContain('get_user');
+    });
+
+    it("tells a tool call's handler which client made it, on every request", async () => {
+        callers.length = 0;
+        const started = await start();
+        running = started.server;
+        const connected = new Client(
+            {
+                name: 'claude-ai',
+                title: 'Claude',
+                version: '1.0.0',
+            },
+            {
+                versionNegotiation: {
+                    mode: {
+                        pin: '2026-07-28',
+                    },
+                },
+            }
+        );
+        await connected.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${started.port}/mcp`)));
+        client = connected;
+        await connected.callTool({
+            name: 'who_am_i',
+            arguments: {},
+        });
+        expect(callers).toEqual([
+            {
+                client: expect.objectContaining({
+                    name: 'claude-ai',
+                    title: 'Claude',
+                }),
+            },
+        ]);
+    });
+
+    it('says a tool call came from a client it cannot name, when the 2025 protocol named it in a request of its own', async () => {
+        callers.length = 0;
+        const connected = await connect();
+        await connected.callTool({
+            name: 'who_am_i',
+            arguments: {},
+        });
+        expect(callers).toEqual([
+            {
+                client: undefined,
+            },
+        ]);
+    });
+
+    it('tells an HTTP request apart from a tool call', async () => {
+        callers.length = 0;
+        const started = await start();
+        running = started.server;
+        await fetch(`http://127.0.0.1:${started.port}/me`);
+        expect(callers).toEqual([undefined]);
     });
 
     it('calls a tool, which runs the contract handler', async () => {
@@ -350,7 +433,7 @@ describe('mcpPlugin', () => {
     });
 
     it('leaves the endpoint out of the contract, so clients never see it', () => {
-        expect(Object.keys(contract.routes)).toEqual(['deleteUser', 'greetUser', 'getUser']);
+        expect(Object.keys(contract.routes)).toEqual(['deleteUser', 'greetUser', 'whoAmI', 'getUser']);
     });
 
     it('still serves the contract routes over HTTP', async () => {

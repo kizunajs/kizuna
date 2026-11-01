@@ -5,7 +5,7 @@ import { defineConfig } from 'kizunajs';
 import { assembleApi, type GuardDeny } from 'kizunajs/adapter';
 import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/client';
-import { buildInstructions, buildMcpTools, createMcpServer } from './mcp-server.js';
+import { buildInstructions, buildMcpTools, createMcpServer, mcpCallOf } from './mcp-server.js';
 
 interface Config {
     groups: typeof kGroups;
@@ -1981,6 +1981,38 @@ describe('MCP server: request context in guards', () => {
                 sessionId: 'session-9',
             },
         });
+        await close();
+    });
+});
+
+describe('the client behind a tool call', () => {
+    it('reaches the handler from `initialize`, on a connection that lasts', async () => {
+        const seen: unknown[] = [];
+        const { client, close } = await connectMcpClient(
+            buildApi({
+                ...router,
+                health: (args: object) => {
+                    seen.push(mcpCallOf(args));
+                    return {
+                        status: 200,
+                        body: {
+                            ok: true,
+                        },
+                    };
+                },
+            })
+        );
+        await client.callTool({
+            name: 'health',
+            arguments: {},
+        });
+        expect(seen).toEqual([
+            {
+                client: expect.objectContaining({
+                    name: 'test-client',
+                }),
+            },
+        ]);
         await close();
     });
 });

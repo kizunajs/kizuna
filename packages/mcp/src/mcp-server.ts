@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { problemDetails } from 'kizunajs';
 import {
+    CLIENT_INFO_META_KEY,
     McpServer,
     inputRequired,
     inputResponse,
@@ -122,6 +123,55 @@ const APPROVAL_KEY = 'approved';
  * The `_meta` key a view sets on a call the person already confirmed in it.
  */
 export const APPROVED_META = 'io.kizunajs/approved';
+
+/**
+ * The MCP client that made a tool call, as its `clientInfo` names it: `name`
+ * like `claude-ai`, and a `title` for people, like `Claude`.
+ */
+export interface McpClientInfo {
+    name: string;
+    title?: string;
+    version: string;
+}
+
+/**
+ * What a handler finds under {@link MCP_CALL} when a tool call ran it. `client`
+ * is undefined when the client never said who it is.
+ */
+export interface McpCall {
+    client: McpClientInfo | undefined;
+}
+
+/**
+ * Where a tool call's handler finds the {@link McpCall}, on its args. A
+ * registry symbol, so a package can read it without importing this one, and
+ * an HTTP request can never set it.
+ */
+export const MCP_CALL: unique symbol = Symbol.for('kizuna.mcp.call') as symbol as typeof MCP_CALL;
+
+/**
+ * The tool call that ran a handler, or undefined when an HTTP request did.
+ *
+ * ```ts
+ * const agent = mcpCallOf(args)?.client?.title;
+ * ```
+ */
+export const mcpCallOf = (args: object): McpCall | undefined => (args as { [MCP_CALL]?: McpCall })[MCP_CALL];
+
+const isClientInfo = (value: unknown): value is McpClientInfo =>
+    value !== null && typeof value === 'object' && typeof (value as { name?: unknown }).name === 'string';
+
+/**
+ * Who is calling. The 2026-07-28 protocol names the client on every request,
+ * under `_meta`. The 2025 protocol names it once, in `initialize`, which a
+ * connection that lasts, like stdio, still holds when the call comes.
+ */
+const clientOf = (context: McpToolContext, server: McpServer): McpClientInfo | undefined => {
+    const named = context.mcpReq?._meta?.[CLIENT_INFO_META_KEY];
+    if (isClientInfo(named)) return named;
+    const initialized = server.server.getClientVersion();
+    return isClientInfo(initialized) ? initialized : undefined;
+};
 
 const approvalTitle = (route: RouteDefinition): string => toolOptionsOf(route)?.title ?? route.summary ?? `${route.method} ${route.path}`;
 
@@ -579,7 +629,8 @@ const executeToolCall = async (
     contextResolvers?: RequestContextMap,
     transportAuth?: McpServerOptions['transportAuth'],
     guardSchema?: z.ZodType,
-    apiArgs?: Record<string, unknown>
+    apiArgs?: Record<string, unknown>,
+    call?: McpCall
 ): Promise<ToolCallResult> => {
     const params = (args.params ?? {}) as Record<string, string>;
     const query = (args.query ?? {}) as Record<string, unknown>;
@@ -659,6 +710,11 @@ const executeToolCall = async (
             ...apiArgs,
             ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
             ...(Object.keys(guardOutcome.securityContext).length > 0 ? { auth: guardOutcome.securityContext } : {}),
+            ...(call === undefined
+                ? {}
+                : {
+                      [MCP_CALL]: call,
+                  }),
         });
 
         return toolEnvelope(result.status, result.body);
@@ -795,7 +851,10 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                     contextResolvers,
                     options?.transportAuth,
                     guardSchema,
-                    apiArgs
+                    apiArgs,
+                    {
+                        client: clientOf(context, server),
+                    }
                 );
             }
         );
