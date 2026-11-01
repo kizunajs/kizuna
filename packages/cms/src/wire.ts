@@ -218,6 +218,7 @@ export const DescribedBlockSchema = Kizuna.model({
         name: z.string().describe('What an item of the list stores under its block key.'),
         label: z.string().optional().describe('What editors see the block called.'),
         description: z.string().optional().describe('What the block is for, read when choosing one.'),
+        icon: z.string().optional().describe('The icon editors see beside its label, like quote or image.'),
         fields: z
             .array(
                 z.object({

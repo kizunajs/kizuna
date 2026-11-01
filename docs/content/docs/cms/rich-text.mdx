@@ -67,7 +67,7 @@ A block sits in the text as a node of its own, with its name under `_type`, a `_
 }
 ```
 
-Editors insert a block from the toolbar, beside Image, or by typing `/` and its label. With one block it is a button of its own, and with several, a picker of every block by label and description. The block shows its fields in the text, and its `…` menu moves it up or down, or removes it. The agent reads the same blocks off the field, and writes each node with its `_type`, `_key` and fields. Each node is checked against its block's fields, and one naming a block the field does not hold is refused.
+Editors insert a block from the toolbar, beside Image, or by typing `/` and its label. With one block it is a button of its own, and with several, a picker of every block by label and description. In the text a block is one row with its icon and label. Folded, the row shows what the block holds: a choice it makes, its first words, its photos, or the name and photo of an item it picks. Open, its fields show under the row. A block just inserted starts open, and its `…` menu moves it up or down, or removes it. The agent reads the same blocks off the field, and writes each node with its `_type`, `_key` and fields. Each node is checked against its block's fields, and one naming a block the field does not hold is refused.
 
 `RichText` takes a component for each block, keyed by its name, and hands it the block's fields:
 

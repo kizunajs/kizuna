@@ -12,6 +12,7 @@ defineBlock(definition: BlockDefinition): ZodObject
 | `name`        | `string`  | The block's name, camelCase, stored under `block` in a `blocks()` list |
 | `label`       | `string`  | What editors see it called. Without one, its name                      |
 | `description` | `string`  | What editors and the agent read when they choose a block               |
+| `icon`        | `string`  | The icon beside its label, one of the names listed below               |
 | `fields`      | `Field[]` | What editors may change, in order                                      |
 
 The result is a Zod object schema, so a page field takes it where it takes any schema, and [`blocks()`](/docs/cms/reference/blocks) takes it as one of the blocks a list may hold. `Output<typeof HeroBlockSchema>` is the type a component receives, with images resolved.
@@ -32,5 +33,7 @@ export const HeroBlockSchema = defineBlock({
     ],
 });
 ```
+
+An icon is one of `article`, `button`, `calendar`, `code`, `columns`, `file`, `gallery`, `image`, `info`, `leaf`, `link`, `list`, `mail`, `map`, `megaphone`, `person`, `people`, `product`, `question`, `quote`, `star`, `table`, `video` and `warning`. The `BlockIcon` type lists them.
 
 See [Blocks](/docs/cms/blocks).

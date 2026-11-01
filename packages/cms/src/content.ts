@@ -75,6 +75,7 @@ export interface DescribedBlock {
     name: string;
     label: string | undefined;
     description: string | undefined;
+    icon: BlockIcon | undefined;
     fields: DescribedField[];
 }
 
@@ -143,6 +144,7 @@ const describe = (
             name: each.name,
             label: each.label,
             description: each.description,
+            icon: each.icon,
             // An item's fields show in order, in the card it opens into, so its layout items are left out.
             fields: describeList(each.fields, '', [], []).map((inner) => ({
                 ...inner,
@@ -167,6 +169,11 @@ export const blocksForWire = (blocks: readonly DescribedBlock[]) =>
             ? {}
             : {
                   description: block.description,
+              }),
+        ...(block.icon === undefined
+            ? {}
+            : {
+                  icon: block.icon,
               }),
         fields: block.fields.map((field) => ({
             name: field.name,

@@ -7,6 +7,7 @@ export {
     BLOCK_KEY,
     type Block,
     type BlockDefinition,
+    type BlockIcon,
     type BlockSchema,
     type BlocksSchema,
     type TaggedBlockSchema,

@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Menu } from '@base-ui/react/menu';
 import {
     defineAnnotation,
     defineBlockObject,
@@ -21,24 +20,7 @@ import {
     isActiveListItem,
     isActiveStyle,
 } from '@portabletext/editor/selectors';
-import {
-    ArrowDown,
-    ArrowUp,
-    Blocks,
-    Bold,
-    Code,
-    Ellipsis,
-    Heading2,
-    Heading3,
-    Italic,
-    Link,
-    List,
-    ListOrdered,
-    Pilcrow,
-    Quote,
-    Underline,
-    Unlink,
-} from 'lucide-react';
+import { Blocks, Bold, Code, Heading2, Heading3, Italic, Link, List, ListOrdered, Pilcrow, Quote, Underline, Unlink } from 'lucide-react';
 import { ICON, useEditorContext } from './context.js';
 import { BlockPicker, type ControlProps } from './controls.js';
 import { blockIconOf } from './block-icons.js';
@@ -572,6 +554,7 @@ export function RichTextControl({ schema, root, value, onChange, disabled, block
                     ...option,
                     described,
                     label: described?.label ?? humanize(option.name),
+                    icon: blockIconOf(described?.icon),
                 };
             }),
         [schema, root, blocks]

@@ -57,6 +57,7 @@ import {
     type JsonSchema,
 } from './schema.js';
 import { ReferenceSheet, useItemSearch, type SearchResult } from './reference-sheet.js';
+import { blockIconOf } from './block-icons.js';
 import { RichTextControl } from './rich-text.js';
 import { LinkControl } from './link-picker.js';
 import { isSeo, SeoControl } from './seo.js';
@@ -1751,16 +1752,22 @@ export function BlockPicker({
                         <p className="k-help">Nothing matches “{query.trim()}”.</p>
                     ) : (
                         <ul className="k-block-picker__list">
-                            {shown.map((choice) => (
-                                <li key={choice.name}>
-                                    <button type="button" className="k-block-picker__card" onClick={() => onPick(choice.name)}>
-                                        <span className="k-block-picker__name">{choice.label}</span>
-                                        {choice.described?.description === undefined ? null : (
-                                            <span className="k-block-picker__description">{choice.described.description}</span>
-                                        )}
-                                    </button>
-                                </li>
-                            ))}
+                            {shown.map((choice) => {
+                                const Icon = blockIconOf(choice.described?.icon);
+                                return (
+                                    <li key={choice.name}>
+                                        <button type="button" className="k-block-picker__card" onClick={() => onPick(choice.name)}>
+                                            <span className="k-block-picker__name">
+                                                <Icon {...ICON} />
+                                                {choice.label}
+                                            </span>
+                                            {choice.described?.description === undefined ? null : (
+                                                <span className="k-block-picker__description">{choice.described.description}</span>
+                                            )}
+                                        </button>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
                 </Dialog.Popup>

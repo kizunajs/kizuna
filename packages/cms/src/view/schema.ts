@@ -34,6 +34,7 @@ export interface DescribedBlock {
     name: string;
     label?: string;
     description?: string;
+    icon?: string;
     fields: Array<{
         name: string;
         label?: string;

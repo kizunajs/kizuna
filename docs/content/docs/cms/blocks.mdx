@@ -36,7 +36,7 @@ export const HeroBlockSchema = defineBlock({
 });
 ```
 
-`label` is what editors see the block called, and `description` is what they read when they choose one. Without a label, they see the block's name.
+`label` is what editors see the block called, and `description` is what they read when they choose one. Without a label, they see the block's name. `icon` sits beside the label, in the text and where editors choose a block, and takes one of a fixed set of names like `quote`, `image` or `question`. Without one, the block shows a generic block icon.
 
 `defineBlock()` returns a Zod object schema, and `Output<T>` is that schema with images resolved, so the component is typed from the block:
 

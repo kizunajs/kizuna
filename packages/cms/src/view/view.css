@@ -1630,8 +1630,16 @@
     }
 
     .k-block-picker__name {
+        display: flex;
+        align-items: center;
+        gap: 8px;
         font-size: 13.5px;
         font-weight: 500;
+    }
+
+    .k-block-picker__name svg {
+        flex-shrink: 0;
+        color: var(--k-muted);
     }
 
     .k-block-picker__description {
@@ -2810,14 +2818,25 @@
         border-radius: 6px;
     }
 
-    /* A block in the text: its name and menu on one line, its fields under them, set like the image beside it. */
+    /* A block in the text: one filled row with its icon, label and what it holds, which opens into its fields. */
+    .k-rich__block {
+        margin: 12px 0;
+    }
+
     .k-rich__block-card {
         display: flex;
         flex-direction: column;
-        gap: 8px;
-        padding: 6px 8px 10px;
-        border-radius: 8px;
+        border-radius: var(--k-radius-control);
         background: var(--k-tint);
+        transition: box-shadow 0.12s ease;
+    }
+
+    .k-rich__block-card[data-open='true'] {
+        border-radius: var(--k-radius-card);
+    }
+
+    .k-rich__block-card:focus-within {
+        box-shadow: 0 0 0 1px var(--k-line-strong);
     }
 
     .k-rich__block[data-selected='true'] .k-rich__block-card {
@@ -2827,23 +2846,110 @@
     .k-rich__block-head {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        gap: 8px;
+        gap: 2px;
+        min-height: 40px;
+        padding: 0 4px 0 0;
+    }
+
+    .k-rich__block-toggle {
+        display: flex;
+        flex: 1;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        height: 40px;
+        padding: 0 6px 0 12px;
+        border: 0;
+        border-radius: var(--k-radius-control);
+        background: none;
+        font: inherit;
+        font-size: 13.5px;
+        text-align: left;
+        color: var(--k-ink);
+        cursor: pointer;
+    }
+
+    .k-rich__block-toggle:focus-visible {
+        outline: 2px solid var(--k-ink);
+        outline-offset: -2px;
+    }
+
+    .k-rich__block-icon {
+        flex-shrink: 0;
+        color: var(--k-muted);
     }
 
     .k-rich__block-name {
-        color: var(--k-muted);
-        font-size: 12.5px;
+        flex-shrink: 0;
         font-weight: 500;
+    }
+
+    .k-rich__block-summary {
+        display: flex;
+        flex: 1;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        color: var(--k-muted);
+    }
+
+    .k-rich__block-tag {
+        flex-shrink: 0;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .k-rich__block-text,
+    .k-rich__block-by {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .k-rich__block-by {
+        flex-shrink: 0;
+        max-width: 40%;
+    }
+
+    .k-rich__block-text + .k-rich__block-by::before {
+        content: '· ';
+    }
+
+    .k-rich__block-more {
+        flex-shrink: 0;
+        font-size: 12.5px;
+    }
+
+    .k-rich__block-chevron {
+        flex-shrink: 0;
+        margin-left: auto;
+        color: var(--k-muted);
+        transition: transform 0.15s ease;
+    }
+
+    .k-rich__block-toggle[aria-expanded='true'] .k-rich__block-chevron {
+        transform: rotate(180deg);
+    }
+
+    .k-rich__block-toggle:hover :is(.k-rich__block-icon, .k-rich__block-chevron) {
+        color: var(--k-ink);
     }
 
     .k-rich__block-head .k-icon-button {
         width: 28px;
         height: 28px;
+        border-radius: 7px;
     }
 
-    .k-rich__block-card .k-fields {
-        gap: 10px;
+    .k-rich__block-fields {
+        padding: 4px 14px 16px;
+    }
+
+    .k-rich__block-fields .k-fields {
+        gap: 14px;
     }
 
     .k-rich__tools .k-button + .k-button {

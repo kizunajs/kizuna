@@ -21,10 +21,71 @@ export interface BlockDefinition<Name extends string, Fields extends FieldList> 
      */
     description?: string;
     /**
+     * The icon editors see beside the block's label, in the text and where
+     * they choose a block. Without one, a generic block icon.
+     */
+    icon?: BlockIcon;
+    /**
      * The fields editors may change, in the order they are shown.
      */
     fields: Fields;
 }
+
+/**
+ * The icons a block may show beside its label.
+ */
+export type BlockIcon =
+    | 'article'
+    | 'button'
+    | 'calendar'
+    | 'code'
+    | 'columns'
+    | 'file'
+    | 'gallery'
+    | 'image'
+    | 'info'
+    | 'leaf'
+    | 'link'
+    | 'list'
+    | 'mail'
+    | 'map'
+    | 'megaphone'
+    | 'person'
+    | 'people'
+    | 'product'
+    | 'question'
+    | 'quote'
+    | 'star'
+    | 'table'
+    | 'video'
+    | 'warning';
+
+const BLOCK_ICONS: Record<BlockIcon, true> = {
+    article: true,
+    button: true,
+    calendar: true,
+    code: true,
+    columns: true,
+    file: true,
+    gallery: true,
+    image: true,
+    info: true,
+    leaf: true,
+    link: true,
+    list: true,
+    mail: true,
+    map: true,
+    megaphone: true,
+    person: true,
+    people: true,
+    product: true,
+    question: true,
+    quote: true,
+    star: true,
+    table: true,
+    video: true,
+    warning: true,
+};
 
 /**
  * The key a {@link blocks} list stores each item's block name under.
@@ -55,6 +116,7 @@ export interface Block {
     name: string;
     label: string | undefined;
     description: string | undefined;
+    icon: BlockIcon | undefined;
     fields: FieldList;
 }
 
@@ -106,6 +168,9 @@ export const defineBlock = <const Name extends string, const Fields extends Fiel
             throw new Error(`${owner} has a ${option} that is no text. Leave it out, or give it words editors read.`);
         }
     }
+    if (definition.icon !== undefined && !Object.hasOwn(BLOCK_ICONS, definition.icon)) {
+        throw new Error(`${owner} has the icon '${String(definition.icon)}'. An icon is one of ${Object.keys(BLOCK_ICONS).join(', ')}.`);
+    }
     const schema = objectOf(definition.fields);
     Object.defineProperty(schema, BLOCK, {
         value: definition.name,
@@ -114,6 +179,7 @@ export const defineBlock = <const Name extends string, const Fields extends Fiel
         name: definition.name,
         label: definition.label,
         description: definition.description,
+        icon: definition.icon,
         fields: definition.fields,
     });
     return schema as BlockSchema<Name, Fields>;

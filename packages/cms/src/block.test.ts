@@ -64,6 +64,33 @@ describe('block', () => {
         ).toThrow("defineBlock('hero') has a label that is no text.");
     });
 
+    it('keeps the icon it names, and throws on one it does not know', () => {
+        const QuoteBlockSchema = defineBlock({
+            name: 'pullQuote',
+            icon: 'quote',
+            fields: [
+                {
+                    name: 'quote',
+                    schema: z.string(),
+                },
+            ],
+        });
+        expect(readBlock(QuoteBlockSchema)?.icon).toBe('quote');
+        expect(() =>
+            defineBlock({
+                name: 'hero',
+                // @ts-expect-error: no such icon
+                icon: 'sparkles',
+                fields: [
+                    {
+                        name: 'heading',
+                        schema: z.string(),
+                    },
+                ],
+            })
+        ).toThrow("defineBlock('hero') has the icon 'sparkles'.");
+    });
+
     it('throws on a name that is not camelCase', () => {
         expect(() =>
             defineBlock({
