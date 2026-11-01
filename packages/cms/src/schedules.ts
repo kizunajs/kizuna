@@ -437,6 +437,7 @@ export const getRelease = async (cms: CmsService, access: EditorAccess, id: stri
  * draft, and not scheduled already.
  */
 const addRefs = async (cms: CmsService, access: EditorAccess, release: ReleaseRow, refs: readonly string[], by: string): Promise<void> => {
+    const added: DraftState[] = [];
     for (const value of refs) {
         const parsed = parseRef(value);
         if (parsed === undefined) throw new CmsHttpError(422, { detail: `'${value}' names no document.`, errors: [] });
@@ -560,6 +561,8 @@ export const scheduleRelease = async (
     refuseIfPast(at);
     const force = body.force === true && view.refs.every((ref) => mayPublishPastReview(cms, access.callerFor(ref).role));
     await cms.schedules.timeRelease(id, at, by, force);
+    const members = await cms.schedules.members(id);
+    await fireScheduled(cms, release, at, await Promise.all(members.map((member) => cms.draftState(refOf(member)))), by);
     return getRelease(cms, access, id, by);
 };
 
@@ -661,7 +664,11 @@ const runRelease = async (cms: CmsService, release: ReleaseRow, by: string, forc
             ? new Map<string, number | null>()
             : await cms.publishTogether(
                   live.map(({ state }) => state.target.ref),
-                  by
+                  by,
+                  {
+                      id: release.id,
+                      name: release.name,
+                  }
               );
     for (const [index, { state }] of live.entries()) {
         const past = pasts[index];

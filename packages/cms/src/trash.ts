@@ -245,8 +245,10 @@ export const emptyTrash = async (cms: CmsService, site: string, by: string): Pro
  */
 export const eraseExpired = async (cms: CmsService, now = new Date()): Promise<{ erased: number }> => {
     const expired = await cms.store.trashedBefore(new Date(now.getTime() - TRASH_DAYS * DAY_MS));
-    for (const root of expired) await cms.store.erase(root);
+    const erased: Array<[string, DocumentRow[]]> = [];
+    for (const root of expired) erased.push([root, await cms.store.erase(root)]);
     await cms.media.eraseUnheld();
+    for (const [root, rows] of erased) await fireErased(cms, root, rows, null);
     return {
         erased: expired.length,
     };
