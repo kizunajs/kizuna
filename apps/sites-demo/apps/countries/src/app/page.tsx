@@ -1,5 +1,6 @@
 import kizuna from '@kizunajs-demo/sites-content/config';
-import { CmsImage, EventList, OfficeList, PageIntro } from '@kizunajs-demo/sites-ui';
+import { RichText } from '@kizunajs/cms/next';
+import { CmsImage, EventList, OfficeList, PageIntro, Prose } from '@kizunajs-demo/sites-ui';
 import { wordsOf } from '../lib/words';
 import { localeOf } from '../lib/locale';
 import styles from './page.module.css';
@@ -31,6 +32,13 @@ export default async function FrontPage() {
         <main>
             <PageIntro eyebrow={site.label} heading={page.heading} text={page.intro} />
             {page.hero === undefined ? null : <CmsImage className={styles.hero} image={page.hero} width={1200} height={675} />}
+            {page.body === undefined ? null : (
+                <div className={styles.body}>
+                    <Prose>
+                        <RichText value={page.body} />
+                    </Prose>
+                </div>
+            )}
             <div className={styles.sections}>
                 {upcoming.length === 0 ? null : (
                     <section className={styles.section}>

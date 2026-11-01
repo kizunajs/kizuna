@@ -1,10 +1,12 @@
 import { z } from 'zod';
+import { pageInstructions } from '../voice';
 import { croppedImage, definePage, definePages } from '@kizunajs/cms';
-import { ImageSchema } from '@kizunajs/cms/schemas';
+import { ImageSchema, link, RichTextSchema } from '@kizunajs/cms/schemas';
 
 const frontPage = definePage({
     name: 'frontPage',
     label: 'Front page',
+    instructions: pageInstructions,
     fields: [
         {
             name: 'heading',
@@ -20,12 +22,18 @@ const frontPage = definePage({
                 aspectRatio: '16:9',
             }).optional(),
         },
+        {
+            name: 'body',
+            label: 'Text',
+            schema: RichTextSchema.optional().describe('A few lines under the photo, with links to pages here and on the other sites.'),
+        },
     ],
 });
 
 const eventsPage = definePage({
     name: 'eventsPage',
     label: 'Events',
+    instructions: pageInstructions,
     sites: ['uk'],
     fields: [
         {
@@ -46,6 +54,7 @@ const eventsPage = definePage({
 const textPage = <const Name extends string, const Sites extends readonly string[]>(page: { name: Name; label: string; sites: Sites }) =>
     definePage({
         ...page,
+        instructions: pageInstructions,
         fields: [
             {
                 name: 'heading',
@@ -63,6 +72,11 @@ const textPage = <const Name extends string, const Sites extends readonly string
                 name: 'image',
                 schema: ImageSchema.optional(),
                 position: 'sidebar',
+            },
+            {
+                name: 'related',
+                label: 'Read more',
+                schema: z.array(link()).max(4).optional(),
             },
         ],
     });

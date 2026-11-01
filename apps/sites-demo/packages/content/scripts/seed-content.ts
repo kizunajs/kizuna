@@ -1797,3 +1797,121 @@ How to keep a cut tree fresh until New Year is in [the journal](/journal).
     },
     note: 'Julenummeret. Kan du lese gjennom før det går ut tirsdag morgen?',
 };
+
+/**
+ * Claude's winter care refresh, asked for by Mia: new copy on the UK's plant
+ * care page and the winter care article, in a release that waits for her
+ * review.
+ */
+export const winterCareRefresh = {
+    release: 'Agent: winter care refresh',
+    summary: 'Winter care refresh',
+    note: 'Updated the plant care page and the winter care article for the dark months. Opening hours and contact details are as they were.',
+    plantCarePage: {
+        intro: 'Every plant leaves with a care card, and in winter the plant care desk answers the same day, light questions first.',
+    },
+    article: {
+        summary: 'Less water, more light and a step back from the radiator: how to see a houseplant through the dark months.',
+    },
+};
+
+/**
+ * Links a seeded page holds to other pages, by ref, added once to a page
+ * that has none: rich text written as markup under `text`, or a list of
+ * links under `links`.
+ */
+export interface SeededLinks {
+    site: string;
+    name: string;
+    locale?: string;
+    field: string;
+    by: string;
+    daysAgo: number;
+    text?: string;
+    links?: Array<{ ref?: string; href?: string; label: string }>;
+}
+
+export const pageLinks: SeededLinks[] = [
+    {
+        site: 'norway',
+        name: 'frontPage',
+        field: 'body',
+        by: nils,
+        daysAgo: 4,
+        text: `Se [alle butikkene våre](page:norway:shopsPage), med åpningstider og adresser.
+
+Lurer du på hvordan du holder liv i en fiolinfiken gjennom vinteren? Hagen UK har samlet det de vet om [plantestell](page:uk:plantCarePage), og [plantelegen](page:uk:plantDoctorPage) svarer på spørsmål samme dag.
+
+Snart åpner vi i [Trondheim](page:norway:trondheimShopPage).`,
+    },
+    {
+        site: 'norway',
+        name: 'frontPage',
+        locale: 'en',
+        field: 'body',
+        by: ada,
+        daysAgo: 4,
+        text: `See [all our shops](page:norway:shopsPage), with opening hours and addresses.
+
+Wondering how to keep a fiddle-leaf fig going through the winter? Hagen UK has gathered what they know about [plant care](page:uk:plantCarePage), and [the plant doctor](page:uk:plantDoctorPage) answers questions the same day.
+
+We open in [Trondheim](page:norway:trondheimShopPage) soon.`,
+    },
+    {
+        site: 'uk',
+        name: 'deliveryPage',
+        field: 'related',
+        by: una,
+        daysAgo: 4,
+        links: [
+            {
+                ref: 'page:group:sustainabilityPage',
+                label: 'How we deliver with less packaging',
+            },
+            {
+                ref: 'page:uk:plantCarePage',
+                label: 'Plant care',
+            },
+        ],
+    },
+    {
+        site: 'group',
+        name: 'careersPage',
+        field: 'related',
+        by: ada,
+        daysAgo: 4,
+        links: [
+            {
+                ref: 'page:norway:aboutPage',
+                label: 'Om Hagen Norge',
+            },
+            {
+                ref: 'page:uk:visitPage',
+                label: 'Visit the London shop',
+            },
+        ],
+    },
+];
+
+/**
+ * The group site's footer: each country's front page, careers, and the
+ * privacy policy, which is a route of the app's own.
+ */
+export const groupFooter = [
+    {
+        ref: 'page:uk:frontPage',
+        label: 'Hagen UK',
+    },
+    {
+        ref: 'page:norway:frontPage',
+        label: 'Hagen Norge',
+    },
+    {
+        ref: 'page:group:careersPage',
+        label: 'Careers',
+    },
+    {
+        href: '/privacy',
+        label: 'Privacy policy',
+    },
+];

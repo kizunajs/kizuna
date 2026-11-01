@@ -1,9 +1,12 @@
 import { z } from 'zod';
+import { pageInstructions } from '../voice';
 import { definePage, definePages } from '@kizunajs/cms';
+import { link } from '@kizunajs/cms/schemas';
 
 const frontPage = definePage({
     name: 'frontPage',
     label: 'Front page',
+    instructions: pageInstructions,
     fields: [
         {
             name: 'heading',
@@ -19,6 +22,7 @@ const frontPage = definePage({
 const aboutPage = definePage({
     name: 'aboutPage',
     label: 'About',
+    instructions: pageInstructions,
     fields: [
         {
             name: 'heading',
@@ -37,6 +41,7 @@ const aboutPage = definePage({
 const textPage = <const Name extends string>(page: { name: Name; label: string }) =>
     definePage({
         ...page,
+        instructions: pageInstructions,
         fields: [
             {
                 name: 'heading',
@@ -49,6 +54,11 @@ const textPage = <const Name extends string>(page: { name: Name; label: string }
             {
                 name: 'body',
                 schema: z.string().min(1).max(4000).describe('Paragraphs, with a blank line between each.'),
+            },
+            {
+                name: 'related',
+                label: 'Read more',
+                schema: z.array(link()).max(4).optional(),
             },
         ],
     });

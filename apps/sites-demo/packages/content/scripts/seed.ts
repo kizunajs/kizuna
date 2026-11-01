@@ -15,9 +15,12 @@ import {
     mia,
     newsletters,
     nils,
+    norwayComments,
     norwayHistoryDraft,
     norwayWinterFrontPage,
+    groupFooter,
     offices,
+    pageLinks,
     officesInNorwegian,
     officesOnTheUk,
     pages,
@@ -831,7 +834,8 @@ export const seedContent = async (service: CmsService): Promise<void> => {
             at: daysAgo(3, 1),
         });
         await asOf(daysAgo(2), async () => {
-            await service.store.addReviewComment({
+            await service.store.addComment({
+                documentId: review.documentId,
                 reviewId: review.id,
                 path: 'body',
                 text: norwayHistoryDraft.comment,
@@ -1098,7 +1102,130 @@ Book a visit at the shop or by writing to care@hagen.example.co.uk. Visits run o
         await asOf(daysAgo(2, 3), () => service.schedules.timeRelease(release.id, trondheimOpens(), ada, false));
         console.log('[demo] made the Trondheim opening release');
     }
+
+    // Claude's winter care refresh for Mia: two drafts in a release, credited to Mia via Claude, waiting for her review.
+    const plantCare = pageRef({
+        site: 'uk',
+        name: 'plantCarePage',
+    });
+    const winterArticleId = (await service.editorItems('articles')).find((item) => item.label === 'Winter care for houseplants')?.id;
+    const winterArticle: DocumentRef | undefined =
+        winterArticleId === undefined
+            ? undefined
+            : {
+                  type: 'item',
+                  collection: 'articles',
+                  id: winterArticleId,
+              };
+    if (
+        winterArticle !== undefined &&
+        (await service.draftState(plantCare)).status === 'published' &&
+        (await service.draftState(winterArticle)).status === 'published' &&
+        !(await hasVersion(plantCare, winterCareRefresh.summary))
+    ) {
+        await withAgent('Claude', async () => {
+            await save(plantCare, winterCareRefresh.plantCarePage, mia, daysAgo(1, 2), winterCareRefresh.summary);
+            await save(winterArticle, winterCareRefresh.article, mia, daysAgo(1, 2), winterCareRefresh.summary);
+            const release = await asOf(daysAgo(1, 3), () => service.schedules.createRelease(winterCareRefresh.release, mia));
+            for (const ref of [plantCare, winterArticle]) {
+                const state = await service.draftState(ref);
+                await asOf(daysAgo(1, 3), () =>
+                    service.schedules.schedule({
+                        ref: formatRef(state.target.ref),
+                        documentId: state.row!.id,
+                        action: 'publish',
+                        at: null,
+                        force: false,
+                        createdBy: mia,
+                        releaseId: release.id,
+                    })
+                );
+                await askForReview(ref, {
+                    by: mia,
+                    reviewers: [mia],
+                    note: winterCareRefresh.note,
+                    at: daysAgo(1, 3),
+                });
+            }
+        });
+        console.log("[demo] made Claude's winter care refresh release");
+    }
+
+    // Links between pages, by ref, here and across the sites: added once, to each document that has none yet.
+
+    /**
+     * Adds a field to a document that does not hold it yet. A live document
+     * publishes it, and one with a draft waiting keeps that draft, with the
+     * field added, on top.
+     */
+    const addField = async (ref: DocumentRef, field: string, value: unknown, by: string, days: number): Promise<void> => {
+        const { row } = await service.document(ref);
+        if (row === undefined || row.published === null) return;
+        if (row.published[field] !== undefined || row.draft?.[field] !== undefined) return;
+        const waiting = row.draft !== null && !sameValues(row.draft, row.published) ? row.draft : undefined;
+        await save(
+            ref,
+            {
+                ...row.published,
+                [field]: value,
+            },
+            by,
+            daysAgo(days),
+            'Links'
+        );
+        await publish(ref, by, daysAgo(days, 1));
+        if (waiting !== undefined) {
+            await save(
+                ref,
+                {
+                    ...waiting,
+                    [field]: value,
+                },
+                by,
+                daysAgo(days, 2)
+            );
+        }
+        console.log(`[demo] linked ${formatRef(ref)}`);
+    };
+
+    for (const entry of pageLinks) {
+        await addField(
+            pageRef(entry, entry.locale),
+            entry.field,
+            entry.text === undefined ? entry.links : richText(entry.text),
+            entry.by,
+            entry.daysAgo
+        );
+    }
+    if (!(await exists(groupNavigation))) {
+        await tell(
+            groupNavigation,
+            {
+                footer: groupFooter,
+            },
+            {
+                by: ada,
+                daysAgo: 4,
+                published: {
+                    by: ada,
+                    daysAgo: 4,
+                },
+            }
+        );
+    }
 };
+
+const groupNavigation: DocumentRef = {
+    type: 'global',
+    name: 'navigation',
+    site: 'group',
+};
+
+/**
+ * Whether two copies of a document hold the same values.
+ */
+const sameValues = (left: Record<string, unknown>, right: Record<string, unknown>): boolean =>
+    JSON.stringify(left) === JSON.stringify(right);
 
 /**
  * The ids of the articles and plants an issue's blocks name, by title and by
@@ -1129,7 +1256,8 @@ const linkedId = (ids: ReadonlyMap<string, string>, label: string): string => {
 
 /**
  * A few words of plain markup as rich text: blank lines between blocks, `## `
- * for a heading, `- ` for a list item, and `[text](/path)` for a link. A line
+ * for a heading, `- ` for a list item, and `[text](/path)` for a link, or
+ * `[text](page:uk:plantCarePage)` for a link to a page by ref. A line
  * `@article <title>` is an article block, and `@plants <name>; <name>` a block
  * of plants.
  */
@@ -1154,7 +1282,7 @@ const richText = (source: string, linked?: Linked) => {
         };
     };
     const block = (line: string, style: string, listItem?: 'bullet') => {
-        const markDefs: Array<{ _type: 'link'; _key: string; href: string }> = [];
+        const markDefs: Array<{ _type: 'link'; _key: string; ref?: string; href?: string }> = [];
         const children = line
             .split(/(\[[^\]]+\]\([^)]+\))/)
             .filter((text) => text !== '')
@@ -1169,10 +1297,18 @@ const richText = (source: string, linked?: Linked) => {
                     };
                 }
                 const mark = key();
+                const target = link[2]!;
                 markDefs.push({
                     _type: 'link',
                     _key: mark,
-                    href: link[2]!,
+                    // A page or an item by ref, which the reader turns into its address on its own site.
+                    ...(/^(?:page|item):/.test(target)
+                        ? {
+                              ref: target,
+                          }
+                        : {
+                              href: target,
+                          }),
                 });
                 return {
                     _type: 'span',

@@ -6,6 +6,10 @@
     border-radius: 12px;
 }
 
+.body {
+    margin-bottom: var(--section);
+}
+
 .sections {
     display: grid;
     gap: var(--section);

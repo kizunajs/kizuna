@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { KizunaPreview } from '@kizunajs/cms/next';
 import kizuna from '@kizunajs-demo/sites-content/config';
-import { sites } from '@kizunajs-demo/sites-content';
 import { Footer, Header } from '@kizunajs-demo/sites-ui';
 import '@kizunajs-demo/sites-ui/globals.css';
 
@@ -20,6 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
     const site = await kizuna.content.site.get();
+    const navigation = await kizuna.content.of(['group']).globals.navigation.get();
     return (
         <html lang={site.locales?.[0] ?? 'en'}>
             <body>
@@ -48,24 +48,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 {children}
                 <Footer
                     companyName={site.companyName}
-                    links={[
-                        {
-                            label: sites.values.uk.label,
-                            href: sites.values.uk.url,
-                        },
-                        {
-                            label: sites.values.norway.label,
-                            href: sites.values.norway.url,
-                        },
-                        {
-                            label: 'Careers',
-                            href: '/careers',
-                        },
-                        {
-                            label: 'Privacy policy',
-                            href: '/privacy',
-                        },
-                    ]}
+                    links={navigation.footer.map((link) => ({
+                        label: link.label ?? '',
+                        href: link.href,
+                    }))}
                 />
                 <KizunaPreview content={kizuna.content} />
             </body>

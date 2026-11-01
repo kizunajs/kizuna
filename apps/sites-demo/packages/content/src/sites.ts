@@ -1,8 +1,9 @@
 import { z } from 'zod';
-import { declareSites, SiteSchema } from '@kizunajs/cms';
+import { AgentInstructions, declareSites, SiteSchema } from '@kizunajs/cms';
 import { pages as groupPages } from './pages/group';
 import { pages as countryPages } from './pages/countries';
 import { Events } from './events';
+import { Navigation } from './navigation';
 
 export const Site = SiteSchema.extend({
     companyName: z.string(),
@@ -19,6 +20,7 @@ export const sites = declareSites(Site, {
         icon: '/icons/group.svg',
         locales: ['en'],
         pages: groupPages,
+        globals: [AgentInstructions, Navigation],
         companyName: 'Hagen Group AS',
     },
     uk: {
@@ -27,6 +29,7 @@ export const sites = declareSites(Site, {
         icon: '/icons/uk.svg',
         locales: ['en'],
         pages: countryPages,
+        globals: [AgentInstructions],
         collections: [Events],
         companyName: 'Hagen UK Ltd',
     },
@@ -35,6 +38,7 @@ export const sites = declareSites(Site, {
         url: process.env.KIZUNA_NORWAY_URL ?? 'http://norway.localhost:3042',
         icon: '/icons/norway.svg',
         pages: countryPages,
+        globals: [AgentInstructions],
         locales: ['nb', 'en'],
         companyName: 'Hagen Norge AS',
     },
