@@ -97,7 +97,7 @@ export function RichTextEditable({ className, blocks }: { className: string; blo
         const below = window.innerHeight - rect.bottom;
         const left = Math.max(8, Math.min(rect.left, window.innerWidth - 248));
         setPosition(
-            below < 300 && rect.top > below
+            below < 480 && rect.top > below
                 ? {
                       left,
                       bottom: window.innerHeight - rect.top + 6,

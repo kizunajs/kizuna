@@ -2642,6 +2642,7 @@
         z-index: 25;
         width: 240px;
         min-width: 0;
+        max-height: min(460px, calc(100vh - 32px));
     }
 
     .k-slash__heading {
