@@ -8,6 +8,10 @@ const config: NextConfig = {
     allowedDevOrigins: ['*.localhost'],
     // The Playwright server builds into its own folder, so it runs beside `pnpm dev`.
     distDir: process.env.NEXT_DIST_DIR ?? '.next',
+    experimental: {
+        // Next forgets revalidated tags on restart, so reads cached on disk would outlive what setup writes.
+        isrFlushToDisk: false,
+    },
 };
 
 export default config;
