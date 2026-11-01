@@ -14,7 +14,7 @@ const contentPlugin = definePlugin({
  * An api whose content is one front page with the schema and migrate step
  * given.
  */
-const apiWith = (documents: Array<{ ref: string; schema: z.ZodType; migration?: number }>) =>
+const apiWith = (documents: Array<{ ref: string; kind?: 'page' | 'global' | 'collection'; schema: z.ZodType; migration?: number }>) =>
     defineConfig({
         content: defineContentProvider({
             plugin: contentPlugin(),
@@ -23,8 +23,8 @@ const apiWith = (documents: Array<{ ref: string; schema: z.ZodType; migration?: 
             documents: () =>
                 documents.map((document) => ({
                     ref: document.ref,
-                    kind: 'page' as const,
-                    name: document.ref.slice('page:'.length),
+                    kind: document.kind ?? 'page',
+                    name: document.ref.slice(document.ref.indexOf(':') + 1),
                     schema: document.schema,
                     migration: document.migration ?? 0,
                 })),
@@ -126,6 +126,29 @@ describe('content', () => {
             },
         ]);
         expect(summaries(diffApis(before, after))).toEqual(['breaking page:frontPage is gone', 'added page:plansPage added']);
+    });
+
+    it('points a gone page at rename-page, and a gone collection at nothing', () => {
+        const withArticles = apiWith([
+            {
+                ref: 'page:frontPage',
+                schema: z.object({
+                    heading: z.string(),
+                }),
+            },
+            {
+                ref: 'collection:articles',
+                kind: 'collection',
+                schema: z.object({
+                    title: z.string(),
+                }),
+            },
+        ]);
+        const after = apiWith([]);
+        expect(diffApis(withArticles, after).map((change) => `${change.key}: ${change.detail}`)).toEqual([
+            'collection:articles: its stored content no longer shows anywhere',
+            "page:frontPage: its stored content no longer shows anywhere; `kizuna cms rename-page` moves a renamed page's content",
+        ]);
     });
 
     describe('a list of blocks', () => {

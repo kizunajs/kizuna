@@ -69,7 +69,10 @@ const diffContent = (before: NonNullable<ApiSnapshot['content']>, after: NonNull
                 level: 'breaking',
                 key: ref,
                 summary: `${ref} is gone`,
-                detail: "its stored content no longer shows anywhere; `kizuna cms rename-page` moves a renamed page's content",
+                detail:
+                    gone.kind === 'page'
+                        ? "its stored content no longer shows anywhere; `kizuna cms rename-page` moves a renamed page's content"
+                        : 'its stored content no longer shows anywhere',
             });
             continue;
         }
