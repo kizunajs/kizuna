@@ -646,3 +646,63 @@ describe('the links index', () => {
         ]);
     });
 });
+
+describe('resolving a URL to a link target', () => {
+    const resolve = (url: string) =>
+        request(app)
+            .get('/editing/link-targets/resolve')
+            .query({
+                url,
+            })
+            .set('authorization', 'Bearer token');
+
+    it("finds a page by its site's url and its path", async () => {
+        await publish(page('uk', 'plantCarePage'), {
+            heading: 'Plant care',
+        });
+        const found = await resolve('https://hagen.example.co.uk/plant-care');
+        expect(found.status).toBe(200);
+        expect(found.body.target).toEqual({
+            ref: 'page:uk:plantCarePage',
+            label: 'Plant care',
+            site: 'uk',
+            siteLabel: 'Hagen UK',
+            siteIcon: 'https://hagen.example.co.uk/icons/uk.svg',
+            path: '/plant-care',
+            status: 'published',
+        });
+    });
+
+    it('finds a page in any language its site serves, the first at the root and each other under its code', async () => {
+        expect((await resolve('https://hagen.example.no/butikker')).body.target.ref).toBe('page:norway:shopsPage');
+        expect((await resolve('https://hagen.example.no/en/butikker')).body.target.ref).toBe('page:norway:shopsPage');
+        expect((await resolve('https://hagen.example.no')).body.target.ref).toBe('page:norway:frontPage');
+        expect((await resolve('https://hagen.example.no/en')).body.target.ref).toBe('page:norway:frontPage');
+        expect((await resolve('https://hagen.example.no/nb/butikker')).status).toBe(404);
+    });
+
+    it('finds the item a collection page shows at the address', async () => {
+        const id = await shop('oslo');
+        const found = await resolve('https://hagen.example.no/en/shops/oslo?utm_source=newsletter#hours');
+        expect(found.body.target).toMatchObject({
+            ref: `item:shops:${id}`,
+            label: 'Hagen Oslo',
+            path: '/shops/oslo',
+        });
+        expect((await resolve('https://hagen.example.no/shops/bergen')).status).toBe(404);
+    });
+
+    it('matches paths exactly, so a trailing slash is another address', async () => {
+        expect((await resolve('https://hagen.example.co.uk/plant-care/')).status).toBe(404);
+        expect((await resolve('https://hagen.example.no/en/')).status).toBe(404);
+        const id = await shop('oslo');
+        expect((await resolve('https://hagen.example.no/shops/oslo/')).status).toBe(404);
+        expect((await resolve(`https://hagen.example.no/shops/oslo`)).body.target.ref).toBe(`item:shops:${id}`);
+    });
+
+    it('finds nothing on a host no site is on, or in a URL that is not one', async () => {
+        expect((await resolve('https://www.instagram.com/hagen')).status).toBe(404);
+        expect((await resolve('/plant-care')).status).toBe(404);
+        expect((await resolve('mailto:hello@hagen.example.no')).status).toBe(404);
+    });
+});

@@ -70,7 +70,15 @@ The link control offers two choices. **Page** opens a search over every page, an
 
 The control shows the page's title and site mark. A link to a page that is not published says so on the field, as Link target unpublished, and in the Publish dialog, which publishes the document all the same.
 
-Agents set a link by ref. `GET /editing/link-targets?q=plant` finds the refs to use, and `?refs=` names the ones a document holds.
+## Pasting a URL
+
+Pasting a URL into rich text links it. A URL on one of the sites, which matches a site's `url` and the address of a page or an item there in any language the site serves, becomes a link to that page or item by ref: over the selected words, or as its title when nothing is selected. Any other URL pasted over selected words links them to that URL.
+
+Paths match exactly, as [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) has it, so `https://hagen.example.co.uk/plant-care/` with its trailing slash is not the plant care page and pastes as a URL.
+
+## Links from agents
+
+Agents set a link by ref. `GET /editing/link-targets?q=plant` finds the refs to use, `?refs=` names the ones a document holds, and `GET /editing/link-targets/resolve?url=https://hagen.example.no/en/butikker` turns a URL on one of the sites into the ref of its page or item, or answers 404.
 
 ## Where a link goes
 

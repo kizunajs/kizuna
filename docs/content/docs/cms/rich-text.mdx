@@ -16,6 +16,12 @@ import { RichTextSchema } from '@kizunajs/cms/schemas';
 
 It stores [Portable Text](https://www.portabletext.org), structured JSON that never holds HTML: paragraphs, three levels of heading, quotes, lists, bold, italic, code, underline, links and images. A link goes to a page or an item picked in the CMS, on any site, or to a URL: `https://`, `http://`, `mailto:`, `tel:`, a path on the site or an `#anchor`, so a `javascript:` link fails the schema. [Links](/docs/cms/links) says where each one goes.
 
+## Editing
+
+Typing `/` at the start of an empty line, or after a space, opens a menu of what the field allows: paragraph, heading, subheading, quote, the two lists, an image, a link to a page, and each block the field holds by its label. Typing after the slash filters it, the arrow keys and Enter pick, and Escape closes it. A pick does what its toolbar button does, at the cursor.
+
+Pasting a URL over selected words links them to it, and a URL on one of the sites links to its page or item by ref, as [pasting a URL](/docs/cms/links#pasting-a-url) says.
+
 ## Blocks in the text
 
 `richText()` lets a rich text field hold blocks between its paragraphs, like a card for an article in a newsletter. Each block is one made with [`defineBlock`](/docs/cms/blocks):
@@ -61,7 +67,7 @@ A block sits in the text as a node of its own, with its name under `_type`, a `_
 }
 ```
 
-Editors insert a block from the toolbar, beside Image. With one block it is a button of its own, and with several, a picker of every block by label and description. The block shows its fields in the text, and its `…` menu moves it up or down, or removes it. The agent reads the same blocks off the field, and writes each node with its `_type`, `_key` and fields. Each node is checked against its block's fields, and one naming a block the field does not hold is refused.
+Editors insert a block from the toolbar, beside Image, or by typing `/` and its label. With one block it is a button of its own, and with several, a picker of every block by label and description. The block shows its fields in the text, and its `…` menu moves it up or down, or removes it. The agent reads the same blocks off the field, and writes each node with its `_type`, `_key` and fields. Each node is checked against its block's fields, and one naming a block the field does not hold is refused.
 
 `RichText` takes a component for each block, keyed by its name, and hands it the block's fields:
 

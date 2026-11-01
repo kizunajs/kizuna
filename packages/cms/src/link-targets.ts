@@ -425,6 +425,60 @@ export const linkTargets = async (
 };
 
 /**
+ * The site a URL belongs to, by the site's `url`, and the path on it. Of two
+ * sites on one host, the one with the longer path wins.
+ */
+const siteAddressOf = (cms: CmsService, url: URL, sees: (site: string) => boolean): { site: string; path: string } | undefined => {
+    let found: { site: string; path: string; base: string } | undefined;
+    for (const site of cms.siteNames()) {
+        if (!sees(site)) continue;
+        let base: URL;
+        try {
+            base = new URL(String(cms.siteInfo(site)['url']));
+        } catch {
+            continue;
+        }
+        if (base.origin !== url.origin) continue;
+        const prefix = base.pathname.replace(/\/+$/, '');
+        const path = url.pathname === prefix ? '/' : url.pathname.startsWith(`${prefix}/`) ? url.pathname.slice(prefix.length) : undefined;
+        if (path === undefined || (found !== undefined && found.base.length >= prefix.length)) continue;
+        found = {
+            site,
+            path,
+            base: prefix,
+        };
+    }
+    return found === undefined
+        ? undefined
+        : {
+              site: found.site,
+              path: found.path,
+          };
+};
+
+/**
+ * The page or item served at a URL on one of the sites `sees` allows, in any
+ * language the site serves, as the link control shows it. Paths match
+ * exactly, so `/plant-care/` is not `/plant-care`.
+ */
+export const linkTargetAt = async (cms: CmsService, value: string, sees: (site: string) => boolean): Promise<LinkTarget | undefined> => {
+    let url: URL;
+    try {
+        url = new URL(value);
+    } catch {
+        return undefined;
+    }
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return undefined;
+    const address = siteAddressOf(cms, url, sees);
+    if (address === undefined || (address.path !== '/' && address.path.endsWith('/'))) return undefined;
+    const served = await cms.pageAt(address.path, address.site);
+    if (served === undefined) return undefined;
+    const { locale: _, ...source } = served;
+    const ref = formatRef(source);
+    return linkedRef(cms, ref) === undefined ? undefined : describeTarget(cms, ref);
+};
+
+/**
  * Every document holding a content link, with the page or item it links to,
  * read from the refs index. With `to`, only the links to that one.
  */

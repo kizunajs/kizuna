@@ -500,21 +500,28 @@ const LinkTargetStatusSchema = z
     .enum(['published', 'unpublished', 'missing'])
     .describe('Published, saved but not published, or deleted and never written.');
 
+const LinkTargetShape = z.object({
+    ref: z.string().describe('What a content link stores under ref.'),
+    label: z.string(),
+    site: z.string().describe('The site it belongs to, or default for shared content.'),
+    siteLabel: z.string().nullable().describe('What editors call its site, Shared for shared content, or null without sites.'),
+    siteIcon: z.string().nullable().describe("Its site's icon as a full URL, or null for shared content."),
+    path: z.string().nullable().describe("Its address on its site, in the site's first language."),
+    status: LinkTargetStatusSchema,
+    image: z.string().optional().describe('A thumbnail, for an item with an image.'),
+});
+
 export const LinkTargetsSchema = Kizuna.model({
     title: 'CMS.LinkTargets',
     schema: z.object({
-        targets: z.array(
-            z.object({
-                ref: z.string().describe('What a content link stores under ref.'),
-                label: z.string(),
-                site: z.string().describe('The site it belongs to, or default for shared content.'),
-                siteLabel: z.string().nullable().describe('What editors call its site, Shared for shared content, or null without sites.'),
-                siteIcon: z.string().nullable().describe("Its site's icon as a full URL, or null for shared content."),
-                path: z.string().nullable().describe("Its address on its site, in the site's first language."),
-                status: LinkTargetStatusSchema,
-                image: z.string().optional().describe('A thumbnail, for an item with an image.'),
-            })
-        ),
+        targets: z.array(LinkTargetShape),
+    }),
+});
+
+export const ResolvedLinkTargetSchema = Kizuna.model({
+    title: 'CMS.ResolvedLinkTarget',
+    schema: z.object({
+        target: LinkTargetShape,
     }),
 });
 

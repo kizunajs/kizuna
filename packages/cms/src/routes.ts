@@ -72,8 +72,10 @@ import { FolderConflictError, FolderNotFoundError, UploadRejectedError, type Med
 import { parseFields, parseFilter } from './item-list.js';
 import { ImageQuerySchema, InvalidateBodySchema, KeepSourceBodySchema, RefreshListSchema, type InvalidateBody } from './wire.js';
 import { CommentListSchema, CommentSchema, NewCommentBodySchema, WaitingCommentsSchema } from './wire.js';
-import { LinkedFromSchema, LinkTargetsSchema } from './wire.js';
-import { linkedFrom } from './link-targets.js';
+import { LinkedFromSchema, LinkTargetsSchema, ResolvedLinkTargetSchema } from './wire.js';
+import { UpdatedDraftSchema, VoiceSchema } from './wire.js';
+import { documentGlossary, documentTerms, glossaryOfDocument, languageOf, resolveVoice, voiceText } from './voice.js';
+import { linkedFrom, linkTargetAt } from './link-targets.js';
 import { invalidate as invalidateDocument, refreshTargets } from './refresh.js';
 import { REFRESH_SIGNATURE_HEADER } from './preview-token.js';
 import { sameContent } from './same-content.js';
@@ -3593,6 +3595,40 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         }) as never
     );
 
+    const resolveLinkTarget = route({
+        method: 'GET',
+        path: `${editingBase}/link-targets/resolve`,
+        auth: editor,
+        summary: 'Find the page or item a URL on one of the sites shows, for a content link to it by ref',
+        description:
+            "The URL matches a site's `url` and an address on it, in any language the site serves, like https://hagen.example.no/en/butikker. Paths match exactly, so a trailing slash is another address. The target has the ref to store under `ref`, with its label, site, path and whether it is published.",
+        tool: true,
+        query: z.object({
+            url: z.string().describe('A full URL, like https://hagen.example.co.uk/plant-care.'),
+        }),
+        responses: {
+            200: ResolvedLinkTargetSchema,
+            404: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const url = (args.query as { url: string }).url;
+            const access = cms.access(args.auth);
+            const target = await linkTargetAt(cms, url, (site) => access.sees(site));
+            if (target === undefined) {
+                throw new CmsHttpError(404, {
+                    detail: `No page or item on the sites is served at '${url}'.`,
+                });
+            }
+            return {
+                status: 200,
+                body: {
+                    target,
+                },
+            };
+        }) as never
+    );
+
     const linkedFromRoute = route({
         method: 'GET',
         path: `${editingBase}/linked-from`,
@@ -3818,6 +3854,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                   }),
             searchItems,
             linkTargets: linkTargetsRoute,
+            resolveLinkTarget,
             linkedFrom: linkedFromRoute,
             createPreview,
             people: {

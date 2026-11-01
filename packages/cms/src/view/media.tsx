@@ -25,6 +25,8 @@ export function MediaPicker({
     onPick,
     disabled,
     label,
+    anchor,
+    onClose,
 }: {
     current: string | undefined;
     onPick: (record: MediaRecord) => void;
@@ -33,9 +35,25 @@ export function MediaPicker({
      * What the button says, when "Choose image" or "Replace" does not fit.
      */
     label?: string;
+    /**
+     * Where the picker opens without its button, like the caret in rich
+     * text. It opens as soon as it is given.
+     */
+    anchor?: {
+        getBoundingClientRect: () => DOMRect;
+    };
+    /**
+     * Called when a picker opened at `anchor` closes, picked or not.
+     */
+    onClose?: () => void;
 }) {
     const { connection, resolveUrl } = useEditorContext();
-    const [open, setOpen] = useState(false);
+    const [ownOpen, setOwnOpen] = useState(false);
+    const open = anchor !== undefined || ownOpen;
+    const setOpen = (next: boolean): void => {
+        if (anchor === undefined) setOwnOpen(next);
+        else if (!next) onClose?.();
+    };
     const [media, setMedia] = useState<MediaRecord[] | undefined>();
     const [failed, setFailed] = useState(false);
     useEffect(() => {
@@ -47,12 +65,14 @@ export function MediaPicker({
     }, [open, connection]);
     return (
         <Popover.Root open={open} onOpenChange={setOpen}>
-            <Popover.Trigger className="k-button k-button--secondary k-button--small" disabled={disabled}>
-                <ImageIcon {...ICON} />
-                {label ?? (current === undefined ? 'Choose image' : 'Replace')}
-            </Popover.Trigger>
+            {anchor === undefined ? (
+                <Popover.Trigger className="k-button k-button--secondary k-button--small" disabled={disabled}>
+                    <ImageIcon {...ICON} />
+                    {label ?? (current === undefined ? 'Choose image' : 'Replace')}
+                </Popover.Trigger>
+            ) : null}
             <Popover.Portal>
-                <Popover.Positioner sideOffset={6} align="start" className="k-positioner">
+                <Popover.Positioner sideOffset={6} align="start" className="k-positioner" anchor={anchor}>
                     <Popover.Popup className="k-popup k-media">
                         {media === undefined ? <p className="k-help">Loading</p> : null}
                         {failed ? <p className="k-help">The images could not be listed. Close this and try again.</p> : null}

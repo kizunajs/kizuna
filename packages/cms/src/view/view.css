@@ -2636,6 +2636,32 @@
         margin: 6px 0 0;
     }
 
+    /* The slash menu: what the field allows, under headings, opened at the caret. */
+    .k-slash {
+        position: fixed;
+        z-index: 25;
+        width: 240px;
+        min-width: 0;
+    }
+
+    .k-slash__heading {
+        padding: 8px 10px 4px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--k-muted);
+    }
+
+    .k-slash__item svg {
+        flex-shrink: 0;
+        color: var(--k-muted);
+    }
+
+    .k-slash__item[data-highlighted] svg {
+        color: var(--k-ink);
+    }
+
     /* A page or an item a link points at: thumbnail, site mark, title and address on one line. */
     .k-link-target {
         display: flex;

@@ -7,7 +7,6 @@ import {
     defineSchema,
     defineTextBlock,
     EditorProvider,
-    PortableTextEditable,
     useEditor,
     useEditorSelector,
     type BlockObjectRenderProps,
@@ -37,26 +36,18 @@ import {
     ListOrdered,
     Pilcrow,
     Quote,
-    Trash2,
     Underline,
     Unlink,
 } from 'lucide-react';
 import { ICON, useEditorContext } from './context.js';
-import { BlockFields, BlockPicker, type ControlProps } from './controls.js';
+import { BlockPicker, type ControlProps } from './controls.js';
+import { blockIconOf } from './block-icons.js';
+import { RichTextBlock, type RichTextBlockChoice } from './rich-text-block.js';
 import { Hint } from './hint.js';
+import { RichTextEditable } from './rich-text-editable.js';
 import { MediaPicker, type MediaRecord } from './media.js';
 import { brokenNoteOf, LinkTargetRow, LinkTargetSheet, useDescribedTargets, type LinkTarget } from './link-picker.js';
-import { humanize, richTextBlockOptionsOf, SAFE_HREF, typeOf, type DescribedBlock, type JsonSchema } from './schema.js';
-
-/**
- * One block rich text may hold, with what the editor shows of it.
- */
-interface RichTextBlockChoice {
-    name: string;
-    label: string;
-    schema: JsonSchema;
-    described: DescribedBlock | undefined;
-}
+import { humanize, richTextBlockOptionsOf, SAFE_HREF, typeOf, type JsonSchema } from './schema.js';
 
 /**
  * The kind of value the editor keeps under a block's field.
@@ -193,104 +184,6 @@ function RichTextImage(props: BlockObjectRenderProps) {
                             },
                         })
                     }
-                />
-            </div>
-        </div>
-    );
-}
-
-/**
- * A block in the text: its name, a menu to move or remove it, and its fields
- * below, each writing the node as a whole.
- */
-function RichTextBlock({ props, choice, root }: { props: BlockObjectRenderProps; choice: RichTextBlockChoice; root: JsonSchema }) {
-    const editor = useEditor();
-    const at = [
-        {
-            _key: props.node._key,
-        },
-    ];
-    const { _type: _name, _key: _ownKey, ...values } = props.node as Record<string, unknown>;
-    const change = (next: unknown): void => {
-        const updated = (next ?? {}) as Record<string, unknown>;
-        const removed = Object.keys(values).filter((name) => !(name in updated));
-        if (removed.length > 0) {
-            editor.send({
-                type: 'block.unset',
-                at,
-                props: removed,
-            });
-        }
-        editor.send({
-            type: 'block.set',
-            at,
-            props: updated,
-        });
-    };
-    return (
-        <div {...props.attributes} className="k-rich__block" data-selected={props.selected}>
-            {props.children}
-            <div
-                contentEditable={false}
-                className="k-rich__block-card"
-                onKeyDown={(event) => event.stopPropagation()}
-                onPaste={(event) => event.stopPropagation()}>
-                <div className="k-rich__block-head">
-                    <span className="k-rich__block-name">{choice.label}</span>
-                    {props.readOnly ? null : (
-                        <Menu.Root>
-                            <Menu.Trigger className="k-icon-button" aria-label={`More for ${choice.label}`}>
-                                <Ellipsis {...ICON} />
-                            </Menu.Trigger>
-                            <Menu.Portal>
-                                <Menu.Positioner sideOffset={6} align="end" className="k-positioner">
-                                    <Menu.Popup className="k-popup k-menu">
-                                        <Menu.Item
-                                            className="k-menu__item"
-                                            onClick={() =>
-                                                editor.send({
-                                                    type: 'move.block up',
-                                                    at,
-                                                })
-                                            }>
-                                            <ArrowUp {...ICON} />
-                                            Move up
-                                        </Menu.Item>
-                                        <Menu.Item
-                                            className="k-menu__item"
-                                            onClick={() =>
-                                                editor.send({
-                                                    type: 'move.block down',
-                                                    at,
-                                                })
-                                            }>
-                                            <ArrowDown {...ICON} />
-                                            Move down
-                                        </Menu.Item>
-                                        <Menu.Item
-                                            className="k-menu__item"
-                                            onClick={() =>
-                                                editor.send({
-                                                    type: 'delete.block',
-                                                    at,
-                                                })
-                                            }>
-                                            <Trash2 {...ICON} />
-                                            Remove
-                                        </Menu.Item>
-                                    </Menu.Popup>
-                                </Menu.Positioner>
-                            </Menu.Portal>
-                        </Menu.Root>
-                    )}
-                </div>
-                <BlockFields
-                    schema={choice.schema}
-                    root={root}
-                    value={values}
-                    onChange={change}
-                    disabled={props.readOnly}
-                    described={choice.described}
                 />
             </div>
         </div>
@@ -709,7 +602,7 @@ export function RichTextControl({ schema, root, value, onChange, disabled, block
             <LinkTargetsContext.Provider value={targets}>
                 <div className="k-rich">
                     {disabled ? null : <Toolbar choices={choices} />}
-                    <PortableTextEditable className="k-rich__editable" />
+                    <RichTextEditable className="k-rich__editable" blocks={choices} />
                 </div>
                 {broken.map((note) => (
                     <p key={note} className="k-help k-rich__broken">
