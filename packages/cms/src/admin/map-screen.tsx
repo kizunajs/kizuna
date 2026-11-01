@@ -189,16 +189,27 @@ const FIT = {
     maxZoom: 1,
 };
 
+const PRO_OPTIONS = {
+    hideAttribution: true,
+};
+
 /**
  * A value for an attribute selector, in quotes.
  */
 const quoted = (value: string): string => `"${value.replace(/["\\]/g, '\\$&')}"`;
 
 /**
- * How long the highlight stays after the pointer leaves a card, so moving
- * from one card to the next does not flash the whole map.
+ * How far, in pixels on screen, the pointer may stray from the hovered card
+ * before its highlight goes, so crossing the gap to the next card keeps the
+ * map faded instead of flashing it.
  */
-const HOVER_GRACE_MS = 120;
+const HOVER_REACH = 24;
+
+/**
+ * How long the pointer rests on a link before it names its target, so
+ * crossing lines on the way to a card shows nothing.
+ */
+const TIP_DELAY_MS = 400;
 
 function MapCanvas({
     map,
@@ -224,8 +235,8 @@ function MapCanvas({
     const canvas = useRef<HTMLDivElement>(null);
     const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
     const [hoveredCard, setHoveredCard] = useState<string | undefined>();
-    const leaving = useRef<number | undefined>(undefined);
-    const [tip, setTip] = useState<{ label: string; x: number; y: number } | undefined>();
+    const tip = useRef<HTMLDivElement>(null);
+    const tipTimer = useRef<number | undefined>(undefined);
     const [search, setSearch] = useState('');
     const [foundIndex, setFoundIndex] = useState(0);
     const siteNamed = useCallback((key: string | null) => sites.find((site) => site.key === key), [sites]);
@@ -365,26 +376,54 @@ function MapCanvas({
             : `.react-flow__node[data-id=${quoted(foundCard.id)}] .k-map__card { box-shadow: inset 0 0 0 1.5px var(--k-ink); }`,
     ].join('\n');
 
-    const enterCard = (id: string | undefined): void => {
-        window.clearTimeout(leaving.current);
-        setHoveredCard(id);
-    };
-    const leaveCard = (): void => {
-        window.clearTimeout(leaving.current);
-        leaving.current = window.setTimeout(() => setHoveredCard(undefined), HOVER_GRACE_MS);
-    };
-    useEffect(() => () => window.clearTimeout(leaving.current), []);
+    // A card's highlight changes only on entering another card, or once the pointer is well clear of it, so the gaps between cards never flash the map.
+    const enterCard = useCallback((_: unknown, node: Node): void => {
+        if (node.type === 'card') setHoveredCard(node.id);
+    }, []);
+    const strayFrom = useCallback(
+        (event: MouseEvent): void => {
+            if (hoveredCard === undefined) return;
+            const card = canvas.current?.querySelector(`.react-flow__node[data-id=${quoted(hoveredCard)}]`)?.getBoundingClientRect();
+            if (
+                card === undefined ||
+                event.clientX < card.left - HOVER_REACH ||
+                event.clientX > card.right + HOVER_REACH ||
+                event.clientY < card.top - HOVER_REACH ||
+                event.clientY > card.bottom + HOVER_REACH
+            ) {
+                setHoveredCard(undefined);
+            }
+        },
+        [hoveredCard]
+    );
+    const leaveCanvas = useCallback(() => setHoveredCard(undefined), []);
 
-    const showTip = (event: MouseEvent, id: string): void => {
-        const label = labels.get(id);
+    // The link's label is drawn straight into its element, so the map never renders again for it.
+    const placeTip = useCallback((event: MouseEvent): void => {
         const box = canvas.current?.getBoundingClientRect();
-        if (label === undefined || box === undefined) return;
-        setTip({
-            label,
-            x: event.clientX - box.left,
-            y: event.clientY - box.top,
-        });
-    };
+        if (tip.current === null || box === undefined) return;
+        tip.current.style.left = `${event.clientX - box.left + 12}px`;
+        tip.current.style.top = `${event.clientY - box.top + 12}px`;
+    }, []);
+    const enterLink = useCallback(
+        (event: MouseEvent, edge: Edge): void => {
+            const label = labels.get(edge.id);
+            window.clearTimeout(tipTimer.current);
+            if (label === undefined || tip.current === null) return;
+            placeTip(event);
+            tipTimer.current = window.setTimeout(() => {
+                if (tip.current === null) return;
+                tip.current.textContent = label;
+                tip.current.hidden = false;
+            }, TIP_DELAY_MS);
+        },
+        [labels, placeTip]
+    );
+    const leaveLink = useCallback((): void => {
+        window.clearTimeout(tipTimer.current);
+        if (tip.current !== null) tip.current.hidden = true;
+    }, []);
+    useEffect(() => () => window.clearTimeout(tipTimer.current), []);
 
     const jumpTo = (card: MapCard | undefined): void => {
         if (card === undefined) return;
@@ -438,7 +477,7 @@ function MapCanvas({
                     </div>
                 </div>
             )}
-            <div ref={canvas} className="k-map__canvas" data-hovering={lit === undefined ? undefined : ''}>
+            <div ref={canvas} className="k-map__canvas" data-hovering={lit === undefined ? undefined : ''} onMouseLeave={leaveCanvas}>
                 <style>{highlight}</style>
                 <ReactFlow
                     nodes={nodes}
@@ -454,26 +493,15 @@ function MapCanvas({
                     maxZoom={1.75}
                     fitView
                     fitViewOptions={FIT}
-                    onNodeMouseEnter={(_, node) => enterCard(node.type === 'card' ? node.id : undefined)}
-                    onNodeMouseLeave={leaveCard}
-                    onEdgeMouseEnter={(event, edge) => showTip(event, edge.id)}
-                    onEdgeMouseMove={(event, edge) => showTip(event, edge.id)}
-                    onEdgeMouseLeave={() => setTip(undefined)}
-                    proOptions={{
-                        hideAttribution: true,
-                    }}>
+                    onNodeMouseEnter={enterCard}
+                    onPaneMouseMove={strayFrom}
+                    onEdgeMouseEnter={enterLink}
+                    onEdgeMouseMove={placeTip}
+                    onEdgeMouseLeave={leaveLink}
+                    proOptions={PRO_OPTIONS}>
                     <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
                 </ReactFlow>
-                {tip === undefined ? null : (
-                    <div
-                        className="k-map__link-label"
-                        style={{
-                            left: tip.x + 12,
-                            top: tip.y + 12,
-                        }}>
-                        {tip.label}
-                    </div>
-                )}
+                <div ref={tip} className="k-map__link-label" hidden />
             </div>
         </>
     );
