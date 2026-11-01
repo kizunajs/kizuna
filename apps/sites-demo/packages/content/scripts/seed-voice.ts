@@ -92,6 +92,13 @@ const norwayVoice = {
 };
 
 /**
+ * Whether a voice says nothing: no tone, audience, rules or glossary.
+ */
+const isEmptyVoice = (content: Record<string, unknown> | null): boolean =>
+    content === null ||
+    Object.values(content).every((value) => value === '' || value === undefined || (Array.isArray(value) && value.length === 0));
+
+/**
  * Writes and publishes Hagen's group voice and Hagen Norge's, each only when
  * it is missing, so a voice an editor changed survives a restart.
  */
@@ -122,7 +129,9 @@ export const seedVoice = async (service: CmsService): Promise<void> => {
         },
     ];
     for (const voice of voices) {
-        if ((await service.document(voice.ref)).row !== undefined) continue;
+        const { row } = await service.document(voice.ref);
+        // A voice saved empty and never published counts as missing, so opening one before the seed ran does not stop it.
+        if (row !== undefined && (row.published !== null || !isEmptyVoice(row.draft))) continue;
         const state = await service.update({
             ref: voice.ref,
             changes: voice.values,

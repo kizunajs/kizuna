@@ -40,8 +40,7 @@ export const Articles = defineCollection({
             name: 'image',
             schema: croppedImage({
                 aspectRatio: '3:2',
-            })
-                .optional(),
+            }).optional(),
             position: 'sidebar',
         },
     ],
