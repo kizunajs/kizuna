@@ -92,6 +92,37 @@ export namespace API {
                         width: number;
                         height: number;
                     };
+                    body?: Array<{
+                        _type: "block";
+                        _key: string;
+                        style: "normal" | "h2" | "h3" | "h4" | "blockquote";
+                        listItem?: "bullet" | "number";
+                        level?: number;
+                        markDefs: Array<{
+                            _type: "link";
+                            _key: string;
+                            /**
+                             * The link's address for the site and language being read.
+                             */
+                            href: string;
+                        }>;
+                        children: Array<{
+                            _type: "span";
+                            _key: string;
+                            text: string;
+                            marks: Array<string>;
+                        }>;
+                    } | {
+                        _type: "image";
+                        _key: string;
+                        image: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                    }>;
                 };
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
@@ -142,10 +173,104 @@ export namespace API {
                 content: {
                     heading: string;
                     intro: string;
-                    /**
-                     * Paragraphs, with a blank line between each.
-                     */
-                    body: string;
+                    body: Array<{
+                        _type: "block";
+                        _key: string;
+                        style: "normal" | "h2" | "h3" | "h4" | "blockquote";
+                        listItem?: "bullet" | "number";
+                        level?: number;
+                        markDefs: Array<{
+                            _type: "link";
+                            _key: string;
+                            /**
+                             * The link's address for the site and language being read.
+                             */
+                            href: string;
+                        }>;
+                        children: Array<{
+                            _type: "span";
+                            _key: string;
+                            text: string;
+                            marks: Array<string>;
+                        }>;
+                    } | {
+                        _type: "image";
+                        _key: string;
+                        image: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                    } | {
+                        _type: "callout";
+                        _key: string;
+                        tone: "tip" | "warning" | "note";
+                        /**
+                         * Two sentences at most.
+                         */
+                        text: string;
+                    } | {
+                        _type: "pullQuote";
+                        _key: string;
+                        quote: string;
+                        person: EmployeeId;
+                    } | {
+                        _type: "plantCard";
+                        _key: string;
+                        plant: ProductId;
+                    } | {
+                        _type: "figure";
+                        _key: string;
+                        image: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                        caption?: string;
+                    } | {
+                        _type: "imagePair";
+                        _key: string;
+                        left: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                        right: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                        caption?: string;
+                    } | {
+                        _type: "faq";
+                        _key: string;
+                        questions: Array<{
+                            question: string;
+                            answer: string;
+                        }>;
+                    } | {
+                        _type: "button";
+                        _key: string;
+                        link: {
+                            /**
+                             * The link's address for the site and language being read, or null when its page or item is not published.
+                             */
+                            href: string | null;
+                            label?: string;
+                        };
+                    } | {
+                        _type: "relatedArticle";
+                        _key: string;
+                        article: ArticleId;
+                    }>;
                     image?: {
                         id: string;
                         url: string;
@@ -153,6 +278,13 @@ export namespace API {
                         width: number;
                         height: number;
                     };
+                    related?: Array<{
+                        /**
+                         * The link's address for the site and language being read, or null when its page or item is not published.
+                         */
+                        href: string | null;
+                        label?: string;
+                    }>;
                 };
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
@@ -178,10 +310,104 @@ export namespace API {
                 content: {
                     heading: string;
                     intro: string;
-                    /**
-                     * Paragraphs, with a blank line between each.
-                     */
-                    body: string;
+                    body: Array<{
+                        _type: "block";
+                        _key: string;
+                        style: "normal" | "h2" | "h3" | "h4" | "blockquote";
+                        listItem?: "bullet" | "number";
+                        level?: number;
+                        markDefs: Array<{
+                            _type: "link";
+                            _key: string;
+                            /**
+                             * The link's address for the site and language being read.
+                             */
+                            href: string;
+                        }>;
+                        children: Array<{
+                            _type: "span";
+                            _key: string;
+                            text: string;
+                            marks: Array<string>;
+                        }>;
+                    } | {
+                        _type: "image";
+                        _key: string;
+                        image: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                    } | {
+                        _type: "callout";
+                        _key: string;
+                        tone: "tip" | "warning" | "note";
+                        /**
+                         * Two sentences at most.
+                         */
+                        text: string;
+                    } | {
+                        _type: "pullQuote";
+                        _key: string;
+                        quote: string;
+                        person: EmployeeId;
+                    } | {
+                        _type: "plantCard";
+                        _key: string;
+                        plant: ProductId;
+                    } | {
+                        _type: "figure";
+                        _key: string;
+                        image: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                        caption?: string;
+                    } | {
+                        _type: "imagePair";
+                        _key: string;
+                        left: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                        right: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                        caption?: string;
+                    } | {
+                        _type: "faq";
+                        _key: string;
+                        questions: Array<{
+                            question: string;
+                            answer: string;
+                        }>;
+                    } | {
+                        _type: "button";
+                        _key: string;
+                        link: {
+                            /**
+                             * The link's address for the site and language being read, or null when its page or item is not published.
+                             */
+                            href: string | null;
+                            label?: string;
+                        };
+                    } | {
+                        _type: "relatedArticle";
+                        _key: string;
+                        article: ArticleId;
+                    }>;
                     image?: {
                         id: string;
                         url: string;
@@ -189,6 +415,13 @@ export namespace API {
                         width: number;
                         height: number;
                     };
+                    related?: Array<{
+                        /**
+                         * The link's address for the site and language being read, or null when its page or item is not published.
+                         */
+                        href: string | null;
+                        label?: string;
+                    }>;
                 };
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
@@ -214,10 +447,104 @@ export namespace API {
                 content: {
                     heading: string;
                     intro: string;
-                    /**
-                     * Paragraphs, with a blank line between each.
-                     */
-                    body: string;
+                    body: Array<{
+                        _type: "block";
+                        _key: string;
+                        style: "normal" | "h2" | "h3" | "h4" | "blockquote";
+                        listItem?: "bullet" | "number";
+                        level?: number;
+                        markDefs: Array<{
+                            _type: "link";
+                            _key: string;
+                            /**
+                             * The link's address for the site and language being read.
+                             */
+                            href: string;
+                        }>;
+                        children: Array<{
+                            _type: "span";
+                            _key: string;
+                            text: string;
+                            marks: Array<string>;
+                        }>;
+                    } | {
+                        _type: "image";
+                        _key: string;
+                        image: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                    } | {
+                        _type: "callout";
+                        _key: string;
+                        tone: "tip" | "warning" | "note";
+                        /**
+                         * Two sentences at most.
+                         */
+                        text: string;
+                    } | {
+                        _type: "pullQuote";
+                        _key: string;
+                        quote: string;
+                        person: EmployeeId;
+                    } | {
+                        _type: "plantCard";
+                        _key: string;
+                        plant: ProductId;
+                    } | {
+                        _type: "figure";
+                        _key: string;
+                        image: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                        caption?: string;
+                    } | {
+                        _type: "imagePair";
+                        _key: string;
+                        left: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                        right: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                        caption?: string;
+                    } | {
+                        _type: "faq";
+                        _key: string;
+                        questions: Array<{
+                            question: string;
+                            answer: string;
+                        }>;
+                    } | {
+                        _type: "button";
+                        _key: string;
+                        link: {
+                            /**
+                             * The link's address for the site and language being read, or null when its page or item is not published.
+                             */
+                            href: string | null;
+                            label?: string;
+                        };
+                    } | {
+                        _type: "relatedArticle";
+                        _key: string;
+                        article: ArticleId;
+                    }>;
                     image?: {
                         id: string;
                         url: string;
@@ -225,6 +552,13 @@ export namespace API {
                         width: number;
                         height: number;
                     };
+                    related?: Array<{
+                        /**
+                         * The link's address for the site and language being read, or null when its page or item is not published.
+                         */
+                        href: string | null;
+                        label?: string;
+                    }>;
                 };
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
@@ -250,10 +584,104 @@ export namespace API {
                 content: {
                     heading: string;
                     intro: string;
-                    /**
-                     * Paragraphs, with a blank line between each.
-                     */
-                    body: string;
+                    body: Array<{
+                        _type: "block";
+                        _key: string;
+                        style: "normal" | "h2" | "h3" | "h4" | "blockquote";
+                        listItem?: "bullet" | "number";
+                        level?: number;
+                        markDefs: Array<{
+                            _type: "link";
+                            _key: string;
+                            /**
+                             * The link's address for the site and language being read.
+                             */
+                            href: string;
+                        }>;
+                        children: Array<{
+                            _type: "span";
+                            _key: string;
+                            text: string;
+                            marks: Array<string>;
+                        }>;
+                    } | {
+                        _type: "image";
+                        _key: string;
+                        image: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                    } | {
+                        _type: "callout";
+                        _key: string;
+                        tone: "tip" | "warning" | "note";
+                        /**
+                         * Two sentences at most.
+                         */
+                        text: string;
+                    } | {
+                        _type: "pullQuote";
+                        _key: string;
+                        quote: string;
+                        person: EmployeeId;
+                    } | {
+                        _type: "plantCard";
+                        _key: string;
+                        plant: ProductId;
+                    } | {
+                        _type: "figure";
+                        _key: string;
+                        image: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                        caption?: string;
+                    } | {
+                        _type: "imagePair";
+                        _key: string;
+                        left: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                        right: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                        caption?: string;
+                    } | {
+                        _type: "faq";
+                        _key: string;
+                        questions: Array<{
+                            question: string;
+                            answer: string;
+                        }>;
+                    } | {
+                        _type: "button";
+                        _key: string;
+                        link: {
+                            /**
+                             * The link's address for the site and language being read, or null when its page or item is not published.
+                             */
+                            href: string | null;
+                            label?: string;
+                        };
+                    } | {
+                        _type: "relatedArticle";
+                        _key: string;
+                        article: ArticleId;
+                    }>;
                     image?: {
                         id: string;
                         url: string;
@@ -261,6 +689,13 @@ export namespace API {
                         width: number;
                         height: number;
                     };
+                    related?: Array<{
+                        /**
+                         * The link's address for the site and language being read, or null when its page or item is not published.
+                         */
+                        href: string | null;
+                        label?: string;
+                    }>;
                 };
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
@@ -470,7 +905,104 @@ export namespace API {
                 items: Array<{
                     title: string;
                     summary: string;
-                    body: string;
+                    body: Array<{
+                        _type: "block";
+                        _key: string;
+                        style: "normal" | "h2" | "h3" | "h4" | "blockquote";
+                        listItem?: "bullet" | "number";
+                        level?: number;
+                        markDefs: Array<{
+                            _type: "link";
+                            _key: string;
+                            /**
+                             * The link's address for the site and language being read.
+                             */
+                            href: string;
+                        }>;
+                        children: Array<{
+                            _type: "span";
+                            _key: string;
+                            text: string;
+                            marks: Array<string>;
+                        }>;
+                    } | {
+                        _type: "image";
+                        _key: string;
+                        image: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                    } | {
+                        _type: "callout";
+                        _key: string;
+                        tone: "tip" | "warning" | "note";
+                        /**
+                         * Two sentences at most.
+                         */
+                        text: string;
+                    } | {
+                        _type: "pullQuote";
+                        _key: string;
+                        quote: string;
+                        person: EmployeeId;
+                    } | {
+                        _type: "plantCard";
+                        _key: string;
+                        plant: ProductId;
+                    } | {
+                        _type: "figure";
+                        _key: string;
+                        image: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                        caption?: string;
+                    } | {
+                        _type: "imagePair";
+                        _key: string;
+                        left: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                        right: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                        caption?: string;
+                    } | {
+                        _type: "faq";
+                        _key: string;
+                        questions: Array<{
+                            question: string;
+                            answer: string;
+                        }>;
+                    } | {
+                        _type: "button";
+                        _key: string;
+                        link: {
+                            /**
+                             * The link's address for the site and language being read, or null when its page or item is not published.
+                             */
+                            href: string | null;
+                            label?: string;
+                        };
+                    } | {
+                        _type: "relatedArticle";
+                        _key: string;
+                        article: ArticleId;
+                    }>;
                     date: string;
                     image?: {
                         id: string;
@@ -507,7 +1039,104 @@ export namespace API {
             | { status: 200; body: {
                 title: string;
                 summary: string;
-                body: string;
+                body: Array<{
+                    _type: "block";
+                    _key: string;
+                    style: "normal" | "h2" | "h3" | "h4" | "blockquote";
+                    listItem?: "bullet" | "number";
+                    level?: number;
+                    markDefs: Array<{
+                        _type: "link";
+                        _key: string;
+                        /**
+                         * The link's address for the site and language being read.
+                         */
+                        href: string;
+                    }>;
+                    children: Array<{
+                        _type: "span";
+                        _key: string;
+                        text: string;
+                        marks: Array<string>;
+                    }>;
+                } | {
+                    _type: "image";
+                    _key: string;
+                    image: {
+                        id: string;
+                        url: string;
+                        alt: string;
+                        width: number;
+                        height: number;
+                    };
+                } | {
+                    _type: "callout";
+                    _key: string;
+                    tone: "tip" | "warning" | "note";
+                    /**
+                     * Two sentences at most.
+                     */
+                    text: string;
+                } | {
+                    _type: "pullQuote";
+                    _key: string;
+                    quote: string;
+                    person: EmployeeId;
+                } | {
+                    _type: "plantCard";
+                    _key: string;
+                    plant: ProductId;
+                } | {
+                    _type: "figure";
+                    _key: string;
+                    image: {
+                        id: string;
+                        url: string;
+                        alt: string;
+                        width: number;
+                        height: number;
+                    };
+                    caption?: string;
+                } | {
+                    _type: "imagePair";
+                    _key: string;
+                    left: {
+                        id: string;
+                        url: string;
+                        alt: string;
+                        width: number;
+                        height: number;
+                    };
+                    right: {
+                        id: string;
+                        url: string;
+                        alt: string;
+                        width: number;
+                        height: number;
+                    };
+                    caption?: string;
+                } | {
+                    _type: "faq";
+                    _key: string;
+                    questions: Array<{
+                        question: string;
+                        answer: string;
+                    }>;
+                } | {
+                    _type: "button";
+                    _key: string;
+                    link: {
+                        /**
+                         * The link's address for the site and language being read, or null when its page or item is not published.
+                         */
+                        href: string | null;
+                        label?: string;
+                    };
+                } | {
+                    _type: "relatedArticle";
+                    _key: string;
+                    article: ArticleId;
+                }>;
                 date: string;
                 image?: {
                     id: string;
@@ -643,7 +1272,7 @@ export namespace API {
                             _type: "link";
                             _key: string;
                             /**
-                             * An https or http URL, mailto:, tel:, a path on this site like /blog, or an #anchor.
+                             * The link's address for the site and language being read.
                              */
                             href: string;
                         }>;
@@ -709,7 +1338,7 @@ export namespace API {
                         _type: "link";
                         _key: string;
                         /**
-                         * An https or http URL, mailto:, tel:, a path on this site like /blog, or an #anchor.
+                         * The link's address for the site and language being read.
                          */
                         href: string;
                     }>;
@@ -1332,20 +1961,20 @@ const routes: GeneratedRoutes = {
 };
 
 /**
- * Brands a value from outside the API, like a URL segment, as `API.OfficeId`. A value from a response is branded already.
- *
- * @example
- * const id = toOfficeId('1');
- */
-export const toOfficeId = (value: string): API.OfficeId => value as API.OfficeId;
-
-/**
  * Brands a value from outside the API, like a URL segment, as `API.EmployeeId`. A value from a response is branded already.
  *
  * @example
  * const id = toEmployeeId('1');
  */
 export const toEmployeeId = (value: string): API.EmployeeId => value as API.EmployeeId;
+
+/**
+ * Brands a value from outside the API, like a URL segment, as `API.ProductId`. A value from a response is branded already.
+ *
+ * @example
+ * const id = toProductId('1');
+ */
+export const toProductId = (value: string): API.ProductId => value as API.ProductId;
 
 /**
  * Brands a value from outside the API, like a URL segment, as `API.ArticleId`. A value from a response is branded already.
@@ -1356,12 +1985,12 @@ export const toEmployeeId = (value: string): API.EmployeeId => value as API.Empl
 export const toArticleId = (value: string): API.ArticleId => value as API.ArticleId;
 
 /**
- * Brands a value from outside the API, like a URL segment, as `API.ProductId`. A value from a response is branded already.
+ * Brands a value from outside the API, like a URL segment, as `API.OfficeId`. A value from a response is branded already.
  *
  * @example
- * const id = toProductId('1');
+ * const id = toOfficeId('1');
  */
-export const toProductId = (value: string): API.ProductId => value as API.ProductId;
+export const toOfficeId = (value: string): API.OfficeId => value as API.OfficeId;
 
 /**
  * Brands a value from outside the API, like a URL segment, as `API.NewsletterId`. A value from a response is branded already.
