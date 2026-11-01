@@ -37,7 +37,7 @@ Commands:
   pages      List every page's path and name.
   orphans    List stored content nothing in the config claims, per site and table. Exits 1 when there is some.
   rename-page <from> <to>
-             Move a renamed page's stored content and history to its new name.
+             Move a renamed page's stored content and history to its new name, and the links to it.
   rename-site <from> <to>
              Move everything a site stores, with its history, to a new site key.
   push       Copy one page into another environment as a draft, with its media.
@@ -564,8 +564,9 @@ export const run = async (argv: readonly string[], context: PluginCliContext): P
                 if (from === undefined || to === undefined) throw new CliError('Name both pages: kizuna cms rename-page <from> <to>.');
                 const service = await serviceOf(context);
                 const site = typeof flags['site'] === 'string' ? flags['site'] : 'default';
+                let links: number;
                 try {
-                    await service.renamePage(from, to, site);
+                    links = await service.renamePage(from, to, site);
                 } catch (error) {
                     if (error instanceof CmsHttpError) throw new CliError(error.message);
                     throw error;
@@ -577,11 +578,12 @@ export const run = async (argv: readonly string[], context: PluginCliContext): P
                                   from,
                                   to,
                                   site,
+                                  links,
                               },
                               null,
                               2
                           )
-                        : `Moved the content of ${from} to ${to}.`
+                        : `Moved the content of ${from} to ${to}, and ${links} ${links === 1 ? 'link' : 'links'} to it.`
                 );
                 return 0;
             }

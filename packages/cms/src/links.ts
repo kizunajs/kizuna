@@ -232,6 +232,33 @@ export const contentLinksOf = (definition: ContentDefinition, content: Record<st
 };
 
 /**
+ * A document with every content link to `from` pointing at `to`, for a page
+ * stored under a new name.
+ */
+export const withRenamedLinks = (
+    definition: ContentDefinition,
+    content: Record<string, unknown>,
+    from: string,
+    to: string
+): Record<string, unknown> => {
+    const renamed: Record<string, unknown> = {
+        ...content,
+    };
+    for (const field of dataFields(definition.fields)) {
+        if (!(field.name in content)) continue;
+        renamed[field.name] = mapLinks(field.schema, content[field.name], field.name, (stored) =>
+            stored.ref === from
+                ? {
+                      ...stored,
+                      ref: to,
+                  }
+                : stored
+        );
+    }
+    return renamed;
+};
+
+/**
  * A document with every link as a component reads it: a content link's ref
  * turned into the address `hrefOf` answers, and a URL link as typed. A rich
  * text link whose target `hrefOf` cannot address is taken out, so its words

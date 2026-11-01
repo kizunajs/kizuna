@@ -317,6 +317,17 @@ export interface Ref {
 }
 
 /**
+ * A document's copies with its links to a renamed page pointing at the new
+ * name, and the refs each copy holds after.
+ */
+export interface Relinked {
+    draft: Content | null;
+    published: Content | null;
+    refs: readonly Ref[];
+    publishedRefs: readonly Ref[];
+}
+
+/**
  * A write carried an `If-Match` for a version that is no longer the latest.
  */
 export class VersionConflictError extends Error {
@@ -1514,16 +1525,55 @@ export class DocumentStore {
     }
 
     /**
-     * Moves a document to another key, its translations, versions and refs
-     * with it.
+     * Moves a page to another key, its translations, versions and refs with
+     * it. In the same transaction every document holding `link`, in any
+     * language and in the trash too, is rewritten through `relink`, which
+     * answers `undefined` to leave one as it is. Answers the documents
+     * rewritten.
      */
-    async rekey(kind: DocumentKind, from: string, to: string, site = SITE): Promise<boolean> {
-        const moved = await this.db
-            .update(cmsDocuments)
-            .set({ key: to })
-            .where(and(eq(cmsDocuments.kind, kind), eq(cmsDocuments.site, site), eq(cmsDocuments.key, from)))
-            .returning({ id: cmsDocuments.id });
-        return moved.length > 0;
+    async renamePage(
+        from: string,
+        to: string,
+        site: string,
+        link: Omit<Ref, 'fieldPath'>,
+        relink: (row: DocumentRow) => Relinked | undefined,
+        author: string
+    ): Promise<DocumentRow[]> {
+        return this.db.transaction(async (tx) => {
+            await tx
+                .update(cmsDocuments)
+                .set({
+                    key: to,
+                })
+                .where(and(eq(cmsDocuments.kind, 'page'), eq(cmsDocuments.site, site), eq(cmsDocuments.key, from)));
+            const holding = tx
+                .select({
+                    id: cmsRefs.documentId,
+                })
+                .from(cmsRefs)
+                .where(and(eq(cmsRefs.brand, link.brand), eq(cmsRefs.refId, link.refId)));
+            const holders = await tx.select().from(cmsDocuments).where(inArray(cmsDocuments.id, holding)).for('update');
+            const rewritten: DocumentRow[] = [];
+            for (const holder of holders) {
+                const relinked = relink(toRow(holder));
+                if (relinked === undefined) continue;
+                const [row] = await tx
+                    .update(cmsDocuments)
+                    .set({
+                        draft: relinked.draft,
+                        published: relinked.published,
+                        updatedAt: new Date(),
+                        updatedBy: author,
+                        updatedVia: actingAgent(),
+                    })
+                    .where(eq(cmsDocuments.id, holder.id))
+                    .returning();
+                await this.replaceRefsIn(tx, holder.id, relinked.refs);
+                await this.replaceRefsIn(tx, holder.id, relinked.publishedRefs, true);
+                rewritten.push(toRow(row!));
+            }
+            return rewritten;
+        });
     }
 
     /**

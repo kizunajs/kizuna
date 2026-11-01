@@ -60,6 +60,7 @@ import {
     type LinkCopy,
     type LinkTarget,
 } from './link-targets.js';
+import { contentLinksOf, LINK_BRAND, withRenamedLinks } from './links.js';
 import { trashItem } from './trash.js';
 import { changesOf, contentEvent, fireContentEvents } from './content-events.js';
 import {
@@ -3908,9 +3909,10 @@ export class CmsService {
 
     /**
      * Moves a page's stored content, versions and history to another name,
-     * after the page was renamed in code.
+     * after the page was renamed in code, and points every content link to
+     * it at the new name. Answers how many links moved.
      */
-    async renamePage(from: string, to: string, site = DEFAULT_SITE): Promise<void> {
+    async renamePage(from: string, to: string, site = DEFAULT_SITE): Promise<number> {
         if (this.sites[site]?.[to] === undefined) {
             throw new CmsHttpError(404, {
                 detail: `No page named '${to}'${site === DEFAULT_SITE ? '' : ` on the ${site} site`}. Rename the page in its content.ts first.`,
@@ -3927,19 +3929,71 @@ export class CmsService {
         if ((await this.store.get('page', to, site)) !== undefined) {
             throw new CmsHttpError(409, { detail: `'${to}' has content of its own. Delete it before moving '${from}' there.` });
         }
-        await this.store.rekey('page', from, to, site);
-        const moved: DocumentRef = {
+        const pageNamed = (name: string): DocumentRef => ({
             type: 'page',
-            name: to,
+            name,
             ...(site === DEFAULT_SITE
                 ? {}
                 : {
                       site,
                   }),
-        };
+        });
+        const before = formatRef(pageNamed(from));
+        const moved = pageNamed(to);
+        const after = formatRef(moved);
+        const listings = this.listings();
+        let links = 0;
+        const holders = await this.store.renamePage(
+            from,
+            to,
+            site,
+            {
+                brand: LINK_BRAND,
+                refId: before,
+            },
+            (holder) => {
+                const target = this.declaredTarget(holder, listings);
+                if (target === undefined) return undefined;
+                const definition =
+                    holder.locale === SOURCE_LOCALE ? target.definition : (translationOf(target.definition) ?? target.definition);
+                const paths = new Set(
+                    [holder.draft, holder.published].flatMap((content) =>
+                        content === null
+                            ? []
+                            : contentLinksOf(definition, content)
+                                  .filter((found) => found.ref === before)
+                                  .map((found) => found.path)
+                    )
+                );
+                if (paths.size === 0) return undefined;
+                links += paths.size;
+                const draft = holder.draft === null ? null : withRenamedLinks(definition, holder.draft, before, after);
+                const published = holder.published === null ? null : withRenamedLinks(definition, holder.published, before, after);
+                return {
+                    draft,
+                    published,
+                    refs: refsOf(definition, draft ?? published ?? {}),
+                    publishedRefs: published === null ? [] : refsOf(definition, published),
+                };
+            },
+            MIGRATION_AUTHOR
+        );
         const row = await this.store.get('page', to, site);
-        if (row !== undefined) await this.store.readdressReviews(row.id, formatRef(moved));
+        if (row !== undefined) await this.store.readdressReviews(row.id, after);
         await this.revalidateDocument(moved);
+        for (const holder of holders) {
+            const target = this.declaredTarget(holder, listings);
+            if (target === undefined) continue;
+            await this.revalidateDocument(
+                holder.locale === SOURCE_LOCALE
+                    ? target.ref
+                    : {
+                          ...target.ref,
+                          locale: holder.locale,
+                      }
+            );
+        }
+        return links;
     }
 
     /**

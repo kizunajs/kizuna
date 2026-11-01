@@ -50,7 +50,7 @@ Lists stored content that nothing in the config claims anymore: pages renamed or
 
 ## `kizuna cms rename-page`
 
-Moves a renamed page's stored content, with its versions and history, to the new name. Rename the page in its `content.ts` first. The command refuses a name that is still a page, and a target that has content of its own.
+Moves a renamed page's stored content, with its versions and history, to the new name. Links to the page in other documents, on any site and in every language, point at the new name too, and the command prints how many moved. Rename the page in its `content.ts` first. The command refuses a name that is still a page, and a target that has content of its own.
 
 ```sh
 kizuna cms rename-page pricingPage plansPage
