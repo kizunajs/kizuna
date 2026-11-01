@@ -81,8 +81,8 @@ export interface FieldFormProps {
      */
     below?: (field: DescribedField) => ReactNode;
     /**
-     * What shows above a field's input, like the group's glossary rows a
-     * site's own rows add to.
+     * What shows above a field's input, under its label, like the group's
+     * glossary rows a site's own rows add to.
      */
     above?: (field: DescribedField) => ReactNode;
     /**
@@ -390,7 +390,8 @@ export function FieldForm({
                             {error}
                         </p>
                     )}
-                    {above?.(field)}
+                    {/* A list that draws its own label shows what goes above it under that label. */}
+                    {heading === undefined ? above?.(field) : null}
                     {custom ?? (
                         <Control
                             key={revisions[field.path] ?? 0}
@@ -398,6 +399,7 @@ export function FieldForm({
                             name={field.name}
                             label={labelOf(field)}
                             heading={heading}
+                            beforeItems={heading === undefined ? undefined : above?.(field)}
                             schema={field.schema}
                             root={field.schema}
                             value={valueOf(field.path)}

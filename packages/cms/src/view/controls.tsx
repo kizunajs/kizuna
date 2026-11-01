@@ -93,6 +93,11 @@ export interface ControlProps {
      */
     heading?: ReactNode;
     /**
+     * What a list whose items fold shows under its heading, above its own
+     * items, like the group's glossary rows above a site's.
+     */
+    beforeItems?: ReactNode;
+    /**
      * The field's help, which a list shows beside its Add button.
      */
     help?: string | undefined;
@@ -1253,6 +1258,7 @@ function ArrayControl(props: ControlProps) {
                         </span>
                     )}
                 </div>
+                {props.beforeItems}
                 {items.length === 0 ? null : (
                     <div className="k-array__items">
                         {items.map((item, index) => {
@@ -1313,6 +1319,7 @@ function ArrayControl(props: ControlProps) {
                                                 {...props}
                                                 id={undefined}
                                                 heading={undefined}
+                                                beforeItems={undefined}
                                                 help={undefined}
                                                 label={undefined}
                                                 schema={resolvedItem}
@@ -1342,6 +1349,7 @@ function ArrayControl(props: ControlProps) {
                                                     {...props}
                                                     id={undefined}
                                                     heading={undefined}
+                                                    beforeItems={undefined}
                                                     help={undefined}
                                                     label={undefined}
                                                     schema={choice.schema}
@@ -1397,6 +1405,7 @@ function ArrayControl(props: ControlProps) {
                             name={undefined}
                             label={undefined}
                             heading={undefined}
+                            beforeItems={undefined}
                             help={undefined}
                             blocks={undefined}
                             schema={itemSchema}
@@ -1609,6 +1618,7 @@ function PropertyControl({
             name={name}
             label={label ?? humanize(name)}
             heading={undefined}
+            beforeItems={undefined}
             help={undefined}
             blocks={undefined}
             value={current[name]}
