@@ -9,15 +9,14 @@ Every `editing` route is an MCP tool, so the model can do what the form does. `e
 
 ## Instructions
 
-An agent writes better when it knows how you write. `instructions` on a page, a global or a collection holds that in Markdown: the voice, what the content is for, and what never to change.
+`instructions` on a page, a global or a collection says what that kind of content is for and how its fields are filled, in Markdown.
 
 ```ts title="src/articles.ts"
 export const Articles = defineCollection({
     name: 'articles',
     id: ArticleId,
-    instructions: `Write as Hagen: plain, practical sentences that say what to do and when.
-- The summary is one sentence that says what the reader comes away knowing.
-- Never change prices, opening hours or addresses.`,
+    instructions: `- The summary is one sentence that says what the reader comes away knowing.
+- Keep an article's date and the sites it shows on as they are.`,
     fields: [
         // ...
     ],
@@ -26,21 +25,7 @@ export const Articles = defineCollection({
 
 The instructions join the description of the tool that writes that kind of content, so `editing_collections_update_draft` lists every collection's, and `editing_describe` answers a document's under `instructions`.
 
-What admins want to add for one site lives in the admin, as content. `AgentInstructions` is a global with one Markdown field, and a site that lists it in its `globals` gets an **Agent instructions** page for its admins to fill in:
-
-```ts title="src/sites.ts"
-import { AgentInstructions, declareSites } from '@kizunajs/cms';
-
-export const sites = declareSites(Site, {
-    uk: {
-        label: 'Hagen UK',
-        pages: countryPages,
-        globals: [AgentInstructions],
-    },
-});
-```
-
-`editing_describe` answers the content's own instructions first, then the published text of the site's Agent instructions, or of the shared one when the global is in the shared `globals`.
+How a site sounds and which words it uses is its [voice](/docs/cms/editing/voice), which admins keep in the admin, one for the group and one per site. Instructions never mention tone or terms, and the voice never names a collection or a field. `editing_describe` answers both, and `editing_voice` reads the voice before something new is written.
 
 ## Credit
 
@@ -86,6 +71,7 @@ The person reads each document's changes word by word on the release's page and 
 | `missing`    | block            | A required field is empty or fails its schema                                                                         |
 | `language`   | warning          | A translation leaves fields empty that the source holds                                                               |
 | `brokenLink` | warning          | A [link](/docs/cms/links) points at a page that is gone, trashed or unpublished. Not within the release being checked |
+| `glossary`   | warning          | A field says a word the site's [glossary](/docs/cms/editing/voice) flags, in the document or one of its translations  |
 | `held`       | block            | Someone else is editing it                                                                                            |
 | `review`     | block or warning | It requires an approval it lacks, or a review waits or was sent back                                                  |
 | `schedule`   | warning          | Publishing it now ends its own schedule, or takes it out of a release                                                 |

@@ -8,7 +8,15 @@ import { EditorContext, ICON, type EditorContextValue } from '../view/context.js
 import { FieldForm, fieldDomId, type FieldFormHandle, type SaveFailure, type SaveState } from '../view/form.js';
 import { Avatar, OwnerControl, type People } from '../view/people.js';
 import { PublishReview, changeViewsOf, type AskedReview, type Changes, type PublishReviewHandle } from '../view/review.js';
-import { documentTitle, languageNameOf, valueAt, type Description, type Draft, type ReviewState } from '../view/schema.js';
+import {
+    documentTitle,
+    languageNameOf,
+    valueAt,
+    type Description,
+    type Draft,
+    type GlossaryIssue,
+    type ReviewState,
+} from '../view/schema.js';
 import { sameContent } from '../same-content.js';
 import { formatRef, parseRef, sourceRefOf } from '../refs.js';
 import { withMediaSite } from './connection.js';
@@ -78,6 +86,9 @@ import { refreshLineOf, type Refresh } from './refresh-line.js';
 import { Versions } from './versions.js';
 import type { WaitingReview } from './dashboard.js';
 import type { PaletteAction } from './search.js';
+import { glossaryAfter, glossaryUnder } from './glossary-lines.js';
+import { GroupTerms, useGroupTerms } from './voice-ui.js';
+import { isUnder, VOICE_GLOBAL } from '../glossary.js';
 
 /**
  * What `translating` holds while every field left in translate mode is
@@ -312,6 +323,8 @@ export function DocumentScreen({
     const [steps, setSteps] = useState<Array<{ field: Description['fields'][number]; pending: Pending }>>([]);
     const [step, setStep] = useState(0);
     const [drafts, setDrafts] = useState<Record<string, unknown>>({});
+    // What the glossary flags in the model's translations, until the person changes the field.
+    const [translatedGlossary, setTranslatedGlossary] = useState<GlossaryIssue[]>([]);
     const [outcomes, setOutcomes] = useState<Record<string, Outcome>>({});
     const [revision, setRevision] = useState(0);
     const [draftChanges, setDraftChanges] = useState<{ changes: Changes; views: ViewedChange[] } | undefined>();
@@ -355,6 +368,12 @@ export function DocumentScreen({
         };
     }, [paletteActions]);
     useRetry(saveProblem, online, retry);
+    // A site's voice shows the group's glossary rows, locked, above its own.
+    const openRef = parseRef(documentRef);
+    const groupTerms = useGroupTerms(
+        connection,
+        openRef?.type === 'global' && openRef.name === VOICE_GLOBAL && openRef.site !== undefined ? openRef.site : undefined
+    );
 
     const describe = useCallback(
         async (ref: string, options: { remount?: boolean } = {}): Promise<Description | undefined> => {
@@ -606,6 +625,7 @@ export function DocumentScreen({
                         complete: answer.body.complete,
                         missing: answer.body.missing,
                         draft: answer.body.content,
+                        glossary: glossaryAfter(current.glossary, answer.body.glossary, Object.keys(changes)),
                     });
                 }
                 return undefined;
@@ -958,7 +978,7 @@ export function DocumentScreen({
         if (tools === undefined) return undefined;
         setTranslating(busy);
         setLinkProblem(undefined);
-        const answer = await connection.call<{ values: Record<string, unknown> }>(`${tools.prefix}_translate`, {
+        const answer = await connection.call<{ values: Record<string, unknown>; issues?: GlossaryIssue[] }>(`${tools.prefix}_translate`, {
             params: tools.params,
             body: {
                 fields: paths,
@@ -970,6 +990,10 @@ export function DocumentScreen({
             setLinkProblem(problemOf(answer, 'The translation failed'));
             return undefined;
         }
+        setTranslatedGlossary((previous) => [
+            ...previous.filter((issue) => !paths.some((path) => isUnder(issue, path))),
+            ...(answer.body.issues ?? []),
+        ]);
         if (Object.keys(answer.body.values).length === 0) {
             toasts.add({
                 description: 'Already up to date',
@@ -1920,12 +1944,14 @@ export function DocumentScreen({
                         busy={translating !== undefined}
                         revision={revision}
                         onGo={setStep}
-                        onChange={(path, value) =>
+                        onChange={(path, value) => {
                             setDrafts((previous) => ({
                                 ...previous,
                                 [path]: value,
-                            }))
-                        }
+                            }));
+                            setTranslatedGlossary((previous) => previous.filter((issue) => !isUnder(issue, path)));
+                        }}
+                        glossary={translatedGlossary}
                         onTranslate={(path) => void translateSteps([path], path)}
                         onDone={finishTranslating}
                         onKeep={(path) => {
@@ -1996,8 +2022,16 @@ export function DocumentScreen({
                             controlFor={(field, input) =>
                                 showsOn !== undefined && field.path === 'showsOn' ? <ShowsOn sites={showsOn} input={input} /> : undefined
                             }
+                            above={(field) =>
+                                groupTerms !== undefined && field.path === 'glossary' ? <GroupTerms terms={groupTerms} /> : null
+                            }
                             below={(field) => (
                                 <>
+                                    {glossaryUnder(document.glossary, document.fields, field).map((issue) => (
+                                        <p key={`${issue.path}:${issue.rule}:${issue.form}`} className="k-help k-glossary-line">
+                                            {issue.detail}
+                                        </p>
+                                    ))}
                                     {openChange !== field.path || document.locale === undefined ? null : (
                                         <div className="k-source-panel">
                                             <SourceChange field={field} code={document.locale.source.toUpperCase()} />

@@ -7,7 +7,10 @@ import { formatRef, type DocumentRef } from './refs.js';
 import { sameContent } from './same-content.js';
 import type { Caller } from './rules.js';
 import { translateFields, TranslationError } from './translate.js';
-import { DraftPageSchema } from './wire.js';
+import { DraftPageSchema, GlossaryIssueSchema } from './wire.js';
+import { documentGlossary, resolveVoice, voiceText } from './voice.js';
+import { termsIn, type GlossaryIssue } from './glossary.js';
+import { textsOf } from './translate.js';
 
 /**
  * What the translate route answers: the draft, and the fields it changed.
@@ -18,6 +21,9 @@ export const TranslatedDraftSchema = Kizuna.model({
         draft: DraftPageSchema,
         fields: z.array(z.string()).describe('The fields the translation changed. Empty when it already said the same.'),
         values: z.record(z.string(), z.unknown()).describe('The translated value of each field it changed.'),
+        issues: z
+            .array(GlossaryIssueSchema)
+            .describe("Words in the translated fields the site's glossary flags, like a kept name the model translated."),
     }),
 });
 
@@ -35,6 +41,7 @@ export interface TranslatedDraft {
     state: DraftState;
     fields: string[];
     values: Record<string, unknown>;
+    issues: GlossaryIssue[];
 }
 
 /**
@@ -75,14 +82,33 @@ export const translateDraft = async (
             detail: `'${name}' is not a translated field of '${formatRef(target.source)}'.`,
         });
     }
+    const sourceValues = Object.fromEntries(
+        fields.map((field) => [field.name, sourceValueOf(source.target.definition, published, field.name)])
+    );
+    const voice = await resolveVoice(cms, target.site, target.locale);
+    const text =
+        voice === null
+            ? ''
+            : voiceText(
+                  voice,
+                  termsIn(
+                      textsOf(fields, sourceValues).map((found) => found.text),
+                      voice.glossary
+                  )
+              );
     let translated: Record<string, unknown>;
     try {
         translated = await translateFields({
             model,
             fields,
-            values: Object.fromEntries(fields.map((field) => [field.name, sourceValueOf(source.target.definition, published, field.name)])),
+            values: sourceValues,
             from: cms.sourceLocaleOf(target.site)!,
             to: target.locale,
+            ...(text === ''
+                ? {}
+                : {
+                      voice: text,
+                  }),
         });
     } catch (error) {
         if (error instanceof TranslationError) throw new CmsHttpError(502, { detail: error.message });
@@ -96,11 +122,21 @@ export const translateDraft = async (
     const current = (await cms.document(target.ref)).row?.draft ?? {};
     const written = fields.map((field) => field.name).filter((name) => name in translated && !sameContent(translated[name], current[name]));
     const values = Object.fromEntries(written.map((name) => [name, translated[name]]));
+    const unsaved = await cms.draftState(target.ref);
+    const issues = await documentGlossary(cms, unsaved, {
+        voice,
+        fields: Object.keys(translated),
+        content: {
+            ...current,
+            ...translated,
+        },
+    });
     if (written.length === 0 || input.save === false) {
         return {
-            state: await cms.draftState(target.ref),
+            state: unsaved,
             fields: written,
             values,
+            issues,
         };
     }
     const state = await cms.update({
@@ -116,5 +152,6 @@ export const translateDraft = async (
         state,
         fields: written,
         values,
+        issues,
     };
 };

@@ -3,6 +3,7 @@ import { DEFAULT_SITE, type Person } from './options.js';
 import { formatRef, parseRef, type DocumentRef } from './refs.js';
 import { documentLabel, peopleOf, reviewOf } from './reviews.js';
 import type { EditorAccess } from './site-access.js';
+import { glossaryOfDocument } from './voice.js';
 
 /**
  * What would stop a publish, or what the person should know before it.
@@ -10,7 +11,7 @@ import type { EditorAccess } from './site-access.js';
  */
 export interface PublishIssue {
     level: 'block' | 'warning';
-    kind: 'nothing' | 'permission' | 'missing' | 'language' | 'brokenLink' | 'held' | 'review' | 'schedule';
+    kind: 'nothing' | 'permission' | 'missing' | 'language' | 'brokenLink' | 'glossary' | 'held' | 'review' | 'schedule';
     detail: string;
     /**
      * The field it is about, by path, when it is about one.
@@ -133,6 +134,15 @@ const checkState = async (
                     : link.reason === 'trashed'
                       ? `The link at ${link.path} points at ${link.target}, which is in the trash.`
                       : `The link at ${link.path} points at ${link.target}, which is not published.`,
+        });
+    }
+    for (const issue of await glossaryOfDocument(cms, state)) {
+        add({
+            level: 'warning',
+            kind: 'glossary',
+            path: issue.path,
+            locale: issue.translation,
+            detail: issue.detail,
         });
     }
     if (state.heldBy !== null && state.heldBy !== by) {

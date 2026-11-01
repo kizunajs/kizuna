@@ -159,6 +159,21 @@ const validate = (service: CmsService, options: ResolvedCmsOptions, api: PluginA
             `cms() gives editors roles on sites, and an admin over every site holds the role 'admin', which ${label} does not declare.`
         );
     }
+    if (options.voice !== undefined) {
+        const roles = typeof options.voice.roles === 'string' ? [options.voice.roles] : options.voice.roles;
+        if (identityRoles === undefined) throw new Error(`cms() gives the voice to roles, but ${label} declares none.`);
+        for (const role of roles) {
+            if (!declared.includes(role)) throw new Error(`cms() gives the voice to the role '${role}', which ${label} does not declare.`);
+        }
+        const named = [
+            ...(options.globals ?? []),
+            ...(options.collections ?? []),
+            ...Object.values(options.sites?.entries ?? {}).flatMap((entry) => [...(entry.globals ?? []), ...(entry.collections ?? [])]),
+        ].find((definition) => definition.name === VOICE_GLOBAL);
+        if (named !== undefined) {
+            throw new Error(`cms() has a voice, which is the global '${VOICE_GLOBAL}'. Give your own '${VOICE_GLOBAL}' another name.`);
+        }
+    }
     const jobsIdentity = options.jobs?.identity;
     if (
         jobsIdentity !== undefined &&

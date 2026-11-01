@@ -10,7 +10,6 @@ import { expressAdapter } from '@kizunajs/express';
 import { createMcpServer } from '@kizunajs/mcp';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { agentOf, UNNAMED_AGENT } from './agents.js';
-import { AgentInstructions } from './instructions.js';
 import { definePage } from './page.js';
 import { cms as cmsContent } from './provider.js';
 import { DocumentStore } from './storage/store.js';
@@ -102,7 +101,6 @@ const makeConfig = (db: ReturnType<typeof drizzle>) =>
                     page: InvestorRelationsPage,
                 },
             },
-            globals: [AgentInstructions],
             auth: {
                 identity: 'editor',
                 roles: ['editor', 'admin'],
@@ -515,20 +513,10 @@ describe('instructions an agent reads', () => {
         expect(editing.globals.updateDraft.description).not.toContain('frontPage');
     });
 
-    it("answers describe with the page's own instructions, then what admins wrote for the site", async () => {
-        const before = await as('mia', request(app).get('/editing/describe?ref=page:frontPage'));
-        expect(before.body.instructions).toBe('Write in a calm, plain voice. Never change the opening hours.');
-        await as('mia', request(app).patch('/editing/globals/agentInstructions/draft')).send({
-            changes: {
-                instructions: 'Hagen speaks to gardeners as a neighbour would.',
-            },
-        });
-        await as('mia', request(app).post('/editing/globals/agentInstructions/publish')).send({});
-        const after = await as('mia', request(app).get('/editing/describe?ref=page:frontPage'));
-        expect(after.body.instructions).toBe(
-            'Write in a calm, plain voice. Never change the opening hours.\n\nHagen speaks to gardeners as a neighbour would.'
-        );
+    it("answers describe with the page's own instructions", async () => {
+        const described = await as('mia', request(app).get('/editing/describe?ref=page:frontPage'));
+        expect(described.body.instructions).toBe('Write in a calm, plain voice. Never change the opening hours.');
         const other = await as('mia', request(app).get('/editing/describe?ref=page:investorRelationsPage'));
-        expect(other.body.instructions).toBe('Hagen speaks to gardeners as a neighbour would.');
+        expect(other.body.instructions).toBeNull();
     });
 });

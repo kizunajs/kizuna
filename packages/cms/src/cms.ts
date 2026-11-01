@@ -3,6 +3,7 @@ import type { ContentRuntime, PluginApi } from 'kizunajs/plugin';
 import {
     adapterContextOf,
     authenticate,
+    flattenJobs,
     flattenRoutes,
     JOBS_META,
     jobFnAt,
@@ -46,6 +47,8 @@ import { mediaIdsOf, resolveContent, withoutImages } from './media/resolve.js';
 import { pathRefusal, type Caller } from './rules.js';
 import { EditorAccess } from './site-access.js';
 import { queueRefreshes, refreshTargets, REFRESH_JOB } from './refresh.js';
+import { VOICE_GLOBAL } from './glossary.js';
+import { voiceGlobal } from './voice.js';
 import {
     brokenLinksOf,
     contentLinks,
@@ -607,13 +610,15 @@ export class CmsService {
         this.notices = new DraftNotices(options.db);
         this.sites = Object.fromEntries(Object.entries(sitesOf(options)).map(([site, declared]) => [site, declared.pages]));
         this.pages = this.sites[DEFAULT_SITE] ?? {};
-        this.globals = Object.fromEntries((options.globals ?? []).map((definition) => [definition.name, definition]));
+        // The voice is a global of Shared and of every site, kept out of `options` so no content route serves it.
+        const voice = options.voice === undefined ? [] : [voiceGlobal(options.voice)];
+        this.globals = Object.fromEntries([...(options.globals ?? []), ...voice].map((definition) => [definition.name, definition]));
         this.collections = Object.fromEntries((options.collections ?? []).map((definition) => [definition.name, definition]));
         const siteEntries = Object.entries(options.sites?.entries ?? {});
         this.siteGlobals = Object.fromEntries(
             siteEntries.map(([site, entry]) => [
                 site,
-                Object.fromEntries((entry.globals ?? []).map((definition) => [definition.name, definition])),
+                Object.fromEntries([...(entry.globals ?? []), ...voice].map((definition) => [definition.name, definition])),
             ])
         );
         this.siteCollections = Object.fromEntries(
@@ -636,6 +641,21 @@ export class CmsService {
             storage: mediaStorageFrom(options.media),
             maxBytes: options.media?.maxBytes ?? 10 * 1024 * 1024,
         });
+    }
+
+    /**
+     * Whether cms() has a voice, and so Shared and every site a `voice`
+     * global.
+     */
+    voiceOn(): boolean {
+        return this.options.voice !== undefined;
+    }
+
+    /**
+     * Whether a document is a voice: Shared's or a site's `voice` global.
+     */
+    isVoice(ref: DocumentRef): boolean {
+        return this.voiceOn() && ref.type === 'global' && ref.name === VOICE_GLOBAL;
     }
 
     entry(name: string, site = DEFAULT_SITE): PageEntry {
@@ -1057,7 +1077,8 @@ export class CmsService {
         if (ref.type === 'global') {
             const site = ref.site ?? DEFAULT_SITE;
             const shared = this.globals[ref.name];
-            if (site !== DEFAULT_SITE && shared !== undefined) {
+            // A site's own global wins, which only the voice shares a name with a shared one for.
+            if (site !== DEFAULT_SITE && shared !== undefined && this.siteGlobals[site]?.[ref.name] === undefined) {
                 return {
                     ref,
                     kind: 'global',
@@ -3124,7 +3145,8 @@ export class CmsService {
             }));
         if (ref.type === 'global') {
             return {
-                everywhere: true,
+                // A voice reaches the models that write, never a page.
+                everywhere: !this.isVoice(ref),
                 pages: [],
                 partners,
             };

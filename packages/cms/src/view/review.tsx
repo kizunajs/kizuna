@@ -7,7 +7,7 @@ import { ICON, useEditorContext } from './context.js';
 import type { MediaRecord } from './media.js';
 import { PeoplePicker, ReviewBadge, type People } from './people.js';
 import { changeView, referencesOf, textOf, type ChangeView, type ReferenceLabel, type Shown, type ValueShape } from './change-value.js';
-import type { DescribedField, Description, PersonView, ReviewState } from './schema.js';
+import type { DescribedField, Description, GlossaryIssue, PersonView, ReviewState } from './schema.js';
 import { defaultLaterOf, isoOf, localPartsOf, zoneNameOf } from './schedule-time.js';
 
 /**
@@ -36,7 +36,19 @@ export interface Changes {
     canPublishPastReview: boolean;
     heldBy: string | null;
     brokenLinks?: BrokenLink[];
+    /**
+     * Words the site's glossary flags, in the draft and its translations.
+     * Older servers leave it out.
+     */
+    glossary?: GlossaryIssue[];
 }
+
+/**
+ * What the Publish dialog says of a word the glossary flags, with the
+ * language first for a translation: "EN: The heading says Cheap."
+ */
+export const glossaryWarningOf = (issue: GlossaryIssue): string =>
+    issue.locale === null ? issue.detail : `${issue.locale.toUpperCase()}: ${issue.detail}`;
 
 /**
  * A content link whose page or item a reader cannot show, as the changes
@@ -220,6 +232,7 @@ interface Pending {
      */
     holder?: string;
     brokenLinks: BrokenLink[];
+    glossary: GlossaryIssue[];
     problem?: string;
 }
 
@@ -502,6 +515,7 @@ export function PublishReview({
                     canPublish: answer.body.canPublish,
                     canPublishPastReview: answer.body.canPublishPastReview,
                     brokenLinks: answer.body.brokenLinks ?? [],
+                    glossary: answer.body.glossary ?? [],
                     ...(holder === undefined
                         ? {}
                         : {
@@ -921,6 +935,12 @@ export function PublishReview({
                                             {brokenLinksWarningOf(document.brokenLinks)}
                                         </p>
                                     )}
+                                    {document.glossary.map((issue) => (
+                                        <p key={`${issue.locale ?? ''}:${issue.path}:${issue.form}`} className="k-help k-review__warning">
+                                            <CircleAlert {...ICON} />
+                                            {glossaryWarningOf(issue)}
+                                        </p>
+                                    ))}
                                     {document.changes.map((change) => (
                                         <div key={change.path} className="k-review__row">
                                             <div className="k-review__body">

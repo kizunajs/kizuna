@@ -214,6 +214,23 @@ export interface Description {
         available: boolean;
     }>;
     locale?: DocumentLocales;
+    /**
+     * Words in the draft the site's glossary flags, by field. Older servers
+     * leave it out.
+     */
+    glossary?: GlossaryIssue[];
+}
+
+/**
+ * A word in a field the site's glossary flags.
+ */
+export interface GlossaryIssue {
+    path: string;
+    locale: string | null;
+    form: string;
+    rule: 'keep' | 'translate' | 'avoid';
+    use: string | null;
+    detail: string;
 }
 
 /**
@@ -315,6 +332,11 @@ export interface Draft {
      * When it publishes or unpublishes on its own or with a release.
      */
     schedule?: DraftSchedule | null;
+    /**
+     * After a change, the words the site's glossary flags in the fields it
+     * wrote.
+     */
+    glossary?: GlossaryIssue[];
 }
 
 /**

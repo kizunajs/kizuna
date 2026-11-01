@@ -1,27 +1,5 @@
-import { z } from 'zod';
-import type { CmsService, DraftState } from './cms.js';
-import { defineGlobal } from './definitions.js';
-import { DEFAULT_SITE, sitesOf, type CmsPluginOptions } from './options.js';
-
-/**
- * A global admins fill in for a site, holding what an agent reads before it
- * writes anything there, after the content's own `instructions`. Add it to a
- * site's `globals`, or to the shared `globals` for every site.
- *
- * @example
- * globals: [PrivacyPolicy, AgentInstructions],
- */
-export const AgentInstructions = defineGlobal({
-    name: 'agentInstructions',
-    label: 'Agent instructions',
-    fields: [
-        {
-            name: 'instructions',
-            schema: z.string().max(8000).default(''),
-            description: 'Markdown an agent reads before it writes on this site: its voice, and what never to change.',
-        },
-    ],
-});
+import type { DraftState } from './cms.js';
+import { sitesOf, type CmsPluginOptions } from './options.js';
 
 interface Instructed {
     name: string;
@@ -62,39 +40,10 @@ export const instructionsSection = (definitions: readonly Instructed[]): string 
               .join('\n\n')}`;
 
 /**
- * The published `instructions` of the {@link AgentInstructions} global on a
- * site, or nothing when the site has none.
- */
-const siteInstructionsOn = async (cms: CmsService, site: string): Promise<string | undefined> => {
-    try {
-        const { row } = await cms.document({
-            type: 'global',
-            name: AgentInstructions.name,
-            ...(site === DEFAULT_SITE
-                ? {}
-                : {
-                      site,
-                  }),
-        });
-        const text = row?.published?.['instructions'];
-        return typeof text === 'string' && text.trim() !== '' ? text.trim() : undefined;
-    } catch {
-        // The site does not have the global.
-        return undefined;
-    }
-};
-
-/**
  * What an agent reads before it writes a document: its content's own
- * instructions, then what admins wrote for its site in the
- * {@link AgentInstructions} global, the site's own before the shared one.
- * `site` names the site for shared content, which every site may show.
+ * instructions. How a site sounds and which words it uses is its voice.
  */
-export const instructionsOf = async (cms: CmsService, state: DraftState, site?: string): Promise<string | null> => {
+export const instructionsOf = (state: DraftState): string | null => {
     const own = state.target.definition.instructions?.trim();
-    const where = state.target.site !== DEFAULT_SITE ? state.target.site : site;
-    const forSite =
-        (where === undefined ? undefined : await siteInstructionsOn(cms, where)) ?? (await siteInstructionsOn(cms, DEFAULT_SITE));
-    const parts = [own, forSite].filter((part): part is string => part !== undefined && part !== '');
-    return parts.length === 0 ? null : parts.join('\n\n');
+    return own === undefined || own === '' ? null : own;
 };

@@ -81,6 +81,11 @@ export interface FieldFormProps {
      */
     below?: (field: DescribedField) => ReactNode;
     /**
+     * What shows above a field's input, like the group's glossary rows a
+     * site's own rows add to.
+     */
+    above?: (field: DescribedField) => ReactNode;
+    /**
      * The input a field gets in place of the one its schema picks, or
      * `undefined` to keep that one.
      */
@@ -171,6 +176,7 @@ export function FieldForm({
     aside,
     before,
     below,
+    above,
     controlFor,
     readOnly,
     locales,
@@ -384,6 +390,7 @@ export function FieldForm({
                             {error}
                         </p>
                     )}
+                    {above?.(field)}
                     {custom ?? (
                         <Control
                             key={revisions[field.path] ?? 0}

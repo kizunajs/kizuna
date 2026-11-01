@@ -34,12 +34,22 @@ export interface TranslateInput {
     values: Readonly<Record<string, unknown>>;
     from: string;
     to: string;
+    /**
+     * How the site writes in `to`, and the glossary terms the source holds,
+     * as Markdown the model follows.
+     */
+    voice?: string | undefined;
 }
 
 type Path = ReadonlyArray<string | number>;
 
 interface Text {
     path: Path;
+    /**
+     * The field the text belongs to: a top-level field, or a field of a
+     * block.
+     */
+    field: Path;
     text: string;
     schema: z.core.$ZodType;
 }
@@ -62,11 +72,11 @@ const collectFields = (fields: FieldList, value: unknown, path: Path, found: Tex
     if (!isObject(value)) return;
     for (const field of dataFields(fields)) {
         if (field.localized === false) continue;
-        collect(field.schema, value[field.name], [...path, field.name], found);
+        collect(field.schema, value[field.name], [...path, field.name], found, [...path, field.name]);
     }
 };
 
-const collect = (schema: z.core.$ZodType, value: unknown, path: Path, found: Text[]): void => {
+const collect = (schema: z.core.$ZodType, value: unknown, path: Path, found: Text[], field: Path): void => {
     if (value === undefined || value === null) return;
     const listed = readBlocks(schema);
     if (listed !== undefined) {
@@ -86,13 +96,14 @@ const collect = (schema: z.core.$ZodType, value: unknown, path: Path, found: Tex
     const def = readDef(inner);
     if (isImageSchema(schema)) {
         const alt = def.shape?.['alt'];
-        if (alt !== undefined && isObject(value)) collect(alt, value['alt'], [...path, 'alt'], found);
+        if (alt !== undefined && isObject(value)) collect(alt, value['alt'], [...path, 'alt'], found, field);
         return;
     }
     if (isText(inner)) {
         if (typeof value === 'string' && value.trim() !== '') {
             found.push({
                 path,
+                field,
                 text: value,
                 schema: inner,
             });
@@ -102,25 +113,38 @@ const collect = (schema: z.core.$ZodType, value: unknown, path: Path, found: Tex
     switch (def.type) {
         case 'object':
             if (!isObject(value)) return;
-            for (const [key, child] of Object.entries(def.shape ?? {})) collect(child, value[key], [...path, key], found);
+            for (const [key, child] of Object.entries(def.shape ?? {})) collect(child, value[key], [...path, key], found, field);
             return;
         case 'array':
             if (!Array.isArray(value) || def.element === undefined) return;
-            value.forEach((item: unknown, index) => collect(def.element!, item, [...path, index], found));
+            value.forEach((item: unknown, index) => collect(def.element!, item, [...path, index], found, field));
             return;
         case 'union': {
             const option = def.options?.find((candidate) => z.safeParse(candidate, value).success);
-            if (option !== undefined) collect(option, value, path, found);
+            if (option !== undefined) collect(option, value, path, found, field);
             return;
         }
         case 'pipe':
-            if (def.in !== undefined) collect(def.in, value, path, found);
+            if (def.in !== undefined) collect(def.in, value, path, found, field);
             return;
         case 'record':
             if (!isObject(value) || def.valueType === undefined) return;
-            for (const [key, item] of Object.entries(value)) collect(def.valueType, item, [...path, key], found);
+            for (const [key, item] of Object.entries(value)) collect(def.valueType, item, [...path, key], found, field);
             return;
     }
+};
+
+/**
+ * Every text a person reads in the values, each with the field it belongs
+ * to by dotted path: `intro`, or `sections.0.heading` for a block's field.
+ */
+export const textsOf = (fields: FieldList, values: unknown): Array<{ field: string; text: string }> => {
+    const found: Text[] = [];
+    collectFields(fields, values, [], found);
+    return found.map((text) => ({
+        field: text.field.join('.'),
+        text: text.text,
+    }));
 };
 
 const place = (target: Values, path: Path, text: string): void => {
@@ -172,11 +196,12 @@ const languageName = (code: string): string => {
     }
 };
 
-const instructions = (from: string, to: string): string =>
+const instructions = (from: string, to: string, voice?: string): string =>
     [
         `Translate every value of the JSON object from ${languageName(from)} to ${languageName(to)}, for a website.`,
         'Answer with the same keys. Keep the tone, and keep names of people, products and places as they are.',
         'Values in a row may be parts of one sentence, split where its formatting changes. Translate them so they read as one sentence in order, and keep the spaces each one starts and ends with.',
+        ...(voice === undefined || voice === '' ? [] : [`\nWrite the ${languageName(to)} as the site does:\n\n${voice}`]),
     ].join('\n');
 
 /**
@@ -205,7 +230,7 @@ export const translateFields = async (input: TranslateInput): Promise<Record<str
     try {
         const result = await generateText({
             model: input.model,
-            instructions: instructions(input.from, input.to),
+            instructions: instructions(input.from, input.to, input.voice),
             prompt: JSON.stringify(keyed((text) => text.text)),
             output: Output.object({
                 schema: z.object(keyed((text) => text.schema)) as z.ZodType<Record<string, string>>,

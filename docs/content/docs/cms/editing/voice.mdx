@@ -1,0 +1,69 @@
+---
+title: Voice and glossary
+description: 'How each site sounds and which words it uses, read by every model that writes for it and checked in every field.'
+---
+
+A model writes better when it knows how the brand sounds and which words it uses. The voice holds that, per site, as content your admins keep: a tone, an audience, a list of do and don't, and a glossary. Models read the voice. The glossary is also checked, word by word, in the form, in a translation and before publishing.
+
+## Turning it on
+
+```ts title="kizuna.cms.config.ts"
+content: cms({
+    db,
+    locales: ['en', 'nb'],
+    translate: {
+        model: anthropic('claude-sonnet-5-5'),
+    },
+    voice: {
+        roles: 'admin',
+    },
+    sites,
+}),
+```
+
+Shared and every site now list **Voice** with their globals. `roles` says who may change it. A model reads the voice as instructions, so keep it to the people who decide how the brand sounds. Everyone else sees it locked.
+
+The voice is a global like any other, so drafts, versions, reviews and who changed the glossary come with it. Models read only the published voice. It serves no `content` route, refreshes no site, and no partner reads it.
+
+## The form
+
+The **Voice** tab holds **Tone**, **Audience**, and **Do and don't**, each rule with a language when it holds in one. None of it is translated, since it is written for the model.
+
+The **Glossary** tab holds one row per term:
+
+| Field      | What it is                                                                                   |
+| ---------- | -------------------------------------------------------------------------------------------- |
+| `forms`    | Every spelling the rule covers. Inflections are spelled out, like billig, billige, billigste |
+| `rule`     | `keep`, `translate` or `avoid`                                                               |
+| `language` | The language the rule holds in. Every language when left out                                 |
+| `use`      | What the forms are written as, or the word to write instead                                  |
+| `note`     | Why, for the model and the next person                                                       |
+
+- **keep**: the term stays exactly as written in every translation, like "Plantedoktoren".
+- **translate**: in `language`, the forms are always written as `use`, like "Hagen Club" as "Hagen-klubben" in Norwegian, whether written there or translated.
+- **avoid**: never written in `language`. With `use`, it names the word to write instead, like "billig" for "rimelig". Without it, the word is banned.
+
+Matching is by whole words, in any case, except `keep`, which matches only as written. Nothing is guessed, so write each form a rule covers.
+
+## Group and site
+
+The voice on Shared is the group's. It holds on every site and for shared content. A site's voice adds to it: tone and rules read the group's first, then the site's, and the glossaries join. A site's row replaces the group's row for the same word, so Hagen Norge can write the group's kept "Hagen Club" as "Hagen-klubben". On a site's Voice, the group's rows sit locked above the site's own.
+
+A site's values on shared content are checked against that site's voice, and the shared fields against the group's.
+
+## What reads it
+
+- **Translation.** The model that drafts a translation reads the site's voice in the target language, and the glossary terms the source holds. The translate route answers `issues` beside `fields`, and translate mode shows each one under the field it is about.
+- **`editing_describe`** answers `voice`: the text for the document's site and language, with the glossary terms its draft or source holds, and `glossary`, the words its draft breaks.
+- **`editing_voice`** answers the whole voice for a site and language, for writing something new. `create_item` names it.
+- **`update_draft`** answers `glossary`, the words the glossary flags in the fields it wrote, so the agent fixes them before anyone looks.
+
+```
+GET /api/editing/voice?site=norway&language=nb
+```
+
+A model reads the group's voice, the site's, the content's own [`instructions`](/docs/cms/editing/agents#instructions), then each field's description, and the glossary wins over all of them.
+
+## Warnings
+
+A word the glossary flags shows as a grey line under its field, names the word and what to write: "The summary says billige. Hagen Norge writes rimelig." The Publish dialog lists it with the other warnings, and [`editing_check`](/docs/cms/editing/agents#checking-before-publishing) as the kind `glossary`. A source's check reads its translations too, and a translation is compared with its source, so a kept name the model translated shows. A glossary warning never stops a publish.

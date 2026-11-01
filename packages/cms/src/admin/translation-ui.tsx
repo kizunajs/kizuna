@@ -5,7 +5,16 @@ import { ICON } from '../view/context.js';
 import { Control } from '../view/controls.js';
 import { richTextOf, wordDiff } from '../view/change-value.js';
 import { readOnlyTextOf } from '../view/read-only.js';
-import { labelOf, languageNameOf, writeInOf, type DescribedField, type Description, type DocumentLocales } from '../view/schema.js';
+import {
+    labelOf,
+    languageNameOf,
+    writeInOf,
+    type DescribedField,
+    type Description,
+    type DocumentLocales,
+    type GlossaryIssue,
+} from '../view/schema.js';
+import { isUnder } from '../glossary.js';
 
 type LocaleEntry = DocumentLocales['locales'][number];
 
@@ -254,6 +263,7 @@ export function TranslateMode({
     onTranslate,
     onKeep,
     onDone,
+    glossary = [],
 }: {
     document: Description;
     steps: ReadonlyArray<{
@@ -273,6 +283,10 @@ export function TranslateMode({
     onTranslate: (path: string) => void;
     onKeep: (path: string) => void;
     onDone: () => void;
+    /**
+     * Words in the model's translations the site's glossary flags.
+     */
+    glossary?: readonly GlossaryIssue[];
 }) {
     const locales = document.locale!;
     const step = steps[current];
@@ -337,6 +351,13 @@ export function TranslateMode({
                     placeholder={writeInOf(locales.current)}
                     required
                 />
+                {glossary
+                    .filter((issue) => isUnder(issue, field.path))
+                    .map((issue) => (
+                        <p key={`${issue.path}:${issue.form}`} className="k-help k-glossary-line">
+                            {issue.detail}
+                        </p>
+                    ))}
                 <div className="k-translate-mode__actions">
                     <button
                         type="button"

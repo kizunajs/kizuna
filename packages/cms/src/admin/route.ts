@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { VOICE_GLOBAL } from '../glossary.js';
 import { route, type PluginApi } from 'kizunajs/plugin';
 import { adapterContextOf, authenticate, flattenRoutes, rawResponse } from 'kizunajs/adapter';
 import { toToolName } from 'kizunajs/generator';
@@ -198,10 +199,21 @@ const adminSitesOf = (options: ResolvedCmsOptions): AdminSite[] =>
                   }
                 : {}),
             pages: Object.keys(entry.pages ?? {}),
-            globals: (entry.globals ?? []).map((definition) => ({
-                name: definition.name,
-                label: definition.label ?? null,
-            })),
+            globals: [
+                ...(entry.globals ?? []).map((definition) => ({
+                    name: definition.name,
+                    label: definition.label ?? null,
+                })),
+                // Every site has a voice of its own beside Shared's.
+                ...(options.voice === undefined
+                    ? []
+                    : [
+                          {
+                              name: VOICE_GLOBAL,
+                              label: 'Voice',
+                          },
+                      ]),
+            ],
             collections: (entry.collections ?? []).map((definition) => ({
                 name: definition.name,
                 label: definition.label ?? null,

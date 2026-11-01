@@ -1046,6 +1046,19 @@
         color: var(--k-muted);
     }
 
+    /* A word the site's glossary flags, under its field. */
+    .k-glossary-line {
+        margin-top: 6px;
+    }
+
+    /* The group's glossary rows, locked, above a site's own. */
+    .k-group-terms {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 10px;
+    }
+
     .k-error {
         display: flex;
         align-items: center;

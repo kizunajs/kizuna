@@ -14,6 +14,7 @@ content: cms({
     locales,
     fallback,
     translate,
+    voice,
     globals,
     collections,
     relationships,
@@ -50,6 +51,7 @@ content: cms({
 | `locales`       | The languages, the first being the source                                                                                                                                     |
 | `fallback`      | Per locale, what to show when a translation is missing                                                                                                                        |
 | `translate`     | `model`, an AI SDK language model that drafts a translation when an editor asks for one                                                                                       |
+| `voice`         | `roles` that may change the [voice](/docs/cms/editing/voice), a built-in global on Shared and every site that models read and the glossary checks                             |
 | `globals`       | `defineGlobal` results, the shared content every site reads                                                                                                                   |
 | `collections`   | `defineCollection` results, the shared content every site reads                                                                                                               |
 | `relationships` | `defineRelationship` results                                                                                                                                                  |

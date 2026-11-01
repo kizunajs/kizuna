@@ -178,6 +178,35 @@ const draftBody = (state: DraftState) => ({
 });
 
 /**
+ * A document's site voice as `describe` answers it: the text for its site
+ * and language with the glossary terms its draft or source holds, and what
+ * the glossary flags in the draft.
+ */
+const describedVoice = async (cms: CmsService, state: DraftState) => {
+    const voice = cms.isVoice(state.target.ref) ? null : await resolveVoice(cms, state.target.site, languageOf(cms, state));
+    if (voice === null) {
+        return {
+            voice: null,
+            glossary: [],
+        };
+    }
+    const terms = await documentTerms(cms, state, voice);
+    const text = voiceText(voice, terms);
+    return {
+        voice:
+            text === ''
+                ? null
+                : {
+                      text,
+                      glossary: terms,
+                  },
+        glossary: await documentGlossary(cms, state, {
+            voice,
+        }),
+    };
+};
+
+/**
  * What editors call a field: its label, or its name written out.
  */
 const labelOf = (field: { label?: string; name: string }): string =>
@@ -281,6 +310,10 @@ const draftChanges = async (cms: CmsService, ref: DocumentRef, access: EditorAcc
         canPublishPastReview: canPublish && mayPublishPastReview(cms, caller.role),
         heldBy: state.heldBy,
         brokenLinks: await cms.brokenLinksOf(ref),
+        glossary: (await glossaryOfDocument(cms, state)).map(({ translation, ...issue }) => ({
+            ...issue,
+            locale: translation,
+        })),
     };
 };
 
@@ -613,7 +646,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 path: `${editingBase}${scope.prefix}/draft`,
                 auth: editor,
                 summary: `Change fields on the draft of ${scope.noun}`,
-                description: `Changes are keyed by field path and merged into the draft, which is then checked against the whole schema. Describe the document first to learn the paths, the schemas, which fields you may write and its \`instructions\`. Nothing goes live until it is published.${scope.instructions ?? ''}`,
+                description: `Changes are keyed by field path and merged into the draft, which is then checked against the whole schema. Describe the document first to learn the paths, the schemas, which fields you may write, its \`instructions\` and its site's \`voice\`. The answer's \`glossary\` lists words the site's glossary flags in the fields you wrote: fix them. Nothing goes live until it is published.${scope.instructions ?? ''}`,
                 tool:
                     scope.approveWrites === true
                         ? {
@@ -626,7 +659,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 body: UpdateDraftBodySchema,
                 responses: {
                     200: {
-                        body: DraftPageSchema,
+                        body: UpdatedDraftSchema,
                         headers: DraftHeadersSchema,
                         cache: 'no-store',
                     },
@@ -652,7 +685,12 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     });
                     return {
                         status: 200,
-                        body: draftBody(state),
+                        body: {
+                            ...draftBody(state),
+                            glossary: await documentGlossary(cms, state, {
+                                fields: Object.keys(body.changes),
+                            }),
+                        },
                         headers: {
                             etag: state.etag,
                         },
@@ -714,7 +752,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                           auth: editor,
                           summary: `Draft a translation of ${scope.noun} from its published source`,
                           description:
-                              "The model translates the source's published text into the language `locale` names and saves it as that language's draft, which a person reviews and publishes. A translated slug is made from the translated title.",
+                              "The model translates the source's published text into the language `locale` names and saves it as that language's draft, which a person reviews and publishes. It writes as the site's voice says, and `issues` lists words in the result the site's glossary flags. A translated slug is made from the translated title.",
                           tool:
                               scope.approveWrites === true
                                   ? {
@@ -760,6 +798,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                                       draft: draftBody(translated.state),
                                       fields: translated.fields,
                                       values: translated.values,
+                                      issues: translated.issues,
                                   },
                               };
                           }) as never
@@ -1796,6 +1835,11 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             path: `${editingBase}${at.prefix}/collections/:name/items`,
             auth: editor,
             summary: 'Add an item to a collection, as a draft',
+            ...(options.voice === undefined
+                ? {}
+                : {
+                      description: "Read the site's voice with `editing_voice` before writing something new, and follow its glossary.",
+                  }),
             tool: true,
             pathParams: at.params.extend({
                 name: z.string(),
@@ -2673,7 +2717,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         auth: editor,
         summary: 'Describe what is shown at a URL, or any document by its ref: its fields, what the caller may write, and the draft',
         description:
-            'Start here when working from the page someone is looking at, or from a ref a source path or another tool gave you. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it. `instructions` says how to write the document, its tone and what never to change: follow it. `usedOn` says where else shared content appears; say so before changing it. A document in several languages lists them under `locale`: to translate it, describe `<ref>@<code>` and write each field from its `sourceValue` with that `locale`. A field whose `sourceChanged` is true is updated, or kept as it is.',
+            'Start here when working from the page someone is looking at, or from a ref a source path or another tool gave you. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it. `instructions` says what the document is for and how its fields are filled, and `voice` how its site writes and which words it uses: follow both, the glossary over everything. `glossary` lists words in the draft the glossary flags. `usedOn` says where else shared content appears; say so before changing it. A document in several languages lists them under `locale`: to translate it, describe `<ref>@<code>` and write each field from its `sourceValue` with that `locale`. A field whose `sourceChanged` is true is updated, or kept as it is.',
         tool: {
             ui: documentView,
         },
@@ -2751,7 +2795,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     schedule: scheduleBody(state),
                     fields: cms.describe(ref, draft, caller, await sharedContentOf(cms, state), translation),
                     layout: cms.describeLayout(ref),
-                    instructions: await instructionsOf(cms, state, query.site),
+                    instructions: instructionsOf(state),
+                    ...(await describedVoice(cms, state)),
                     draft,
                     ...(await reviewFields(cms, state)),
                     canPublish: cms.mayPublish(access, ref),
@@ -2806,13 +2851,64 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         }) as never
     );
 
+    const voice = route({
+        method: 'GET',
+        path: `${editingBase}/voice`,
+        auth: editor,
+        summary: "Read how a site writes in a language: its tone, audience, do and don't, and its glossary",
+        description:
+            "Read it before writing something new for a site. The group's voice on Shared holds everywhere and the site's adds to it, and a site's glossary term replaces the group's for the same word. The glossary wins over everything else you were told about words. Only the published voice counts.",
+        tool: true,
+        query: z.object({
+            site: z
+                .string()
+                .optional()
+                .describe("The site, like norway. Leave it out for the group's voice, which shared content follows."),
+            language: z
+                .string()
+                .optional()
+                .describe("The language you write in, like 'nb'. Leave it out for every language's rules and terms."),
+        }),
+        responses: {
+            200: {
+                body: VoiceSchema,
+                cache: 'no-store',
+            },
+            404: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const query = (args.query ?? {}) as { site?: string; language?: string };
+            const site = query.site === undefined || query.site === DEFAULT_SITE ? undefined : query.site;
+            if (site !== undefined && !cms.siteNames().includes(site)) {
+                throw new CmsHttpError(404, {
+                    detail: `There is no site named '${site}'.`,
+                });
+            }
+            cms.access(args.auth).assertSees(site);
+            const resolved = await resolveVoice(cms, site, query.language);
+            if (resolved === null) {
+                throw new CmsHttpError(404, {
+                    detail: 'cms() has no voice.',
+                });
+            }
+            return {
+                status: 200,
+                body: {
+                    ...resolved,
+                    text: voiceText(resolved),
+                },
+            };
+        }) as never
+    );
+
     const check = route({
         method: 'GET',
         path: `${editingBase}/check`,
         auth: editor,
         summary: 'Check what would stop a document or a release from publishing, saving nothing',
         description:
-            'Pass a document by `ref` or a release by `release`. Each document lists its issues: a `block` refuses the publish, like a required field missing, someone editing it or a review it waits for, and a `warning` lets it through, like a link to an unpublished page, a translation with empty fields or a schedule the publish ends. Check before asking someone to review or publish your work.',
+            "Pass a document by `ref` or a release by `release`. Each document lists its issues: a `block` refuses the publish, like a required field missing, someone editing it or a review it waits for, and a `warning` lets it through, like a link to an unpublished page, a translation with empty fields, a word the site's glossary flags or a schedule the publish ends. Check before asking someone to review or publish your work.",
         tool: true,
         query: z.object({
             ref: z.string().optional().describe('A document, as `describe` names it under `ref`.'),
@@ -3768,6 +3864,11 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         },
         editing: {
             describe,
+            ...(options.voice === undefined
+                ? {}
+                : {
+                      voice,
+                  }),
             releaseHold,
             check,
             pages: {

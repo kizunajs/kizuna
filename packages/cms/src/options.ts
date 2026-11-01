@@ -558,6 +558,18 @@ export interface CmsPluginOptions<
      */
     translate?: TranslateOptions;
     /**
+     * Gives Shared and every site a Voice: the tone, audience, rules and
+     * glossary a model reads before it writes or translates, and the
+     * glossary the form, the translation and the check before publishing
+     * flag words by. `roles` says who may change it.
+     *
+     * @example
+     * voice: {
+     *     roles: 'admin',
+     * },
+     */
+    voice?: VoiceOptions;
+    /**
      * The site this deployment shows, which `kizuna.content` reads in
      * process.
      *
@@ -844,6 +856,11 @@ export const CmsPluginOptionsSchema = z
                         error: 'must be an AI SDK language model',
                     }
                 ),
+            })
+            .optional(),
+        voice: z
+            .object({
+                roles: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]),
             })
             .optional(),
         partners: z

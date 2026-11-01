@@ -54,7 +54,8 @@ const partnerReadOf = (ref: DocumentRef): PartnerRead =>
  */
 export const refreshTargets = (cms: CmsService, ref: DocumentRef, sites?: readonly string[]): RefreshTarget[] => {
     const names = cms.siteNames();
-    if (names.length === 0) return [];
+    // A voice shows on no page, and no partner reads it.
+    if (names.length === 0 || cms.isVoice(ref)) return [];
     const site = cms.target(ref).site;
     const shared = site === DEFAULT_SITE;
     const reached = shared ? names.filter((name) => sites === undefined || sites.includes(name)) : [site];

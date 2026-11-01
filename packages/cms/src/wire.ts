@@ -151,6 +151,57 @@ const HeldBySchema = z
         'Who edits the document now. One person edits a document at a time: a write from anyone else answers 409 until they stop, or two minutes after their last save. Null when nobody does.'
     );
 
+export const GlossaryIssueSchema = Kizuna.model({
+    title: 'CMS.GlossaryIssue',
+    schema: z.object({
+        path: z.string().describe('The field, by path.'),
+        locale: z.string().nullable().describe('The language the field is in, or null without languages.'),
+        form: z.string().describe('The word the field says, or for a translation, the word its source says.'),
+        rule: z.enum(['keep', 'translate', 'avoid']),
+        use: z.string().nullable().describe('What the glossary writes instead, when it names it.'),
+        detail: z.string().describe('What to change, like "The summary says billig. Hagen Norge writes rimelig."'),
+    }),
+});
+
+const VoiceTermSchema = z.object({
+    forms: z.array(z.string()),
+    rule: z.enum(['keep', 'translate', 'avoid']),
+    language: z.string().optional(),
+    use: z.string().optional(),
+    note: z.string().optional(),
+    from: z.enum(['group', 'site']).describe("Whether the group's voice on Shared or the site's own holds it."),
+});
+
+export const VoiceSchema = Kizuna.model({
+    title: 'CMS.Voice',
+    schema: z.object({
+        site: z.string().nullable().describe("The site, or null for the group's voice on Shared."),
+        language: z.string().nullable(),
+        text: z
+            .string()
+            .describe("All of it as Markdown to follow when writing: tone, audience, do and don't, then the glossary, which wins."),
+        tone: z.array(z.string()).describe("The group's tone, then the site's."),
+        audience: z.array(z.string()),
+        rules: z.array(
+            z.object({
+                kind: z.enum(['do', 'dont']),
+                text: z.string(),
+                language: z.string().optional(),
+                from: z.enum(['group', 'site']),
+            })
+        ),
+        glossary: z.array(VoiceTermSchema),
+    }),
+});
+
+export const DescribedVoiceSchema = z
+    .object({
+        text: z.string().describe("How the site writes in the document's language, with the glossary terms its draft or source holds."),
+        glossary: z.array(VoiceTermSchema).describe('The glossary terms its draft or source holds.'),
+    })
+    .nullable()
+    .describe("The site's voice, which wins over `instructions` on tone and words. Null when cms() has no voice or it says nothing.");
+
 export const DraftPageSchema = Kizuna.model({
     title: 'CMS.Draft',
     schema: z.object({
@@ -174,6 +225,15 @@ export const DraftPageSchema = Kizuna.model({
         heldBy: HeldBySchema,
         schedule: DraftScheduleSchema,
         place: PlaceSchema.optional().describe("An item's place, in an orderable collection, once it has one."),
+    }),
+});
+
+export const UpdatedDraftSchema = Kizuna.model({
+    title: 'CMS.UpdatedDraft',
+    schema: DraftPageSchema.extend({
+        glossary: z
+            .array(GlossaryIssueSchema)
+            .describe("Words the site's glossary flags in the fields this change wrote. Fix them before anyone looks."),
     }),
 });
 
@@ -446,8 +506,12 @@ export const DescribedPageSchema = Kizuna.model({
             .string()
             .nullable()
             .describe(
-                "Markdown on how to write the document, its tone and what never to change: its content's own, then what admins wrote for its site. Null when there are none."
+                "Markdown on what the document is for and how its fields are filled, from its content's own `instructions`. Null when there are none."
             ),
+        voice: DescribedVoiceSchema,
+        glossary: z
+            .array(GlossaryIssueSchema)
+            .describe("Words in the draft the site's glossary flags, by field. Fix them before asking for a review."),
         draft: z.record(z.string(), z.unknown()).nullable(),
         actions: z.array(AvailableActionSchema).optional().describe("For an item, the buttons its collection's actions show the caller."),
         locale: DocumentLocalesSchema.optional(),
@@ -556,6 +620,11 @@ export const DraftChangesSchema = Kizuna.model({
         brokenLinks: z
             .array(BrokenLinkSchema)
             .describe('Content links whose page or item is not published or is gone. They read as plain text, and publishing goes ahead.'),
+        glossary: z
+            .array(GlossaryIssueSchema)
+            .describe(
+                "Words the site's glossary flags, in the draft and its translations, with `locale` naming the translation or null for the document itself. Publishing goes ahead."
+            ),
         changes: z
             .array(
                 z.object({
@@ -1194,9 +1263,9 @@ export const PublishIssueSchema = Kizuna.model({
     schema: z.object({
         level: z.enum(['block', 'warning']).describe('A `block` refuses the publish. A `warning` lets it through.'),
         kind: z
-            .enum(['nothing', 'permission', 'missing', 'language', 'brokenLink', 'held', 'review', 'schedule'])
+            .enum(['nothing', 'permission', 'missing', 'language', 'brokenLink', 'glossary', 'held', 'review', 'schedule'])
             .describe(
-                'Nothing to publish, a publish you may not make, a required field missing, a translation with empty fields, a link to a page that is gone or unpublished, someone editing it, a review it waits for, or a schedule publishing ends.'
+                "Nothing to publish, a publish you may not make, a required field missing, a translation with empty fields, a link to a page that is gone or unpublished, a word the site's glossary flags, someone editing it, a review it waits for, or a schedule publishing ends."
             ),
         detail: z.string(),
         path: z.string().nullable().describe('The field it is about, by path, when it is about one.'),

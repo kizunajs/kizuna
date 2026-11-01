@@ -163,6 +163,8 @@ With Show Norsk on, each source line ends in Translate, on every field, filled o
 
 The model writes the text, rich text and alt text from the source's published version, and the slug is made from the translated title. Links, ids and the rich text's structure stay as they are. Agents call the same route as a tool, `POST /editing/pages/frontPage/translate?locale=en`, which saves to the draft. With `save: false` it answers the translation without saving it.
 
+With a [voice](/docs/cms/editing/voice), the model writes as the site does in the target language, and keeps the glossary terms the source holds. The route answers `issues`, the words in the result the glossary flags, and translate mode shows each one under its field.
+
 ## With several sites
 
 Each site names the languages it serves, from those on `cms()`:

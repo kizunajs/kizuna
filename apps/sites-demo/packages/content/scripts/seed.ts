@@ -130,6 +130,8 @@ const asOf = async <T>(moment: Date, write: () => Promise<T>): Promise<T> => {
  * so an editor's changes survive a restart.
  */
 export const seedContent = async (service: CmsService): Promise<void> => {
+    await seedVoice(service);
+
     const caller = service.caller({
         editor: {
             role: 'admin',

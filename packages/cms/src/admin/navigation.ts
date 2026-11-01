@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { VOICE_GLOBAL } from '../glossary.js';
 import { formatRef, parseRef } from '../refs.js';
 import { humanize } from '../view/schema.js';
 import type { AdminSite } from './config.js';
@@ -772,7 +773,9 @@ const sharedEntriesOf = (
             : {
                   site,
               };
+    // Shared has a voice of its own, beside each site's.
     const ownedBySite = (kind: 'globals' | 'collections', name: string): boolean =>
+        !(kind === 'globals' && name === VOICE_GLOBAL) &&
         (options.sites ?? []).some((candidate) => candidate[kind].some((entry) => entry.name === name));
     return [
         ...options.globals
