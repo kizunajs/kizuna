@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import { readMetaBrand, readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
-import { readBlock, readBlocks } from './block.js';
+import { readBlock, readBlocks, type BlockIcon } from './block.js';
 import { optionOf } from './union.js';
 import { readRichTextBlocks } from './rich-text.js';
 import { isImageSchema } from './image.js';
