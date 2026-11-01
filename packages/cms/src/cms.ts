@@ -58,6 +58,7 @@ import {
     type LinkTarget,
 } from './link-targets.js';
 import { trashItem } from './trash.js';
+import { changesOf, contentEvent, fireContentEvents } from './content-events.js';
 import {
     DocumentStore,
     SOURCE_LOCALE,
@@ -3452,15 +3453,23 @@ export class CmsService {
         if (state.row !== undefined) await this.schedules.endFor(state.row.id);
         await this.revalidateDocument(ref, sites);
         await queueRefreshes(this, ref, sites);
+        await fireContentEvents(this, [
+            contentEvent(this, state.target, 'published', author, changesOf(state.row?.published, state.row?.draft)),
+        ]);
         return this.draftState(ref);
     }
 
     /**
      * Publishes several drafts in one transaction, so a visitor never sees
      * some of them live and others not, then refreshes each as `publish`
-     * does. Refuses all of them when one is incomplete.
+     * does. Refuses all of them when one is incomplete. Each fires its own
+     * `published` event, naming the `release` it went out with.
      */
-    async publishTogether(refs: readonly DocumentRef[], author: string): Promise<Map<string, number | null>> {
+    async publishTogether(
+        refs: readonly DocumentRef[],
+        author: string,
+        release?: { id: string; name: string }
+    ): Promise<Map<string, number | null>> {
         const states = await Promise.all(refs.map((ref) => this.draftState(ref)));
         for (const state of states) {
             if (!state.complete) {
@@ -3484,6 +3493,15 @@ export class CmsService {
             await this.revalidateDocument(ref, sites[index]);
             await queueRefreshes(this, ref, sites[index]);
         }
+        await fireContentEvents(
+            this,
+            states.map((state) =>
+                contentEvent(this, state.target, 'published', author, {
+                    ...changesOf(state.row?.published, state.row?.draft),
+                    release: release ?? null,
+                })
+            )
+        );
         return versions;
     }
 
@@ -3523,6 +3541,9 @@ export class CmsService {
         if (state.row !== undefined) await this.schedules.endFor(state.row.id);
         await this.revalidateDocument(ref, sites);
         await queueRefreshes(this, ref, sites);
+        await fireContentEvents(this, [
+            contentEvent(this, state.target, 'published', approval.by, changesOf(state.row?.published, state.row?.draft)),
+        ]);
         return this.draftState(ref);
     }
 
@@ -3546,6 +3567,7 @@ export class CmsService {
         if (row !== undefined) await this.schedules.endFor(row.id);
         await this.revalidateDocument(ref, sites);
         await queueRefreshes(this, ref, sites);
+        await fireContentEvents(this, [contentEvent(this, target, 'unpublished', author)]);
         return this.draftState(ref);
     }
 
@@ -4012,6 +4034,22 @@ export class CmsService {
      */
     refreshJob(): JobFnByKey | undefined {
         return jobFnAt(jobRunnerFrom(this.jobsMeta()), `${CONTENT_JOBS_KEY}.${REFRESH_JOB}`);
+    }
+
+    /**
+     * One of the api's jobs, by the job `k.jobs` declared, with the dotted
+     * key it sits at, or `undefined` when the config does not name it.
+     */
+    contentJob(job: object): { key: string; job: JobFnByKey } | undefined {
+        const meta = this.jobsMeta();
+        const key = meta === undefined ? undefined : flattenJobs(meta.jobs).find((candidate) => candidate.job === job)?.jobKey;
+        const found = key === undefined ? undefined : jobFnAt(jobRunnerFrom(meta), key);
+        return key === undefined || found === undefined
+            ? undefined
+            : {
+                  key,
+                  job: found,
+              };
     }
 
     /**

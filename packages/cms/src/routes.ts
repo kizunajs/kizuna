@@ -1907,7 +1907,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             guarded(async (cms, args) => {
                 const site = siteOf(cms, args, at);
                 assertPublishes(cms, cms.access(args.auth), cms.listing(args.params['name']!, site).refOf(args.params['id']!));
-                await restoreItem(cms, args.params['name']!, args.params['id']!, site);
+                await restoreItem(cms, args.params['name']!, args.params['id']!, site, authorOf(cms, args));
                 return {
                     status: 204,
                     body: undefined,
@@ -1938,7 +1938,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             guarded(async (cms, args) => {
                 const site = siteOf(cms, args, at);
                 assertPublishes(cms, cms.access(args.auth), cms.listing(args.params['name']!, site).refOf(args.params['id']!));
-                await eraseItem(cms, args.params['name']!, args.params['id']!, site);
+                await eraseItem(cms, args.params['name']!, args.params['id']!, site, authorOf(cms, args));
                 return {
                     status: 204,
                     body: undefined,
@@ -1972,7 +1972,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         detail: 'The shared trash holds what every site showed, so an admin over every site empties it.',
                     });
                 }
-                await emptyTrash(cms, site);
+                await emptyTrash(cms, site, authorOf(cms, args));
                 return {
                     status: 204,
                     body: undefined,

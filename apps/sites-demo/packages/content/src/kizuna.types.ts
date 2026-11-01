@@ -8,6 +8,7 @@ import type { mcpPlugin } from '@kizunajs/mcp';
 import type { resendPlugin } from '@kizunajs/resend';
 import type { editor } from './identities';
 import type { partner } from './partners';
+import type { jobs } from './jobs';
 
 export interface Config {
     adapter: ReturnType<typeof nextAdapter>;
@@ -17,5 +18,6 @@ export interface Config {
             partner: typeof partner;
         };
     };
+    jobs: typeof jobs;
     plugins: [ReturnType<typeof mcpPlugin>, ReturnType<typeof resendPlugin>];
 }

@@ -15,6 +15,7 @@ import {
     type ReviewState,
 } from './reviews.js';
 import type { EditorAccess } from './site-access.js';
+import { contentEvent, fireContentEvents } from './content-events.js';
 import type { ReleaseRow, ScheduleAction, ScheduleRow } from './storage/schedule-store.js';
 
 /**
@@ -372,6 +373,14 @@ export const scheduleDocument = async (
         force: forceFor(cms, access, ref, body.force),
         createdBy: by,
     });
+    await fireContentEvents(cms, [
+        contentEvent(cms, state.target, 'scheduled', by, {
+            schedule: {
+                action: body.action,
+                at: at.toISOString(),
+            },
+        }),
+    ]);
     return plain(await scheduleView(cms, row, undefined, await peopleOf(cms), new Date()));
 };
 
@@ -454,7 +463,30 @@ const addRefs = async (cms: CmsService, access: EditorAccess, release: ReleaseRo
             createdBy: by,
             releaseId: release.id,
         });
+        added.push(state);
     }
+    if (release.at !== null) await fireScheduled(cms, release, release.at, added, by);
+};
+
+/**
+ * One `scheduled` event per document a timed release publishes.
+ */
+const fireScheduled = async (cms: CmsService, release: ReleaseRow, at: Date, states: readonly DraftState[], by: string): Promise<void> => {
+    await fireContentEvents(
+        cms,
+        states.map((state) =>
+            contentEvent(cms, state.target, 'scheduled', by, {
+                release: {
+                    id: release.id,
+                    name: release.name,
+                },
+                schedule: {
+                    action: 'publish',
+                    at: at.toISOString(),
+                },
+            })
+        )
+    );
 };
 
 export const createRelease = async (

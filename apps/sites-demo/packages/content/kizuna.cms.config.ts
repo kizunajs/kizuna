@@ -20,6 +20,7 @@ import { auth } from './src/auth';
 import { dashboard, overview } from './src/dashboard';
 import { partner, partners } from './src/partners';
 import { OUTBOX_API_KEY, outboxUrl } from './src/outbox';
+import { jobs } from './src/jobs';
 
 /**
  * The site this deployment shows. The setup script names none, and reads as the group.
@@ -42,6 +43,7 @@ export default defineConfig({
             partner,
         },
     },
+    jobs,
     jobRunner: {
         mode: 'in-process',
     },
@@ -56,12 +58,23 @@ export default defineConfig({
                       model: anthropic('claude-sonnet-5-5'),
                   },
               }),
+        voice: {
+            roles: 'admin',
+        },
         collections: [Employees, Offices, Articles, Products, Newsletters],
         globals: [PrivacyPolicy],
         sites,
         partners,
         dashboard,
         overview,
+        on: [
+            {
+                event: 'published',
+                collection: 'articles',
+                job: jobs.announceArticle,
+                when: (event) => Object.keys(event.before).length === 0,
+            },
+        ],
         site: () => process.env.KIZUNA_SITE,
         auth: {
             identity: 'editor',

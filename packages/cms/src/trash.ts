@@ -10,6 +10,7 @@ import { SOURCE_LOCALE, type DocumentRow } from './storage/store.js';
 import { descendantsOf, loadParents, parentIn } from './tree.js';
 import { PersonSchema } from './wire.js';
 import { TRASH_DAYS } from './trash-window.js';
+import { contentEvent, fireContentEvents } from './content-events.js';
 
 export { TRASH_DAYS };
 
@@ -92,6 +93,10 @@ export const trashItem = async (cms: CmsService, name: string, id: string, site:
         await cms.revalidateDocument(ref, showing[index]);
         await queueRefreshes(cms, ref, showing[index]);
     }
+    await fireContentEvents(
+        cms,
+        refs.map((ref) => contentEvent(cms, cms.target(ref), 'trashed', by))
+    );
 };
 
 /**
@@ -127,7 +132,7 @@ const itemsOf = async (cms: CmsService, listing: Listing, root: DocumentRow): Pr
  * while the item above it in a tree is in the trash, or when another item
  * now has its address.
  */
-export const restoreItem = async (cms: CmsService, name: string, id: string, site: string): Promise<void> => {
+export const restoreItem = async (cms: CmsService, name: string, id: string, site: string, by: string): Promise<void> => {
     const listing = cms.listing(name, site);
     const root = await entryOf(cms, listing, id);
     const items = await itemsOf(cms, listing, root);
@@ -156,17 +161,38 @@ export const restoreItem = async (cms: CmsService, name: string, id: string, sit
         await cms.revalidateDocument(ref, showing);
         await queueRefreshes(cms, ref, showing);
     }
+    await fireContentEvents(
+        cms,
+        items.map((row) => contentEvent(cms, cms.target(listing.refOf(idOf(listing, row))), 'restored', by))
+    );
+};
+
+/**
+ * One `deleted` event per item a delete took for good: their sources, without
+ * translations or each site's values, credited to `by`, or to no one when
+ * the daily job erased them.
+ */
+const fireErased = async (cms: CmsService, root: string, rows: readonly DocumentRow[], by: string | null): Promise<void> => {
+    const site = rows.find((row) => row.id === root)?.site;
+    const events = rows
+        .filter((row) => row.locale === SOURCE_LOCALE && row.site === site)
+        .flatMap((row) => {
+            const listing = cms.storedListing(row.key.slice(0, row.key.indexOf('/')), row.site);
+            return listing === undefined ? [] : [contentEvent(cms, cms.target(listing.refOf(idOf(listing, row))), 'deleted', by)];
+        });
+    await fireContentEvents(cms, events);
 };
 
 /**
  * Deletes an item in the trash for good, with what went with it, and the
  * images in the trash only they held.
  */
-export const eraseItem = async (cms: CmsService, name: string, id: string, site: string): Promise<void> => {
+export const eraseItem = async (cms: CmsService, name: string, id: string, site: string, by: string): Promise<void> => {
     const listing = cms.listing(name, site);
     const root = await entryOf(cms, listing, id);
-    await cms.store.erase(root.id);
+    const erased = await cms.store.erase(root.id);
     await cms.media.eraseUnheld();
+    await fireErased(cms, root.id, erased, by);
 };
 
 /**
@@ -204,10 +230,12 @@ export const trashOf = async (cms: CmsService, site: string, people: readonly Pe
  * Deletes for good everything in the trash of a site's own collections, or
  * of the shared ones. Answers how many deletes went.
  */
-export const emptyTrash = async (cms: CmsService, site: string): Promise<number> => {
+export const emptyTrash = async (cms: CmsService, site: string, by: string): Promise<number> => {
     const entries = await cms.store.trashEntries('item', site);
-    for (const { document } of entries) await cms.store.erase(document.id);
+    const erased: Array<[string, DocumentRow[]]> = [];
+    for (const { document } of entries) erased.push([document.id, await cms.store.erase(document.id)]);
     await cms.media.eraseUnheld();
+    for (const [root, rows] of erased) await fireErased(cms, root, rows, by);
     return entries.length;
 };
 

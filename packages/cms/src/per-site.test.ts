@@ -388,7 +388,7 @@ describe('a perSite field', () => {
         ).toMatchObject({
             by: 'ada',
         });
-        await restoreItem(service, 'offices', id, 'default');
+        await restoreItem(service, 'offices', id, 'default', 'ada');
         expect((await request(app).get(`/content/sites/uk/collections/offices/${id}`)).body.phone).toBe('+44 20 7000 1111');
     });
 });

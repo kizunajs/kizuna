@@ -1,26 +1,139 @@
 ---
 title: Events
-description: 'What runs when content publishes, unpublishes or is deleted.'
+description: 'Jobs that run when content publishes, unpublishes, goes to the trash, comes back, is deleted or is scheduled.'
 ---
 
-A collection names what happens after it publishes, with `plugins` and `jobs` like a route handler:
+When an article publishes, the newsletter list should hear about it. When a product's price changes, the shop should get the new price. Both are [jobs](/docs/jobs), and `on` on `cms()` says which events queue them:
 
-```ts
-on: {
-    published: async (product, { plugins, jobs }) => {
-        await plugins.medusa.upsertProduct(product);
-        await jobs.indexProduct.queue({
-            input: {
-                id: product.id,
+```ts title="kizuna.config.ts"
+import { jobs } from './src/jobs';
+
+export default defineConfig({
+    jobs,
+    jobRunner: {
+        mode: 'in-process',
+    },
+    content: cms({
+        db,
+        collections: [Articles, Products],
+        on: [
+            {
+                event: 'published',
+                collection: 'articles',
+                job: jobs.announceArticle,
             },
-        });
-    },
-    deleted: async (product, { plugins }) => {
-        await plugins.medusa.removeProduct(product.id);
-    },
-},
+        ],
+        auth: {
+            identity: 'editor',
+        },
+    }),
+});
 ```
 
-`published`, `unpublished` and `deleted`. They run after the write and cannot change it. An error is logged and the publish stands. Drafts have no event. `on` on `cms()` runs for every document.
+The job takes the event as its `input`:
 
-Validation is the field's schema, access is `auth`, and derived values belong to the page. None of them are events.
+```ts title="src/jobs.ts"
+import { ContentEventSchema } from '@kizunajs/cms';
+import { k } from './k';
+
+export const jobs = k.jobs({
+    announceArticle: k
+        .job({
+            summary: 'Tell the newsletter list about a new article',
+            input: ContentEventSchema,
+        })
+        .handler(async ({ input, plugins }) => {
+            const title = String(input.after['title']);
+            await plugins.resend.sendBroadcast({
+                list: 'weekly',
+                name: title,
+                subject: `New in the journal: ${title}`,
+                html: `<p>${String(input.after['summary'])}</p>`,
+            });
+        }),
+});
+```
+
+## The events
+
+| Event         | When                                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------- |
+| `published`   | A document publishes, by hand, on its schedule or with a release                                              |
+| `unpublished` | A published document is withdrawn                                                                             |
+| `trashed`     | An item goes to the [trash](/docs/cms/editing/admin#trash)                                                    |
+| `restored`    | An item comes back from the trash                                                                             |
+| `deleted`     | An item is deleted for good, from the trash or by the daily job                                               |
+| `scheduled`   | A document is [scheduled](/docs/cms/editing/scheduling) to publish or unpublish, on its own or with a release |
+
+Each document gets its own event, so a release that publishes three articles fires three `published` events, and deleting an item with two under it in a [tree](/docs/cms/collections#trees) fires three `trashed` events. Saving a draft fires nothing.
+
+## What a job receives
+
+```ts
+{
+    event: 'published',
+    ref: 'item:articles:k3j9x2',
+    type: 'item',
+    name: 'articles',
+    id: 'k3j9x2',
+    site: null,
+    locale: 'en',
+    by: 'mia@hagen.example.com',
+    via: 'Claude',
+    at: '2026-11-01T09:30:00.000Z',
+    changed: ['title'],
+    before: {
+        title: 'Repotting a monstera',
+    },
+    after: {
+        title: 'Repotting a monstera in spring',
+    },
+    release: null,
+    schedule: null,
+}
+```
+
+- **`ref`** is the document as the CMS names it everywhere else. `name` is the page's or global's name, or the collection an item is in, and `id` is the item's id.
+- **`site`** is the site the document belongs to, or whose values on shared content changed. Shared content has `null`.
+- **`locale`** is the language of the copy, so publishing the Norwegian translation says `nb`. Without `locales` it is `null`.
+- **`by`** is the editor, as `auth.author` names them. The daily job that empties the trash deletes as no one, so its `deleted` events have `null`. A scheduled publish is credited to the editor who scheduled it.
+- **`via`** is the agent that did it for them, like `Claude`, as the admin [credits it](/docs/cms/editing/agents), or `null` for a person in the admin.
+- **`changed`** names each field a publish changed against what was live before, with `before` and `after` holding those fields' values. A first publish changes every field it has, so `before` is empty. Every other event changes no fields.
+- **`release`** is the `{ id, name }` of the release a document publishes or is scheduled with.
+- **`schedule`** is `{ action, at }` on a `scheduled` event: whether it publishes or unpublishes, and when.
+
+`ContentEventSchema` from `@kizunajs/cms` is the shape, and `ContentEvent` its type.
+
+## Narrowing a trigger
+
+`collection`, `global` or `page` names one document kind. A trigger with none of them runs for every document:
+
+```ts
+on: [
+    {
+        event: 'trashed',
+        job: jobs.removeFromSearch,
+    },
+],
+```
+
+`when` is a plain function of the event, and the job queues only when it answers `true`. A product syncs to the shop only when its price changed:
+
+```ts
+on: [
+    {
+        event: 'published',
+        collection: 'products',
+        job: jobs.syncPrice,
+        when: (event) => event.changed.includes('price'),
+    },
+],
+```
+
+## When a job fails
+
+The CMS queues each job after the write it follows, so a job never holds up or undoes a publish. A job that cannot be queued, or a `when` that throws, is logged and the document stays published.
+
+Each job is queued with a dedupe key of its own per event, the job's key, the document and the event at its time, like `announceArticle:item:articles:k3j9x2:published@2026-11-01T09:30:00.000Z`. A transport that honours `dedupeKey` runs it once however often it is handed over. Retries and run history belong to the transport, as for every [job](/docs/jobs).
+
+`defineConfig` throws when a trigger names a job that `jobs` does not declare, or a collection, global or page the CMS does not have.

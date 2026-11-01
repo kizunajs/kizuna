@@ -10,6 +10,8 @@ import { isView, type View } from './view-definition.js';
 import { DashboardWidgetSchema, OverviewWidgetSchema, type DashboardWidget, type OverviewWidget } from './dashboard.js';
 import { isDeclaredSites, type DeclaredSites } from './site.js';
 import type { TranslateOptions } from './translate.js';
+import type { VoiceOptions } from './voice.js';
+import type { ContentEvent } from './content-events.js';
 
 /**
  * One discovered page: where it is served, and what it declares.
@@ -429,6 +431,62 @@ export const partnerReads = (partner: PartnerOptions, read: PartnerRead): boolea
  */
 export const DEFAULT_SITE = 'default';
 
+/**
+ * What happens to a document that a job may run on.
+ */
+export const ContentEventNameSchema = z.enum(['published', 'unpublished', 'trashed', 'restored', 'deleted', 'scheduled']);
+
+export type ContentEventName = z.output<typeof ContentEventNameSchema>;
+
+/**
+ * A job a trigger may name: one whose `input` takes a {@link ContentEvent}.
+ */
+export interface ContentEventJob {
+    readonly definition: {
+        readonly input: z.ZodType<unknown, ContentEvent>;
+    };
+    readonly responses: unknown;
+}
+
+/**
+ * A job that runs when something happens to content.
+ *
+ * @example
+ * {
+ *     event: 'published',
+ *     collection: 'articles',
+ *     job: jobs.announceArticle,
+ * }
+ */
+export interface ContentTrigger {
+    event: ContentEventName;
+    /**
+     * Only the items of this collection. Name one of `collection`, `global`
+     * and `page`, or none for every document.
+     */
+    collection?: string;
+    /**
+     * Only this global.
+     */
+    global?: string;
+    /**
+     * Only this page.
+     */
+    page?: string;
+    /**
+     * The job the CMS queues, declared with `k.jobs` and named on
+     * `defineConfig`. Its `input` is `ContentEventSchema`.
+     */
+    job: ContentEventJob;
+    /**
+     * Queues the job only when this answers `true`.
+     *
+     * @example
+     * when: (event) => event.changed.includes('price'),
+     */
+    when?: (event: ContentEvent) => boolean;
+}
+
 export interface CmsPluginOptions<
     Pages extends PageMap = PageMap,
     Sites extends DeclaredSites<any, any> | undefined = DeclaredSites | undefined,
@@ -536,6 +594,21 @@ export interface CmsPluginOptions<
     jobs?: {
         identity: string;
     };
+    /**
+     * Jobs the CMS queues when content publishes, unpublishes, goes to the
+     * trash, comes back, is deleted for good or is scheduled. Each queues
+     * after the write, so a job that fails never undoes it.
+     *
+     * @example
+     * on: [
+     *     {
+     *         event: 'published',
+     *         collection: 'articles',
+     *         job: jobs.announceArticle,
+     *     },
+     * ],
+     */
+    on?: readonly ContentTrigger[];
     /**
      * Content with one instance and no route, made with `defineGlobal()`.
      */
@@ -698,6 +771,24 @@ const SiteContentSchema = z.object({
         .optional(),
 });
 
+const ContentTriggerSchema = z
+    .object({
+        event: ContentEventNameSchema,
+        collection: z.string().min(1).optional(),
+        global: z.string().min(1).optional(),
+        page: z.string().min(1).optional(),
+        job: z.custom<ContentEventJob>(
+            (value) => typeof value === 'object' && value !== null && 'definition' in value && 'responses' in value,
+            {
+                error: 'must be a job declared with k.jobs',
+            }
+        ),
+        when: z.custom<ContentTrigger['when']>(isFunction).optional(),
+    })
+    .refine((trigger) => [trigger.collection, trigger.global, trigger.page].filter((name) => name !== undefined).length < 2, {
+        error: 'names one of `collection`, `global` and `page`, or none for every document',
+    });
+
 export const CmsPluginOptionsSchema = z
     .object({
         name: z.string().min(1).optional(),
@@ -775,6 +866,7 @@ export const CmsPluginOptionsSchema = z
                 identity: z.string().min(1),
             })
             .optional(),
+        on: z.array(ContentTriggerSchema).optional(),
         auth: z.object({
             identity: z.string().min(1),
             roles: z.union([z.string(), z.array(z.string())]).optional(),

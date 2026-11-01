@@ -134,6 +134,8 @@ content: cms({
 
 One identity guards both endpoints, so when your jobs name one as well, it is the same.
 
+The CMS also queues your own jobs when content publishes, goes to the trash or is scheduled, through `on` on `cms()`. See [Events](/docs/cms/events).
+
 ## Schedules
 
 A five-field cron expression, read as UTC, or an object to read it in a time zone:

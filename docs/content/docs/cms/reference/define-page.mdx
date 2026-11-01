@@ -18,7 +18,6 @@ definePage(definition: PageDefinition): Page
 | `requireReview` | `boolean`                                | Publishing waits for an approval                                                                           |
 | `instructions`  | `string`                                 | Markdown an agent reads before writing the page. See [Instructions](/docs/cms/editing/agents#instructions) |
 | `migrate`       | `Record<number, (document) => document>` | Steps that bring stored content up to the current fields                                                   |
-| `on`            | `{ published, unpublished, deleted }`    | Functions that run after the fact, with `plugins` and `jobs`                                               |
 
 ## Example
 

@@ -71,14 +71,6 @@ export const Products = defineCollection({
         },
     ],
     indexes: ['slug', 'category'],
-    on: {
-        published: async (product, { plugins }) => {
-            await plugins.medusa.upsertProduct(product);
-        },
-        deleted: async (product, { plugins }) => {
-            await plugins.medusa.removeProduct(product.id);
-        },
-    },
 });
 ```
 
@@ -86,7 +78,7 @@ A required field a product lacks is what `kizuna cms check` lists, so completene
 
 ## Pushing to the engine
 
-The push is a plugin of yours, a few lines over Medusa's admin client. The product's kizuna id goes in `external_id`, which Medusa can look up by:
+The push is a plugin of yours, a few lines over Medusa's admin client. The product's kizuna id goes in `external_id`, which Medusa can look up by. It takes the fields a publish changed, so a first publish creates the whole product and a later one updates what changed:
 
 ```ts title="src/plugins/medusa.ts"
 export const medusaPlugin = definePlugin({
@@ -103,20 +95,20 @@ export const medusaPlugin = definePlugin({
 
         return {
             exports: {
-                upsertProduct: async (product: Product) => {
+                upsertProduct: async (id: string, changed: Partial<Product>) => {
                     const { products } = await medusa.admin.product.list({
-                        external_id: product.id,
+                        external_id: id,
                     });
                     const body = {
-                        title: product.name,
-                        handle: product.slug,
-                        external_id: product.id,
-                        weight: product.specs.weightKg * 1000,
-                        material: product.specs.material,
-                        images: product.gallery.map((image) => ({
+                        external_id: id,
+                        title: changed.name,
+                        handle: changed.slug,
+                        weight: changed.specs === undefined ? undefined : changed.specs.weightKg * 1000,
+                        material: changed.specs?.material,
+                        images: changed.gallery?.map((image) => ({
                             url: image.url,
                         })),
-                        variants: product.variants.map((variant) => ({
+                        variants: changed.variants?.map((variant) => ({
                             title: variant.label,
                             sku: variant.sku,
                             options: variant.options,
@@ -138,6 +130,56 @@ export const medusaPlugin = definePlugin({
         };
     },
 });
+```
+
+Two [jobs](/docs/jobs) call it, and `on` on `cms()` queues them as [events](/docs/cms/events) happen. A product leaves the shop when it is unpublished or goes to the trash, and comes back when it publishes again:
+
+```ts title="src/jobs.ts"
+export const jobs = k.jobs({
+    pushProduct: k
+        .job({
+            retry: 5,
+            input: ContentEventSchema,
+        })
+        .handler(async ({ input, plugins }) => {
+            await plugins.medusa.upsertProduct(input.id!, input.after);
+        }),
+    removeProduct: k
+        .job({
+            retry: 5,
+            input: ContentEventSchema,
+        })
+        .handler(async ({ input, plugins }) => {
+            await plugins.medusa.removeProduct(input.id!);
+        }),
+});
+```
+
+```ts title="kizuna.config.ts"
+content: cms({
+    db,
+    collections: [Products, Categories],
+    on: [
+        {
+            event: 'published',
+            collection: 'products',
+            job: jobs.pushProduct,
+        },
+        {
+            event: 'unpublished',
+            collection: 'products',
+            job: jobs.removeProduct,
+        },
+        {
+            event: 'trashed',
+            collection: 'products',
+            job: jobs.removeProduct,
+        },
+    ],
+    auth: {
+        identity: 'editor',
+    },
+}),
 ```
 
 Prices, stock locations and sales channels are set in Medusa, once per variant, by the people who own them. A product published before they are set is in Medusa and not for sale.

@@ -17,10 +17,12 @@ import { draftEventsRoute } from './draft-events.js';
 import { adminRoutes, signInLocationOf } from './admin/route.js';
 import { signInRoute, signInScreenRoute, signOutRoute } from './admin/sign-in-route.js';
 import { routePrefix } from './options.js';
+import { VOICE_GLOBAL } from './glossary.js';
 import { assertActionAccess, resolveActions } from './action.js';
 import { assertViews } from './view-routes.js';
 import { assertTree } from './tree.js';
 import { assertDashboard } from './dashboard.js';
+import { assertTriggers } from './content-events.js';
 import { resolve } from 'node:path';
 
 /**
@@ -227,6 +229,11 @@ const validate = (service: CmsService, options: ResolvedCmsOptions, api: PluginA
     }
     assertViews(options.views ?? [], [...names.keys()], identityRoles, label);
     assertDashboard(options, identityRoles, label);
+    assertTriggers(service, options.on ?? [], {
+        collections: allCollections.map((definition) => definition.name),
+        globals: [...(options.globals ?? []), ...ownGlobals].map((definition) => definition.name),
+        pages: [...new Set(Object.values(sitesOf(options)).flatMap((declared) => Object.keys(declared.pages)))],
+    });
     for (const [site, declared] of Object.entries(sitesOf(options))) {
         const reachable = [...(options.collections ?? []), ...(options.sites?.entries[site]?.collections ?? [])];
         for (const entry of Object.values(declared.pages)) {

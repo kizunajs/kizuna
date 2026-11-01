@@ -297,7 +297,7 @@ describe('storage', () => {
         await service.deleteItem('offices', id);
         expect((await pglite.query('select id from cms_documents where trashed_at is null')).rows).toEqual([]);
         expect((await pglite.query('select id from cms_documents where trashed_at is not null')).rows).toHaveLength(2);
-        await eraseItem(service, 'offices', id, 'default');
+        await eraseItem(service, 'offices', id, 'default', 'ada');
         expect((await pglite.query('select id from cms_documents')).rows).toEqual([]);
         expect((await pglite.query('select document_id from cms_translations')).rows).toEqual([]);
     });

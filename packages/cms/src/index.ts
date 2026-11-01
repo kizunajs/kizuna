@@ -105,8 +105,10 @@ export { type Output, type Resolved } from './output.js';
 export { link, LINK_BRAND, type LinkRef, type ResolvedLink } from './links.js';
 export { type BrokenLink, type ContentLinkEdge, type LinkTarget } from './link-targets.js';
 export { cms } from './provider.js';
-export { AgentInstructions } from './instructions.js';
 export { withAgent } from './agents.js';
+export { ContentEventSchema, type ContentEvent } from './content-events.js';
+export { GlossaryTermSchema, VoiceRuleSchema, type ResolvedVoice, type VoiceOptions } from './voice.js';
+export { glossaryIssues, type GlossaryIssue, type GlossaryRule, type GlossaryTerm, type VoiceTerm } from './glossary.js';
 export { type PublishCheck, type PublishIssue } from './publish-check.js';
 export {
     SiteSchema,
@@ -162,6 +164,9 @@ export {
     type PageEntry,
     type PageMap,
     type SitePages,
+    type ContentEventName,
+    type ContentEventJob,
+    type ContentTrigger,
     definePages,
 } from './options.js';
 export { CmsService, CmsHttpError, pageCacheTag, documentCacheTag, collectionCacheTag, brandOf, type ContentProblem } from './cms.js';

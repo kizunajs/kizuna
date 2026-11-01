@@ -16,7 +16,6 @@ defineGlobal(definition: GlobalDefinition): Global
 | `requireReview` | `boolean`                                | Publishing waits for an approval                                                                     |
 | `instructions`  | `string`                                 | Markdown an agent reads before writing it. See [Instructions](/docs/cms/editing/agents#instructions) |
 | `migrate`       | `Record<number, (document) => document>` | Steps for stored content                                                                             |
-| `on`            | `{ published, unpublished, deleted }`    | Functions that run after the fact                                                                    |
 
 ```ts
 export const Site = defineGlobal({
