@@ -26,7 +26,9 @@ export const PageMapSchema = Kizuna.model({
                 site: z.string().nullable().describe('The site it belongs to, or null for the shared content.'),
                 title: z.string(),
                 path: z.string().nullable(),
-                status: z.union([PageStatusSchema, z.literal('missing')]).describe('`missing` for a link target in the trash or gone.'),
+                status: z
+                    .union([PageStatusSchema, z.enum(['trashed', 'missing'])])
+                    .describe('`trashed` for a link target in the trash, `missing` for one that is gone.'),
                 collection: z.string().optional().describe('For an item, the `id` of the route that shows it.'),
                 count: z.int().optional().describe('For a route that shows a collection, how many items it shows.'),
             })

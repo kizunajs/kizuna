@@ -16,9 +16,18 @@ export interface LinkTarget {
     siteLabel: string | null;
     siteIcon: string | null;
     path: string | null;
-    status: 'published' | 'unpublished' | 'missing';
+    status: 'published' | 'unpublished' | 'trashed' | 'missing';
     image?: string;
 }
+
+/**
+ * What the picker says of a target a reader cannot open.
+ */
+const TARGET_STATUS_LABEL: Record<Exclude<LinkTarget['status'], 'published'>, string> = {
+    unpublished: 'Not published',
+    trashed: 'In trash',
+    missing: 'Deleted',
+};
 
 /**
  * Searches the pages and items a content link may point at, or names the
@@ -70,6 +79,7 @@ export const useDescribedTargets = (refs: readonly string[]): ReadonlyMap<string
 export const brokenNoteOf = (target: LinkTarget | undefined): string | undefined => {
     if (target === undefined) return undefined;
     if (target.status === 'unpublished') return `Link target unpublished: ${target.label}`;
+    if (target.status === 'trashed') return `Link target in trash: ${target.label}`;
     if (target.status === 'missing') return `Link target deleted: ${target.label}`;
     return undefined;
 };
@@ -230,9 +240,7 @@ export function LinkTargetSheet({
                                         }}>
                                         <LinkTargetRow target={target} />
                                         {target.status === 'published' ? null : (
-                                            <span className="k-reference-sheet__detail">
-                                                {target.status === 'unpublished' ? 'Not published' : 'Deleted'}
-                                            </span>
+                                            <span className="k-reference-sheet__detail">{TARGET_STATUS_LABEL[target.status]}</span>
                                         )}
                                     </button>
                                 </li>

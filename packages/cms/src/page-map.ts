@@ -1,12 +1,13 @@
 import type { PageStatus } from './cms.js';
 import { DEFAULT_SITE } from './options.js';
 import { parseRef } from './refs.js';
+import type { LinkTargetStatus } from './link-targets.js';
 
 /**
- * Where a card on the map stands: a page's status, or `missing` for a link's
- * target that is in the trash or gone.
+ * Where a card on the map stands: a page's status, or `trashed` or `missing`
+ * for a link's target that is in the trash or gone.
  */
-export type PageMapStatus = PageStatus | 'missing';
+export type PageMapStatus = PageStatus | 'trashed' | 'missing';
 
 /**
  * One card on the map: a page, an item a page shows at its address, the
@@ -82,7 +83,7 @@ export interface PageMapInput {
      * What a document is called, where it is and whether it is live, by its
      * ref, for the items and for documents that are not pages.
      */
-    targets: ReadonlyMap<string, { label: string; path: string | null; status: 'published' | 'unpublished' | 'missing' }>;
+    targets: ReadonlyMap<string, { label: string; path: string | null; status: LinkTargetStatus }>;
     /**
      * Whether the caller may open a site, `undefined` for the shared content.
      */
@@ -102,8 +103,8 @@ const siteOfRef = (ref: string): string | null => {
     return site === undefined || site === DEFAULT_SITE ? null : site;
 };
 
-const statusOfTarget = (status: 'published' | 'unpublished' | 'missing' | undefined): PageMapStatus =>
-    status === 'published' ? 'published' : status === 'unpublished' ? 'draft' : 'missing';
+const statusOfTarget = (status: LinkTargetStatus | undefined): PageMapStatus =>
+    status === 'published' ? 'published' : status === 'unpublished' ? 'draft' : (status ?? 'missing');
 
 const LIVE: ReadonlySet<PageMapStatus> = new Set(['published', 'changed']);
 

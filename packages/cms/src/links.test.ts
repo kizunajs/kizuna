@@ -515,6 +515,18 @@ describe('reading a content link', () => {
         expect((await service.brokenLinksOf(page('norway', 'frontPage'))).map((broken) => broken.reason)).toEqual(['trashed', 'trashed']);
     });
 
+    it('names a target in the trash apart from one that is gone', async () => {
+        const id = await shop('oslo');
+        await service.deleteItem('shops', id);
+        const named = await request(app)
+            .get('/editing/link-targets')
+            .query({
+                refs: [`item:shops:${id}`, 'item:shops:gone'],
+            })
+            .set('authorization', 'Bearer token');
+        expect(named.body.targets.map((target: { status: string }) => target.status)).toEqual(['trashed', 'missing']);
+    });
+
     it('shows a draft target in draft mode', async () => {
         await write(page('uk', 'plantCarePage'), {
             heading: 'Plant care',

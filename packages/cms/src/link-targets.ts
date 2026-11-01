@@ -30,9 +30,10 @@ export interface BrokenLink {
 }
 
 /**
- * Where a link's page or item stands: live, saved but not published, or gone.
+ * Where a link's page or item stands: live, saved but not published, in the
+ * trash, or gone.
  */
-export type LinkTargetStatus = 'published' | 'unpublished' | 'missing';
+export type LinkTargetStatus = 'published' | 'unpublished' | 'trashed' | 'missing';
 
 /**
  * A page or an item a content link may point at, as the link control shows
@@ -214,7 +215,9 @@ export const linkTargetStatus = async (cms: CmsService, value: string): Promise<
     const ref = linkedRef(cms, value);
     if (ref === undefined) return 'missing';
     const row = (await cms.document(ref)).row;
-    if (row === undefined || (row.draft === null && row.published === null)) return 'missing';
+    if (row === undefined || (row.draft === null && row.published === null)) {
+        return ref.type === 'item' && (await cms.trashed(ref)) !== undefined ? 'trashed' : 'missing';
+    }
     return row.publishedVersion === null || row.published === null ? 'unpublished' : 'published';
 };
 
@@ -232,11 +235,10 @@ export const brokenLinksOf = async (cms: CmsService, ref: DocumentRef): Promise<
         if (!statuses.has(link.ref)) statuses.set(link.ref, await linkTargetStatus(cms, link.ref));
         const status = statuses.get(link.ref)!;
         if (status === 'published') continue;
-        const linked = status === 'missing' ? linkedRef(cms, link.ref) : undefined;
         broken.push({
             path: link.path,
             target: link.ref,
-            reason: linked?.type === 'item' && (await cms.trashed(linked)) !== undefined ? 'trashed' : status,
+            reason: status,
         });
     }
     return broken;
@@ -395,7 +397,7 @@ const describeTarget = async (cms: CmsService, value: string): Promise<LinkTarge
     const route = listing.routes[0];
     return {
         ref: value,
-        label: status === 'missing' ? value : documentLabel(state),
+        label: status === 'missing' || status === 'trashed' ? value : documentLabel(state),
         site: listing.site,
         ...markOf(cms, listing.site),
         path: route === undefined ? null : (fillPath(route.pattern, content) ?? null),

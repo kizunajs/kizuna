@@ -15,7 +15,7 @@ import { link } from './links.js';
 import { DocumentStore } from './storage/store.js';
 import { memoryMediaStorage } from './media/storage.js';
 import { heldJobs } from './held-jobs.fixture.js';
-import type { PageMap } from './page-map.js';
+import { pageMapOf, type PageMap } from './page-map.js';
 
 const k = new Kizuna();
 const roles = Kizuna.roles(['editor', 'admin']);
@@ -266,5 +266,48 @@ describe('the page map', () => {
         expect((await grace.post('/editing/sites/uk/pages/aboutPage/unpublish').send({})).status).toBe(200);
         const map = await mapOf(grace);
         expect(map.links.find((link) => link.to === 'page:uk:aboutPage')?.broken).toBe(true);
+    });
+
+    it('tells a link target in the trash from one that is gone', () => {
+        const map = pageMapOf({
+            pages: [],
+            collectionPages: [],
+            links: [
+                {
+                    from: 'global:footer',
+                    to: 'item:shops:oslo',
+                    fieldPaths: ['contact'],
+                    published: true,
+                },
+                {
+                    from: 'global:footer',
+                    to: 'item:shops:bergen',
+                    fieldPaths: ['contact'],
+                    published: true,
+                },
+            ],
+            targets: new Map([
+                [
+                    'item:shops:oslo',
+                    {
+                        label: 'item:shops:oslo',
+                        path: null,
+                        status: 'trashed',
+                    },
+                ],
+                [
+                    'item:shops:bergen',
+                    {
+                        label: 'item:shops:bergen',
+                        path: null,
+                        status: 'missing',
+                    },
+                ],
+            ]),
+            sees: () => true,
+        });
+        expect(map.nodes.find((node) => node.ref === 'item:shops:oslo')?.status).toBe('trashed');
+        expect(map.nodes.find((node) => node.ref === 'item:shops:bergen')?.status).toBe('missing');
+        expect(map.links.every((link) => link.broken)).toBe(true);
     });
 });

@@ -535,7 +535,7 @@
         background: none;
     }
 
-    .k-map__dot[data-status='missing'] {
+    .k-map__dot:is([data-status='trashed'], [data-status='missing']) {
         border: 1.5px dashed var(--k-muted);
         background: none;
     }

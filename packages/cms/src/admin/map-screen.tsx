@@ -157,7 +157,7 @@ const PageCard = memo(function PageCard({ data }: NodeProps<Node<CardData>>) {
                 <span
                     className="k-map__dot"
                     data-status={node.status}
-                    title={node.status === 'missing' ? 'Missing' : statusLabelOf(node.status)}
+                    title={node.status === 'trashed' ? 'In trash' : node.status === 'missing' ? 'Deleted' : statusLabelOf(node.status)}
                 />
             </a>
         </>

@@ -562,8 +562,8 @@ export const BrokenLinkSchema = z.object({
  * Where a link's page or item stands.
  */
 const LinkTargetStatusSchema = z
-    .enum(['published', 'unpublished', 'missing'])
-    .describe('Published, saved but not published, or deleted and never written.');
+    .enum(['published', 'unpublished', 'trashed', 'missing'])
+    .describe('Published, saved but not published, in the trash, or deleted and never written.');
 
 const LinkTargetShape = z.object({
     ref: z.string().describe('What a content link stores under ref.'),
