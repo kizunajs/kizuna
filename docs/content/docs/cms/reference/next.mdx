@@ -10,7 +10,8 @@ description: 'What the Next.js app imports: the preview, links, the proxy and me
 | `href(page, params)`                | The address of a page in the current language, from its `paths`                               |
 | `inStoredOrder(ids, records, idOf)` | Records in the order a field holds them, dropping ids that found nothing                      |
 | `withKizunaCms(config)`             | From `@kizunajs/cms/next/config`: collects `content.ts` files into `cms.pages.ts`             |
-| `contentProxy(kizuna)`              | From `@kizunajs/cms/next/proxy`: rewrites localized addresses when `paths.rewrite` is on      |
+| `contentProxy({ cms, site })`       | From `@kizunajs/cms/next/proxy`: answers the site's redirects from `proxy.ts`                 |
+| `matchRedirect(table, request)`     | From `@kizunajs/cms/redirects`: the redirect a request meets, for a proxy of your own         |
 | `JsonLd`, `sitemapOf`               | From `@kizunajs/cms/metadata`: structured data from an item, and the sitemap from the content |
 
 A page's own metadata is `kizuna.content.pages.<name>.metadata`, exported as `generateMetadata`.

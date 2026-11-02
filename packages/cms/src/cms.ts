@@ -77,6 +77,8 @@ import {
     type Migration,
 } from './storage/store.js';
 import { ScheduleStore } from './storage/schedule-store.js';
+import { applyRedirectsIn, RedirectStore } from './storage/redirect-store.js';
+import { publishEffects, touchTargets } from './redirects.js';
 import { previewSecret, previewTokenExpiry, signPreviewToken, verifyPreviewToken, verifyRefresh } from './preview-token.js';
 import { DraftNotices } from './draft-notices.js';
 import { depthRefusal, descendantsOf, loadParents, loopRefusal, parentIn, placeInTree } from './tree.js';
@@ -107,7 +109,7 @@ export class CmsHttpError extends Error {
 const isEmptyValue = (value: unknown): boolean =>
     value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0);
 
-const MIGRATION_AUTHOR = 'kizuna-cms';
+export const MIGRATION_AUTHOR = 'kizuna-cms';
 
 /**
  * Brings stored content of one definition up to its latest migration step.
@@ -561,6 +563,10 @@ export class CmsService {
      */
     readonly schedules: ScheduleStore;
     /**
+     * Each site's redirects and their version.
+     */
+    readonly redirects: RedirectStore;
+    /**
      * Tells the draft preview, on every server instance, when a draft is saved.
      */
     readonly notices: DraftNotices;
@@ -608,6 +614,7 @@ export class CmsService {
     ) {
         this.store = new DocumentStore(options.db);
         this.schedules = new ScheduleStore(options.db);
+        this.redirects = new RedirectStore(options.db);
         this.notices = new DraftNotices(options.db);
         this.sites = Object.fromEntries(Object.entries(sitesOf(options)).map(([site, declared]) => [site, declared.pages]));
         this.pages = this.sites[DEFAULT_SITE] ?? {};
@@ -1457,6 +1464,28 @@ export class CmsService {
         const found = await this.inLocale(ref, locale, async (each) => {
             const { row } = await this.document(each);
             const content = copy === 'draft' ? (row?.draft ?? row?.published) : row?.publishedVersion === null ? null : row?.published;
+            return content === null || content === undefined
+                ? undefined
+                : {
+                      content,
+                  };
+        });
+        return found?.content;
+    }
+
+    /**
+     * A document's content in a language, with a translation over its source,
+     * from the copy `pick` takes of each stored row. `undefined` when it has
+     * none in that language or a language it falls back to.
+     */
+    async storedWith(
+        ref: DocumentRef,
+        locale: string | undefined,
+        pick: (target: Target, row: DocumentRow | undefined) => Record<string, unknown> | null | undefined
+    ): Promise<Record<string, unknown> | undefined> {
+        const found = await this.inLocale(ref, locale, async (each) => {
+            const { target, row } = await this.document(each);
+            const content = pick(target, row);
             return content === null || content === undefined
                 ? undefined
                 : {
@@ -3472,7 +3501,11 @@ export class CmsService {
         }
         await this.assertNoLoop(ref, state.row?.draft, 'published');
         const sites = await this.sitesShowing(ref, ['published', 'draft']);
-        await this.store.publish(state.target.kind, state.target.key, author, state.target.site, state.target.locale);
+        const effects = await publishEffects(this, [ref], author);
+        await this.store.publish(state.target.kind, state.target.key, author, state.target.site, state.target.locale, {
+            paths: effects.pathsOf(ref),
+            redirects: effects.redirects,
+        });
         if (state.row !== undefined) await this.schedules.endFor(state.row.id);
         await this.revalidateDocument(ref, sites);
         await queueRefreshes(this, ref, sites);
@@ -3504,13 +3537,18 @@ export class CmsService {
             await this.assertNoLoop(state.target.ref, state.row?.draft, 'published');
         }
         const sites = await Promise.all(refs.map((ref) => this.sitesShowing(ref, ['published', 'draft'])));
+        const effects = await publishEffects(this, refs, author);
         const versions = new Map<string, number | null>();
         await this.options.db.transaction(async (tx) => {
             const store = new DocumentStore(tx as unknown as CmsDatabase);
             for (const state of states) {
-                const published = await store.publish(state.target.kind, state.target.key, author, state.target.site, state.target.locale);
+                const published = await store.publish(state.target.kind, state.target.key, author, state.target.site, state.target.locale, {
+                    paths: effects.pathsOf(state.target.ref),
+                });
                 versions.set(formatRef(state.target.ref), published?.publishedVersion ?? null);
             }
+            // Last, so a redirect from an address another of these takes is removed.
+            await applyRedirectsIn(tx as unknown as CmsDatabase, effects.redirects);
         });
         for (const [index, ref] of refs.entries()) {
             await this.revalidateDocument(ref, sites[index]);
@@ -3544,12 +3582,17 @@ export class CmsService {
         }
         await this.assertNoLoop(ref, state.row?.draft, 'published');
         const sites = await this.sitesShowing(ref, ['published', 'draft']);
+        const effects = await publishEffects(this, [ref], approval.by);
         const outcome = await this.store.approveAndPublish(
             state.target.kind,
             state.target.key,
             approval,
             state.target.site,
-            state.target.locale
+            state.target.locale,
+            {
+                paths: effects.pathsOf(ref),
+                redirects: effects.redirects,
+            }
         );
         if (outcome === 'answered') {
             throw new CmsHttpError(409, {
@@ -3587,6 +3630,7 @@ export class CmsService {
                 detail: `'${formatRef(ref)}' is not published.`,
             });
         }
+        await touchTargets(this, [ref]);
         if (row !== undefined) await this.schedules.endFor(row.id);
         await this.revalidateDocument(ref, sites);
         await queueRefreshes(this, ref, sites);

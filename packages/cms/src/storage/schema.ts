@@ -105,6 +105,12 @@ export const cmsVersions = pgTable(
             withTimezone: true,
             mode: 'date',
         }),
+        /**
+         * Where the document was served when this version went live: one
+         * path per site and language, language prefix included. `null` for
+         * a version never published, and for a global.
+         */
+        publishedPaths: jsonb('published_paths'),
     },
     (table) => [
         primaryKey({
@@ -318,3 +324,58 @@ export const cmsSchedules = pgTable(
     },
     (table) => [index('cms_schedules_due').on(table.status, table.at), index('cms_schedules_release').on(table.releaseId)]
 );
+
+/**
+ * One address of a site that sends visitors elsewhere. `from` is the whole
+ * path a visitor asks for, language prefix included, and unique per site.
+ * `to` is a page or an item by ref, resolved to its address when read, a path
+ * on the same site, or a URL.
+ */
+export const cmsRedirects = pgTable(
+    'cms_redirects',
+    {
+        id: text('id').primaryKey(),
+        site: text('site').notNull(),
+        /**
+         * The language `from` is in, or `null` on a site without languages.
+         */
+        locale: text('locale'),
+        from: text('from_path').notNull(),
+        /**
+         * `document`, `path` or `url`.
+         */
+        toType: text('to_type').notNull(),
+        /**
+         * The ref, the path or the URL `toType` names.
+         */
+        toValue: text('to_value').notNull(),
+        /**
+         * `307` or `308`.
+         */
+        status: integer('status').notNull(),
+        /**
+         * `rename`, `manual` or `import`.
+         */
+        origin: text('origin').notNull(),
+        createdBy: text('created_by').notNull(),
+        /**
+         * The agent that made it for `createdBy`, like `Claude`.
+         */
+        createdVia: text('created_via'),
+        createdAt: timestamp('created_at', {
+            withTimezone: true,
+            mode: 'date',
+        }).notNull(),
+    },
+    (table) => [unique('cms_redirects_from').on(table.site, table.from), index('cms_redirects_target').on(table.toType, table.toValue)]
+);
+
+/**
+ * Each site's redirects version, moved on in the same transaction as any
+ * change to what the site's redirects answer. It is the `ETag` of the site's
+ * redirects.
+ */
+export const cmsRedirectVersions = pgTable('cms_redirect_versions', {
+    site: text('site').primaryKey(),
+    version: integer('version').notNull(),
+});

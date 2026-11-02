@@ -93,38 +93,7 @@ export function ProductCard({ product }: { product: Product }) {
 }
 ```
 
-On the Norwegian site that renders `/produkter/oak-desk`. Serving that address means rewriting it to the route on every request, so it is turned on in the config:
-
-```ts title="kizuna.config.ts"
-content: cms({
-    db,
-    pages,
-    locales: ['nb', 'en'],
-    paths: {
-        rewrite: true,
-    },
-}),
-```
-
-The proxy does the rewrite, and composes with anything else your proxy does:
-
-```ts title="src/proxy.ts"
-import type { NextRequest } from 'next/server';
-import { contentProxy } from '@kizunajs/cms/next/proxy';
-import kizuna from '@kizuna-config';
-
-const rewriteContent = contentProxy(kizuna);
-
-export function proxy(request: NextRequest) {
-    return rewriteContent(request);
-}
-
-export const config = {
-    matcher: ['/((?!api|_next|.*\\..*).*)'],
-};
-```
-
-`/produkter/oak-desk` reaches `src/app/products/[slug]`, and the folder's own address, `/products/oak-desk`, answers `404` on the Norwegian site. Without `rewrite`, the routes answer at their folders and `paths` feeds only `href`, the sitemap and the language alternates.
+On the Norwegian site that renders `/produkter/oak-desk`.
 
 ## Translating
 

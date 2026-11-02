@@ -5,6 +5,7 @@ import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
 import { cmsComments, cmsDocuments, cmsRefreshes, cmsRefs, cmsReviews, cmsTranslations, cmsVersions } from './schema.js';
 import { CMS_MIGRATION_SQL, likePrefix, type IndexType } from './migration.js';
 import { PLACE } from '../place.js';
+import { applyRedirectsIn, type PublishedAddress, type RedirectChanges } from './redirect-store.js';
 
 /**
  * Any Drizzle Postgres database: node-postgres, postgres.js, Neon, PGlite.
@@ -419,6 +420,20 @@ const toReview = (row: typeof cmsReviews.$inferSelect): ReviewRow => ({
     reviewers: row.reviewers as string[],
     status: row.status as ReviewStatus,
 });
+
+/**
+ * What a publish writes besides the published copy, in the same transaction.
+ */
+export interface PublishEffects {
+    /**
+     * Where the document is served once it is live, recorded on the version.
+     */
+    paths?: readonly PublishedAddress[] | null;
+    /**
+     * The redirects the publish makes and removes.
+     */
+    redirects?: RedirectChanges;
+}
 
 /**
  * The tables the CMS owns, read and written through the app's Drizzle
@@ -1044,9 +1059,18 @@ export class DocumentStore {
     }
 
     /**
-     * Points `published` at the current draft and its version.
+     * Points `published` at the current draft and its version. The version
+     * records `effects.paths`, and `effects.redirects` is written in the
+     * same transaction.
      */
-    async publish(kind: DocumentKind, key: string, author: string, site = SITE, locale = SOURCE_LOCALE): Promise<DocumentRow | undefined> {
+    async publish(
+        kind: DocumentKind,
+        key: string,
+        author: string,
+        site = SITE,
+        locale = SOURCE_LOCALE,
+        effects?: PublishEffects
+    ): Promise<DocumentRow | undefined> {
         return this.db.transaction(async (tx) => {
             const [existing] = await tx
                 .select()
@@ -1071,9 +1095,11 @@ export class DocumentStore {
                 .update(cmsVersions)
                 .set({
                     publishedAt: now,
+                    publishedPaths: effects?.paths ?? null,
                 })
                 .where(and(eq(cmsVersions.documentId, existing.id), eq(cmsVersions.version, latest)));
             await this.publishRefsIn(tx, existing.id);
+            if (effects?.redirects !== undefined) await applyRedirectsIn(tx, effects.redirects);
             const [row] = await tx.select().from(cmsDocuments).where(eq(cmsDocuments.id, existing.id)).limit(1);
             return toRow(row!);
         });
@@ -1090,7 +1116,8 @@ export class DocumentStore {
         key: string,
         approval: { review: string; by: string; version: number },
         site = SITE,
-        locale = SOURCE_LOCALE
+        locale = SOURCE_LOCALE,
+        effects?: PublishEffects
     ): Promise<DocumentRow | 'answered' | 'changed' | undefined> {
         return this.db.transaction(async (tx) => {
             const [existing] = await tx
@@ -1129,9 +1156,11 @@ export class DocumentStore {
                 .update(cmsVersions)
                 .set({
                     publishedAt: now,
+                    publishedPaths: effects?.paths ?? null,
                 })
                 .where(and(eq(cmsVersions.documentId, existing.id), eq(cmsVersions.version, latest)));
             await this.publishRefsIn(tx, existing.id);
+            if (effects?.redirects !== undefined) await applyRedirectsIn(tx, effects.redirects);
             const [row] = await tx.select().from(cmsDocuments).where(eq(cmsDocuments.id, existing.id)).limit(1);
             return toRow(row!);
         });

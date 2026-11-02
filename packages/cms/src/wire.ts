@@ -1287,3 +1287,102 @@ export const PublishCheckSchema = Kizuna.model({
         ),
     }),
 });
+
+// Editing redirects: the routes behind a site's Redirects screen and the old addresses a document's Info lists.
+
+const RedirectTargetBodySchema = z
+    .discriminatedUnion('type', [
+        z
+            .object({
+                type: z.literal('document'),
+                ref: z
+                    .string()
+                    .describe(
+                        'A page or an item, like item:articles:k3j9x2, or one translation of it, like item:articles:k3j9x2@en. Visitors go wherever it is served when they arrive, so the redirect follows it through renames.'
+                    ),
+            })
+            .strict(),
+        z
+            .object({
+                type: z.literal('path'),
+                path: z.string().describe('A path on the same site, like /butikker.'),
+            })
+            .strict(),
+        z
+            .object({
+                type: z.literal('url'),
+                url: z.string().describe('An address elsewhere, starting with https://.'),
+            })
+            .strict(),
+    ])
+    .describe('Where visitors go: a page or an item, a path on the site, or a URL.');
+
+const RedirectStatusSchema = z
+    .literal([307, 308])
+    .describe('308 for an address that moved for good, which search engines treat as the new one. 307 for a temporary one, like /sommer.');
+
+export const CreateRedirectBodySchema = z
+    .object({
+        from: z
+            .string()
+            .describe(
+                'The address visitors ask for, with its language prefix and any query, like /en/shops/oslo or /produkt.php?id=12. It never ends in /, and no page may be live there.'
+            ),
+        to: RedirectTargetBodySchema,
+        status: RedirectStatusSchema.default(308),
+    })
+    .strict();
+
+export const UpdateRedirectBodySchema = z
+    .object({
+        from: CreateRedirectBodySchema.shape.from.optional(),
+        to: RedirectTargetBodySchema.optional(),
+        status: RedirectStatusSchema.optional(),
+    })
+    .strict();
+
+export const RedirectSchema = Kizuna.model({
+    title: 'CMS.Redirect',
+    schema: z.object({
+        id: z.string(),
+        from: z.string(),
+        to: z
+            .discriminatedUnion('type', [
+                z.object({
+                    type: z.literal('document'),
+                    ref: z.string(),
+                    label: z.string(),
+                    path: z
+                        .string()
+                        .nullable()
+                        .describe(
+                            'Where it is served now, or null while it is unpublished or in the trash, when the redirect answers nothing.'
+                        ),
+                }),
+                z.object({
+                    type: z.literal('path'),
+                    path: z.string(),
+                }),
+                z.object({
+                    type: z.literal('url'),
+                    url: z.string(),
+                }),
+            ])
+            .describe('Where visitors go.'),
+        status: z.literal([307, 308]),
+        origin: z
+            .enum(['rename', 'manual', 'import'])
+            .describe(
+                '`rename`: made when its document published at a new address, which can be deleted but not changed. `manual`: made by an editor. `import`: made by `kizuna cms import-redirects`.'
+            ),
+        by: PersonSchema.nullable().describe('Who made it, or published the rename that made it. Null for an import.'),
+        createdAt: z.iso.datetime(),
+    }),
+});
+
+export const RedirectListSchema = Kizuna.model({
+    title: 'CMS.RedirectList',
+    schema: z.object({
+        redirects: z.array(RedirectSchema).describe('Each redirect of the site, by its from.'),
+    }),
+});

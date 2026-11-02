@@ -98,6 +98,7 @@ import {
     withdrawReviews,
 } from './reviews.js';
 import { waitingTranslations } from './waiting-translations.js';
+import { redirectsRoute } from './redirect-table.js';
 import { addComment, commentsOf, refOfRow, resolveThread, waitingComments } from './comments.js';
 import { actingAgent, agentOf, withAgent } from './agents.js';
 import { checkDocument, checkRelease } from './publish-check.js';
@@ -110,6 +111,7 @@ import { listViewsRoute, viewRoutes } from './view-routes.js';
 import { dashboardRoute } from './dashboard-routes.js';
 import { pageMapRoute } from './page-map-routes.js';
 import { scheduleRoutes } from './schedule-routes.js';
+import { redirectRoutes } from './redirect-routes.js';
 import { cancelSchedule, scheduleDocument } from './schedules.js';
 import { TranslateBodySchema, TranslatedDraftSchema, translateDraft } from './translate-draft.js';
 import type { EditorAccess } from './site-access.js';
@@ -1598,6 +1600,11 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
               pages: pageReadsOf(sites[DEFAULT_SITE]?.pages ?? {}, DEFAULT_SITE),
               globals: globalReadsOf(DEFAULT_SITE, `${base}/content`),
               collections: collectionReadsOf(DEFAULT_SITE, `${base}/content`),
+              redirects: redirectsRoute({
+                  site: DEFAULT_SITE,
+                  base,
+                  guarded,
+              }) as never,
           }
         : {
               sites: Object.fromEntries(
@@ -1607,6 +1614,11 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                           pages: pageReadsOf(sites[site]?.pages ?? {}, site),
                           globals: globalReadsOf(site, `${base}/content/sites/${site}`),
                           collections: collectionReadsOf(site, `${base}/content/sites/${site}`),
+                          redirects: redirectsRoute({
+                              site,
+                              base,
+                              guarded,
+                          }),
                       },
                   ])
               ) as never,
@@ -3893,6 +3905,12 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                               ...itemRoutes(onSite),
                               ...editingRoutes(siteItemScope),
                           },
+                          redirects: redirectRoutes({
+                              editor,
+                              editingBase,
+                              guarded,
+                              onSite: true,
+                          }),
                       },
                   }),
             globals: {
@@ -3991,6 +4009,16 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 editingBase,
                 guarded,
             }),
+            ...(siteEntries.length === 0
+                ? {
+                      redirects: redirectRoutes({
+                          editor,
+                          editingBase,
+                          guarded,
+                          onSite: false,
+                      }),
+                  }
+                : {}),
         },
         invalidate,
     };

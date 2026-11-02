@@ -11,6 +11,7 @@ import { descendantsOf, loadParents, parentIn } from './tree.js';
 import { PersonSchema } from './wire.js';
 import { TRASH_DAYS } from './trash-window.js';
 import { contentEvent, fireContentEvents } from './content-events.js';
+import { touchTargets } from './redirects.js';
 
 export { TRASH_DAYS };
 
@@ -89,6 +90,7 @@ export const trashItem = async (cms: CmsService, name: string, id: string, site:
     });
     if (root === undefined) throw new CmsHttpError(404, { detail: `There is no item '${id}' in '${listing.name}'.` });
     for (const row of await cms.store.trashedWith(root.id)) await cms.schedules.endFor(row.id);
+    await touchTargets(cms, refs);
     for (const [index, ref] of refs.entries()) {
         await cms.revalidateDocument(ref, showing[index]);
         await queueRefreshes(cms, ref, showing[index]);
@@ -154,6 +156,10 @@ export const restoreItem = async (cms: CmsService, name: string, id: string, sit
         }
     }
     await cms.store.restore(root.id, IMAGE_BRAND);
+    await touchTargets(
+        cms,
+        items.map((row) => listing.refOf(idOf(listing, row)))
+    );
     for (const row of items) {
         if (row.published === null) continue;
         const ref = listing.refOf(idOf(listing, row));

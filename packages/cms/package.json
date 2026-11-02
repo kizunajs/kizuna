@@ -104,6 +104,26 @@
         "types": "./dist/keys.d.cts",
         "default": "./dist/keys.cjs"
       }
+    },
+    "./next/proxy": {
+      "import": {
+        "types": "./dist/next-proxy.d.mts",
+        "default": "./dist/next-proxy.mjs"
+      },
+      "require": {
+        "types": "./dist/next-proxy.d.cts",
+        "default": "./dist/next-proxy.cjs"
+      }
+    },
+    "./redirects": {
+      "import": {
+        "types": "./dist/redirect-match.d.mts",
+        "default": "./dist/redirect-match.mjs"
+      },
+      "require": {
+        "types": "./dist/redirect-match.d.cts",
+        "default": "./dist/redirect-match.cjs"
+      }
     }
   },
   "kizuna": {
@@ -114,7 +134,9 @@
       "./next/preview": "client",
       "./cli": "server",
       "./next/config": "server",
-      "./keys": "client"
+      "./keys": "client",
+      "./next/proxy": "server",
+      "./redirects": "client"
     }
   },
   "files": [
@@ -125,7 +147,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/schemas.ts src/next.tsx src/next-preview.tsx src/next-config.ts src/cli.ts src/keys.ts --format esm,cjs --dts --clean --shims --external kizunajs --external zod --external drizzle-orm --external next --external react --external react-dom --external ai --external @kizunajs/cms/next/preview --external next/headers --external next/navigation --external next/cache --external next/server --external sharp --external @aws-sdk/client-s3 --external @aws-sdk/s3-request-presigner --external @vercel/stega --external @base-ui/react --external lucide-react --external @portabletext/react --external @portabletext/editor --external @portabletext/editor/plugins --external @portabletext/editor/selectors --external @portabletext/types && node scripts/build-view.mjs",
+    "build": "tsdown src/index.ts src/schemas.ts src/next.tsx src/next-preview.tsx src/next-config.ts src/cli.ts src/keys.ts src/next-proxy.ts src/redirect-match.ts --format esm,cjs --dts --clean --shims --external kizunajs --external zod --external drizzle-orm --external next --external react --external react-dom --external ai --external @kizunajs/cms/next/preview --external next/headers --external next/navigation --external next/cache --external next/server --external sharp --external @aws-sdk/client-s3 --external @aws-sdk/s3-request-presigner --external @vercel/stega --external @base-ui/react --external lucide-react --external @portabletext/react --external @portabletext/editor --external @portabletext/editor/plugins --external @portabletext/editor/selectors --external @portabletext/types && node scripts/build-view.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -156,20 +156,55 @@ There is no `FAQPage`: Google stopped showing it in 2026.
 
 ## Redirects
 
-A `redirects` collection, served by `nextAdapter()` at request time. Nothing redeploys.
+An article that publishes with a new slug keeps its old address working. In the same publish, the old address redirects to the article with a `308`, on each site that shows it and in each language whose address changed. A draft makes none.
 
-| Field       | What it is                                            |
-| ----------- | ----------------------------------------------------- |
-| `from`      | The old path, unique per site                         |
-| `to`        | A path, a URL, or a page or item that follows renames |
-| `permanent` | `308`, or `307` for a campaign address                |
+- The redirect points at the article rather than its new address, so a later rename takes it along, and no redirect leads to another.
+- Renaming back removes the redirect, and so does another item publishing at the old address.
+- `/offices` and `/offices/` are two addresses, as [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) says. The query is carried over, so `?utm_source=newsletter` reaches the new address.
 
-1. An article publishes with a new slug.
-2. The old address redirects to it.
-3. Earlier redirects to the article follow.
-4. A redirect from the new address is removed.
+The site's proxy serves them, before Next renders anything:
 
-Rename-made redirects are read-only. `/offices` and `/offices/` are two addresses, as [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) says. `GET /content/redirects` lists them for anything that is not Next.
+```ts title="src/proxy.ts"
+import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server';
+import { contentProxy } from '@kizunajs/cms/next/proxy';
+
+const redirects = contentProxy({
+    cms: 'https://cms.example.co.uk/api',
+    site: 'uk',
+});
+
+export async function proxy(request: NextRequest, event: NextFetchEvent) {
+    return (await redirects(request, event)) ?? NextResponse.next();
+}
+
+export const config = {
+    matcher: ['/((?!_next/static|_next/image|api|admin).*)'],
+};
+```
+
+So each one is a real `308`, or `307` for a temporary address, whatever the page does with Suspense. The proxy keeps the site's redirects in memory and asks the CMS for changes at most every ten seconds, after the response, so a rename reaches visitors within ten seconds and nothing redeploys. While the CMS is down, the proxy keeps the redirects it has. Browsers keep a redirect for an hour rather than for good, so a page renamed and renamed back answers everyone again within the hour.
+
+The matcher lets addresses with a dot through, so an old `/price-list.pdf` can redirect too. A CMS without sites leaves out `site`.
+
+Any other framework reads `GET /content/sites/:site/redirects`, or `GET /content/redirects` without sites. It needs no token, since every visitor meets the redirects anyway. Send its `ETag` back as `If-None-Match` to get `304` until something changes, and match each request with `matchRedirect`:
+
+```ts
+import { matchRedirect } from '@kizunajs/cms/redirects';
+
+const found = matchRedirect(table, request);
+if (found !== undefined) return Response.redirect(found.location, found.status);
+```
+
+### Editing redirects
+
+Each site has a [Redirects](/docs/cms/editing/admin#redirects) screen in the admin, and agents edit the same redirects as tools. Whoever may publish on the site adds, changes and deletes them, since a change takes effect at once.
+
+- A redirect goes to a page or an item, a path on the site, or a URL. A page or an item is followed through its renames, so prefer it to its path.
+- `308` is the default, and `307` is for a temporary address like `/sommer`.
+- An address where a page is published is refused, and the answer names the page.
+- A path that redirects already is stored as where that redirect goes, and the redirects that pointed at the new address go where it goes, so a visitor is sent once. A redirect that would lead back to where it started is refused.
+- `from` is the address as visitors ask for it, with its language prefix, like `/en/shops/oslo`, and it never ends in `/`.
+- A redirect a rename made can be deleted but not changed.
 
 ## The sitemap
 
@@ -212,6 +247,6 @@ A move keeps its search standing when every old address answers. Export the old 
 kizuna cms import-redirects old-site.csv
 ```
 
-Each old address answers with a `301` straight to its new page, never to the front page, and never through another redirect. Imported articles keep their original `datePublished`. Keep the old domain pointing at the new site for a year, since links to it are still out there.
+Each old address answers with a `308` straight to its new page, never to the front page, and never through another redirect. Imported articles keep their original `datePublished`. Keep the old domain pointing at the new site for a year, since links to it are still out there.
 
-HubSpot keeps its forms inside HubSpot, and they embed on the new site as they are, so lead capture carries on while the site moves. Its uploaded files, under `/hubfs/`, cannot be redirected from HubSpot's side, so copy them into the media library and map their addresses with the rest.
+Forms that live on a marketing platform embed on the new site as they are, so lead capture carries on while the site moves. Files the old platform hosts under its own addresses cannot be redirected from its side, so copy them into the media library and map their addresses with the rest.

@@ -166,6 +166,30 @@ alter table cms_documents add column if not exists updated_via text;
 alter table cms_versions add column if not exists via text;
 alter table cms_reviews add column if not exists requested_via text;
 alter table cms_releases add column if not exists created_via text;
+
+alter table cms_versions add column if not exists published_paths jsonb;
+
+create table if not exists cms_redirects (
+    id text primary key,
+    site text not null,
+    locale text,
+    from_path text not null,
+    to_type text not null,
+    to_value text not null,
+    status int not null,
+    origin text not null,
+    created_by text not null,
+    created_via text,
+    created_at timestamptz not null,
+    constraint cms_redirects_from unique (site, from_path)
+);
+
+create index if not exists cms_redirects_target on cms_redirects (to_type, to_value);
+
+create table if not exists cms_redirect_versions (
+    site text primary key,
+    version int not null
+);
 `;
 
 /**
