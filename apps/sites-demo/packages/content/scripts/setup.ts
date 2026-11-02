@@ -6,6 +6,7 @@ import { db } from '../src/db';
 import { auth } from '../src/auth';
 import { AUTH_TABLES_SQL, user } from '../src/auth/schema';
 import { seedContent } from './seed';
+import { seedRedirects } from './seed-redirects';
 
 const PASSWORD = process.env.DEMO_PASSWORD ?? 'kizuna-demo';
 
@@ -105,6 +106,7 @@ const main = async (): Promise<void> => {
             .where(eq(user.email, person.email));
     }
     await seedContent(service);
+    await seedRedirects(service);
     // Content saved before the index held images, and before it kept the published refs, gets both.
     await service.reindexRefs();
 };
