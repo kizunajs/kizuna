@@ -41,6 +41,7 @@ interface LinkedFrom {
     siteLabel: string | null;
 }
 import { ShowsOn } from './shows-on.js';
+import { OldAddresses } from './redirects-screen.js';
 import { PageHeader, type Crumb } from './page-header.js';
 import { refInLocale } from './translation.js';
 import {
@@ -1349,6 +1350,11 @@ export function DocumentScreen({
             />
         );
 
+    // Only a site has addresses: a site's own document's, or the site a shared one is open in.
+    const parsedRef = parseRef(document.ref);
+    const redirectSite: string | undefined | null =
+        parsedRef === undefined || parsedRef.type === 'global' ? null : !hasSites() ? undefined : (parsedRef.site ?? addressSite() ?? null);
+
     const info = (
         <Popover.Root
             onOpenChange={(open) => {
@@ -1431,6 +1437,9 @@ export function DocumentScreen({
                                     ))}
                                 </ul>
                             </div>
+                        )}
+                        {redirectSite === null ? null : (
+                            <OldAddresses connection={connection} refValue={document.ref} site={redirectSite} />
                         )}
                     </Popover.Popup>
                 </Popover.Positioner>

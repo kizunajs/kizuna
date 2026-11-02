@@ -69,6 +69,7 @@ describe('the admin search', () => {
             ['Pages', 'Content'],
             ['Scheduled', 'Content'],
             ['Media', 'Content'],
+            ['Redirects', 'Content'],
             ['Trash', 'Content'],
             ['Site', 'Content'],
             ['Articles', 'Content'],
@@ -93,7 +94,7 @@ describe('the admin search', () => {
             places: placesOf(sections),
             documents,
         });
-        expect(empty.places).toHaveLength(9);
+        expect(empty.places).toHaveLength(10);
         expect(empty.documents).toEqual([]);
 
         const found = searchOf({

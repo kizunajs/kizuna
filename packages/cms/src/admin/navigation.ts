@@ -87,6 +87,12 @@ export type Screen = (
       }
     | {
           /**
+           * The addresses of a site that send visitors elsewhere.
+           */
+          kind: 'redirects';
+      }
+    | {
+          /**
            * An address under the admin's that names no screen.
            */
           kind: 'missing';
@@ -253,6 +259,7 @@ export const hrefIn = (site: string | undefined, screen: Screen): string => {
     if (screen.kind === 'sites') return screen.key === undefined ? at('sites') : at('sites', screen.key);
     if (screen.kind === 'people') return at('people');
     if (screen.kind === 'trash') return at('trash');
+    if (screen.kind === 'redirects') return at('redirects');
     if (screen.kind === 'map') return at('map');
     if (screen.kind === 'media') return screen.id === undefined ? at('media') : at('media', screen.id);
     if (screen.kind === 'collection') return at('collections', screen.name);
@@ -400,6 +407,12 @@ const screenAt = (segments: readonly string[], site: AdminSite | undefined): Scr
             kind: 'trash',
         };
     }
+    // Only a site has addresses, so with several sites each has its own redirects.
+    if (section === 'redirects' && name === undefined && (site !== undefined || sites.length === 0)) {
+        return {
+            kind: 'redirects',
+        };
+    }
     if (section === 'releases' && name !== undefined && id === undefined) {
         return {
             kind: 'release',
@@ -485,6 +498,17 @@ export const screenInSite = (screen: Screen, key: string | undefined): Screen =>
         return placed({
             kind: screen.kind,
         });
+    }
+    if (screen.kind === 'redirects') {
+        return placed(
+            site === undefined
+                ? {
+                      kind: 'dashboard',
+                  }
+                : {
+                      kind: 'redirects',
+                  }
+        );
     }
     const listOf = (name: string): Screen =>
         placed({
@@ -734,6 +758,12 @@ export const navigationOf = (options: {
                     },
                 },
                 {
+                    label: 'Redirects',
+                    screen: {
+                        kind: 'redirects',
+                    },
+                },
+                {
                     label: 'Trash',
                     screen: {
                         kind: 'trash',
@@ -944,6 +974,13 @@ const siteNavigationOf = (options: Parameters<typeof navigationOf>[0], declared:
                     },
                 },
                 media(shown.key),
+                {
+                    label: 'Redirects',
+                    screen: {
+                        kind: 'redirects',
+                        site: shown.key,
+                    },
+                },
                 trash(shown.key),
             ],
         },
@@ -1014,7 +1051,13 @@ export const placeOf = (screen: Screen, allSites: boolean): Place => {
  */
 export const screenInPlace = (screen: Screen, place: Place): Screen => {
     if (place.kind === 'site') {
-        if (screen.kind === 'waiting' || screen.kind === 'scheduled' || screen.kind === 'map' || screen.kind === 'trash') {
+        if (
+            screen.kind === 'waiting' ||
+            screen.kind === 'scheduled' ||
+            screen.kind === 'map' ||
+            screen.kind === 'trash' ||
+            screen.kind === 'redirects'
+        ) {
             return {
                 kind: screen.kind,
                 site: place.site,
@@ -1150,6 +1193,7 @@ export const isCurrent = (entry: Screen, shown: Screen): boolean => {
     if (entry.kind === 'waiting') return shown.kind === 'waiting' && shown.site === entry.site;
     if (entry.kind === 'map') return shown.kind === 'map' && shown.site === entry.site;
     if (entry.kind === 'trash') return shown.kind === 'trash' && shown.site === entry.site;
+    if (entry.kind === 'redirects') return shown.kind === 'redirects' && shown.site === entry.site;
     if (entry.kind === 'scheduled') return (shown.kind === 'scheduled' || shown.kind === 'release') && shown.site === entry.site;
     if (entry.kind === 'sites' || entry.kind === 'people') return shown.kind === entry.kind;
     if (entry.kind === 'pages') {

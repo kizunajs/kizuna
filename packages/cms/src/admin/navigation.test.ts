@@ -60,6 +60,12 @@ describe('the admin navigation', () => {
             ],
             [
                 {
+                    kind: 'redirects',
+                },
+                '/admin/redirects',
+            ],
+            [
+                {
                     kind: 'document',
                     ref: 'page:frontPage',
                 },
@@ -156,7 +162,7 @@ describe('the admin navigation', () => {
             },
         });
         expect(sections.map((section) => [section.label, section.entries.map((entry) => entry.label)])).toEqual([
-            ['Content', ['Pages', 'Scheduled', 'Media', 'Trash', 'Site', 'Articles']],
+            ['Content', ['Pages', 'Scheduled', 'Media', 'Redirects', 'Trash', 'Site', 'Articles']],
             ['People', ['Employees']],
         ]);
     });
@@ -482,6 +488,7 @@ describe('the admin navigation with several sites', () => {
             ['Waiting', '/admin/uk/waiting'],
             ['Scheduled', '/admin/uk/scheduled'],
             ['Media', '/admin/uk/media'],
+            ['Redirects', '/admin/uk/redirects'],
             ['Trash', '/admin/uk/trash'],
         ]);
     });
@@ -760,6 +767,29 @@ describe('the admin navigation with several sites', () => {
                 screenOf('/admin/uk/map')
             )
         ).toBe(true);
+    });
+
+    it("gives each site's Redirects an address, and none to Overview or Shared", () => {
+        const screen: Screen = {
+            kind: 'redirects',
+            site: 'uk',
+        };
+        expect(hrefOf(screen)).toBe('/admin/uk/redirects');
+        expect(screenOf('/admin/uk/redirects')).toEqual(screen);
+        expect(screenOf('/admin/redirects').kind).toBe('missing');
+        expect(placeOf(screenOf('/admin/uk/redirects'), true)).toEqual(sitePlace('uk'));
+        expect(screenInPlace(screenOf('/admin/uk/redirects'), sitePlace('norway'))).toEqual({
+            kind: 'redirects',
+            site: 'norway',
+        });
+        expect(screenInPlace(screenOf('/admin/uk/redirects'), ALL_PLACE)).toEqual({
+            kind: 'dashboard',
+        });
+        expect(screenInSite(screenOf('/admin/uk/redirects'), undefined)).toEqual({
+            kind: 'dashboard',
+        });
+        expect(isCurrent(screen, screenOf('/admin/uk/redirects'))).toBe(true);
+        expect(isCurrent(screen, screenOf('/admin/norway/redirects'))).toBe(false);
     });
 
     it('keeps Waiting when the switcher moves between Overview and a site', () => {

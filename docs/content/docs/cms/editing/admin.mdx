@@ -292,6 +292,21 @@ Each takes the same permission as publishing the item, and Delete forever and Em
 
 A site's own collections have the same under `/editing/sites/:site`, as `editing_sites_collections_`. Reading an item in the trash answers `404` with `trashed`, when it went there and who deleted it, and a write to it answers `404` too.
 
+## Redirects
+
+**Redirects** sits above Trash in each site's sidebar. It lists the site's [redirects](/docs/cms/seo#redirects) by the address they start at, with where each goes, a page or item by its name and current path, its status, and who made it: **Renamed Oslo** for a rename, the person who added it, or **Import**.
+
+**Add redirect** opens a dialog with From, To and Status, and a row's address opens the same dialog to change it or **Delete** it. A redirect a rename made opens with its fields locked, and can only be deleted. Whoever may publish on the site may edit its redirects, and Delete asks first.
+
+| Route                                       | Tool                             | Asks first |
+| ------------------------------------------- | -------------------------------- | ---------- |
+| `GET /editing/sites/:site/redirects`        | `editing_sites_redirects_list`   | No         |
+| `POST /editing/sites/:site/redirects`       | `editing_sites_redirects_create` | No         |
+| `PATCH /editing/sites/:site/redirects/:id`  | `editing_sites_redirects_update` | No         |
+| `DELETE /editing/sites/:site/redirects/:id` | `editing_sites_redirects_delete` | Yes        |
+
+A CMS with one site has them under `/editing/redirects`, as `editing_redirects_`, and Redirects sits under Content. The list takes `to`, a page or item by ref, for only the redirects to it.
+
 ## Editing
 
 A document opens with its title large and its actions on the right: **Save draft**, **Publish**, and a `…` menu. Someone asked to review it also gets **Review**, which puts what is live beside the draft, field by field, with the request's note and each reviewer's answer, as in [Reviews](/docs/cms/editing/reviews). Under the title a line says where it stands, and when it last changed and who saved it. The menu holds **Ask for review**, which sends it to someone to look at first as in [Reviews](/docs/cms/editing/reviews), **Cancel schedule** while it is [scheduled](/docs/cms/editing/scheduling), **Add to release** while its draft has changes, as in [Releases](/docs/cms/editing/releases), **Unpublish** once it is live, whose message offers **Undo** to publish it again when the draft held no changes, and for an item **Duplicate**, the collection's own [actions](/docs/cms/collections#actions) and **Delete**, which moves it to the [trash](#trash) and offers **Undo**.
@@ -304,7 +319,7 @@ When a save does not reach the CMS, **Save draft** reads **Not saved**, with why
 
 A document your role may not change says so, with the way back to its list. An item in the trash reads **In trash**, with who deleted it and when, **Restore** and the way to the trash. An address that names no document, like an article deleted for good, offers its list and the search.
 
-Under the title, **Edit** shows the fields and **Versions** counts the saved versions. At the other end of that row, **Live Preview** puts the site beside the fields and **Info** lists the document's owner, where you can pick another, its page, and when it was created, last updated and last published.
+Under the title, **Edit** shows the fields and **Versions** counts the saved versions. At the other end of that row, **Live Preview** puts the site beside the fields and **Info** lists the document's owner, where you can pick another, its page, when it was created, last updated and last published, and the old addresses that [redirect](#redirects) to it, each with a button that removes it and **Undo** on the message that follows.
 
 - **Edit** lays the fields out with their [layout](/docs/cms/fields#layout): tabs over the fields, rows side by side, collapsible sections, and the fields marked `position: 'sidebar'` in a column on the right. A document with no sidebar fields gives the main column the full width.
 - **Versions** lists every saved version, newest first and ten to a page, with where it stood and who saved it. **Compare** opens a version beside the current draft, side by side or inline, and **Only changed fields** hides the fields they share. The other versions are listed beside it to compare with instead. **Restore this version** asks first, then makes that version the draft, which you [publish](/docs/cms/editing/drafts) as usual. The draft you had stays under Versions, and **Undo** on the message that follows brings it back until you change the draft again.

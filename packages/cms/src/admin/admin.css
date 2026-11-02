@@ -5846,6 +5846,133 @@
         }
     }
 
+    /* Redirects: one row per address, split by hairlines like Trash, with no fill behind them. */
+    .k-redirects__rows {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .k-redirects__row {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.6fr) 88px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 16px;
+        min-height: 58px;
+        padding: 8px 0;
+        box-shadow: inset 0 -1px 0 var(--k-line);
+        font-size: 13.5px;
+        color: var(--k-ink);
+    }
+
+    .k-redirects__row--head {
+        min-height: 36px;
+        font-size: 12.5px;
+        color: var(--k-muted);
+    }
+
+    .k-redirects__from {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        color: var(--k-muted);
+    }
+
+    .k-redirects__open {
+        display: flex;
+        min-width: 0;
+        padding: 0;
+        border: 0;
+        background: none;
+        font: inherit;
+        color: var(--k-ink);
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .k-redirects__open:hover {
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+
+    .k-redirects__to {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .k-redirects__detail {
+        font-size: 12.5px;
+        color: var(--k-muted);
+    }
+
+    .k-redirects__status {
+        color: var(--k-muted);
+    }
+
+    .k-redirects__by {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        color: var(--k-muted);
+    }
+
+    .k-redirects__actions {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    @media (max-width: 720px) {
+        .k-redirects__row {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+        }
+
+        .k-redirects__status,
+        .k-redirects__by,
+        .k-redirects__row--head > :nth-child(3),
+        .k-redirects__row--head > :nth-child(4) {
+            display: none;
+        }
+    }
+
+    .k-redirect-dialog {
+        width: min(560px, calc(100vw - 32px));
+    }
+
+    .k-redirect-dialog__body {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-top: 14px;
+    }
+
+    .k-redirect-dialog__status {
+        align-self: flex-start;
+    }
+
+    /* Delete sits apart from Cancel and Save, at the dialog's left. */
+    .k-redirect-dialog__delete {
+        margin-right: auto;
+    }
+
+    /* An old address under a document's Info, with its remove button at the end. */
+    .k-old-address {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        min-width: 0;
+        font-size: 13px;
+        color: var(--k-ink);
+    }
+
+    .k-old-address__remove {
+        flex: none;
+        width: 24px;
+        height: 24px;
+    }
+
     .k-release-dialog {
         width: min(560px, calc(100vw - 32px));
     }

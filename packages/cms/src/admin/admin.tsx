@@ -12,6 +12,7 @@ import {
     List,
     Menu as MenuIcon,
     Network,
+    Signpost,
     Table2,
     Trash2,
     Users,
@@ -33,6 +34,7 @@ import { CollectionList, PagesList, createItem } from './list.js';
 import { MapScreen } from './map-screen.js';
 import { MediaLibrary } from './media.js';
 import { TrashScreen } from './trash-screen.js';
+import { RedirectsScreen } from './redirects-screen.js';
 import {
     ALL_PLACE,
     CONTENT_GROUP,
@@ -138,6 +140,7 @@ const entryIconOf = (screen: Screen): LucideIcon | undefined => {
     if (screen.kind === 'sites') return Globe;
     if (screen.kind === 'people') return Users;
     if (screen.kind === 'trash') return Trash2;
+    if (screen.kind === 'redirects') return Signpost;
     if (screen.kind === 'map') return Network;
     return undefined;
 };
@@ -294,6 +297,13 @@ export function Admin({ config }: { config: AdminConfig }) {
             return [
                 {
                     label: 'Trash',
+                },
+            ];
+        }
+        if (screen.kind === 'redirects') {
+            return [
+                {
+                    label: 'Redirects',
                 },
             ];
         }
@@ -514,6 +524,7 @@ export function Admin({ config }: { config: AdminConfig }) {
                 />
             );
         }
+        if (screen.kind === 'redirects') return <RedirectsScreen key={screen.site ?? ''} connection={connection} site={screen.site} />;
         if (screen.kind === 'map') return <MapScreen connection={connection} sites={sites} site={screen.site} />;
         if (screen.kind === 'scheduled') return <ScheduledScreen connection={connection} site={screen.site} sites={sites} />;
         if (screen.kind === 'release') return <ReleaseScreen connection={connection} id={screen.id} site={screen.site} sites={sites} />;
