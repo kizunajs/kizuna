@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pluginExportsOf } from 'kizunajs/adapter';
 import type { CmsExports } from './setup.js';
-import { CmsHttpError, type CmsService } from './cms.js';
+import { CmsHttpError, MIGRATION_AUTHOR, type CmsService } from './cms.js';
 import { DEFAULT_SITE, type EnvironmentOptions } from './options.js';
 import { defaultPagesOutput, discoverPages, findAppDir, renderPagesModule } from './discovery.js';
 import { mediaIdsOf, renameImages } from './media/resolve.js';
@@ -11,6 +11,8 @@ import type { MediaRecord } from './media/media.js';
 import { formatRef, type DocumentRef } from './refs.js';
 import { servesCollection } from './page.js';
 import { orphansOf, renameSite, type TableCounts } from './site-storage.js';
+import { movedAddresses, redirectMovedAddresses, type MovedAddress } from './moved-pages.js';
+import { CsvError, importRedirects, type ImportResult } from './redirect-import.js';
 
 /**
  * What the kizuna CLI hands a plugin's commands.
@@ -34,6 +36,7 @@ Commands:
              Store every document at its latest migration step, so reads stop migrating it.
   reindex    Rebuild the index of the ids and images each document holds, which media uses read.
   check      List published content that fails its schema. Exits 1 when there is some.
+             Also lists pages whose path changed in code since they last published.
   pages      List every page's path and name.
   orphans    List stored content nothing in the config claims, per site and table. Exits 1 when there is some.
   rename-page <from> <to>
@@ -42,6 +45,8 @@ Commands:
              Move everything a site stores, with its history, to a new site key.
   push       Copy one page into another environment as a draft, with its media.
   pull       Copy every published page, global and item, with media, into local.
+  import-redirects <file.csv>
+             Redirect each row's from to its to, from a CSV with the columns from,to,status.
 
 Options:
   --json             Print machine-readable output.
@@ -50,7 +55,10 @@ Options:
   --write            pages: also write the pages module the config imports.
   --out <file>       pages --write: where. Default: cms.pages.ts beside the app directory
   --site <name>      push, rename-page: the site the page belongs to, when several apps share the CMS.
+                     import-redirects: the site the redirects belong to.
   --dry-run          rename-site: print what would move, and move nothing.
+                     import-redirects: print what would be written, and write nothing.
+  --redirect         check: redirect each moved page's old address to it.
   --to <env>         push: the target environment. pull: the destination. Default: local
   --from <env>       push: the source environment. Default: local. pull: the source, required.
 `;
@@ -59,7 +67,7 @@ class CliError extends Error {}
 
 type Flags = Record<string, string | boolean>;
 
-const BOOLEAN_FLAGS = ['json', 'write', 'dry-run'];
+const BOOLEAN_FLAGS = ['json', 'write', 'dry-run', 'redirect'];
 
 const parse = (argv: readonly string[]): { command: string | undefined; positional: string[]; flags: Flags } => {
     const flags: Flags = {};
@@ -461,6 +469,54 @@ const runPull = async (context: PluginCliContext, flags: Flags): Promise<Record<
     };
 };
 
+const plural = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`;
+
+/**
+ * What `check` prints about pages that moved in code, naming the site when
+ * the CMS has several.
+ */
+const movedLines = (moved: readonly MovedAddress[], redirected: boolean): string[] => {
+    if (moved.length === 0) return [];
+    const where = (address: MovedAddress): string => (address.site === DEFAULT_SITE ? '' : ` on ${address.site}`);
+    return redirected
+        ? [
+              'Redirected the old addresses of pages that moved in code:',
+              ...moved.map((address) => `  ${address.from}${where(address)} to ${address.ref}, now at ${address.to}`),
+          ]
+        : [
+              'Pages that moved in code since they last published, whose old addresses answer nothing:',
+              ...moved.map((address) => `  ${address.ref}${where(address)}, ${address.from} is now ${address.to}`),
+              'Redirect each old address to its page with kizuna cms check --redirect.',
+          ];
+};
+
+const importLines = (result: ImportResult): string[] => [
+    `${result.dryRun ? 'Would write' : 'Wrote'} ${plural(result.written.length, 'redirect', 'redirects')}, collapsed ${result.collapsed.length}, skipped ${result.skipped.length}.`,
+    ...(result.collapsed.length === 0
+        ? []
+        : [
+              'Collapsed, since their to redirects too:',
+              ...result.collapsed.map((row) => `  line ${row.line}: ${row.from} goes to ${row.target} rather than ${row.to}`),
+          ]),
+    ...(result.skipped.length === 0
+        ? []
+        : ['Skipped:', ...result.skipped.map((row) => `  line ${row.line}: ${row.from === '' ? '(no from)' : row.from}, ${row.detail}`)]),
+];
+
+/**
+ * The site a command works on: `--site`, or the only one there is.
+ */
+const siteOf = (service: CmsService, flags: Flags): string => {
+    const names = service.siteNames();
+    const site = typeof flags['site'] === 'string' ? flags['site'] : DEFAULT_SITE;
+    if (names.length > 0 && !names.includes(site)) {
+        throw new CliError(
+            `${typeof flags['site'] === 'string' ? `No site named '${site}'.` : 'Pass --site <name>.'} Known: ${names.join(', ')}.`
+        );
+    }
+    return site;
+};
+
 /**
  * `kizuna cms …`, as the kizuna CLI delegates it. Returns the exit code.
  */
@@ -511,21 +567,57 @@ export const run = async (argv: readonly string[], context: PluginCliContext): P
             case 'check': {
                 const service = await serviceOf(context);
                 const problems = await service.contentProblems();
+                const redirected = flags['redirect'] === true;
+                const moved = redirected
+                    ? await redirectMovedAddresses(service, MIGRATION_AUTHOR)
+                    : await movedAddresses(service, MIGRATION_AUTHOR);
                 context.stdout(
                     json
-                        ? JSON.stringify(problems, null, 2)
-                        : problems.length === 0
-                          ? 'All published content passes its schema.'
-                          : [
-                                'Published content that fails its schema:',
-                                ...problems.flatMap((problem) => [
-                                    `  ${problem.ref}${problem.serving === undefined ? ', reads as unpublished' : `, visitors see version ${problem.serving}`}`,
-                                    ...problem.issues.map((issue) => `    ${issue}`),
-                                ]),
-                                'Add a migrate step or a default for each field, or fix the content and publish it again.',
-                            ].join('\n')
+                        ? JSON.stringify(
+                              {
+                                  problems,
+                                  moved,
+                                  redirected,
+                              },
+                              null,
+                              2
+                          )
+                        : [
+                              ...(problems.length === 0
+                                  ? ['All published content passes its schema.']
+                                  : [
+                                        'Published content that fails its schema:',
+                                        ...problems.flatMap((problem) => [
+                                            `  ${problem.ref}${problem.serving === undefined ? ', reads as unpublished' : `, visitors see version ${problem.serving}`}`,
+                                            ...problem.issues.map((issue) => `    ${issue}`),
+                                        ]),
+                                        'Add a migrate step or a default for each field, or fix the content and publish it again.',
+                                    ]),
+                              ...movedLines(moved, redirected),
+                          ].join('\n')
                 );
                 return problems.length === 0 ? 0 : 1;
+            }
+            case 'import-redirects': {
+                const file = positional[0];
+                if (file === undefined) throw new CliError('Name the CSV: kizuna cms import-redirects <file.csv>.');
+                const path = resolve(context.cwd, file);
+                if (!existsSync(path)) throw new CliError(`There is no file at ${path}.`);
+                const service = await serviceOf(context);
+                let result: ImportResult;
+                try {
+                    result = await importRedirects(service, readFileSync(path, 'utf8'), {
+                        site: siteOf(service, flags),
+                        author: MIGRATION_AUTHOR,
+                        dryRun: flags['dry-run'] === true,
+                    });
+                } catch (error) {
+                    if (error instanceof CmsHttpError) throw new CliError(error.message);
+                    if (error instanceof CsvError) throw new CliError(error.message);
+                    throw error;
+                }
+                context.stdout(json ? JSON.stringify(result, null, 2) : importLines(result).join('\n'));
+                return 0;
             }
             case 'orphans': {
                 const service = await serviceOf(context);
