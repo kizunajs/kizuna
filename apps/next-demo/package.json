@@ -12,13 +12,13 @@
     "kizuna:check": "kizuna generate --check"
   },
   "dependencies": {
-    "@scalar/nextjs-api-reference": "^0.10.11",
     "@kizunajs-demo/shared": "workspace:*",
-    "kizunajs": "workspace:*",
     "@kizunajs/fetch": "workspace:*",
-    "@kizunajs/next": "workspace:*",
     "@kizunajs/mcp": "workspace:*",
+    "@kizunajs/next": "workspace:*",
     "@kizunajs/openapi": "workspace:*",
+    "@scalar/nextjs-api-reference": "^0.10.20",
+    "kizunajs": "workspace:*",
     "next": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",

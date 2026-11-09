@@ -69,7 +69,7 @@
     "@types/express": "catalog:",
     "express": "catalog:",
     "kizunajs": "workspace:*",
-    "resend": "^6.30.0",
+    "resend": "^6.37.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "zod": "catalog:"

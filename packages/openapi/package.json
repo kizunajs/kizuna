@@ -60,17 +60,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "yaml": "^2.8.4"
+    "yaml": "^2.9.1"
   },
   "peerDependencies": {
     "kizunajs": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "kizunajs": "workspace:*",
     "@kizunajs/express": "workspace:*",
     "@types/express": "catalog:",
     "express": "catalog:",
+    "kizunajs": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "zod": "catalog:"
