@@ -304,9 +304,10 @@ describe('Zod meta() in OpenAPI output', () => {
         );
         expect(spec.components?.schemas?.RawTagged).toBeUndefined();
         const responseSchema = spec.paths['/raw']?.get?.responses['200']?.content?.['application/json']?.schema;
-        expect(responseSchema).not.toEqual({
-            $ref: '#/components/schemas/RawTagged',
+        expect(responseSchema).toMatchObject({
+            type: 'object',
         });
+        expect(responseSchema).not.toHaveProperty('$ref');
     });
 
     it('keeps a described model field as a $ref with its own description', () => {
@@ -335,8 +336,7 @@ describe('Zod meta() in OpenAPI output', () => {
         );
         const operation = spec.paths['/articles/{id}']?.patch;
         const bodySchema = operation?.requestBody?.content?.['application/json']?.schema as
-            | { properties: Record<string, unknown> }
-            | undefined;
+            { properties: Record<string, unknown> } | undefined;
         expect(bodySchema?.properties['status']).toEqual({
             description: 'Set by the editor',
             $ref: '#/components/schemas/ArticleStatus',
@@ -821,8 +821,7 @@ describe('transform field handling', () => {
         }).api;
         const spec = generateJson(contract, baseConfig);
         const properties = spec.paths['/users']?.post?.requestBody?.content?.['application/json']?.schema?.properties as
-            | Record<string, unknown>
-            | undefined;
+            Record<string, unknown> | undefined;
         expect(properties?.['name']).toEqual({
             type: 'string',
         });
@@ -859,8 +858,7 @@ describe('transform field handling', () => {
         }).api;
         const spec = generateJson(contract, baseConfig);
         const schema = spec.paths['/items']?.get?.parameters?.find((parameter) => parameter.name === 'ids')?.schema as
-            | Record<string, unknown>
-            | undefined;
+            Record<string, unknown> | undefined;
         const branches = schema?.anyOf as Array<Record<string, unknown>> | undefined;
         expect(branches?.[1]).toMatchObject({
             type: 'string',
@@ -960,7 +958,7 @@ describe('complex transform edge cases', () => {
         const bodyProps = createBody?.properties as Record<string, unknown>;
 
         expect(bodyProps?.['username']).toEqual({ type: 'string' });
-        expect((bodyProps?.['bio'] as Record<string, unknown>)?.['anyOf']).toMatchObject([{ type: 'string' }, { type: 'null' }]);
+        expect(bodyProps?.['bio']).toEqual({ type: ['string', 'null'] });
         expect(bodyProps?.['tags']).toMatchObject({ type: 'array', items: { type: 'string' } });
         expect((bodyProps?.['metadata'] as Record<string, unknown>)?.['additionalProperties']).toEqual({ type: 'string' });
         expect((bodyProps?.['coords'] as Record<string, unknown>)?.['prefixItems']).toMatchObject([
@@ -973,9 +971,8 @@ describe('complex transform edge cases', () => {
         expect(addressProps?.['street']).toEqual({ type: 'string' });
         expect(addressProps?.['zip']).toEqual({ type: 'string' });
 
-        const extraAllOf = (bodyProps?.['extra'] as Record<string, unknown>)?.['allOf'] as Array<Record<string, unknown>>;
-        const extraSecondProps = extraAllOf?.[1]?.['properties'] as Record<string, unknown>;
-        expect(extraSecondProps?.['label']).toEqual({ type: 'string' });
+        const extraProps = (bodyProps?.['extra'] as Record<string, unknown>)?.['properties'] as Record<string, unknown>;
+        expect(extraProps?.['label']).toEqual({ type: 'string' });
     });
 });
 
@@ -1446,8 +1443,7 @@ describe('deprecation from metadata', () => {
 
     it('marks a deprecated inline response field and leaves its siblings unmarked', () => {
         const responseSchema = spec.paths['/inline']?.get?.responses['200']?.content?.['application/json']?.schema as
-            | Record<string, Record<string, Record<string, unknown>>>
-            | undefined;
+            Record<string, Record<string, Record<string, unknown>>> | undefined;
         expect(responseSchema?.properties?.['name']?.deprecated).toBe(true);
         expect(responseSchema?.properties?.['fullName']?.deprecated).toBeUndefined();
     });
@@ -1510,8 +1506,7 @@ describe('examples from metadata', () => {
 
     it('emits an example array as multiple JSON Schema examples', () => {
         const bodySchema = spec.paths['/events']?.post?.requestBody?.content?.['application/json']?.schema as
-            | Record<string, Record<string, Record<string, unknown>>>
-            | undefined;
+            Record<string, Record<string, Record<string, unknown>>> | undefined;
         expect(bodySchema?.properties?.['name']?.examples).toEqual(['Launch party', 'Board meeting']);
     });
 
@@ -1554,8 +1549,7 @@ describe('brands from metadata', () => {
 
     it('emits the brand on a response field', () => {
         const body = operation?.responses?.['200']?.content?.['application/json']?.schema as
-            | Record<string, Record<string, Record<string, unknown>>>
-            | undefined;
+            Record<string, Record<string, Record<string, unknown>>> | undefined;
         expect(body?.properties?.['id']?.['x-kizuna-brand']).toBe('CenterId');
     });
 
@@ -1867,8 +1861,7 @@ describe('error response media type (RFC 9457)', () => {
             baseConfig
         );
         const errorSchema = deprecatedSpec.paths['/users/{id}']?.get?.responses?.['404']?.content?.['application/problem+json']?.schema as
-            | Record<string, Record<string, Record<string, unknown>>>
-            | undefined;
+            Record<string, Record<string, Record<string, unknown>>> | undefined;
         expect(errorSchema?.properties?.['detail']?.deprecated).toBe(true);
     });
 });
@@ -1937,8 +1930,7 @@ describe('binary response bodies', () => {
 
     it('emits type: string, format: binary under the declared media type', () => {
         const schema = spec.paths['/badge']?.get?.responses?.['200']?.content?.['application/pdf']?.schema as
-            | Record<string, unknown>
-            | undefined;
+            Record<string, unknown> | undefined;
         expect(schema).toEqual({ type: 'string', format: 'binary' });
     });
 });
