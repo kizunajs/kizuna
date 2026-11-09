@@ -61,18 +61,18 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/server": "^2.0.0"
+    "@modelcontextprotocol/server": "^2.4.0"
   },
   "peerDependencies": {
     "kizunajs": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@modelcontextprotocol/client": "^2.0.0",
-    "kizunajs": "workspace:*",
     "@kizunajs/express": "workspace:*",
+    "@modelcontextprotocol/client": "^2.4.0",
     "@types/express": "catalog:",
     "express": "catalog:",
+    "kizunajs": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "zod": "catalog:"

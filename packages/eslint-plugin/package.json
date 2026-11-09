@@ -60,17 +60,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@typescript-eslint/parser": "^8.0.0",
-    "@typescript-eslint/utils": "^8.0.0"
+    "@typescript-eslint/parser": "^8.72.1",
+    "@typescript-eslint/utils": "^8.72.1"
   },
   "peerDependencies": {
     "eslint": ">=9.0.0",
-    "typescript": ">=5.0.0",
-    "kizunajs": "workspace:*"
+    "kizunajs": "workspace:*",
+    "typescript": ">=5.0.0"
   },
   "devDependencies": {
-    "kizunajs": "workspace:*",
     "eslint": "catalog:",
+    "kizunajs": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "zod": "catalog:"

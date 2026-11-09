@@ -10,12 +10,7 @@ export type RequestPart = 'path' | 'query' | 'header' | 'multipart' | 'urlencode
  * A field its part of the request cannot carry.
  */
 export type FieldIssue =
-    | 'unsendablePath'
-    | 'unsendableQuery'
-    | 'unsendableHeader'
-    | 'unsendableForm'
-    | 'binaryFormField'
-    | 'fileInUrlencoded';
+    'unsendablePath' | 'unsendableQuery' | 'unsendableHeader' | 'unsendableForm' | 'binaryFormField' | 'fileInUrlencoded';
 
 export interface FieldViolation {
     issue: FieldIssue;

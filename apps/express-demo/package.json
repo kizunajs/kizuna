@@ -15,14 +15,14 @@
   },
   "dependencies": {
     "@kizunajs-demo/shared": "workspace:*",
-    "kizunajs": "workspace:*",
     "@kizunajs/express": "workspace:*",
     "@kizunajs/fetch": "workspace:*",
     "@kizunajs/mcp": "workspace:*",
     "@kizunajs/openapi": "workspace:*",
     "@kizunajs/resend": "workspace:*",
     "express": "catalog:",
-    "resend": "^6.30.0",
+    "kizunajs": "workspace:*",
+    "resend": "^6.37.0",
     "zod": "catalog:"
   },
   "devDependencies": {

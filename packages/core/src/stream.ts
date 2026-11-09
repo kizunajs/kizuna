@@ -49,8 +49,7 @@ export type StreamMessageOf<Def extends StreamResponseDefinition> =
  * The `body` of a streamed status: an async generator function receiving `{ signal }`, or any async iterable.
  */
 export type StreamBodyOf<Def extends StreamResponseDefinition> =
-    | ((context: StreamContext) => AsyncIterable<StreamChunk<Def>>)
-    | AsyncIterable<StreamChunk<Def>>;
+    ((context: StreamContext) => AsyncIterable<StreamChunk<Def>>) | AsyncIterable<StreamChunk<Def>>;
 
 /**
  * The `body` type of one streamed status, for a generator written outside its handler.

@@ -172,6 +172,23 @@ const normalizeMeta = ({ zodSchema, jsonSchema }: { zodSchema: z.core.$ZodType; 
     delete jsonSchema.id;
 };
 
+const inlineRootRef = (raw: Record<string, unknown>): Record<string, unknown> => {
+    const { $ref: ref, ...rest } = raw;
+    const defs = raw.$defs as Record<string, Record<string, unknown>> | undefined;
+    if (typeof ref !== 'string' || !ref.startsWith(ZOD_DEF_REF_BASE)) return raw;
+    const id = ref.slice(ZOD_DEF_REF_BASE.length);
+    const target = defs?.[id];
+    return target && !globalRegistrySchemas().has(id)
+        ? {
+              ...target,
+              ...rest,
+          }
+        : raw;
+};
+
+const convert = (schema: z.ZodType, io: 'input' | 'output'): Record<string, unknown> =>
+    inlineRootRef(z.toJSONSchema(schema, { unrepresentable: 'any', io, override: normalizeMeta }) as Record<string, unknown>);
+
 const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Record<string, unknown> => {
     const id = readModelSchema(schema) === schema ? readMetaId(schema) : undefined;
     if (id) {
@@ -181,19 +198,13 @@ const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Rec
     }
     const discriminated = readDiscriminatedUnion(schema);
     if (discriminated) {
-        const raw = rewriteRefs(
-            omit(z.toJSONSchema(schema, { unrepresentable: 'any', io, override: normalizeMeta }) as Record<string, unknown>, [
-                '$defs',
-                '$schema',
-            ])
-        ) as Record<string, unknown>;
+        const raw = rewriteRefs(omit(convert(schema, io), ['$defs', '$schema'])) as Record<string, unknown>;
         return {
             ...raw,
             discriminator: buildDiscriminatorBlock(discriminated.discriminator, discriminated.options),
         };
     }
-    const raw = z.toJSONSchema(schema, { unrepresentable: 'any', io, override: normalizeMeta }) as Record<string, unknown>;
-    const result = rewriteRefs(omit(raw, ['$defs', '$schema'])) as Record<string, unknown>;
+    const result = rewriteRefs(omit(convert(schema, io), ['$defs', '$schema'])) as Record<string, unknown>;
     applyFileBinary(schema, result);
     return result;
 };
