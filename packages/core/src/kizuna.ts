@@ -40,10 +40,7 @@ import type {
  * permissions.
  */
 export type RouteAuthValue<Id extends string = string, Identities = Record<string, unknown>> =
-    | Id
-    | false
-    | readonly Id[]
-    | RouteAuthRule<Id, Identities>;
+    Id | false | readonly Id[] | RouteAuthRule<Id, Identities>;
 
 /**
  * The `requires` an identity accepts: a subset of the catalog behind its roles,

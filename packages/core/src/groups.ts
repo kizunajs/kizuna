@@ -57,8 +57,7 @@ export interface GroupSet<Declared extends Record<string, GroupOptions | string>
  */
 export type GroupPaths<Declared> = {
     [Key in Extract<keyof Declared, string>]:
-        | Key
-        | (Declared[Key] extends { groups: infer Nested } ? `${Key}.${GroupPaths<Nested>}` : never);
+        Key | (Declared[Key] extends { groups: infer Nested } ? `${Key}.${GroupPaths<Nested>}` : never);
 }[Extract<keyof Declared, string>];
 
 /**
