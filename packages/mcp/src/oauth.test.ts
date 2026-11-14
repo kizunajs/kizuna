@@ -113,6 +113,14 @@ const user = k.identity
                     detail: 'Invalid or expired token',
                 },
             });
+        if (session.revoked) {
+            deny({
+                status: 401,
+                body: {
+                    detail: 'Token revoked',
+                },
+            });
+        }
         const tokenScopes = session.scope.split(' ');
         return {
             userId: session.userId,
@@ -273,7 +281,7 @@ const contract = defineConfig({
     ],
 }).api;
 
-const TOKENS: Record<string, { userId: string; role: 'employee' | 'admin'; scope: string }> = {
+const TOKENS: Record<string, { userId: string; role: 'employee' | 'admin'; scope: string; revoked?: boolean }> = {
     reader: {
         userId: 'u-reader',
         role: 'employee',
@@ -288,6 +296,12 @@ const TOKENS: Record<string, { userId: string; role: 'employee' | 'admin'; scope
         userId: 'u-admin',
         role: 'admin',
         scope: 'openid users:read users:write report:read',
+    },
+    revoked: {
+        userId: 'u-revoked',
+        role: 'admin',
+        scope: 'openid users:read users:write report:read',
+        revoked: true,
     },
 };
 
@@ -393,6 +407,21 @@ describe('mcpPlugin: oauth', () => {
     it('answers a bad token with 401 and invalid_token', async () => {
         const port = await start();
         const response = await jsonRpc(port, 'garbage', {});
+        expect(response.status).toBe(401);
+        expect(response.headers.get('www-authenticate')).toContain('error="invalid_token"');
+    });
+
+    it('answers a token whose guard calls deny and still returns a context with 401', async () => {
+        const port = await start();
+        const response = await jsonRpc(
+            port,
+            'revoked',
+            toolCall('api_get_user', {
+                params: {
+                    id: '42',
+                },
+            })
+        );
         expect(response.status).toBe(401);
         expect(response.headers.get('www-authenticate')).toContain('error="invalid_token"');
     });

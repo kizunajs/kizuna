@@ -248,6 +248,8 @@ A guard returns the identity's `context`, field for field. Whether that caller m
 
 `deny({ status, body, headers })` answers with [Problem Details](/docs/reference/problem-details-schema), the same shape `throwError` takes in a handler. A `401` carries the `WWW-Authenticate` challenge RFC 9110 requires, named after the identity that denied it. A cookie or API key has no challenge to send, so those answer `403`.
 
+Calling `deny` refuses the request even when the guard goes on to return a context, so a missing `return` cannot let a request through.
+
 ### What a refusal says
 
 A refusal carries `detail` alone until `guardSchema` widens it:

@@ -1093,7 +1093,23 @@ describe('MCP server: guards', () => {
         routes: [{ api: securedRoutes }],
     }).api;
 
-    const makeSecuredApi = () => {
+    type UserGuard = (args: { bearer: { token: string } | null; deny: GuardDeny }) => unknown;
+
+    const tokenGuard: UserGuard = ({ bearer, deny }) => {
+        if (bearer?.token !== 'tok_ada')
+            return deny({
+                status: 401,
+                body: {
+                    detail: 'Unauthorized',
+                },
+            });
+        return {
+            userId: '1',
+            role: 'member',
+        };
+    };
+
+    const makeSecuredApi = (userGuard: UserGuard = tokenGuard) => {
         return assembleApi(securedContract, {
             router: {
                 api: {
@@ -1118,19 +1134,7 @@ describe('MCP server: guards', () => {
                 },
             },
             guards: {
-                user: ({ bearer, deny }: { bearer: { token: string } | null; deny: GuardDeny }) => {
-                    if (bearer?.token !== 'tok_ada')
-                        return deny({
-                            status: 401,
-                            body: {
-                                detail: 'Unauthorized',
-                            },
-                        });
-                    return {
-                        userId: '1',
-                        role: 'member',
-                    };
-                },
+                user: userGuard,
             },
         }) as Parameters<typeof createMcpServer>[0];
     };
@@ -1172,6 +1176,37 @@ describe('MCP server: guards', () => {
         expect(result.isError).toBe(true);
         expect(parsed.status).toBe(401);
         expect(parsed.body.detail).toBe('Unauthorized');
+        await close();
+    });
+
+    it('denies a tool call whose guard calls deny and still returns a context', async () => {
+        const { client, close } = await connectMcpClient(
+            makeSecuredApi(({ deny }) => {
+                deny({
+                    status: 401,
+                    body: {
+                        detail: 'Unauthorized',
+                    },
+                });
+                return {
+                    userId: '1',
+                    role: 'member',
+                };
+            }),
+            {
+                credentialHeaders: {
+                    authorization: 'Bearer tok_ada',
+                },
+            }
+        );
+        const result = await client.callTool({
+            name: 'api_who_am_i',
+            arguments: {},
+        });
+        const content = result.content as Array<{ type: string; text: string }>;
+        const parsed = JSON.parse(content[0]!.text);
+        expect(result.isError).toBe(true);
+        expect(parsed.status).toBe(401);
         await close();
     });
 
