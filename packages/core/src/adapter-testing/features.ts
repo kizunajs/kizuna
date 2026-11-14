@@ -16,7 +16,7 @@ export const ADAPTER_FEATURES = {
         summary: 'An undeclared path is refused.',
     },
     'routing.sharedSegmentParams': {
-        summary: 'Several params in one segment split the way Express 5 splits them.',
+        summary: 'Several params in one segment split at the last separator, so the last param takes what follows it.',
     },
     'routing.sharedSegmentMismatch': {
         summary: 'A path that leaves a param of a shared segment empty is refused.',

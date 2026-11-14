@@ -331,7 +331,7 @@ describe('matchRoute with several params in one segment', () => {
         }),
     });
 
-    it('captures the way Express 5 does', () => {
+    it('gives the last param what follows the last separator', () => {
         expect(matched(matchRoute('GET', '/files/archive.tar.gz', segmentRoutes)).params).toEqual({
             name: 'archive.tar',
             ext: 'gz',
@@ -355,7 +355,7 @@ describe('matchRoute with several params in one segment', () => {
         });
     });
 
-    it('refuses what Express 5 refuses', () => {
+    it('refuses a path that leaves a param empty', () => {
         expect(matchRoute('GET', '/range/a-b-', segmentRoutes).kind).toBe('not-found');
         expect(matchRoute('GET', '/range/-a', segmentRoutes).kind).toBe('not-found');
         expect(matchRoute('GET', '/files/archive.', segmentRoutes).kind).toBe('not-found');

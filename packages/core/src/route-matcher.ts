@@ -37,8 +37,8 @@ const escapeLiteral = (text: string): string => text.replace(REGEX_ESCAPE, '\\$&
  * A param that follows another in the same segment, like `:to` in
  * `/range/:from-:to`. It cannot contain the text between the two, apart from
  * being exactly that text, so a path that fails to match fails in linear time
- * instead of trying every split of the segment. path-to-regexp v8, which
- * Express 5 routes with, compiles it the same way and captures the same values.
+ * instead of trying every split of the segment. So the last param takes what
+ * follows the last separator, and the param before it takes the rest.
  */
 const paramAfter = (separator: string): string => {
     const character =
