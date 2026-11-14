@@ -287,6 +287,26 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             );
         },
 
+        'routing.malformedEscape': async () => {
+            const plain = await api.request({
+                method: 'GET',
+                path: '/users/%E0',
+            });
+            expect(plain.status).toBe(400);
+            await using(
+                {
+                    input: sharedSegmentInput,
+                },
+                async (shared) => {
+                    const response = await shared.request({
+                        method: 'GET',
+                        path: '/range/%E0-b',
+                    });
+                    expect(response.status).toBe(400);
+                }
+            );
+        },
+
         'routing.subRouterComposition': async () => {
             await using(
                 {

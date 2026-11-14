@@ -17,7 +17,16 @@ export interface RouteMatch {
     params: Record<string, string>;
 }
 
-export type MatchResult = { kind: 'matched'; match: RouteMatch } | { kind: 'method-mismatch'; allowed: Method[] } | { kind: 'not-found' };
+/**
+ * `malformed-path` is a path whose params hold a percent-encoding that does not decode (RFC 3986 section 2.1).
+ */
+export type MatchResult =
+    | { kind: 'matched'; match: RouteMatch }
+    | { kind: 'method-mismatch'; allowed: Method[] }
+    | { kind: 'malformed-path' }
+    | { kind: 'not-found' };
+
+export type PathParamsResult = { kind: 'matched'; params: Record<string, string> } | { kind: 'malformed-path' } | { kind: 'not-found' };
 
 const REGEX_ESCAPE = /[.+?^${}()|[\]\\]/g;
 const CHARACTER_CLASS_ESCAPE = /[\\\]^-]/g;
@@ -64,13 +73,36 @@ const compileRoute = (routeKey: string, route: RouteDefinition): CompiledRoute =
     ...compilePath(route.path),
 });
 
-const paramsOf = (paramNames: string[], result: RegExpExecArray): Record<string, string> => {
+const decoded = (text: string): string | undefined => {
+    try {
+        return decodeURIComponent(text);
+    } catch {
+        return undefined;
+    }
+};
+
+/**
+ * Whether a raw pathname holds a percent-encoding that does not decode, like `/users/%E0`.
+ */
+export const isMalformedPath = (pathname: string): boolean => pathname.split('/').some((segment) => decoded(segment) === undefined);
+
+const paramsOf = (paramNames: string[], result: RegExpExecArray): PathParamsResult => {
     const params: Record<string, string> = {};
-    paramNames.forEach((name, index) => {
+    for (const [index, name] of paramNames.entries()) {
         const captured = result[index + 1];
-        if (captured !== undefined) params[name] = decodeURIComponent(captured);
-    });
-    return params;
+        if (captured === undefined) continue;
+        const value = decoded(captured);
+        if (value === undefined) {
+            return {
+                kind: 'malformed-path',
+            };
+        }
+        params[name] = value;
+    }
+    return {
+        kind: 'matched',
+        params,
+    };
 };
 
 export interface SharedSegmentRoute {
@@ -81,10 +113,9 @@ export interface SharedSegmentRoute {
     routerPath: string;
     /**
      * The route's params, read from the request's raw pathname the way
-     * `matchRoute` reads them, or `undefined` when the pathname does not fit
-     * the route.
+     * `matchRoute` reads them.
      */
-    readParams: (pathname: string) => Record<string, string> | undefined;
+    readParams: (pathname: string) => PathParamsResult;
 }
 
 /**
@@ -110,7 +141,12 @@ export const sharedSegmentRoute = (path: string): SharedSegmentRoute | undefined
             // The route's path ends where the pathname does, so a prefix the framework strips, like a mount path, falls outside it.
             const tail = pathname.split('/').slice(1 - pathSegments.length);
             const result = pattern.exec('/' + tail.join('/'));
-            return result ? paramsOf(paramNames, result) : undefined;
+            if (!result) {
+                return {
+                    kind: 'not-found',
+                };
+            }
+            return paramsOf(paramNames, result);
         },
     };
 };
@@ -160,14 +196,18 @@ export const sortFlattenedRoutes = <T extends { route: RouteDefinition }>(routes
     return parsed.map((p) => p.entry);
 };
 
-const toMatch = (candidate: CompiledRoute, result: RegExpExecArray): MatchResult => ({
-    kind: 'matched',
-    match: {
-        routeKey: candidate.routeKey,
-        route: candidate.route,
-        params: paramsOf(candidate.paramNames, result),
-    },
-});
+const toMatch = (candidate: CompiledRoute, result: RegExpExecArray): MatchResult => {
+    const params = paramsOf(candidate.paramNames, result);
+    if (params.kind !== 'matched') return params;
+    return {
+        kind: 'matched',
+        match: {
+            routeKey: candidate.routeKey,
+            route: candidate.route,
+            params: params.params,
+        },
+    };
+};
 
 export const matchRoute = (method: string, pathname: string, routes: Routes, basePath?: string): MatchResult => {
     const target = stripBasePath(pathname, basePath);

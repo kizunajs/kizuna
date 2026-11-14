@@ -21,6 +21,9 @@ export const ADAPTER_FEATURES = {
     'routing.sharedSegmentMismatch': {
         summary: 'A path that leaves a param of a shared segment empty is refused.',
     },
+    'routing.malformedEscape': {
+        summary: 'A param with a percent-encoding that does not decode answers 400.',
+    },
     'routing.subRouterComposition': {
         summary: 'Routes composed from a sub-router mount at their declared path.',
     },
