@@ -75,15 +75,18 @@ const prepareOAuth = (oauth: McpOAuthProps, endpointPath: `/${string}`, api: Api
     };
 };
 
+const isToolCall = (message: unknown): boolean =>
+    message !== null && typeof message === 'object' && (message as { method?: unknown }).method === 'tools/call';
+
 /**
- * The oauth scheme's requirement for the tool a `tools/call` body names, so
+ * The oauth scheme's requirement for the tool a `tools/call` message names, so
  * the challenge speaks about the operation the client is attempting. The
  * route's `roles` and `requires` ride along when the oauth identity is the only one on
  * the route whose roles can satisfy it; otherwise the tool call checks it,
  * with every guard's role in hand.
  */
 const toolCallTarget = (
-    body: unknown,
+    message: unknown,
     enforcement: OAuthEnforcement
 ): {
     scopes: readonly string[];
@@ -91,8 +94,8 @@ const toolCallTarget = (
     requires: RequiredPermissions | undefined;
     params: Record<string, string>;
 } => {
-    if (body !== null && typeof body === 'object' && (body as { method?: unknown }).method === 'tools/call') {
-        const callParams = (body as { params?: { name?: unknown; arguments?: { params?: unknown } } }).params;
+    if (isToolCall(message)) {
+        const callParams = (message as { params?: { name?: unknown; arguments?: { params?: unknown } } }).params;
         const definition = typeof callParams?.name === 'string' ? enforcement.tools.get(callParams.name) : undefined;
         if (definition !== undefined) {
             const requirements = resolveSecurityRequirements(definition.route);
@@ -139,7 +142,16 @@ export const mcpEndpoint = (props: McpPluginProps, api: unknown) => {
             const enforcement = enforcementOf();
             let transportAuth: { scheme: string; context?: Record<string, unknown> } | undefined;
             if (enforcement !== undefined) {
-                const target = toolCallTarget(args.body, enforcement);
+                const calls = (Array.isArray(args.body) ? args.body : [args.body]).filter(isToolCall);
+                if (calls.length > 1) {
+                    return denialResponse({
+                        status: 400,
+                        body: {
+                            detail: 'Send one tools/call per request.',
+                        },
+                    });
+                }
+                const target = toolCallTarget(calls[0], enforcement);
                 const outcome = await enforceOAuth({
                     scheme: enforcement.oauth.scheme,
                     guard: enforcement.guard,
