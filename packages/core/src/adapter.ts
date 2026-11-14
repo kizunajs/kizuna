@@ -213,6 +213,29 @@ export const guardDenyFor = (scheme: SecurityScheme | undefined): GuardDeny<Guar
 export const isGuardDenial = (value: unknown): value is GuardDenial => typeof value === 'object' && value !== null && GUARD_DENY in value;
 
 /**
+ * Run a guard with the `deny` for its scheme. A guard that calls `deny` is
+ * denied whether or not it returns the denial, and a returned denial wins over
+ * one it only called.
+ */
+export const callGuard = async <HandlerContext>(
+    guard: GuardRun<HandlerContext>,
+    scheme: SecurityScheme | undefined,
+    args: Record<string, unknown>
+): Promise<Record<string, unknown> | GuardDenial | void> => {
+    const buildDenial = guardDenyFor(scheme);
+    let calledDenial: GuardDenial | undefined;
+    const result = await guard({
+        ...args,
+        deny: (denial) => {
+            const built = buildDenial(denial);
+            calledDenial ??= built;
+            return built;
+        },
+    } as Parameters<GuardRun<HandlerContext>>[0]);
+    return isGuardDenial(result) ? result : (calledDenial ?? result);
+};
+
+/**
  * The runtime behavior of a guard. It receives one object: the adapter's handler
  * context (e.g. `req`/`res`) plus the credential the identity's method extracted
  * from the request (or `null` if absent), a `deny` helper, and the request
@@ -1427,13 +1450,12 @@ const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
             }
             const schemeDefinition = schemes?.[scheme];
             const credential = schemeDefinition ? extractCredential(schemeDefinition, request as AdapterRequest<unknown>) : {};
-            const guardResult = await guard({
+            const guardResult = await callGuard(guard, schemeDefinition, {
                 ...(handlerContext as Record<string, unknown>),
                 ...credential,
                 params,
-                deny: guardDenyFor(schemeDefinition),
                 ...(hasRequestContext ? { requestContext } : {}),
-            } as Parameters<typeof guard>[0]);
+            });
             if (isGuardDenial(guardResult)) {
                 if (responseValidation) assertDeclaredBody(route, routeKey, guardResult.status, guardResult.body);
                 return {

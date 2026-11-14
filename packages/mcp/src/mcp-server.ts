@@ -25,7 +25,7 @@ import {
     withPermissions,
     type GuardDenialBody,
     resolveSecurityRequirements,
-    guardDenyFor,
+    callGuard,
     isGuardDenial,
 } from 'kizunajs/adapter';
 import { contractOf } from 'kizunajs/adapter';
@@ -436,13 +436,12 @@ const runGuards = async (
         }
         const schemeDefinition = schemes?.[scheme];
         const credential = schemeDefinition ? extractCredential(schemeDefinition, credentialRequest) : {};
-        const guardResult = await guard({
+        const guardResult = await callGuard(guard, schemeDefinition, {
             ...(handlerContext ?? {}),
             ...credential,
             params,
-            deny: guardDenyFor(schemeDefinition),
             ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
-        } as Parameters<typeof guard>[0]);
+        });
         if (isGuardDenial(guardResult)) {
             return {
                 ok: false,
