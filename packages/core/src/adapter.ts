@@ -1378,6 +1378,119 @@ const streamToolsFor = <NativeRequest, HandlerContext, ResponseContext>(
         },
     });
 
+export interface GateInput {
+    routeKey: string;
+    route: RouteDefinition;
+    params: Record<string, string>;
+    request: AdapterRequest<unknown>;
+    handlerContext: unknown;
+    guards: GuardMap<unknown> | undefined;
+    schemes: Record<string, SecurityScheme> | undefined;
+    contextResolvers: RequestContextMap<unknown> | undefined;
+    responseValidation: boolean | undefined;
+}
+
+export type GateResult =
+    | Extract<AdapterResult, { kind: 'guard-denied' }>
+    | {
+          kind: 'allowed';
+          requestContext: Record<string, unknown>;
+          securityContext: Record<string, unknown>;
+      };
+
+/**
+ * Everything that decides whether a caller reaches a route's handler: the
+ * request context, each identity's guard, and the route's roles and `requires`.
+ */
+export const runGate = async ({
+    routeKey,
+    route,
+    params,
+    request,
+    handlerContext,
+    guards,
+    schemes,
+    contextResolvers,
+    responseValidation,
+}: GateInput): Promise<GateResult> => {
+    const requestContext: Record<string, unknown> = {};
+    if (contextResolvers) {
+        for (const [name, resolver] of Object.entries(contextResolvers)) {
+            requestContext[name] = await resolver({
+                ...(handlerContext as Record<string, unknown>),
+                params,
+                headers: request.headers as Record<string, string | string[] | undefined>,
+            } as Parameters<typeof resolver>[0]);
+        }
+    }
+
+    const hasRequestContext = Object.keys(requestContext).length > 0;
+
+    const securityContext: Record<string, unknown> = {};
+    for (const { scheme } of resolveSecurityRequirements(route)) {
+        const guard = guards?.[scheme];
+        if (!guard) {
+            throw new Error(`No guard registered for security scheme "${scheme}" required by route "${routeKey}".`);
+        }
+        const schemeDefinition = schemes?.[scheme];
+        const credential = schemeDefinition ? extractCredential(schemeDefinition, request) : {};
+        const guardResult = await guard({
+            ...(handlerContext as Record<string, unknown>),
+            ...credential,
+            params,
+            deny: guardDenyFor(schemeDefinition),
+            ...(hasRequestContext ? { requestContext } : {}),
+        } as Parameters<typeof guard>[0]);
+        if (isGuardDenial(guardResult)) {
+            if (responseValidation) assertDeclaredBody(route, routeKey, guardResult.status, guardResult.body);
+            return {
+                kind: 'guard-denied',
+                status: guardResult.status,
+                body: guardResult.body,
+                headers: guardResult.headers,
+            };
+        }
+        if (guardResult && typeof guardResult === 'object') {
+            securityContext[scheme] = withPermissions(scheme, schemeDefinition, guardResult);
+        }
+    }
+    const accessCheck = {
+        roles: route.roles,
+        requires: route.requires,
+        requiredSchemes: resolveSecurityRequirements(route).map((requirement) => requirement.scheme),
+        schemes,
+        securityContext,
+    };
+    const forbidden = requiresDenial(accessCheck);
+    if (forbidden !== undefined) {
+        const missingScope = insufficientScope(accessCheck);
+        const resourceMetadata = accessCheck.requiredSchemes
+            .map((scheme) => schemes?.[scheme]?.resourceMetadata)
+            .find((url) => url !== undefined);
+        return {
+            kind: 'guard-denied',
+            status: 403,
+            body: requiresDenialBody(route, forbidden),
+            ...(missingScope.length > 0
+                ? {
+                      headers: {
+                          'www-authenticate': bearerChallenge({
+                              error: 'insufficient_scope',
+                              scope: missingScope.join(' '),
+                              resource_metadata: resourceMetadata,
+                          }),
+                      },
+                  }
+                : {}),
+        };
+    }
+    return {
+        kind: 'allowed',
+        requestContext,
+        securityContext,
+    };
+};
+
 const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
     invocation: Invocation<NativeRequest, HandlerContext, ResponseContext>
 ): Promise<AdapterResult> => {
@@ -1405,78 +1518,20 @@ const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
 
     try {
         const handlerContext = await invocation.handlerContext();
-
-        const requestContext: Record<string, unknown> = {};
-        if (contextResolvers) {
-            for (const [name, resolver] of Object.entries(contextResolvers)) {
-                requestContext[name] = await resolver({
-                    ...(handlerContext as Record<string, unknown>),
-                    params,
-                    headers: request.headers as Record<string, string | string[] | undefined>,
-                } as Parameters<typeof resolver>[0]);
-            }
-        }
-
-        const hasRequestContext = Object.keys(requestContext).length > 0;
-
-        const securityContext: Record<string, unknown> = {};
-        for (const { scheme } of resolveSecurityRequirements(route)) {
-            const guard = guards?.[scheme];
-            if (!guard) {
-                throw new Error(`No guard registered for security scheme "${scheme}" required by route "${routeKey}".`);
-            }
-            const schemeDefinition = schemes?.[scheme];
-            const credential = schemeDefinition ? extractCredential(schemeDefinition, request as AdapterRequest<unknown>) : {};
-            const guardResult = await guard({
-                ...(handlerContext as Record<string, unknown>),
-                ...credential,
-                params,
-                deny: guardDenyFor(schemeDefinition),
-                ...(hasRequestContext ? { requestContext } : {}),
-            } as Parameters<typeof guard>[0]);
-            if (isGuardDenial(guardResult)) {
-                if (responseValidation) assertDeclaredBody(route, routeKey, guardResult.status, guardResult.body);
-                return {
-                    kind: 'guard-denied',
-                    status: guardResult.status,
-                    body: guardResult.body,
-                    headers: guardResult.headers,
-                };
-            }
-            if (guardResult && typeof guardResult === 'object') {
-                securityContext[scheme] = withPermissions(scheme, schemeDefinition, guardResult);
-            }
-        }
-        const accessCheck = {
-            roles: route.roles,
-            requires: route.requires,
-            requiredSchemes: resolveSecurityRequirements(route).map((requirement) => requirement.scheme),
+        const gate = await runGate({
+            routeKey,
+            route,
+            params,
+            request: request as AdapterRequest<unknown>,
+            handlerContext,
+            guards: guards as GuardMap<unknown> | undefined,
             schemes,
-            securityContext,
-        };
-        const forbidden = requiresDenial(accessCheck);
-        if (forbidden !== undefined) {
-            const missingScope = insufficientScope(accessCheck);
-            const resourceMetadata = accessCheck.requiredSchemes
-                .map((scheme) => schemes?.[scheme]?.resourceMetadata)
-                .find((url) => url !== undefined);
-            return {
-                kind: 'guard-denied',
-                status: 403,
-                body: requiresDenialBody(route, forbidden),
-                ...(missingScope.length > 0
-                    ? {
-                          headers: {
-                              'www-authenticate': bearerChallenge({
-                                  error: 'insufficient_scope',
-                                  scope: missingScope.join(' '),
-                                  resource_metadata: resourceMetadata,
-                              }),
-                          },
-                      }
-                    : {}),
-            };
-        }
+            contextResolvers: contextResolvers as RequestContextMap<unknown> | undefined,
+            responseValidation,
+        });
+        if (gate.kind === 'guard-denied') return gate;
+        const { requestContext, securityContext } = gate;
+        const hasRequestContext = Object.keys(requestContext).length > 0;
 
         const throwError = (response: { status: number; body: unknown; headers?: ResponseHeaders }): never => {
             throw new ResponseError(response);

@@ -27,6 +27,7 @@
         "resend",
         "---Tooling---",
         "cli",
+        "testing",
         "eslint",
         "breaking-changes",
         "---Build your own---",

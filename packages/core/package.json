@@ -101,6 +101,16 @@
         "types": "./dist/jobs-entry.d.cts",
         "default": "./dist/jobs-entry.cjs"
       }
+    },
+    "./testing": {
+      "import": {
+        "types": "./dist/testing.d.mts",
+        "default": "./dist/testing.mjs"
+      },
+      "require": {
+        "types": "./dist/testing.d.cts",
+        "default": "./dist/testing.cjs"
+      }
     }
   },
   "kizuna": {
@@ -111,7 +121,8 @@
       "./plugin": "client",
       "./generator": "client",
       "./adapter": "server",
-      "./jobs": "server"
+      "./jobs": "server",
+      "./testing": "server"
     }
   },
   "files": [
@@ -126,7 +137,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/adapter.ts src/jobs-entry.ts src/plugin.ts src/generator.ts src/schemas.ts src/authoring-names.ts --format esm,cjs --dts --clean",
+    "build": "tsdown src/index.ts src/adapter.ts src/jobs-entry.ts src/plugin.ts src/generator.ts src/schemas.ts src/authoring-names.ts src/testing.ts --format esm,cjs --dts --clean",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {

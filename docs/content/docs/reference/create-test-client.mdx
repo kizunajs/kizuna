@@ -1,0 +1,52 @@
+---
+title: createTestClient()
+description: Call an api's routes from a test through the whole request pipeline, and check who may call each one.
+---
+
+See the [testing guide](/docs/testing) for usage.
+
+```ts
+import { accessMatrix, createTestClient } from 'kizunajs/testing';
+```
+
+## createTestClient
+
+```ts
+createTestClient(config, options?): TestClient
+```
+
+| Parameter         | Type                   | Required | Description                                                                        |
+| ----------------- | ---------------------- | -------- | ---------------------------------------------------------------------------------- |
+| `config`          | `{ api }`              | Yes      | What `defineConfig` returns                                                        |
+| `options.plugins` | partial plugin exports | No       | Replaces what handlers receive under `plugins`, keyed by slug. The rest stays real |
+| `options.jobs`    | partial job tree       | No       | Replaces what handlers receive under `jobs`. The rest runs the real job            |
+
+The client has one method per route, nested the way your groups are. Each takes `{ params, query, body, headers }`, whichever the route declares, and answers `{ status, body, headers }`. Besides the declared statuses, a call can answer the `400` kizuna sends for invalid input and the `401` and `403` a guarded route's guards send.
+
+A call throws when the route answers a status it does not declare, a body its schema rejects, or a field its schema does not declare.
+
+### as
+
+```ts
+api.as(identity, result): TestClient
+```
+
+| Parameter  | Type                    | Description                                   |
+| ---------- | ----------------------- | --------------------------------------------- |
+| `identity` | an identity name        | One of the identities the config declares     |
+| `result`   | what that guard returns | The context and `role` the guard would return |
+
+Returns a client that calls as that identity. Its guard is skipped, and the route's roles and `requires` still run. Chain it for a route that requires several identities.
+
+## accessMatrix
+
+```ts
+accessMatrix(config, callers): Promise<Record<string, Record<string, number | 'allowed'>>>
+```
+
+| Parameter | Type                                           | Description                                      |
+| --------- | ---------------------------------------------- | ------------------------------------------------ |
+| `config`  | `{ api }`                                      | What `defineConfig` returns                      |
+| `callers` | `Record<string, { [identity]: guard result }>` | Each caller, named, with the identities it holds |
+
+Runs the guards, roles and `requires` of every route for each caller and for `anonymous`, a caller with no credential, without running a handler. Returns one row per route, keyed by its dotted name, with the status each caller meets or `allowed`. Throws when the api has no routes.

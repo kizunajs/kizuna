@@ -1,0 +1,163 @@
+---
+title: Testing
+description: Call your routes from a test through the whole request pipeline, as any caller, with no server and no tokens.
+---
+
+A route already declares its inputs, its responses and who may call it. `createTestClient` turns that into tests: it calls your routes the way the generated clients do, through routing, Zod parsing, the guards, roles and `requires`, and the Problem Details every error carries. Nothing listens on a port.
+
+## Create a client
+
+Pass it the config `kizuna generate` reads:
+
+```ts title="src/users.test.ts"
+import { createTestClient } from 'kizunajs/testing';
+import config from '../kizuna.config';
+
+const api = createTestClient(config);
+```
+
+A call takes what the generated client takes and answers `{ status, body, headers }`. Checking `status` narrows `body` to that status's schema:
+
+```ts
+const response = await api.users.getUser({
+    params: {
+        id: '1',
+    },
+});
+
+expect(response).toMatchObject({
+    status: 200,
+    body: {
+        name: 'Ada',
+    },
+});
+```
+
+The body is what arrives over JSON, so a `z.date()` field is its ISO string. A streamed response answers its `body` as the `ReadableStream` a client reads.
+
+## Call as someone
+
+`as` names an identity and what its guard would return. The guard is skipped, and the route's roles and `requires` still run, so a role the route refuses gets the same `403` a real caller would:
+
+```ts
+const response = await api
+    .as('user', {
+        userId: '1',
+    })
+    .users.deleteUser({
+        params: {
+            id: '2',
+        },
+    });
+```
+
+Chain `as` for a route that requires several identities. Without it, every guard runs with no credential, which is how you test the `401`. A credential sent in `headers` reaches the real guard.
+
+## What fails a test
+
+A call throws when its route answers something it does not declare:
+
+- **A status** missing from `responses`.
+- **A body** its schema rejects.
+- **A field** its schema does not declare, such as a `passwordHash` left on the object a handler returns.
+
+The error names the route and what it answered, so the failing test points at the handler.
+
+## Replace plugins and jobs
+
+`plugins` and `jobs` replace what handlers receive under those names. Anything you leave out stays real:
+
+```ts
+const send = vi.fn();
+const queue = vi.fn();
+
+const api = createTestClient(config, {
+    plugins: {
+        email: {
+            send,
+        },
+    },
+    jobs: {
+        users: {
+            indexUser: {
+                queue,
+            },
+        },
+    },
+});
+```
+
+A service a handler imports itself is mocked the way you mock any module, with `vi.mock`.
+
+## Check who may call every route
+
+`accessMatrix` runs the gate, the guards, roles and `requires`, for every route as each caller you name, plus one with no credential. No handler runs. Snapshot the result, so a change to who may call a route shows up in review:
+
+```ts title="src/access.test.ts"
+import { accessMatrix } from 'kizunajs/testing';
+import config from '../kizuna.config';
+
+test('who may call each route', async () => {
+    expect(
+        await accessMatrix(config, {
+            ada: {
+                user: {
+                    userId: '1',
+                },
+            },
+            owner: {
+                member: {
+                    workspaceUserId: '1',
+                    role: 'owner',
+                },
+            },
+        })
+    ).toMatchSnapshot();
+});
+```
+
+Each route gets a row, with the status each caller meets or `allowed`:
+
+```ts
+'users.deleteUser': {
+    anonymous: 401,
+    ada: 401,
+    owner: 'allowed',
+},
+```
+
+A route that forgot a role, or one opened to everyone, shows up as a changed row. The table covers the gate alone, so a rule a handler applies itself, like "only your own invoices", needs a test of its own.
+
+## A database transaction per test
+
+Handlers import their database, so the rollback lives in your database module. Keep the test's transaction in an `AsyncLocalStorage`, and every query a handler runs during the call goes through it:
+
+```ts title="src/db.ts"
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+export const testTransaction = new AsyncLocalStorage<Database>();
+
+export const db = (): Database => testTransaction.getStore() ?? pool;
+```
+
+```ts title="src/users.test.ts"
+test('createUser stores the user', async () => {
+    await pool.transaction(async (transaction) => {
+        await testTransaction.run(transaction, async () => {
+            await api
+                .as('user', {
+                    userId: '1',
+                })
+                .users.createUser({
+                    body: {
+                        name: 'Ada',
+                        email: 'ada@example.com',
+                    },
+                });
+        });
+        await transaction.rollback();
+    });
+});
+```
+
+See [`createTestClient`](/docs/reference/create-test-client) for every option.
