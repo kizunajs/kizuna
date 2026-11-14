@@ -26,6 +26,7 @@ import {
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
+    sharedSegmentRoute,
     type Adapter,
 } from 'kizunajs/adapter';
 import type { SecurityScheme } from 'kizunajs';
@@ -54,6 +55,10 @@ declare global {
     namespace Express {
         interface Request {
             kizunaRoute?: RouteDefinition;
+            /**
+             * The params of a route with several params in one segment, read by kizuna's matcher.
+             */
+            kizunaParams?: Record<string, string>;
             /**
              * The body as it was sent, kept by {@link keepRawBody}.
              */
@@ -253,9 +258,18 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
     ): void => {
         const method = route.method.toLowerCase() as 'get' | 'head' | 'post' | 'put' | 'patch' | 'delete' | 'options';
         const parseBody = bodyParserFor(route, options?.json);
+        const shared = sharedSegmentRoute(route.path);
         expressRouter[method](
             route.path,
             (req: Request, _res: Response, next: NextFunction) => {
+                if (shared) {
+                    const params = shared.readParams(req.path);
+                    if (params === undefined) {
+                        next('route');
+                        return;
+                    }
+                    req.kizunaParams = params;
+                }
                 req.kizunaRoute = route;
                 next();
             },
@@ -268,7 +282,7 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
                         kind: 'pre-resolved',
                         routeKey,
                         route,
-                        params: req.params as Record<string, string>,
+                        params: req.kizunaParams ?? (req.params as Record<string, string>),
                     },
                     query: req.query,
                     headers: req.headers,

@@ -27,6 +27,7 @@ import {
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
+    sharedSegmentRoute,
     type Adapter,
 } from 'kizunajs/adapter';
 import type { SecurityScheme } from 'kizunajs';
@@ -56,6 +57,10 @@ export interface FastifyHandlerContext {
 declare module 'fastify' {
     interface FastifyRequest {
         kizunaRoute?: RouteDefinition;
+        /**
+         * The params of a route with several params in one segment, read by kizuna's matcher.
+         */
+        kizunaParams?: Record<string, string>;
         /**
          * The body as it was sent, kept for routes with `rawBody: true`.
          */
@@ -221,9 +226,24 @@ export const fastifyKizuna = fastifyPlugin(
             resolvedRouter: CoreRouter<Routes, FastifyHandlerContext>,
             method: Method = route.method
         ): void => {
+            const shared = sharedSegmentRoute(route.path);
             app.route({
                 method,
                 url: route.path,
+                ...(shared
+                    ? {
+                          onRequest: [
+                              async (request: FastifyRequest, reply: FastifyReply) => {
+                                  const params = shared.readParams(request.url.split('?', 1)[0]!);
+                                  if (params === undefined) {
+                                      reply.callNotFound();
+                                      return reply;
+                                  }
+                                  request.kizunaParams = params;
+                              },
+                          ],
+                      }
+                    : {}),
                 preHandler: [
                     async (request: FastifyRequest) => {
                         request.kizunaRoute = route;
@@ -242,7 +262,7 @@ export const fastifyKizuna = fastifyPlugin(
                             kind: 'pre-resolved',
                             routeKey,
                             route,
-                            params: (request.params ?? {}) as Record<string, string>,
+                            params: request.kizunaParams ?? ((request.params ?? {}) as Record<string, string>),
                         },
                         query: (request.query ?? {}) as Record<string, string>,
                         headers: request.headers,

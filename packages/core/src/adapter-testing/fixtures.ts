@@ -1026,6 +1026,71 @@ export const methodInput = {
 
 export const methodContract = defineConfig(methodInput).api;
 
+/**
+ * Routes with several params in one segment.
+ */
+export const sharedSegmentRoutes = k.routes({
+    getRange: k
+        .route({
+            method: 'GET',
+            path: '/range/:from-:to',
+            responses: {
+                200: z.object({
+                    from: z.string(),
+                    to: z.string(),
+                }),
+            },
+        })
+        .handler(({ params }) => ({
+            status: 200,
+            body: {
+                from: params.from,
+                to: params.to,
+            },
+        })),
+    getFile: k
+        .route({
+            method: 'GET',
+            path: '/files/:name.:ext',
+            responses: {
+                200: z.object({
+                    name: z.string(),
+                    ext: z.string(),
+                }),
+            },
+        })
+        .handler(({ params }) => ({
+            status: 200,
+            body: {
+                name: params.name,
+                ext: params.ext,
+            },
+        })),
+    getSpan: k
+        .route({
+            method: 'GET',
+            path: '/span/:start-to-:end',
+            responses: {
+                200: z.object({
+                    start: z.string(),
+                    end: z.string(),
+                }),
+            },
+        })
+        .handler(({ params }) => ({
+            status: 200,
+            body: {
+                start: params.start,
+                end: params.end,
+            },
+        })),
+});
+
+export const sharedSegmentInput = {
+    ...config,
+    routes: [sharedSegmentRoutes],
+};
+
 const probePlugin = definePlugin({
     slug: 'probe',
     options: z.object({

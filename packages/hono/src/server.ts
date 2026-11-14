@@ -1,4 +1,4 @@
-import type { Context, Env, Hono, MiddlewareHandler } from 'hono';
+import type { Context, Env, Hono, MiddlewareHandler, Next } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import {
     type AdapterRequest,
@@ -22,6 +22,7 @@ import {
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
+    sharedSegmentRoute,
     type Adapter,
     renderJsonResult,
     parseFetchBody,
@@ -119,8 +120,14 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
         resolvedRouter: CoreRouter<Routes, HonoHandlerContext<Env>>
     ): void => {
         const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete' | 'options';
-        const kizunaHandler = async (c: Context<E>) => {
+        const shared = sharedSegmentRoute(route.path);
+        const kizunaHandler = async (c: Context<E>, next: Next) => {
             const url = new URL(c.req.url);
+            const params = shared ? shared.readParams(url.pathname) : (c.req.param() as Record<string, string>);
+            if (params === undefined) {
+                await next();
+                return;
+            }
 
             const adapterRequest: AdapterRequest<Request> = {
                 request: c.req.raw,
@@ -129,7 +136,7 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
                     kind: 'pre-resolved',
                     routeKey,
                     route,
-                    params: c.req.param() as Record<string, string>,
+                    params,
                 },
                 query: entriesToObject(url.searchParams),
                 headers: headersToObject(c.req.raw.headers),
@@ -156,7 +163,7 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
         };
         (app.on as (method: string, path: string, ...handlers: MiddlewareHandler[]) => void)(
             method,
-            route.path,
+            shared?.routerPath ?? route.path,
             kizunaHandler as MiddlewareHandler
         );
     };
