@@ -497,6 +497,36 @@ describe('mcpPlugin: oauth', () => {
         expect(challenge).toContain('resource_metadata="https://api.example.com/.well-known/oauth-protected-resource/mcp"');
     });
 
+    it('answers a scope shortfall inside a batch with 403', async () => {
+        const port = await start();
+        const response = await jsonRpc(port, 'reader', [
+            toolCall('api_create_user', {
+                body: {
+                    name: 'Ada',
+                },
+            }),
+        ]);
+        expect(response.status).toBe(403);
+        expect(response.headers.get('www-authenticate')).toContain('error="insufficient_scope"');
+    });
+
+    it('refuses a batch with more than one tool call with 400', async () => {
+        const port = await start();
+        const response = await jsonRpc(port, 'admin', [
+            toolCall('api_get_user', {
+                params: {
+                    id: '1',
+                },
+            }),
+            toolCall('api_get_user', {
+                params: {
+                    id: '2',
+                },
+            }),
+        ]);
+        expect(response.status).toBe(400);
+    });
+
     it('runs a tool the token has the scopes for', async () => {
         const port = await start();
         const connected = await connect(port, 'writer');
