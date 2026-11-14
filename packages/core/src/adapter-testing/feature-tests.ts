@@ -14,6 +14,7 @@ import {
     responseShapeInput,
     securedInput,
     sessionAuthorization,
+    sharedSegmentInput,
     signedBodyText,
     subUserInput,
     userInput,
@@ -227,6 +228,63 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 path: '/not-a-declared-route',
             });
             expect(response.status).toBe(404);
+        },
+
+        'routing.sharedSegmentParams': async () => {
+            const cases = {
+                '/range/a-b-c': {
+                    from: 'a-b',
+                    to: 'c',
+                },
+                '/range/2024-01-2024-02': {
+                    from: '2024-01-2024',
+                    to: '02',
+                },
+                '/range/a%2Db-c': {
+                    from: 'a-b',
+                    to: 'c',
+                },
+                '/files/archive.tar.gz': {
+                    name: 'archive.tar',
+                    ext: 'gz',
+                },
+                '/span/a-to-b-to-c': {
+                    start: 'a-to-b',
+                    end: 'c',
+                },
+            };
+            await using(
+                {
+                    input: sharedSegmentInput,
+                },
+                async (shared) => {
+                    for (const [path, params] of Object.entries(cases)) {
+                        const response = await shared.request({
+                            method: 'GET',
+                            path,
+                        });
+                        expect(response.status, path).toBe(200);
+                        expect(response.body, path).toEqual(params);
+                    }
+                }
+            );
+        },
+
+        'routing.sharedSegmentMismatch': async () => {
+            await using(
+                {
+                    input: sharedSegmentInput,
+                },
+                async (shared) => {
+                    for (const path of ['/range/a-b-', '/range/-a', '/files/archive.']) {
+                        const response = await shared.request({
+                            method: 'GET',
+                            path,
+                        });
+                        expect(response.status, path).toBe(404);
+                    }
+                }
+            );
         },
 
         'routing.subRouterComposition': async () => {

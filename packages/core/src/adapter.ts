@@ -674,8 +674,8 @@ export { groupRoutes } from './routes.js';
 export { isGroupSet } from './groups.js';
 export { ResponseError } from './response-error.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
-export type { MatchResult, RouteMatch } from './route-matcher.js';
-export { matchRoute } from './route-matcher.js';
+export type { MatchResult, RouteMatch, SharedSegmentRoute } from './route-matcher.js';
+export { matchRoute, sharedSegmentRoute } from './route-matcher.js';
 export { type ApiRouter } from './server-surface.js';
 
 export type RouteMatcher = (method: string, path: string, routes: Routes, basePath?: string) => MatchResult;

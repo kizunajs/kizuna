@@ -15,6 +15,12 @@ export const ADAPTER_FEATURES = {
     'routing.notFound': {
         summary: 'An undeclared path is refused.',
     },
+    'routing.sharedSegmentParams': {
+        summary: 'Several params in one segment split the way Express 5 splits them.',
+    },
+    'routing.sharedSegmentMismatch': {
+        summary: 'A path that leaves a param of a shared segment empty is refused.',
+    },
     'routing.subRouterComposition': {
         summary: 'Routes composed from a sub-router mount at their declared path.',
     },
