@@ -674,8 +674,8 @@ export { groupRoutes } from './routes.js';
 export { isGroupSet } from './groups.js';
 export { ResponseError } from './response-error.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
-export type { MatchResult, RouteMatch, SharedSegmentRoute } from './route-matcher.js';
-export { matchRoute, sharedSegmentRoute } from './route-matcher.js';
+export type { MatchResult, PathParamsResult, RouteMatch, SharedSegmentRoute } from './route-matcher.js';
+export { isMalformedPath, matchRoute, sharedSegmentRoute } from './route-matcher.js';
 export { type ApiRouter } from './server-surface.js';
 
 export type RouteMatcher = (method: string, path: string, routes: Routes, basePath?: string) => MatchResult;
@@ -686,11 +686,15 @@ export interface AdapterRequest<NativeRequest> {
     /**
      * - `core-match`: core matches the path against the routes (Next-style catch-all routing).
      * - `pre-resolved`: adapter has already routed the request and tells core which route was matched (Express-style per-route registration).
+     * - `malformed-path`: adapter has routed the request, but its params hold a percent-encoding that does not decode.
      */
     resolution:
         | {
               kind: 'core-match';
               path: string;
+          }
+        | {
+              kind: 'malformed-path';
           }
         | {
               kind: 'pre-resolved';
@@ -717,6 +721,9 @@ export interface AdapterRequest<NativeRequest> {
 export type AdapterResult =
     | {
           kind: 'not-found';
+      }
+    | {
+          kind: 'malformed-path';
       }
     | {
           kind: 'method-not-allowed';
@@ -988,7 +995,18 @@ const resolveRoute = (
             },
         };
     }
-    const matched = matcher(request.method, request.resolution.path, routes, basePath);
+    const matched =
+        request.resolution.kind === 'malformed-path'
+            ? request.resolution
+            : matcher(request.method, request.resolution.path, routes, basePath);
+    if (matched.kind === 'malformed-path') {
+        return {
+            ok: false,
+            result: {
+                kind: 'malformed-path',
+            },
+        };
+    }
     if (matched.kind === 'not-found') {
         return {
             ok: false,
@@ -1061,6 +1079,7 @@ const withDeprecationHeaders = (result: AdapterResult, route: RouteDefinition): 
     switch (result.kind) {
         case 'raw-response':
         case 'not-found':
+        case 'malformed-path':
         case 'method-not-allowed':
             return result;
         default: {
@@ -1087,6 +1106,7 @@ const statusOf = (result: AdapterResult): number | undefined => {
         // A route that did not match carries no declaration to read a policy from.
         case 'raw-response':
         case 'not-found':
+        case 'malformed-path':
         case 'method-not-allowed':
             return undefined;
         case 'success':
@@ -1114,7 +1134,14 @@ const statusOf = (result: AdapterResult): number | undefined => {
  * headers alone.
  */
 const withCacheHeaders = (result: AdapterResult, route: RouteDefinition): AdapterResult => {
-    if (result.kind === 'raw-response' || result.kind === 'not-found' || result.kind === 'method-not-allowed') return result;
+    if (
+        result.kind === 'raw-response' ||
+        result.kind === 'not-found' ||
+        result.kind === 'malformed-path' ||
+        result.kind === 'method-not-allowed'
+    ) {
+        return result;
+    }
     const status = statusOf(result);
     if (status === undefined) return result;
     const policy = cacheHeaders(resolveResponseCache(route.responses[status]));
@@ -1823,6 +1850,8 @@ const renderResult = (
                     allow: result.allowed.join(', '),
                 }
             );
+        case 'malformed-path':
+            return renderError(400, 'The path holds a percent-encoding that does not decode.');
         case 'invalid-body':
             return renderError(400, result.detail, undefined, result.headers);
         case 'validation-failed':

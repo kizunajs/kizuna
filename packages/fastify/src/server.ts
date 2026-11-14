@@ -28,6 +28,7 @@ import {
     jobRouter,
     jobRunnerFrom,
     sharedSegmentRoute,
+    type PathParamsResult,
     type Adapter,
 } from 'kizunajs/adapter';
 import type { SecurityScheme } from 'kizunajs';
@@ -60,7 +61,7 @@ declare module 'fastify' {
         /**
          * The params of a route with several params in one segment, read by kizuna's matcher.
          */
-        kizunaParams?: Record<string, string>;
+        kizunaParams?: PathParamsResult;
         /**
          * The body as it was sent, kept for routes with `rawBody: true`.
          */
@@ -235,7 +236,7 @@ export const fastifyKizuna = fastifyPlugin(
                           onRequest: [
                               async (request: FastifyRequest, reply: FastifyReply) => {
                                   const params = shared.readParams(request.url.split('?', 1)[0]!);
-                                  if (params === undefined) {
+                                  if (params.kind === 'not-found') {
                                       reply.callNotFound();
                                       return reply;
                                   }
@@ -258,12 +259,18 @@ export const fastifyKizuna = fastifyPlugin(
                     const adapterRequest: AdapterRequest<FastifyRequest> = {
                         request,
                         method: request.method,
-                        resolution: {
-                            kind: 'pre-resolved',
-                            routeKey,
-                            route,
-                            params: request.kizunaParams ?? ((request.params ?? {}) as Record<string, string>),
-                        },
+                        resolution:
+                            request.kizunaParams?.kind === 'malformed-path'
+                                ? request.kizunaParams
+                                : {
+                                      kind: 'pre-resolved',
+                                      routeKey,
+                                      route,
+                                      params:
+                                          request.kizunaParams?.kind === 'matched'
+                                              ? request.kizunaParams.params
+                                              : ((request.params ?? {}) as Record<string, string>),
+                                  },
                         query: (request.query ?? {}) as Record<string, string>,
                         headers: request.headers,
                         readBody: () => request.body,

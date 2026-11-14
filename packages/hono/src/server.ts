@@ -2,6 +2,7 @@ import type { Context, Env, Hono, MiddlewareHandler, Next } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import {
     type AdapterRequest,
+    type PathParamsResult,
     type RouteDefinition,
     type Routes,
     type Router as CoreRouter,
@@ -23,6 +24,7 @@ import {
     jobRouter,
     jobRunnerFrom,
     sharedSegmentRoute,
+    isMalformedPath,
     type Adapter,
     renderJsonResult,
     parseFetchBody,
@@ -123,8 +125,17 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
         const shared = sharedSegmentRoute(route.path);
         const kizunaHandler = async (c: Context<E>, next: Next) => {
             const url = new URL(c.req.url);
-            const params = shared ? shared.readParams(url.pathname) : (c.req.param() as Record<string, string>);
-            if (params === undefined) {
+            const params: PathParamsResult = shared
+                ? shared.readParams(url.pathname)
+                : isMalformedPath(url.pathname)
+                  ? {
+                        kind: 'malformed-path',
+                    }
+                  : {
+                        kind: 'matched',
+                        params: c.req.param() as Record<string, string>,
+                    };
+            if (params.kind === 'not-found') {
                 await next();
                 return;
             }
@@ -132,12 +143,15 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
             const adapterRequest: AdapterRequest<Request> = {
                 request: c.req.raw,
                 method: c.req.method,
-                resolution: {
-                    kind: 'pre-resolved',
-                    routeKey,
-                    route,
-                    params,
-                },
+                resolution:
+                    params.kind === 'malformed-path'
+                        ? params
+                        : {
+                              kind: 'pre-resolved',
+                              routeKey,
+                              route,
+                              params: params.params,
+                          },
                 query: entriesToObject(url.searchParams),
                 headers: headersToObject(c.req.raw.headers),
                 readBody: (r: RouteDefinition) => parseFetchBody(c.req.raw, r),

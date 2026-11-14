@@ -27,6 +27,7 @@ import {
     jobRouter,
     jobRunnerFrom,
     sharedSegmentRoute,
+    type PathParamsResult,
     type Adapter,
 } from 'kizunajs/adapter';
 import type { SecurityScheme } from 'kizunajs';
@@ -58,7 +59,7 @@ declare global {
             /**
              * The params of a route with several params in one segment, read by kizuna's matcher.
              */
-            kizunaParams?: Record<string, string>;
+            kizunaParams?: PathParamsResult;
             /**
              * The body as it was sent, kept by {@link keepRawBody}.
              */
@@ -264,7 +265,7 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
             (req: Request, _res: Response, next: NextFunction) => {
                 if (shared) {
                     const params = shared.readParams(req.path);
-                    if (params === undefined) {
+                    if (params.kind === 'not-found') {
                         next('route');
                         return;
                     }
@@ -278,12 +279,18 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
                 const adapterRequest: AdapterRequest<Request> = {
                     request: req,
                     method: req.method,
-                    resolution: {
-                        kind: 'pre-resolved',
-                        routeKey,
-                        route,
-                        params: req.kizunaParams ?? (req.params as Record<string, string>),
-                    },
+                    resolution:
+                        req.kizunaParams?.kind === 'malformed-path'
+                            ? req.kizunaParams
+                            : {
+                                  kind: 'pre-resolved',
+                                  routeKey,
+                                  route,
+                                  params:
+                                      req.kizunaParams?.kind === 'matched'
+                                          ? req.kizunaParams.params
+                                          : (req.params as Record<string, string>),
+                              },
                     query: req.query,
                     headers: req.headers,
                     readBody: () => req.body,
