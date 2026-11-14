@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply, FastifyPluginAsync } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
-import { Readable, pipeline } from 'node:stream';
+import { Readable, Transform, pipeline } from 'node:stream';
 import type { ServerResponse } from 'node:http';
 import {
     type AdapterRequest,
@@ -87,22 +87,40 @@ interface FastifyResponseContext {
     responseValidation?: boolean;
 }
 
+type CountedStream = NodeJS.ReadableStream & {
+    /**
+     * The bytes read off the wire so far, which Fastify checks against
+     * `bodyLimit` and `Content-Length` when a `preParsing` hook replaces the
+     * request stream.
+     */
+    receivedEncodedLength?: number;
+};
+
 /**
- * Read a `rawBody` route's body once, keep the text, and hand Fastify a fresh
- * stream to parse, so the route gets both the text and the parsed body.
+ * Keep a `rawBody` route's body as it was sent. The bytes pass through to
+ * Fastify's parser as it reads them, so its `bodyLimit` and `Content-Length`
+ * checks stop the read as they would on any route, and the text is kept once
+ * the whole body has passed.
  */
-const keepRawBody = async (
-    request: FastifyRequest,
-    _reply: FastifyReply,
-    payload: NodeJS.ReadableStream
-): Promise<NodeJS.ReadableStream> => {
+const keepRawBody = async (request: FastifyRequest, _reply: FastifyReply, payload: CountedStream): Promise<CountedStream> => {
     const chunks: Buffer[] = [];
-    for await (const chunk of payload) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
-    const buffer = Buffer.concat(chunks);
-    request.kizunaRawBody = buffer.toString('utf8');
-    const replay = Readable.from([buffer]) as Readable & { receivedEncodedLength?: number };
-    replay.receivedEncodedLength = buffer.length;
-    return replay;
+    let received = 0;
+    const recorder: Transform & CountedStream = new Transform({
+        transform(chunk: Buffer, _encoding, callback) {
+            received += chunk.length;
+            // A hook ahead of this one, like a decompressor, counts what came off the wire itself.
+            recorder.receivedEncodedLength = payload.receivedEncodedLength ?? received;
+            // Past the limit Fastify answers 413, so the rest is not kept.
+            if (recorder.receivedEncodedLength <= request.routeOptions.bodyLimit) chunks.push(chunk);
+            callback(null, chunk);
+        },
+        flush(callback) {
+            request.kizunaRawBody = Buffer.concat(chunks).toString('utf8');
+            callback();
+        },
+    });
+    pipeline(payload, recorder, () => undefined);
+    return recorder;
 };
 
 const writeStream = (open: NonNullable<RenderedResult['stream']>, res: ServerResponse, validate: boolean | undefined): void => {
