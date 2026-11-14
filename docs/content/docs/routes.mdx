@@ -150,6 +150,24 @@ pathParams: z.object({
 }),
 ```
 
+### Several parameters in one segment
+
+A segment can hold more than one parameter, with fixed text between them, as OpenAPI 3.2 allows:
+
+```ts
+path: '/files/:name.:ext',
+```
+
+The last parameter takes what follows the last separator, and the one before it takes the rest. Every adapter splits the same way:
+
+| Path                 | Request                 | `params`                           |
+| -------------------- | ----------------------- | ---------------------------------- |
+| `/files/:name.:ext`  | `/files/archive.tar.gz` | `name: 'archive.tar'`, `ext: 'gz'` |
+| `/flights/:from-:to` | `/flights/OSL-BGO`      | `from: 'OSL'`, `to: 'BGO'`         |
+| `/flights/:from-:to` | `/flights/OSL-`         | no match, `404`                    |
+
+A parameter is never empty, so a request that leaves one empty matches nothing.
+
 ### What each part can carry
 
 A route can only declare what its part of the request can send, and `k.routes` throws on anything else when the config loads:
