@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, type Mock } from 'vitest';
-import { QueryClient, skipToken } from '@tanstack/query-core';
+import { QueryClient, dehydrate, skipToken } from '@tanstack/query-core';
 import { KizunaTanstackQuery } from './proxy.js';
 import { NonStreamResponseError, UndeclaredResponseError, isNonStreamResponseError, isUndeclaredResponseError } from './errors.js';
 import { createClient, type Client } from './generated/client.js';
@@ -363,6 +363,56 @@ describe('skipToken', () => {
         });
 
         expect(options.queryFn).toBe(skipToken);
+    });
+});
+
+describe('set-cookie', () => {
+    const settingCookie = async () =>
+        new Response(JSON.stringify(ok.body), {
+            status: 200,
+            headers: {
+                'content-type': 'application/json',
+                'set-cookie': 'session=abc123; HttpOnly; Secure; Path=/',
+                'x-request-id': 'req-1',
+            },
+        });
+    const api = new KizunaTanstackQuery(
+        createClient({
+            baseUrl: 'http://api.test',
+            fetch: settingCookie,
+        })
+    );
+
+    it('leaves set-cookie out of query data, keeping every other header', async () => {
+        const queryClient = new QueryClient();
+
+        const result = await queryClient.fetchQuery(
+            api.users.getUser.queryOptions({
+                input: {
+                    params: {
+                        id: '1',
+                    },
+                },
+            })
+        );
+
+        expect(result.headers).not.toHaveProperty('set-cookie');
+        expect(result.headers).toMatchObject({
+            'x-request-id': 'req-1',
+        });
+        expect(JSON.stringify(dehydrate(queryClient))).not.toContain('session=');
+    });
+
+    it('keeps set-cookie on call, which returns what the fetch client returns', async () => {
+        const result = await api.users.getUser.call({
+            params: {
+                id: '1',
+            },
+        });
+
+        expect(result.headers).toMatchObject({
+            'set-cookie': 'session=abc123; HttpOnly; Secure; Path=/',
+        });
     });
 });
 
