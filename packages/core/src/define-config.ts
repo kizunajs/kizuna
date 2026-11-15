@@ -13,6 +13,7 @@ import type { AssembledRoutes } from './group-routes.js';
 import { assembleRoutes } from './routes.js';
 import { problemDetails, type GuardBody, type GuardOutput, type GuardSchemaCheck } from './problem-details.js';
 import { readObjectShape } from './zod-internals.js';
+import { streamToolsOf } from './tool-events.js';
 import type { Routes, RouteDefinition, RouteAuth, SecurityRequirement, RequiredPermissions } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
@@ -424,6 +425,18 @@ export const defineConfig = <
             continue;
         }
         resolveRouteAuth(route, route.auth, identities, routeKey);
+    }
+    // A tool's guard is the one its own `auth` resolves to, which only happens for a route `routes` lists.
+    const listed = new Set(flattenRoutes(routes).map(({ route }) => route));
+    for (const { route, routeKey } of [...flattenRoutes(routes), ...flattenRoutes(pluginRoutes)]) {
+        for (const response of Object.values(route.responses)) {
+            for (const { route: tool, routeKey: toolKey } of flattenRoutes(streamToolsOf(response) ?? {})) {
+                if (listed.has(tool)) continue;
+                throw new Error(
+                    `Route '${routeKey}' streams the tool '${toolKey}', which \`routes\` does not list. A tool is a route, so add its routes to \`routes\`.`
+                );
+            }
+        }
     }
     // After every route's `auth` resolves, so both of these can read `security`.
     injectGuardResponses(routes, identities, guardSchema);

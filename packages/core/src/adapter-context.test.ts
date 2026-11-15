@@ -61,6 +61,7 @@ const tools = k.routes({
 const contract = defineConfig({
     ...config,
     routes: [
+        tools,
         k.routes({
             everything: k.route({
                 method: 'POST',

@@ -158,7 +158,7 @@ responses: {
 | `tool_result` | `{ id, name, output }`  |
 | `tool_error`  | `{ id, name, message }` |
 
-`id` ties a result back to its call, and `input` carries the `{ params, query, body }` the route takes. Every route named under `tools` declares `tool`, and `k.routes` throws on one that does not, or on one that streams or takes a form body.
+`id` ties a result back to its call, and `input` carries the `{ params, query, body }` the route takes. Every route named under `tools` declares `tool`, and `k.routes` throws on one that does not, or on one that streams or takes a form body. `defineConfig` throws on one that `routes` does not list.
 
 </Step>
 
