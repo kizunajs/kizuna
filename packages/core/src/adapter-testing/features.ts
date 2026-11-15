@@ -162,6 +162,9 @@ export const ADAPTER_FEATURES = {
     'plugins.rawResponse': {
         summary: 'A plugin route answering with `rawResponse` sends its response untouched by validation or rendering.',
     },
+    'plugins.rawResponseStreamError': {
+        summary: 'A `rawResponse` body that fails partway ends that response, and the server goes on serving.',
+    },
     'streams.sseFraming': {
         summary: 'A streamed status writes each yield as a server-sent event under `text/event-stream` with `Cache-Control: no-store`.',
     },
