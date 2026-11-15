@@ -8,6 +8,7 @@ import {
     csvBody,
     cachedInput,
     deprecatedInput,
+    failingStreamFirstChunk,
     issueInput,
     methodInput,
     ownerToken,
@@ -1064,6 +1065,23 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 });
                 expect(response.status).toBe(200);
                 expect(response.text).toBe('not json at all');
+            });
+        },
+        'plugins.rawResponseStreamError': async () => {
+            await usingPlugins(async (mounted) => {
+                const response = await mounted.stream({
+                    method: 'GET',
+                    path: '/probe/failing-stream',
+                });
+                expect(response.status).toBe(200);
+                const { text, error } = await withTimeout(collectStreamText(response.body), 2000, 'the cut-short read');
+                expect(text).toBe(failingStreamFirstChunk);
+                expect(error).toBeDefined();
+                const next = await mounted.request({
+                    method: 'GET',
+                    path: '/probe/ping',
+                });
+                expect(next.status).toBe(200);
             });
         },
         'streams.sseFraming': async () => {
