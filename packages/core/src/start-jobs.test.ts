@@ -142,6 +142,46 @@ describe('startJobs', () => {
         expect(sent).toHaveLength(0);
     });
 
+    describe('a monthly schedule', () => {
+        const monthlyApi = (transport: ReturnType<typeof recording>['transport']) => ({
+            [JOBS_META]: {
+                jobs: k.jobs({
+                    sendInvoices: k.job({
+                        schedule: '0 0 1 * *',
+                    }),
+                }),
+                handlers: {
+                    sendInvoices: () => {},
+                },
+                transport,
+            },
+        });
+
+        it('waits for a run further away than one timer can hold', async () => {
+            vi.setSystemTime(new Date('2026-11-30T23:59:00Z'));
+            const { sent, transport } = recording();
+            const scheduler = startJobs(monthlyApi(transport), { logger: silent });
+            await vi.advanceTimersByTimeAsync(2 * 24 * 60 * 60 * 1000);
+            expect(sent.map((message) => message.dedupeKey)).toEqual(['sendInvoices@2026-12-01T00:00:00.000Z']);
+            await vi.advanceTimersByTimeAsync(31 * 24 * 60 * 60 * 1000);
+            scheduler.stop();
+            expect(sent.map((message) => message.dedupeKey)).toEqual([
+                'sendInvoices@2026-12-01T00:00:00.000Z',
+                'sendInvoices@2027-01-01T00:00:00.000Z',
+            ]);
+        });
+
+        it('stops a long wait once stopped', async () => {
+            vi.setSystemTime(new Date('2026-12-01T00:01:00Z'));
+            const { sent, transport } = recording();
+            const scheduler = startJobs(monthlyApi(transport), { logger: silent });
+            await vi.advanceTimersByTimeAsync(25 * 24 * 60 * 60 * 1000);
+            scheduler.stop();
+            await vi.advanceTimersByTimeAsync(10 * 24 * 60 * 60 * 1000);
+            expect(sent).toHaveLength(0);
+        });
+    });
+
     it('honours exclude', async () => {
         vi.setSystemTime(new Date('2026-08-05T02:59:00Z'));
         const { sent, transport } = recording();
