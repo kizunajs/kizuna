@@ -175,7 +175,7 @@ Reach for this when a hot path is spending real work on misses, not as a habit.
 | `immutable`            | `true`                  | `immutable`              |
 | `vary`                 | `string[]`              | the `Vary` header        |
 
-`scope: 'private'` is the caller's own browser, `'public'` is every cache in between, including CDNs and corporate proxies. `defineConfig` throws when a route behind `security` declares `'public'`, since that lets a shared cache hand Alice's response to Bob. It also rejects a policy that declares nothing, a number of seconds that is not a whole number of zero or more, and an empty `vary`.
+`scope: 'private'` is the caller's own browser, `'public'` is every cache in between, including CDNs and corporate proxies. `defineConfig` throws when a route behind `security` declares `'public'`, since that lets a shared cache hand Alice's response to Bob. It also throws when such a route sets a `maxAge` above zero, `sharedMaxAge`, `staleWhileRevalidate`, `staleIfError` or `mustRevalidate` with no `scope`, and asks for `'private'`. It also rejects a policy that declares nothing, a number of seconds that is not a whole number of zero or more, and an empty `vary`.
 
 `'no-store'` replaces the object rather than sitting inside it, because it rules out every other directive.
 

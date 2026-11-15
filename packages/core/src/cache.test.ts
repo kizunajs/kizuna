@@ -296,6 +296,93 @@ describe('assertValidCache', () => {
     });
 });
 
+describe('a route behind authentication', () => {
+    const user = k.identity.bearer({});
+    const secured = new Kizuna<{
+        auth: {
+            identities: {
+                user: typeof user;
+            };
+        };
+    }>();
+    const assemble = (cache: CachePolicy) =>
+        defineConfig({
+            auth: {
+                identities: {
+                    user,
+                },
+            },
+            routes: [
+                {
+                    payslips: secured.routes({
+                        listPayslips: secured.route({
+                            method: 'GET',
+                            path: '/me/payslips',
+                            auth: 'user',
+                            responses: {
+                                200: {
+                                    body: z.object({
+                                        ok: z.boolean(),
+                                    }),
+                                    cache,
+                                },
+                            },
+                        }),
+                    }),
+                },
+            ],
+        }).api;
+
+    test.each<[string, CachePolicy]>([
+        [
+            'a lifetime',
+            {
+                maxAge: 300,
+            },
+        ],
+        [
+            'a shared-cache lifetime',
+            {
+                sharedMaxAge: 300,
+            },
+        ],
+        [
+            'must-revalidate',
+            {
+                mustRevalidate: true,
+            },
+        ],
+    ])('refuses %s with no scope', (_, cache) => {
+        expect(() => assemble(cache)).toThrow(
+            /a cache policy with no cache\.scope on its 200 response, but the route is behind authentication/
+        );
+    });
+
+    test.each<[string, CachePolicy]>([
+        [
+            'a private lifetime',
+            {
+                scope: 'private',
+                maxAge: 300,
+            },
+        ],
+        [
+            'a zero lifetime with no scope',
+            {
+                maxAge: 0,
+            },
+        ],
+        [
+            'no-cache with no scope',
+            {
+                noCache: true,
+            },
+        ],
+    ])('accepts %s', (_, cache) => {
+        expect(() => assemble(cache)).not.toThrow();
+    });
+});
+
 describe('the policies the caching guide shows', () => {
     test('are all accepted by k.contract', () => {
         expect(
