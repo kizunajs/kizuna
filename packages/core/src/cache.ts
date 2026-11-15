@@ -81,10 +81,23 @@ export const assertValidCache = (routes: Routes): void => {
                     `${where} an empty cache.vary ${onStatus}, which sends no Vary header. Name the request headers that change the response, or drop it.`
                 );
             }
-            if (cache.scope === 'public' && route.security !== undefined && route.security.length > 0) {
+            const guarded = route.security !== undefined && route.security.length > 0;
+            if (cache.scope === 'public' && guarded) {
                 throw new Error(
                     `${where} cache.scope 'public' ${onStatus}, but the route is behind authentication, ` +
                         `which lets a shared cache serve one caller's response to another. Use 'private'.`
+                );
+            }
+            const sharedCacheMayStore =
+                (cache.maxAge !== undefined && cache.maxAge > 0) ||
+                cache.sharedMaxAge !== undefined ||
+                cache.staleWhileRevalidate !== undefined ||
+                cache.staleIfError !== undefined ||
+                cache.mustRevalidate === true;
+            if (cache.scope === undefined && guarded && sharedCacheMayStore) {
+                throw new Error(
+                    `${where} a cache policy with no cache.scope ${onStatus}, but the route is behind authentication, ` +
+                        `so a shared cache may store one caller's response and serve it to another. Add scope: 'private'.`
                 );
             }
 
