@@ -155,7 +155,7 @@ const writeWebResponse = async (response: unknown, reply: FastifyReply): Promise
         reply.raw.end();
         return;
     }
-    Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]).pipe(reply.raw);
+    pipeline(Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]), reply.raw, () => undefined);
 };
 
 const adapter = defineAdapter<FastifyRequest, void, FastifyHandlerContext, FastifyResponseContext>({

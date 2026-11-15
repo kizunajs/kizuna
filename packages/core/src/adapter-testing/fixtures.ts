@@ -1091,6 +1091,8 @@ export const sharedSegmentInput = {
     routes: [sharedSegmentRoutes],
 };
 
+export const failingStreamFirstChunk = 'id,name\n1,Ada\n';
+
 const probePlugin = definePlugin({
     slug: 'probe',
     options: z.object({
@@ -1142,6 +1144,39 @@ const probePlugin = definePlugin({
                             'Content-Type': 'text/plain',
                         },
                     })
+                )
+            ),
+            failingStream: route({
+                method: 'GET',
+                path: '/probe/failing-stream',
+                responses: {
+                    200: z.object({
+                        never: z.boolean(),
+                    }),
+                },
+            }).handler(() =>
+                rawResponse(
+                    new Response(
+                        new ReadableStream<Uint8Array>({
+                            start(controller) {
+                                controller.enqueue(new TextEncoder().encode(failingStreamFirstChunk));
+                            },
+                            pull(controller) {
+                                return new Promise((resolve) => {
+                                    setTimeout(() => {
+                                        controller.error(new Error('The upstream dropped the connection.'));
+                                        resolve();
+                                    }, 20);
+                                });
+                            },
+                        }),
+                        {
+                            status: 200,
+                            headers: {
+                                'Content-Type': 'text/csv',
+                            },
+                        }
+                    )
                 )
             ),
         },

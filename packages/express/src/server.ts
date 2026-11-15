@@ -187,7 +187,7 @@ const writeWebResponse = async (response: unknown, res: Response): Promise<void>
         res.end();
         return;
     }
-    Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res);
+    pipeline(Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]), res, () => undefined);
 };
 
 const adapter = defineAdapter<Request, void, ExpressHandlerContext, ExpressResponseContext>({
