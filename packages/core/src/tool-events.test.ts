@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { streamToolsOf, toolEvents } from './tool-events.js';
 import { formatEvent } from './stream.js';
 import { Kizuna } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 
 const toolRoutesK = new Kizuna();
 
@@ -493,5 +494,42 @@ describe('expandStreamTools', () => {
                 }),
             })
         ).toThrow(/beside a single stream schema/);
+    });
+});
+
+describe('a tool a streamed response names', () => {
+    const assistant = toolRoutesK.routes({
+        reply: toolRoutesK.route({
+            method: 'POST',
+            path: '/assistant/reply',
+            responses: {
+                200: {
+                    stream: {
+                        done: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                    tools,
+                },
+            },
+        }),
+    });
+
+    it('throws when routes does not list it', () => {
+        expect(
+            () =>
+                defineConfig({
+                    routes: [assistant],
+                }).api
+        ).toThrow("Route 'reply' streams the tool 'weather.getForecast', which `routes` does not list.");
+    });
+
+    it('accepts it when routes lists it', () => {
+        expect(
+            () =>
+                defineConfig({
+                    routes: [tools, assistant],
+                }).api
+        ).not.toThrow();
     });
 });
