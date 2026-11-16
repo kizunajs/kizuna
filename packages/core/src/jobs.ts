@@ -86,14 +86,15 @@ export type JobRunnerConfig = JobsConfig & JobDeliveryConfig;
  */
 export interface JobDeliveryConfig {
     /**
-     * Carries a queued job to whatever runs it. Without one, `queue` runs the
-     * job in this process and it is lost on a crash.
+     * Carries a queued job to whatever runs it. `false` runs a queued job in
+     * this process, without waiting for it, and loses it on a crash or a
+     * serverless freeze.
      */
-    transport?: JobTransport;
+    transport: JobTransport | false;
     /**
      * Reached by every failed run no caller awaits, from a worker,
-     * `/jobs/dispatch`, `/jobs/run`, or `queue` without a transport. Called once
-     * per attempt.
+     * `/jobs/dispatch`, `/jobs/run`, or `queue` with `transport: false`. Called
+     * once per attempt.
      */
     onError?: JobErrorHandler;
 }
@@ -439,13 +440,19 @@ export const isCompiledJob = (value: unknown): value is CompiledJob => {
  * Throw when declared jobs do not say how they run, or when the job endpoints
  * would be served with no identity guarding them.
  */
-export const assertJobRunner = (jobs: Jobs | undefined, config: JobsConfig | undefined): void => {
+export const assertJobRunner = (jobs: Jobs | undefined, config: JobRunnerConfig | undefined): void => {
     const flattened = jobs ? flattenJobs(jobs) : [];
     if (flattened.length === 0) return;
     if (config?.mode === undefined) {
         throw new Error(
             "The jobs do not say how they run. Set `jobRunner: { mode: 'http' }` to serve `/jobs/dispatch` and `/jobs/run`, " +
                 "or `jobRunner: { mode: 'long-running' }` when `startJobs` ticks them in this process."
+        );
+    }
+    if (config.transport === undefined) {
+        throw new Error(
+            'The jobs do not say where queued work goes. Set `jobRunner.transport` to a transport, such as `pgmqTransport({ pool })`, ' +
+                'or to `false` to run a queued job in this process and lose it on a crash.'
         );
     }
     if (config.mode === 'long-running' || flattened.some(({ job }) => job.identity !== undefined)) return;

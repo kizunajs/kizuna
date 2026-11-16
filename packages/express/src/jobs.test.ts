@@ -139,6 +139,7 @@ const contract = defineConfig({
     routes: [routes],
     jobRunner: {
         mode: 'http',
+        transport: false,
     },
     jobs,
 }).api;
@@ -305,6 +306,7 @@ describe('a job outside a tick', () => {
             routes: [routes],
             jobRunner: {
                 mode: 'http',
+                transport: false,
             },
             jobs: k.jobs('scheduler', {
                 sendDigests: k.job({
@@ -364,6 +366,7 @@ describe('onJobError', () => {
             }),
             jobRunner: {
                 mode: 'http',
+                transport: false,
                 onError: onJobError,
             },
         });
@@ -445,6 +448,7 @@ describe('jobs on a long-running server', () => {
             }),
             jobRunner: {
                 mode: 'long-running',
+                transport: false,
             },
         });
         const app = express();

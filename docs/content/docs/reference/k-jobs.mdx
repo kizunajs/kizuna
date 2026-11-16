@@ -104,7 +104,7 @@ await jobs.indexUser.queue({
 });
 ```
 
-Input is validated against the job's `input` schema either way. Where a queued job goes is the [transport's](/docs/extend/create-job-transport) business; with none configured it runs in this process.
+Input is validated against the job's `input` schema either way. Where a queued job goes is the [transport's](/docs/extend/create-job-transport) business; with `transport: false` it runs in this process.
 
 ## Validation
 

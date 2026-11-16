@@ -289,9 +289,9 @@ type JobRunnerInput<J extends Jobs> = string extends keyof J
       }
     : {
           /**
-           * How this deployment runs the jobs it declares: over HTTP or in
-           * process, what carries queued work out of the process, and where a
-           * failure is reported. The jobs themselves are declared with
+           * How this deployment runs the jobs it declares: over HTTP or from a
+           * long-running server, what carries queued work out of the process,
+           * and where a failure is reported. The jobs themselves are declared with
            * `k.jobs` and go under `jobs`.
            */
           jobRunner: JobRunnerConfig;
@@ -469,7 +469,7 @@ export const defineConfig = <
         {
             guards,
             requestContext: handlersOf(options.requestContext as Record<string, unknown> | undefined, RESOLVER),
-            jobTransport: options.jobRunner?.transport,
+            jobTransport: options.jobRunner?.transport || undefined,
             onJobError: options.jobRunner?.onError,
         },
         options.adapter

@@ -289,6 +289,7 @@ describe('k.contract with jobs', () => {
             routes: [routes],
             jobRunner: {
                 mode: 'http',
+                transport: false,
             },
             jobs,
         }).api;
@@ -317,6 +318,7 @@ describe('k.contract with jobs', () => {
                     routes: [routes],
                     jobRunner: {
                         mode: 'http',
+                        transport: false,
                     },
                     jobs,
                 }).api
@@ -351,6 +353,7 @@ describe('a job endpoint colliding with a route', () => {
                     routes: [routesAt(path)],
                     jobRunner: {
                         mode: 'http',
+                        transport: false,
                     },
                     jobs: scheduled,
                 }).api
@@ -365,6 +368,7 @@ describe('a job endpoint colliding with a route', () => {
                     routes: [routesAt('/jobs')],
                     jobRunner: {
                         mode: 'http',
+                        transport: false,
                     },
                     jobs: scheduled,
                 }).api
@@ -392,6 +396,7 @@ describe('a job endpoint colliding with a route', () => {
                     ...movedConfig,
                     jobRunner: {
                         mode: 'http',
+                        transport: false,
                         path: '/internal/tick',
                     },
                     routes: [
@@ -422,6 +427,7 @@ describe('a job endpoint colliding with a route', () => {
                     ...config,
                     jobRunner: {
                         mode: 'long-running',
+                        transport: false,
                     },
                     routes: [routesAt('/jobs/dispatch')],
                     jobs: scheduled,
@@ -455,6 +461,21 @@ describe('how jobs run', () => {
         ).toThrow('The jobs do not say how they run.');
     });
 
+    it('must say where queued work goes', () => {
+        expect(
+            () =>
+                defineConfig({
+                    ...config,
+                    routes: [],
+                    jobs: scheduled,
+                    // @ts-expect-error `transport` is required, a transport or `false`
+                    jobRunner: {
+                        mode: 'http',
+                    },
+                }).api
+        ).toThrow('The jobs do not say where queued work goes.');
+    });
+
     it('rejects jobs served over HTTP with no identity', () => {
         expect(
             () =>
@@ -464,6 +485,7 @@ describe('how jobs run', () => {
                     jobs: unguarded,
                     jobRunner: {
                         mode: 'http',
+                        transport: false,
                     },
                 }).api
         ).toThrow('would let anyone trigger them');
@@ -478,6 +500,7 @@ describe('how jobs run', () => {
                     jobs: unguarded,
                     jobRunner: {
                         mode: 'long-running',
+                        transport: false,
                     },
                 }).api
         ).not.toThrow();
@@ -559,6 +582,7 @@ describe('job handlers and plugins', () => {
             routes: [],
             jobRunner: {
                 mode: 'http',
+                transport: false,
             },
             jobs,
             plugins: [

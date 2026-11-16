@@ -51,8 +51,8 @@ export interface JobFn<Job extends CompiledJob> {
      */
     run: (...args: JobRunArgs<Job>) => Promise<JobHandlerReturn<Job['definition']>>;
     /**
-     * Put the job in line and answer without waiting for it. With no transport
-     * configured the job runs in this process and is lost on a crash.
+     * Put the job in line and answer without waiting for it. With
+     * `transport: false` the job runs in this process and is lost on a crash.
      */
     queue: (...args: JobQueueArgs<Job>) => Promise<void>;
 }
@@ -86,7 +86,7 @@ export class JobInputError extends Error {
 
 /**
  * Called for every failed run of a job that no caller awaits: one a worker,
- * `/jobs/dispatch` or `/jobs/run` ran, or one queued without a transport. A
+ * `/jobs/dispatch` or `/jobs/run` ran, or one queued with `transport: false`. A
  * run fails when its handler throws or answers a status of 400 or more, which
  * arrives as a `ResponseError`. Without one, the failure is logged.
  */

@@ -101,6 +101,7 @@ const contract = defineConfig({
     routes: [routes],
     jobRunner: {
         mode: 'http',
+        transport: false,
     },
     jobs,
 }).api;
@@ -181,6 +182,7 @@ describe('jobs on a long-running server', () => {
         }),
         jobRunner: {
             mode: 'long-running',
+            transport: false,
         },
     }).api.mount({
         basePath: '/api',

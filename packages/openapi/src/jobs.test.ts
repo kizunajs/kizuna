@@ -57,6 +57,7 @@ const contract = defineConfig({
     routes: [routes],
     jobRunner: {
         mode: 'http',
+        transport: false,
     },
     jobs,
 }).api as unknown as ApiDefinition;
