@@ -13,7 +13,7 @@ pnpm add @kizunajs/pgmq pg
 ```ts
 // kizuna.config.ts
 import pg from 'pg';
-import { pgmq } from '@kizunajs/pgmq';
+import { pgmqTransport } from '@kizunajs/pgmq';
 
 const pool = new pg.Pool({
     connectionString: process.env.DATABASE_URL,
@@ -25,7 +25,7 @@ export default defineConfig({
     jobs,
     jobRunner: {
         mode: 'in-process',
-        transport: pgmq({
+        transport: pgmqTransport({
             pool,
         }),
     },

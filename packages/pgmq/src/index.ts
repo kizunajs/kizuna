@@ -1,1 +1,1 @@
-export { pgmq, type PgmqOptions, type PgmqPool } from './transport.js';
+export { pgmqTransport, type PgmqOptions, type PgmqPool } from './transport.js';

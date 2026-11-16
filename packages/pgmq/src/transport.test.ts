@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Kizuna, ResponseError, type JobWorkerContext } from 'kizunajs';
 import { JOBS_META } from 'kizunajs/adapter';
 import { startJobWorker } from 'kizunajs/jobs';
-import { pgmq } from './transport.js';
+import { pgmqTransport } from './transport.js';
 import * as sql from './sql.js';
 
 interface Statement {
@@ -85,7 +85,7 @@ const drain = async (
     run: JobWorkerContext['run'],
     jobs: string[] = ['users.indexUser']
 ): Promise<void> => {
-    const transport = pgmq({
+    const transport = pgmqTransport({
         pool: database.pool,
         pollIntervalMs: 5,
         logger: silent,
@@ -105,7 +105,7 @@ const drain = async (
 describe('dispatch', () => {
     it('sends the job, its input and its attempts to the job’s own queue', async () => {
         const database = fakePool();
-        await pgmq({
+        await pgmqTransport({
             pool: database.pool,
         }).dispatch({
             job: 'users.indexUser',
@@ -131,7 +131,7 @@ describe('dispatch', () => {
 
     it('creates a queue once per process', async () => {
         const database = fakePool();
-        const transport = pgmq({
+        const transport = pgmqTransport({
             pool: database.pool,
         });
         await transport.dispatch({
@@ -154,7 +154,7 @@ describe('dispatch', () => {
                 code: '23505',
             })
         );
-        await pgmq({
+        await pgmqTransport({
             pool: database.pool,
         }).dispatch({
             job: 'cleanup',
@@ -166,7 +166,7 @@ describe('dispatch', () => {
 
     it('passes runAt for the database to turn into a delay', async () => {
         const database = fakePool();
-        await pgmq({
+        await pgmqTransport({
             pool: database.pool,
         }).dispatch({
             job: 'cleanup',
@@ -179,7 +179,7 @@ describe('dispatch', () => {
 
     it('sends a message with a dedupe key like any other, since pgmq has no deduplication', async () => {
         const database = fakePool();
-        const transport = pgmq({
+        const transport = pgmqTransport({
             pool: database.pool,
         });
         await transport.dispatch({
@@ -196,7 +196,7 @@ describe('dispatch', () => {
     it('throws on a job whose queue name pgmq would refuse', async () => {
         const database = fakePool();
         await expect(
-            pgmq({
+            pgmqTransport({
                 pool: database.pool,
             }).dispatch({
                 job: 'billing.reconcileEveryOutstandingInvoiceForTheQuarter',
@@ -306,7 +306,7 @@ describe('start', () => {
         const database = fakePool();
         database.deliver(stored('users.indexUser', 1));
         let finish: () => void = () => {};
-        const transport = pgmq({
+        const transport = pgmqTransport({
             pool: database.pool,
             pollIntervalMs: 5,
             logger: silent,
@@ -340,7 +340,7 @@ describe('start', () => {
 
     it('throws when two jobs share one queue name', async () => {
         await expect(
-            pgmq({
+            pgmqTransport({
                 pool: fakePool().pool,
             }).start!({
                 jobs: [
@@ -375,7 +375,7 @@ describe('with startJobWorker', () => {
                 userId: '1',
             })
         );
-        const transport = pgmq({
+        const transport = pgmqTransport({
             pool: database.pool,
             pollIntervalMs: 5,
             logger: silent,
@@ -416,7 +416,7 @@ describe('with startJobWorker', () => {
                 userIdentifier: 'renamed since this was queued',
             })
         );
-        const transport = pgmq({
+        const transport = pgmqTransport({
             pool: database.pool,
             pollIntervalMs: 5,
             logger: silent,

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ResponseError, type JobWorker, type JobWorkerContext } from 'kizunajs';
-import { pgmq } from './transport.js';
+import { pgmqTransport } from './transport.js';
 
 /**
  * pgmq installs from one SQL file, so each version runs in PGlite with no
@@ -36,7 +36,7 @@ describe.each(VERSIONS)('pgmq %s', (version) => {
     });
 
     const transport = () =>
-        pgmq({
+        pgmqTransport({
             pool: database,
             pollIntervalMs: 5,
             logger: silent,
