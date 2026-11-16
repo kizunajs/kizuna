@@ -269,7 +269,7 @@ export default defineConfig({
     jobs,
     jobRunner: {
         mode: 'in-process',
-        transport: pgmq({
+        transport: pgmqTransport({
             pool,
         }),
     },

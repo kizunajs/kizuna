@@ -110,13 +110,13 @@ const toSeconds = (milliseconds: number): number => Math.ceil(milliseconds / 100
  *     jobs,
  *     jobRunner: {
  *         mode: 'in-process',
- *         transport: pgmq({
+ *         transport: pgmqTransport({
  *             pool,
  *         }),
  *     },
  * });
  */
-export const pgmq = (options: PgmqOptions): JobTransport => {
+export const pgmqTransport = (options: PgmqOptions): JobTransport => {
     const { pool } = options;
     const prefix = options.prefix ?? 'kizuna_';
     const visibilitySeconds = toSeconds(options.visibilityTimeoutMs ?? 60_000);
