@@ -415,13 +415,13 @@ describe('a job endpoint colliding with a route', () => {
         ).not.toThrow();
     });
 
-    it('claims nothing for jobs that run in process', () => {
+    it('claims nothing for jobs on a long-running server', () => {
         expect(
             () =>
                 defineConfig({
                     ...config,
                     jobRunner: {
-                        mode: 'in-process',
+                        mode: 'long-running',
                     },
                     routes: [routesAt('/jobs/dispatch')],
                     jobs: scheduled,
@@ -469,7 +469,7 @@ describe('how jobs run', () => {
         ).toThrow('would let anyone trigger them');
     });
 
-    it('accepts jobs with no identity in process', () => {
+    it('accepts jobs with no identity on a long-running server', () => {
         expect(
             () =>
                 defineConfig({
@@ -477,7 +477,7 @@ describe('how jobs run', () => {
                     routes: [],
                     jobs: unguarded,
                     jobRunner: {
-                        mode: 'in-process',
+                        mode: 'long-running',
                     },
                 }).api
         ).not.toThrow();
@@ -509,12 +509,12 @@ describe('the job endpoints', () => {
         expect(Object.values(served).map((route) => route.path)).toEqual(['/jobs/dispatch', '/jobs/run']);
     });
 
-    it('are not built for jobs that run in process', () => {
+    it('are not built for jobs on a long-running server', () => {
         const served = jobRoutes({
             jobs: scheduled,
             handlers: {},
             config: {
-                mode: 'in-process',
+                mode: 'long-running',
             },
         });
         expect(served).toEqual({});

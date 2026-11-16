@@ -24,7 +24,7 @@ export default defineConfig({
     routes,
     jobs,
     jobRunner: {
-        mode: 'in-process',
+        mode: 'long-running',
         transport: pgmqTransport({
             pool,
         }),

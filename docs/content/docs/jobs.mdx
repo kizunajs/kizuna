@@ -229,9 +229,9 @@ A job's handler receives the same runner, so a scheduled job can queue one job p
 
 <InstallTabs packageName="kizunajs" />
 
-<Tabs groupId="jobs-setup" items={['In process (long running server)', 'Long running server and transport', 'Serverless and transport']}>
+<Tabs groupId="jobs-setup" items={['Long running server', 'Long running server and transport', 'Serverless and transport']}>
 
-<Tab value="In process (long running server)">
+<Tab value="Long running server">
 
 No queue. `startJobs` watches the clock, and a queued job runs right here.
 
@@ -249,7 +249,7 @@ export const jobs = k.jobs({
 });
 ```
 
-`mode: 'in-process'` leaves the endpoints unmounted. A job that fails after the response has gone reports to [`onError`](#hearing-about-failures):
+`mode: 'long-running'` leaves the endpoints unmounted. A job that fails after the response has gone reports to [`onError`](#hearing-about-failures):
 
 ```ts title="kizuna.config.ts"
 export default defineConfig({
@@ -257,7 +257,7 @@ export default defineConfig({
     routes,
     jobs,
     jobRunner: {
-        mode: 'in-process',
+        mode: 'long-running',
         onError: (job, error) => Sentry.captureException(error, { tags: { job } }),
     },
 });
@@ -287,7 +287,7 @@ export default defineConfig({
     routes,
     jobs,
     jobRunner: {
-        mode: 'in-process',
+        mode: 'long-running',
         transport: pgmqTransport({
             pool,
         }),
@@ -416,7 +416,7 @@ Configure both under `jobRunner` on [`defineConfig`](/docs/reference/define-conf
 
 | Option     | Default  | Description                                        |
 | ---------- | -------- | -------------------------------------------------- |
-| `mode`     | required | `'http'` serves both, `'in-process'` neither       |
+| `mode`     | required | `'http'` serves both, `'long-running'` neither     |
 | `path`     | `/jobs`  | The namespace both are mounted under               |
 | `method`   | `POST`   | `/jobs/dispatch`'s method. `'GET'` for Vercel Cron |
 | `windowMs` | `60000`  | How far back a tick looks for due jobs             |
@@ -425,7 +425,7 @@ Configure both under `jobRunner` on [`defineConfig`](/docs/reference/define-conf
 
 `method` moves `/jobs/dispatch` only: `/jobs/run` takes a body, so it is always `POST`. Nothing is served on `/jobs` itself.
 
-`mode: 'in-process'` serves neither, for a long-running server whose schedules `startJobs` ticks. It takes none of the options below `mode`, and its jobs need no identity. Served endpoints do need one, so `defineConfig` throws when jobs without an identity would be reachable. Use `'http'` when a transport delivers to `/jobs/run` or platform cron ticks `/jobs/dispatch`.
+`mode: 'long-running'` serves neither. Your own process drives the jobs, with `startJobs` ticking the schedules. It takes none of the options below `mode`, and its jobs need no identity. Served endpoints do need one, so `defineConfig` throws when jobs without an identity would be reachable. Use `'http'` when a transport delivers to `/jobs/run` or platform cron ticks `/jobs/dispatch`.
 
 A tick runs each due job inline, in the request the scheduler made, so the function's timeout is the budget for all of them. Keep the tick short by having a scheduled job queue one job per unit of work:
 

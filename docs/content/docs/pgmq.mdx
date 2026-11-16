@@ -46,7 +46,7 @@ export default defineConfig({
     routes,
     jobs,
     jobRunner: {
-        mode: 'in-process',
+        mode: 'long-running',
         transport: pgmqTransport({
             pool,
         }),
@@ -90,6 +90,26 @@ A job declares its attempts with `retry`. A failed attempt is tried again after 
 A `422`, or input the job's schema no longer accepts, is not retried. Neither is a job that has used every attempt. Those messages move to the queue's archive table, `pgmq.a_kizuna_billing_reconcile_invoices`, so the archive is where you look for jobs that failed for good. A job that succeeds is deleted.
 
 A worker reads a message and hides it from other workers for the visibility timeout, 60 seconds by default. A job still running after that is read again by another worker, so raise `visibilityTimeoutMs` above your slowest job.
+
+## Reading the queues
+
+The queues are pgmq's own tables, so anything that can query your database reads them with SQL. How many jobs wait in each queue, and how long the oldest has waited:
+
+```sql
+select queue_name, queue_length, oldest_msg_age_sec
+from pgmq.metrics_all()
+where queue_name like 'kizuna_%';
+```
+
+The jobs that failed for good, newest first:
+
+```sql
+select msg_id, read_ct, archived_at, message->'input' as input
+from pgmq.a_kizuna_users_index_user
+order by archived_at desc;
+```
+
+To retry one, have a route queue its `input` again with `jobs.users.indexUser.queue(...)`. The archive keeps what the job was given but not why it failed, which reaches [`onError`](/docs/jobs#hearing-about-failures).
 
 ## One scheduler, any number of workers
 

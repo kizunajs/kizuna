@@ -426,7 +426,7 @@ describe('onJobError', () => {
     });
 });
 
-describe('jobs that run in process', () => {
+describe('jobs on a long-running server', () => {
     const buildClosedApp = () => {
         const { api } = defineConfig({
             ...config,
@@ -444,7 +444,7 @@ describe('jobs that run in process', () => {
                     }),
             }),
             jobRunner: {
-                mode: 'in-process',
+                mode: 'long-running',
             },
         });
         const app = express();

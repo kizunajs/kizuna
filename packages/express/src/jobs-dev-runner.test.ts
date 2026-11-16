@@ -193,7 +193,7 @@ describe('startJobsDevRunner', () => {
             ...config,
             adapter: expressAdapter(),
             jobRunner: {
-                mode: 'in-process',
+                mode: 'long-running',
             },
             routes: [routes],
             jobs,
