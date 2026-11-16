@@ -105,7 +105,7 @@ export default defineConfig({
 });
 ```
 
-`jobRunner` is required once `jobs` declares one, and its `mode` says how they run: `'http'` serves the two job endpoints, `'in-process'` leaves them unmounted for `startJobs` to tick. A job carries its own identity, so it declares no `auth`, and it stays out of `api.routes`, the OpenAPI document, and the generated Swift, Kotlin and MCP surfaces. See [Jobs](/docs/jobs).
+`jobRunner` is required once `jobs` declares one, and its `mode` says how they run: `'http'` serves the two job endpoints, `'long-running'` leaves them unmounted for `startJobs` to tick. A job carries its own identity, so it declares no `auth`, and it stays out of `api.routes`, the OpenAPI document, and the generated Swift, Kotlin and MCP surfaces. See [Jobs](/docs/jobs).
 
 ## Plugins
 

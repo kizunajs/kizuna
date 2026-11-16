@@ -36,7 +36,7 @@ export const jobs = k.jobs('scheduler', {
 
 Jobs nest to any depth. Because a job carries its own identity, it declares no `auth` of its own.
 
-Omit the identity argument only for jobs that run in process, with `jobRunner: { mode: 'in-process' }`. Otherwise `/jobs/run` would let anyone trigger them, so `defineConfig` throws.
+Omit the identity argument only for jobs on a long-running server, with `jobRunner: { mode: 'long-running' }`. Otherwise `/jobs/run` would let anyone trigger them, so `defineConfig` throws.
 
 ```ts title="jobs.ts"
 export const jobs = k.jobs({

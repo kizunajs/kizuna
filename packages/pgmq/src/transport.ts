@@ -109,7 +109,7 @@ const toSeconds = (milliseconds: number): number => Math.ceil(milliseconds / 100
  *     routes,
  *     jobs,
  *     jobRunner: {
- *         mode: 'in-process',
+ *         mode: 'long-running',
  *         transport: pgmqTransport({
  *             pool,
  *         }),

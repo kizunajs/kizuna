@@ -46,7 +46,7 @@ Jobs (`k.jobs`) are the one non-HTTP-shaped concept. Settled; don't relitigate.
 - A job declares no path and no method. `schedule` is optional.
 - A config that declares jobs names `jobRunner.mode`, required, so how they run is never a default.
 - `mode: 'http'` serves two endpoints, both under the `jobRunner.path` namespace (default `/jobs`, which serves nothing itself): `POST /jobs/dispatch` runs whatever is due, `POST /jobs/run` runs the one job its `{ job, input }` body names. The jobs' identity guards both, and jobs without one make `defineConfig` throw. A job is addressed by its dotted key.
-- `mode: 'in-process'` mounts neither, for a long-running server whose schedules `startJobs` ticks. Jobs there need no identity.
+- `mode: 'long-running'` mounts neither. The app's own process drives the jobs, with `startJobs` ticking the schedules. Jobs there need no identity.
 - `run` and `queue`, never a bare call. `run` takes the input; `queue` takes a message (`input`, `runAt`, `dedupeKey`).
 
 `@kizunajs/pgmq` is the first-party transport, a pull queue in the app's own Postgres.

@@ -49,7 +49,7 @@ const stripTrailingSlash = (url: string): string => (url.endsWith('/') ? url.sli
  * Tick the dispatch endpoint over the network on an interval, so `pnpm dev`
  * exercises the same request your platform cron will make in production.
  *
- * Reach for `startJobs` instead when you schedule in-process: it reads each job's
+ * Reach for `startJobs` instead on a long-running server: it reads each job's
  * own schedule rather than ticking on a fixed interval.
  *
  * @example
@@ -70,9 +70,9 @@ export const startJobsDevRunner = (contract: ApiDefinition, options: JobsDevRunn
         );
     }
 
-    if (contract.jobsConfig?.mode === 'in-process') {
+    if (contract.jobsConfig?.mode === 'long-running') {
         throw new Error(
-            "[kizuna/schedule] startJobsDevRunner ticks the dispatch endpoint, which `mode: 'in-process'` does not serve. " +
+            "[kizuna/schedule] startJobsDevRunner ticks the dispatch endpoint, which `mode: 'long-running'` does not serve. " +
                 'Run the schedules in this process with `startJobs` instead.'
         );
     }

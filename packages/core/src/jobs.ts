@@ -26,7 +26,7 @@ export type JobsConfig = HttpJobsConfig | InProcessJobsConfig;
 export interface HttpJobsConfig {
     /**
      * `'http'` serves `/jobs/dispatch` and `/jobs/run`, guarded by the jobs'
-     * identity. `'in-process'` is for a long-running server whose schedules
+     * identity. `'long-running'` is for a long-running server whose schedules
      * `startJobs` ticks, and serves neither.
      */
     mode: 'http';
@@ -65,7 +65,7 @@ export interface HttpJobsConfig {
  * No job endpoint is served, so the jobs need no identity.
  */
 export interface InProcessJobsConfig {
-    mode: 'in-process';
+    mode: 'long-running';
     path?: never;
     method?: never;
     windowMs?: never;
@@ -445,19 +445,19 @@ export const assertJobRunner = (jobs: Jobs | undefined, config: JobsConfig | und
     if (config?.mode === undefined) {
         throw new Error(
             "The jobs do not say how they run. Set `jobRunner: { mode: 'http' }` to serve `/jobs/dispatch` and `/jobs/run`, " +
-                "or `jobRunner: { mode: 'in-process' }` when `startJobs` ticks them in this process."
+                "or `jobRunner: { mode: 'long-running' }` when `startJobs` ticks them in this process."
         );
     }
-    if (config.mode === 'in-process' || flattened.some(({ job }) => job.identity !== undefined)) return;
+    if (config.mode === 'long-running' || flattened.some(({ job }) => job.identity !== undefined)) return;
     const base = config.path ?? DEFAULT_JOBS_PATH;
     throw new Error(
         `The jobs declare no identity, so \`${base}/dispatch\` and \`${base}/run\` would let anyone trigger them. ` +
-            "Pass an identity to `k.jobs`, or set `jobRunner: { mode: 'in-process' }` when the jobs run in this process with `startJobs`."
+            "Pass an identity to `k.jobs`, or set `jobRunner: { mode: 'long-running' }` when the jobs run in this process with `startJobs`."
     );
 };
 
 export const jobClaims = (jobs: Jobs | undefined, config: JobsConfig | undefined): PathClaim[] => {
-    if (!jobs || config?.mode === 'in-process' || flattenJobs(jobs).length === 0) return [];
+    if (!jobs || config?.mode === 'long-running' || flattenJobs(jobs).length === 0) return [];
     const base = config?.path ?? DEFAULT_JOBS_PATH;
     return [
         {

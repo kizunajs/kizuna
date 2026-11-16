@@ -192,7 +192,7 @@ describe('the dispatch endpoint', () => {
     });
 });
 
-describe('jobs that run in process', () => {
+describe('jobs on a long-running server', () => {
     const buildClosedApp = async () => {
         const { api } = defineConfig({
             ...config,
@@ -206,7 +206,7 @@ describe('jobs that run in process', () => {
                     .handler(() => {}),
             }),
             jobRunner: {
-                mode: 'in-process',
+                mode: 'long-running',
             },
         });
         const app = Fastify();
