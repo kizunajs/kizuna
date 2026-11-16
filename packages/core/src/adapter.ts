@@ -41,7 +41,15 @@ import { encodeStreamBody, EVENT_STREAM_MEDIA_TYPE, streamContentType, type Enco
 import { streamToolsOf } from './tool-events.js';
 import { createStreamTools, type StreamTools } from './tool-runner.js';
 import { DEFAULT_JOBS_PATH, flattenJobs, type Jobs, type JobsConfig } from './jobs.js';
-import { createJobRunner, jobFnAt, JobInputError, type JobRunner, type JobRunnerOptions, type JobErrorHandler } from './job-runner.js';
+import {
+    attemptJob,
+    createJobRunner,
+    jobFnAt,
+    JobInputError,
+    type JobRunner,
+    type JobRunnerOptions,
+    type JobErrorHandler,
+} from './job-runner.js';
 import {
     DispatchFailedSchema,
     DispatchResultSchema,
@@ -531,7 +539,7 @@ export const dispatchHandler = <HandlerContext>(meta: JobsMeta): RouteHandler<Ro
     for (const { jobKey } of flattenJobs(meta.jobs)) {
         const jobFn = jobFnAt(runner, jobKey);
         if (!jobFn) continue;
-        thunks[jobKey] = () => jobFn.run();
+        thunks[jobKey] = () => attemptJob(() => jobFn.run(), jobKey, meta.onError);
     }
     return (async () => {
         const result = await dispatchDueJobs({ jobs: meta.jobs } as unknown as ApiDefinition, thunks, {
@@ -601,8 +609,15 @@ export const runHandler = <HandlerContext>(meta: JobsMeta): RouteHandler<RouteDe
             };
         }
         try {
-            return await jobFn.run(input);
+            return await attemptJob(() => jobFn.run(input), job, meta.onError);
         } catch (error) {
+            if (error instanceof ResponseError) {
+                return {
+                    status: error.status,
+                    body: error.body,
+                    headers: error.headers,
+                };
+            }
             if (error instanceof JobInputError) {
                 return {
                     status: 422,

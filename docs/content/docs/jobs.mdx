@@ -152,6 +152,25 @@ An invalid expression throws when the config is assembled, naming the field.
 
 <Callout type="warn">Job handlers must be idempotent. Delivery is at least once everywhere, so a retry runs your handler again.</Callout>
 
+### Hearing about failures
+
+`onError` on `jobRunner` hears every failed run that no caller awaits: one a worker, a tick or `/jobs/run` ran, or one queued without a transport. A run fails when its handler throws or answers a status of 400 or more, which arrives as a `ResponseError`.
+
+```ts title="kizuna.config.ts"
+jobRunner: {
+    mode: 'http',
+    onError: (job, error) => {
+        Sentry.captureException(error, {
+            tags: {
+                job,
+            },
+        });
+    },
+},
+```
+
+It is called once per attempt, so a job that fails three times reports three times. Without it, each failure is logged. A `run` from a handler throws to that handler instead.
+
 ## Running and queueing
 
 Every handler receives a `jobs` runner shaped like the declaration, with two methods per job:
@@ -230,7 +249,7 @@ export const jobs = k.jobs({
 });
 ```
 
-`mode: 'in-process'` leaves the endpoints unmounted. A job that fails after the response has gone needs somewhere to report:
+`mode: 'in-process'` leaves the endpoints unmounted. A job that fails after the response has gone reports to [`onError`](#hearing-about-failures):
 
 ```ts title="kizuna.config.ts"
 export default defineConfig({

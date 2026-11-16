@@ -91,8 +91,9 @@ export interface JobDeliveryConfig {
      */
     transport?: JobTransport;
     /**
-     * Reached when a job fails after its response was sent, which is the only
-     * point where nothing else can report it.
+     * Reached by every failed run no caller awaits, from a worker,
+     * `/jobs/dispatch`, `/jobs/run`, or `queue` without a transport. Called once
+     * per attempt.
      */
     onError?: JobErrorHandler;
 }
