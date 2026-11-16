@@ -11,7 +11,7 @@ The transport API is new and still settling. The message shape and what a transp
 
 A transport carries a job from `jobs.indexUser.queue(...)` to the process that runs it.
 
-Kizuna ships none, so you write one against the queue you run.
+Kizuna ships one, for [pgmq](/docs/pgmq). For any other queue, you write one against it.
 
 ```ts title="job-transport.ts"
 import { defineJobTransport } from 'kizunajs';
@@ -89,6 +89,8 @@ start: async ({ jobs, run }) => {
 ```
 
 Call `run` once per message, and let its rejection propagate, which is how your queue learns to retry. A swallowed rejection reads as a successful queue.
+
+`run` rejects when the handler throws, and when it returns a status of 400 or more. A returned status rejects as a `ResponseError` carrying it, so a transport that can skip retries reads `error.status === 422` as [do not retry](/docs/jobs#return-status-and-retries).
 
 ## `register`
 

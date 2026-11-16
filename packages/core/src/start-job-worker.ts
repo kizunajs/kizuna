@@ -8,6 +8,7 @@ import {
     type JobsMeta,
     type JobWorker,
 } from './adapter.js';
+import { ResponseError } from './response-error.js';
 
 export interface StartJobWorkerOptions {
     /**
@@ -31,9 +32,11 @@ export interface StartJobWorkerOptions {
  *
  * Returns `undefined` when the transport does not implement `start`.
  *
- * Each message goes through the same runner `queue` writes to, so its input is
- * validated against the schema it lands on rather than the one it left, and a
- * rejection propagates for the transport to retry.
+ * Each message's input is validated against the schema it lands on.
+ *
+ * A handler that throws, or returns a status of 400 or more, rejects. A
+ * returned status rejects as a `ResponseError`, so a transport can tell a `422`
+ * from a `503`.
  *
  * @example
  * const worker = await startJobWorker(api);
@@ -74,7 +77,12 @@ export const startJobWorker = async (api: unknown, options?: StartJobWorkerOptio
         run: async (message) => {
             const jobFn = jobFnAt(runner, message.job);
             if (!jobFn) throw new Error(`No handler is bound for job "${message.job}" on this api.`);
-            await jobFn.run(message.input);
+            const response = (await jobFn.run(message.input)) as {
+                status: number;
+                body: unknown;
+            };
+            // A returned 503 asks for a retry as plainly as a thrown one does.
+            if (response.status >= 400) throw new ResponseError(response);
         },
     });
 };

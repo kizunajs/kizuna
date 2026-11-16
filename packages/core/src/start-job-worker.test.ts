@@ -4,6 +4,7 @@ import { Kizuna } from './kizuna.js';
 import { defineJobTransport, type JobMessage, type JobWorkerContext } from './job-transport.js';
 import { JOBS_META } from './adapter.js';
 import { startJobWorker } from './start-job-worker.js';
+import { ResponseError } from './response-error.js';
 
 interface Config {}
 
@@ -119,6 +120,49 @@ describe('startJobWorker', () => {
                 input: undefined,
             })
         ).rejects.toThrow('the disk is full');
+    });
+
+    it('rejects with the status a handler returns, so a returned 503 retries like a thrown one', async () => {
+        const queue = pulling();
+        const bound = handlers();
+        bound.cleanup.mockResolvedValue({
+            status: 503,
+            body: {
+                detail: 'The search index is rebuilding',
+            },
+        });
+        await startJobWorker(apiWith(queue.transport, bound), { logger: silent });
+
+        const rejection = await queue
+            .deliver({
+                job: 'cleanup',
+                input: undefined,
+            })
+            .catch((error: unknown) => error);
+        expect(rejection).toBeInstanceOf(ResponseError);
+        expect(rejection).toMatchObject({
+            status: 503,
+            message: 'The search index is rebuilding',
+        });
+    });
+
+    it('resolves when a handler returns a success status', async () => {
+        const queue = pulling();
+        const bound = handlers();
+        bound.cleanup.mockResolvedValue({
+            status: 200,
+            body: {
+                removed: 3,
+            },
+        });
+        await startJobWorker(apiWith(queue.transport, bound), { logger: silent });
+
+        await expect(
+            queue.deliver({
+                job: 'cleanup',
+                input: undefined,
+            })
+        ).resolves.toBeUndefined();
     });
 
     it('returns the transport’s worker, so a caller can stop draining', async () => {

@@ -19,6 +19,7 @@
         "adapters",
         "request-context",
         "jobs",
+        "pgmq",
         "---Clients---",
         "clients",
         "---Plugins---",
