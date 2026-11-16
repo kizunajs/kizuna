@@ -269,7 +269,9 @@ export default defineConfig({
     jobs,
     jobRunner: {
         mode: 'in-process',
-        transport: bullmq(connection),
+        transport: pgmq({
+            pool,
+        }),
     },
 });
 ```
@@ -279,7 +281,7 @@ kizuna.api.mount(app);
 startJobs(kizuna.api);
 ```
 
-If your queue hands work back rather than calling your job's URL, run a worker to pull from it:
+[pgmq](/docs/pgmq) keeps the queue in your own Postgres database. A queue that hands work back, like pgmq, needs a worker to pull from it:
 
 ```ts title="worker.ts"
 import { startJobWorker } from 'kizunajs/jobs';
@@ -365,14 +367,14 @@ export default defineConfig({
 });
 ```
 
-Kizuna ships no transports. QStash, BullMQ, pg-boss, Cloud Tasks, SQS, or a table in your own database all fit the same interface: see [Create a job transport](/docs/extend/create-job-transport).
+Kizuna ships one for [pgmq](/docs/pgmq). QStash, BullMQ, pg-boss, Cloud Tasks, SQS, or a table in your own database all fit the same interface: see [Create a job transport](/docs/extend/create-job-transport).
 
 A job is addressed by its dotted key, so a transport carries the name and the input. Queues come in two shapes, and the shape decides whether you run anything extra:
 
 | Shape               | Examples                           | You run                                    |
 | ------------------- | ---------------------------------- | ------------------------------------------ |
 | Delivers over HTTP  | QStash, Cloud Tasks, SQS to Lambda | nothing, the run endpoint is already there |
-| Hands the work back | BullMQ, pg-boss, your own table    | `startJobWorker(api)`                      |
+| Hands the work back | pgmq, BullMQ, pg-boss, your table  | `startJobWorker(api)`                      |
 
 `startJobWorker` returns `undefined` against a queue that needs no worker. Run it in the API's process or its own.
 

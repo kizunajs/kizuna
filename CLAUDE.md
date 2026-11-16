@@ -49,7 +49,9 @@ Jobs (`k.jobs`) are the one non-HTTP-shaped concept. Settled; don't relitigate.
 - `mode: 'in-process'` mounts neither, for a long-running server whose schedules `startJobs` ticks. Jobs there need no identity.
 - `run` and `queue`, never a bare call. `run` takes the input; `queue` takes a message (`input`, `runAt`, `dedupeKey`).
 
-Deliberate omissions: no first-party transports, no stored state, and no per-job cron generation. Retries, deduplication, and run history belong to the transport. An occurrence's dedupe key is `job@occurrenceISO`.
+`@kizunajs/pgmq` is the first-party transport, a pull queue in the app's own Postgres.
+
+Deliberate omissions: no stored state and no per-job cron generation. Retries, deduplication, and run history belong to the transport. An occurrence's dedupe key is `job@occurrenceISO`.
 
 # Tools
 
