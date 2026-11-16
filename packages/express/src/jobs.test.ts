@@ -339,9 +339,9 @@ describe('onJobError', () => {
                         }),
                     })
                     .handler(() => ({
-                        status: 200,
+                        status: 503,
                         body: {
-                            sent: 0,
+                            detail: 'The mailer is down',
                         },
                     })),
                 reconcile: k
@@ -380,6 +380,41 @@ describe('onJobError', () => {
         await vi.waitFor(() => expect(onJobError).toHaveBeenCalled());
         expect(onJobError.mock.calls[0]?.[0]).toBe('reconcile');
         expect((onJobError.mock.calls[0]?.[1] as Error).message).toBe('the index is offline');
+    });
+
+    it('counts a scheduled job that answers 503 as failed, and reports it', async () => {
+        const onJobError = vi.fn();
+        const response = await tick(buildAppWithout(onJobError));
+        expect(response.status).toBe(503);
+        expect(response.body).toMatchObject({
+            failed: ['sendDigests'],
+        });
+        expect(onJobError).toHaveBeenCalledWith(
+            'sendDigests',
+            expect.objectContaining({
+                status: 503,
+            })
+        );
+    });
+
+    it('reaches a job the run endpoint ran', async () => {
+        const onJobError = vi.fn();
+        const response = await request(buildAppWithout(onJobError))
+            .post('/jobs/run')
+            .set('authorization', 'Bearer cron-secret')
+            .send({
+                job: 'reconcile',
+                input: {
+                    since: '2026-11-01',
+                },
+            });
+        expect(response.status).toBe(500);
+        expect(onJobError).toHaveBeenCalledWith(
+            'reconcile',
+            expect.objectContaining({
+                message: 'the index is offline',
+            })
+        );
     });
 
     it('logs the failure when none is configured', async () => {

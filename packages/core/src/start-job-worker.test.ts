@@ -49,11 +49,12 @@ const pulling = () => {
     };
 };
 
-const apiWith = (transport: unknown, handlers: Record<string, unknown>) => ({
+const apiWith = (transport: unknown, handlers: Record<string, unknown>, onError?: (job: string, error: unknown) => void) => ({
     [JOBS_META]: {
         jobs,
         handlers,
         transport,
+        onError,
     },
 });
 
@@ -163,6 +164,52 @@ describe('startJobWorker', () => {
                 input: undefined,
             })
         ).resolves.toBeUndefined();
+    });
+
+    it('reports each failed attempt to the jobs’ onError', async () => {
+        const queue = pulling();
+        const bound = handlers();
+        const onError = vi.fn();
+        bound.cleanup.mockRejectedValue(new Error('the disk is full'));
+        await startJobWorker(apiWith(queue.transport, bound, onError), { logger: silent });
+
+        await expect(
+            queue.deliver({
+                job: 'cleanup',
+                input: undefined,
+            })
+        ).rejects.toThrow('the disk is full');
+        expect(onError).toHaveBeenCalledWith(
+            'cleanup',
+            expect.objectContaining({
+                message: 'the disk is full',
+            })
+        );
+    });
+
+    it('logs a failed attempt when no onError is configured', async () => {
+        const queue = pulling();
+        const bound = handlers();
+        const logger = {
+            log: vi.fn(),
+            warn: vi.fn(),
+            error: vi.fn(),
+        };
+        bound.cleanup.mockResolvedValue({
+            status: 503,
+            body: {
+                detail: 'The disk is busy',
+            },
+        });
+        await startJobWorker(apiWith(queue.transport, bound), { logger });
+
+        await expect(
+            queue.deliver({
+                job: 'cleanup',
+                input: undefined,
+            })
+        ).rejects.toBeInstanceOf(ResponseError);
+        expect(logger.error).toHaveBeenCalledWith('[kizuna] Job "cleanup" failed:', expect.any(ResponseError));
     });
 
     it('returns the transport’s worker, so a caller can stop draining', async () => {
