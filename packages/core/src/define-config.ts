@@ -10,7 +10,7 @@ import { flattenRoutes, type RoutesWithHandlerContext } from './handler-pipeline
 import { assertJobRunner, jobClaims, type Jobs, type JobsArg, type JobRunnerConfig } from './jobs.js';
 import type { GroupOptions, GroupSet } from './groups.js';
 import type { AssembledRoutes } from './group-routes.js';
-import { assembleRoutes } from './routes.js';
+import { assembleRoutes, assertNoContentResponses } from './routes.js';
 import { problemDetails, type GuardBody, type GuardOutput, type GuardSchemaCheck } from './problem-details.js';
 import { readObjectShape } from './zod-internals.js';
 import { streamToolsOf } from './tool-events.js';
@@ -398,6 +398,7 @@ export const defineConfig = <
                 `Route '${routeKey}' is \`hidden\` and declares \`tool\`. A hidden route never publishes, so remove one of them.`
             );
         }
+        assertNoContentResponses(route, routeKey);
         if (route.rawBody === true && route.contentType === 'multipart/form-data') {
             throw new Error(
                 `Route '${routeKey}' declares \`rawBody\` on a \`multipart/form-data\` body. A multipart body is read as a stream of parts, so kizuna cannot keep it as text. Remove \`rawBody\`, or take the body as JSON.`

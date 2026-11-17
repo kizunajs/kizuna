@@ -59,6 +59,10 @@ describe.each([
         expect(await messageIdsFor('contract-collection.ts', parserOptions)).toEqual(['collection', 'collection']);
     });
 
+    it('flags z.undefined(), which has no JSON form', async () => {
+        expect(await messageIdsFor('contract-undefined.ts', parserOptions)).toEqual(['undefined']);
+    });
+
     it('flags a union of objects with nothing on the wire naming the branch', async () => {
         expect(await messageIdsFor('contract-union.ts', parserOptions)).toEqual(['union']);
     });

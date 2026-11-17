@@ -117,6 +117,7 @@ const createSourceResolver = (): SchemaResolver => {
 const MESSAGE_IDS = {
     coerce: ['coerce', 'coerceReference'],
     collection: ['collection', 'collectionReference'],
+    undefined: ['undefined', 'undefinedReference'],
     union: ['union', 'unionReference'],
     transform: ['transform', 'transformReference'],
     nullable: ['nullable', 'nullableReference'],
@@ -209,6 +210,10 @@ export const noUnsupportedSchema = ESLintUtils.RuleCreator.withoutDocs({
                 'z.set and z.map are not supported in a Kizuna schema. JSON has neither, so the value arrives as an empty object. Use z.array() for a set and z.record() for a map.',
             collectionReference:
                 'This schema uses z.set or z.map, which JSON cannot carry. Use z.array() for a set and z.record() for a map.',
+            undefined:
+                'z.undefined() has no JSON form, so the generated clients read it as a value. Use z.void() for a response with no content, or .optional() for a field that may be left out.',
+            undefinedReference:
+                'This schema uses z.undefined(), which has no JSON form. Use z.void() for a response with no content, or .optional() for a field that may be left out.',
             union: 'A union of objects needs a discriminator, or nothing on the wire says which branch arrived. Use z.discriminatedUnion() instead.',
             unionReference:
                 'This schema unions objects with no discriminator, so nothing on the wire says which branch arrived. Use z.discriminatedUnion() instead.',
