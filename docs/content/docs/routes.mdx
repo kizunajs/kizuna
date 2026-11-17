@@ -434,6 +434,8 @@ return {
 };
 ```
 
+A `204`, `205` or `304` carries no content (RFC 9110), so `defineConfig` throws when one declares anything else.
+
 To type response headers, give the status a `{ body, headers }` object:
 
 ```ts

@@ -5,7 +5,9 @@ import {
     findCoercedSchemaPath,
     isBinarySchema,
     isFileSchema,
+    isVoidSchema,
     readDef,
+    readDefType,
     readObjectShape,
     resolveBaseType,
     unwrapOptionalWrappers,
@@ -195,6 +197,34 @@ const assertToolDescribed = (route: RouteDefinition, routeKey: string): void => 
         `Route "${routeKey}" declares \`tool\` but describes nothing. A model reads the description before it calls, ` +
             'so give the route a `summary`, or `tool: { description }`.'
     );
+};
+
+/**
+ * The statuses RFC 9110 gives no content: 204 (section 15.3.5), 205 (15.3.6)
+ * and 304 (15.4.5).
+ */
+const NO_CONTENT_STATUSES: ReadonlySet<number> = new Set([204, 205, 304]);
+
+/**
+ * A response with no content is declared `z.void()`. `z.undefined()` reads the
+ * same in a handler, but the OpenAPI document and the generated clients take
+ * it as a JSON body and try to decode one.
+ */
+export const assertNoContentResponses = (route: RouteDefinition, routeKey: string): void => {
+    for (const [status, response] of Object.entries(route.responses)) {
+        for (const schema of responseSchemas(response)) {
+            if (readDefType(schema) !== 'undefined') continue;
+            throw new Error(
+                `Route '${routeKey}' declares its ${status} response as \`z.undefined()\`, which the generated clients read as a JSON body. ` +
+                    'Declare `z.void()` for a response with no content.'
+            );
+        }
+        if (!NO_CONTENT_STATUSES.has(Number(status))) continue;
+        if (!isStreamResponse(response) && isVoidSchema(isZodSchema(response) ? response : response.body)) continue;
+        throw new Error(
+            `Route '${routeKey}' declares a body on its ${status} response. A ${status} carries no content, so declare it \`z.void()\`.`
+        );
+    }
 };
 
 const validateRoutes = (routes: Routes, prefix?: string): void => {
