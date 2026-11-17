@@ -33,6 +33,7 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
     "@eslint/js": "^9.39.5",
+    "@hey-api/openapi-ts": "0.99.0",
     "@kizunajs/eslint-plugin": "workspace:*",
     "@kizunajs/fetch": "workspace:*",
     "@release-it/conventional-changelog": "^11.0.1",
