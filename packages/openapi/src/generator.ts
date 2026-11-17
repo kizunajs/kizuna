@@ -28,6 +28,7 @@ import {
     encodeForWire,
 } from 'kizunajs/generator';
 import { getStatusText } from 'kizunajs';
+import { ValidationErrorSchema } from 'kizunajs/schemas';
 import type { ApiDefinition, RequiredPermissions, SecurityRequirement } from 'kizunajs';
 import { OPENAPI_PLUGIN_SLUG } from './plugin.js';
 import type { StreamResponseDefinition } from 'kizunajs';
@@ -413,31 +414,7 @@ const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWa
 
             const hasValidation = route.body || route.query;
             if (hasValidation) {
-                const validationSchema = {
-                    type: 'object',
-                    required: ['type', 'title', 'status', 'detail', 'errors'],
-                    properties: {
-                        type: { type: 'string' },
-                        title: { type: 'string' },
-                        status: { type: 'integer' },
-                        detail: { type: 'string' },
-                        errors: {
-                            type: 'array',
-                            items: {
-                                type: 'object',
-                                required: ['code', 'path', 'message'],
-                                properties: {
-                                    code: { type: 'string' },
-                                    path: {
-                                        type: 'array',
-                                        items: { type: 'string' },
-                                    },
-                                    message: { type: 'string' },
-                                },
-                            },
-                        },
-                    },
-                };
+                const validationSchema = toJsonSchema(ValidationErrorSchema);
                 const existing = operation.responses['400'];
                 if (existing) {
                     const existingSchema = existing.content?.['application/problem+json']?.schema;
@@ -445,9 +422,12 @@ const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWa
                         description: getStatusText(400),
                         content: {
                             'application/problem+json': {
-                                schema: {
-                                    oneOf: [existingSchema, validationSchema].filter(Boolean),
-                                },
+                                schema:
+                                    existingSchema?.$ref === validationSchema.$ref
+                                        ? validationSchema
+                                        : {
+                                              oneOf: [existingSchema, validationSchema].filter(Boolean),
+                                          },
                             },
                         },
                     };
