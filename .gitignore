@@ -27,3 +27,4 @@ build/
 # planning notes
 plans/
 tests/.generated-client-*.ts
+tests/.generated-openapi-*/
