@@ -402,3 +402,38 @@ describe('a branded schema', () => {
         expect(source).not.toContain('KizunaBrand');
     });
 });
+
+describe('a model that holds itself', () => {
+    const EventFilterSchema = Kizuna.model({
+        title: 'EventFilter',
+        schema: z.object({
+            city: z.string().optional(),
+            get or() {
+                return z.array(EventFilterSchema).optional();
+            },
+        }),
+    });
+
+    const output = generateFetchClient(
+        defineConfig({
+            routes: [
+                k.routes({
+                    searchEvents: k.route({
+                        method: 'POST',
+                        path: '/events/search',
+                        summary: 'Search events',
+                        tool: true,
+                        body: EventFilterSchema,
+                        responses: {
+                            200: z.array(EventFilterSchema),
+                        },
+                    }),
+                }),
+            ],
+        }).api
+    );
+
+    it('writes a type that holds a list of itself', () => {
+        expect(output).toContain('or?: Array<EventFilter>;');
+    });
+});

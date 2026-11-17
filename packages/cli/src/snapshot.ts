@@ -5,6 +5,8 @@ import {
     walkApi,
     flattenJobs,
     readDef,
+    readMetaId,
+    readModelSchema,
     readObjectShape,
     resolveResponseBody,
     toToolName,
@@ -21,6 +23,7 @@ export type SchemaNode =
     | { kind: 'object'; nullable?: true; fields: Record<string, { optional: boolean; schema: SchemaNode }>; refinements?: number }
     | { kind: 'array'; nullable?: true; element: SchemaNode; refinements?: number }
     | { kind: 'enum'; nullable?: true; values: string[]; refinements?: number }
+    | { kind: 'model'; nullable?: true; model: string; refinements?: number }
     | { kind: string; nullable?: true; refinements?: number };
 
 export interface RouteSnapshot {
@@ -81,36 +84,44 @@ const refinementCount = (schema: z.core.$ZodType): number | undefined => {
 };
 
 /**
- * A Zod schema reduced to the shape a comparison reads.
+ * A Zod schema reduced to the shape a comparison reads. A model that holds
+ * itself is written out once, and inside itself as a reference by its title.
+ *
+ * `inside` is the objects the walk is in, so it can tell when it has gone round.
  */
-export const toSchemaNode = (schema: z.core.$ZodType): SchemaNode => {
+export const toSchemaNode = (schema: z.core.$ZodType, inside: readonly z.core.$ZodType[] = []): SchemaNode => {
     const { inner, nullable } = unwrapOptionalWrappers(schema);
     const def = readDef(inner);
+    const nullability: { nullable?: true } = nullable ? { nullable: true } : {};
+
+    // A model copied by `.describe()` or `.meta()` is still the model.
+    const identity = readModelSchema(inner) ?? inner;
+    if (inside.includes(identity)) return { kind: 'model', ...nullability, model: readMetaId(inner) ?? '' };
 
     // `z.union([UserSchema, z.null()])` says what `.nullable()` says.
     const options = def.type === 'union' ? (def.options ?? []) : [];
     const nonNull = options.filter((option) => readDef(option).type !== 'null');
     if (nonNull.length === 1 && options.length > 1) {
         return {
-            ...toSchemaNode(nonNull[0]!),
+            ...toSchemaNode(nonNull[0]!, inside),
             nullable: true,
         };
     }
 
-    const nullability: { nullable?: true } = nullable ? { nullable: true } : {};
     const refinements = refinementCount(inner);
     const carry = refinements === undefined ? {} : { refinements };
 
     const shape = readObjectShape(inner);
     if (shape) {
         const fields: Record<string, { optional: boolean; schema: SchemaNode }> = {};
+        const within = [...inside, identity];
         for (const [key, field] of Object.entries(shape)) {
-            fields[key] = { optional: unwrapOptionalWrappers(field).optional, schema: toSchemaNode(field) };
+            fields[key] = { optional: unwrapOptionalWrappers(field).optional, schema: toSchemaNode(field, within) };
         }
         return { kind: 'object', ...nullability, fields, ...carry };
     }
 
-    if (def.type === 'array' && def.element) return { kind: 'array', ...nullability, element: toSchemaNode(def.element), ...carry };
+    if (def.type === 'array' && def.element) return { kind: 'array', ...nullability, element: toSchemaNode(def.element, inside), ...carry };
     if (def.type === 'enum') {
         return {
             kind: 'enum',

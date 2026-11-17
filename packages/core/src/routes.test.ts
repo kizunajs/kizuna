@@ -156,6 +156,115 @@ describe('k.routes', () => {
     });
 });
 
+const EventFilterSchema = Kizuna.model({
+    title: 'EventFilter',
+    schema: z.object({
+        city: z.string().optional(),
+        get or() {
+            return z.array(EventFilterSchema).optional();
+        },
+    }),
+});
+
+const FolderSchema = Kizuna.model({
+    title: 'Folder',
+    schema: z.object({
+        name: z.string(),
+        get folders() {
+            return z.record(z.string(), FolderSchema);
+        },
+    }),
+});
+
+const CategorySchema = z.object({
+    name: z.string(),
+    get subcategories() {
+        return z.array(CategorySchema);
+    },
+});
+
+const TaskSchema = Kizuna.model({
+    title: 'Task',
+    schema: z.object({
+        title: z.string(),
+        get parent() {
+            return TaskSchema.optional();
+        },
+    }),
+});
+
+const CommentSchema: z.ZodType = z.lazy(() =>
+    z.object({
+        text: z.string(),
+        replies: z.array(CommentSchema),
+    })
+);
+
+const routeAnswering = (schema: z.ZodType) =>
+    k.route({
+        method: 'GET',
+        path: '/items',
+        responses: {
+            200: schema,
+        },
+    });
+
+describe('k.routes schemas that hold themselves', () => {
+    it('accepts a model that holds itself in a list', () => {
+        expect(() =>
+            k.routes.users({
+                searchEvents: k.route({
+                    method: 'POST',
+                    path: '/events/search',
+                    body: EventFilterSchema,
+                    responses: {
+                        200: z.array(EventFilterSchema),
+                    },
+                }),
+            })
+        ).not.toThrow();
+    });
+
+    it('accepts a model that holds itself in a record', () => {
+        expect(() =>
+            k.routes.users({
+                getFolder: routeAnswering(FolderSchema),
+            })
+        ).not.toThrow();
+    });
+
+    it('throws on a schema that holds itself without a name', () => {
+        expect(() =>
+            k.routes.users({
+                listCategories: routeAnswering(CategorySchema),
+            })
+        ).toThrowError(
+            'Route "listCategories" holds a schema inside itself at "responses.200.subcategories". A client can only refer to a schema by its name, ' +
+                "so wrap it in Kizuna.model({ title: 'Comment', schema: ... })."
+        );
+    });
+
+    it('throws on a model that holds itself directly in a field', () => {
+        expect(() =>
+            k.routes.users({
+                getTask: routeAnswering(TaskSchema),
+            })
+        ).toThrowError(
+            'Route "getTask" holds a model directly inside itself at "responses.200.parent". A Swift struct cannot contain itself, so hold it in a list, or hold its id.'
+        );
+    });
+
+    it('throws on z.lazy and shows the getter', () => {
+        expect(() =>
+            k.routes.users({
+                listComments: routeAnswering(CommentSchema),
+            })
+        ).toThrowError(
+            'Route "listComments" uses z.lazy at "responses.200", which has no type a client can name.\nMake the schema a Kizuna.model'
+        );
+    });
+});
+
 describe('k.routes z.coerce ban', () => {
     it('throws when a top-level query schema is coerced', () => {
         expect(() =>

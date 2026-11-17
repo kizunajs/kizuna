@@ -28,12 +28,15 @@ const elementOf = (schema: SchemaNode): SchemaNode | undefined =>
 const valuesOf = (schema: SchemaNode): string[] | undefined =>
     schema.kind === 'enum' ? (schema as Extract<SchemaNode, { kind: 'enum' }>).values : undefined;
 
+const modelOf = (schema: SchemaNode): string | undefined =>
+    schema.kind === 'model' ? (schema as Extract<SchemaNode, { kind: 'model' }>).model : undefined;
+
 /**
  * What a reader sees when the kinds differ, so `array` reads as `array<string>`.
  */
 const describeKind = (schema: SchemaNode): string => {
     const element = elementOf(schema);
-    return element ? `array<${describeKind(element)}>` : schema.kind;
+    return element ? `array<${describeKind(element)}>` : (modelOf(schema) ?? schema.kind);
 };
 
 /**
@@ -64,7 +67,7 @@ export const diffSchemas = (
         return [{ breaking: direction === 'response', path, summary: `${path || 'the body'} is gone` }];
     }
 
-    if (before.kind !== after.kind) {
+    if (before.kind !== after.kind || modelOf(before) !== modelOf(after)) {
         return [
             {
                 breaking: true,

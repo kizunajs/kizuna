@@ -3,12 +3,14 @@ import { ROUTES_GROUP, type Routes, type RouteDefinition, type ResponseDefinitio
 import { isRouteDefinition } from './handler-pipeline.js';
 import {
     findCoercedSchemaPath,
+    findSelfReferenceIssue,
     isBinarySchema,
     isFileSchema,
     readDef,
     readObjectShape,
     resolveBaseType,
     unwrapOptionalWrappers,
+    type SelfReferenceIssue,
 } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
 import { parsePath, type PathParamsCheck } from './path-params.js';
@@ -29,10 +31,9 @@ const responseSchemas = (response: ResponseDefinition): z.core.$ZodType[] => {
 };
 
 /**
- * Throws if any of a route's schemas use `z.coerce`. Built-in query/path/header
- * coercion makes it redundant.
+ * Every schema a route declares, each with where it sits.
  */
-const assertNoCoercion = (route: RouteDefinition, routeKey: string): void => {
+const schemasOf = (route: RouteDefinition): Array<[string, z.core.$ZodType]> => {
     const targets: Array<[string, z.core.$ZodType | undefined]> = [
         ['body', route.body],
         ['query', route.query],
@@ -44,8 +45,15 @@ const assertNoCoercion = (route: RouteDefinition, routeKey: string): void => {
             targets.push([`responses.${status}`, schema]);
         }
     }
-    for (const [field, schema] of targets) {
-        if (!schema) continue;
+    return targets.filter((target): target is [string, z.core.$ZodType] => target[1] !== undefined);
+};
+
+/**
+ * Throws if any of a route's schemas use `z.coerce`. Built-in query/path/header
+ * coercion makes it redundant.
+ */
+const assertNoCoercion = (route: RouteDefinition, routeKey: string): void => {
+    for (const [field, schema] of schemasOf(route)) {
         const coercedPath = findCoercedSchemaPath(schema);
         if (coercedPath === undefined) continue;
         const location = coercedPath ? `${field}.${coercedPath}` : field;
@@ -54,6 +62,39 @@ const assertNoCoercion = (route: RouteDefinition, routeKey: string): void => {
                 `kizuna automatically coerces query, path, and header params to their declared types for you, ` +
                 `so use z.number(), z.date(), or z.bigint() instead.`
         );
+    }
+};
+
+const selfReferenceMessage = (routeKey: string, location: string, kind: SelfReferenceIssue['kind']): string => {
+    if (kind === 'lazy') {
+        return (
+            `Route "${routeKey}" uses z.lazy at "${location}", which has no type a client can name.\n` +
+            'Make the schema a Kizuna.model and refer to it with a getter:\n' +
+            '    get replies() {\n' +
+            '        return z.array(CommentSchema);\n' +
+            '    },'
+        );
+    }
+    if (kind === 'unnamed') {
+        return (
+            `Route "${routeKey}" holds a schema inside itself at "${location}". A client can only refer to a schema by its name, ` +
+            "so wrap it in Kizuna.model({ title: 'Comment', schema: ... })."
+        );
+    }
+    return (
+        `Route "${routeKey}" holds a model directly inside itself at "${location}". A Swift struct cannot contain itself, ` +
+        'so hold it in a list, or hold its id.'
+    );
+};
+
+/**
+ * Throws when a schema holds itself in a way no client can write.
+ */
+const assertSelfReferencesNamed = (route: RouteDefinition, routeKey: string): void => {
+    for (const [field, schema] of schemasOf(route)) {
+        const issue = findSelfReferenceIssue(schema);
+        if (issue === undefined) continue;
+        throw new Error(selfReferenceMessage(routeKey, issue.path ? `${field}.${issue.path}` : field, issue.kind));
     }
 };
 
@@ -211,6 +252,7 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
             assertHeadersSendable(value, fullKey);
             assertFormFieldsSendable(value, fullKey);
             assertNoCoercion(value, fullKey);
+            assertSelfReferencesNamed(value, fullKey);
             assertValidStreams(value, fullKey);
             assertToolDescribed(value, fullKey);
             resolveCoercionPlans(value);

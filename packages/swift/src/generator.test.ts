@@ -2552,3 +2552,41 @@ describe('Swift generator: brands', () => {
         ).toThrow('brand "CenterId" wraps both String and Int');
     });
 });
+
+describe('Swift generator: a model that holds itself', () => {
+    const EventFilterSchema = Kizuna.model({
+        title: 'EventFilter',
+        schema: z.object({
+            city: z.string().optional(),
+            get or() {
+                return z.array(EventFilterSchema).optional();
+            },
+        }),
+    });
+
+    const output = generateSwiftClient(
+        defineConfig({
+            ...config,
+            routes: [
+                k.routes({
+                    searchEvents: k.route({
+                        method: 'POST',
+                        path: '/events/search',
+                        summary: 'Search events',
+                        tool: true,
+                        body: EventFilterSchema,
+                        responses: {
+                            200: z.array(EventFilterSchema),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+
+    it('writes a struct that holds a list of itself', () => {
+        expect(output).toContain('public struct EventFilter: Codable, Sendable, Equatable');
+        expect(output).toContain('public let or: [EventFilter]?');
+    });
+});

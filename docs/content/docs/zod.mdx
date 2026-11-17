@@ -60,7 +60,7 @@ Routes deprecate too, with dates and sunset headers. See [Deprecations](/docs/de
 
 ## Named schemas
 
-[`Kizuna.model`](/docs/reference/kizuna-model) registers a schema under a stable name, so the OpenAPI document emits `#/components/schemas/User` and the Swift and Kotlin clients emit a `User` type, instead of repeating the shape inline everywhere it appears. Only names registered through `Kizuna.model` reach the generators.
+[`Kizuna.model`](/docs/reference/kizuna-model) registers a schema under a stable name, so the OpenAPI document emits `#/components/schemas/User` and the Swift and Kotlin clients emit a `User` type, instead of repeating the shape inline everywhere it appears. Only names registered through `Kizuna.model` reach the generators. A model can also [hold itself](/docs/reference/kizuna-model#a-model-that-holds-itself), like a task with subtasks.
 
 ## Branded IDs
 

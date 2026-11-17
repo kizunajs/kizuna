@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { Kizuna } from 'kizunajs';
 import { diffSchemas as diffSchemaNodes } from './diff-schemas.js';
 import { toSchemaNode } from './snapshot.js';
 
@@ -201,5 +202,35 @@ describe('nothing changing', () => {
 
         expect(diffSchemas(schema, schema, 'request')).toEqual([]);
         expect(diffSchemas(undefined, undefined, 'response')).toEqual([]);
+    });
+});
+
+describe('a model that holds itself', () => {
+    const before = Kizuna.model({
+        title: 'EventFilter',
+        schema: z.object({
+            city: z.string().optional(),
+            get or() {
+                return z.array(before).optional();
+            },
+        }),
+    });
+    const after = Kizuna.model({
+        title: 'EventFilter',
+        schema: z.object({
+            city: z.string().optional(),
+            country: z.string(),
+            get or() {
+                return z.array(after).optional();
+            },
+        }),
+    });
+
+    it('is quiet when nothing changed', () => {
+        expect(summaries(before, before, 'request')).toEqual([]);
+    });
+
+    it('reports a field it gains once, not once per level', () => {
+        expect(summaries(before, after, 'request')).toEqual(['BREAKING country is now required']);
     });
 });

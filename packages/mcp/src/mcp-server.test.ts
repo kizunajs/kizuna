@@ -1911,3 +1911,43 @@ describe('MCP server: request context in guards', () => {
         await close();
     });
 });
+
+describe('a tool whose input holds itself', () => {
+    const EventFilterSchema = Kizuna.model({
+        title: 'EventFilter',
+        schema: z.object({
+            city: z.string().optional(),
+            get or() {
+                return z.array(EventFilterSchema).optional();
+            },
+        }),
+    });
+
+    it('lists the input with a $ref to itself', async () => {
+        const { client, close } = await connectMcpClient(
+            defineConfig({
+                routes: [
+                    k.routes({
+                        searchEvents: k.route({
+                            method: 'POST',
+                            path: '/events/search',
+                            summary: 'Search events',
+                            tool: true,
+                            body: EventFilterSchema,
+                            responses: {
+                                200: z.array(EventFilterSchema),
+                            },
+                        }),
+                    }),
+                ],
+            }).api
+        );
+
+        const { tools } = await client.listTools();
+        const searchEvents = tools.find((tool) => tool.name === 'search_events')!;
+
+        expect(JSON.stringify(searchEvents.inputSchema)).toContain('"$ref":"#/$defs/EventFilter"');
+
+        await close();
+    });
+});
