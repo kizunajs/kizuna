@@ -130,6 +130,24 @@ const calleeName = (node: TSESTree.CallExpression): string | undefined => {
     return undefined;
 };
 
+/**
+ * Whether a call declares routes: `k.route(...)`, `k.routes(...)`, or a group like
+ * `k.routes.users(...)` or `k.routes.workspaces.members(...)`.
+ */
+const declaresRoutes = (call: TSESTree.CallExpression): boolean => {
+    let callee: TSESTree.Node = call.callee;
+    while (callee.type === 'MemberExpression') {
+        if (
+            callee.property.type === 'Identifier' &&
+            (callee.property.name === AUTHORING_NAMES.route || callee.property.name === AUTHORING_NAMES.routes)
+        ) {
+            return true;
+        }
+        callee = callee.object;
+    }
+    return false;
+};
+
 interface SchemaSite {
     node: TSESTree.Node;
     position: SchemaPosition;
@@ -158,7 +176,7 @@ const schemaNodesOf = (call: TSESTree.CallExpression): SchemaSite[] => {
             : [];
     }
 
-    if (name !== AUTHORING_NAMES.routes && name !== AUTHORING_NAMES.defineConfig) return [];
+    if (name !== AUTHORING_NAMES.defineConfig && !declaresRoutes(call)) return [];
 
     const nodes: SchemaSite[] = [];
     const visit = (node: TSESTree.Node): void => {
