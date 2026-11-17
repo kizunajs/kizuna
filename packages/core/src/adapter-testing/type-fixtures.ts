@@ -433,6 +433,7 @@ export const pluginTypeContract = defineConfig({
     ],
     jobRunner: {
         mode: 'http',
+        transport: false,
     },
     jobs: pluginTypeK.jobs({
         reindex: pluginTypeK.job({

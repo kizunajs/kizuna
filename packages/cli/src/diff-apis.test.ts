@@ -223,6 +223,7 @@ describe('what a document cannot carry', () => {
         }),
         jobRunner: {
             mode: 'long-running',
+            transport: false,
         },
     }).api;
 

@@ -100,6 +100,7 @@ export default defineConfig({
     jobs,
     jobRunner: {
         mode: 'http',
+        transport: false,
     },
     auth: {
         identities: {
@@ -154,11 +155,12 @@ An invalid expression throws when the config is assembled, naming the field.
 
 ### Hearing about failures
 
-`onError` on `jobRunner` hears every failed run that no caller awaits: one a worker, a tick or `/jobs/run` ran, or one queued without a transport. A run fails when its handler throws or answers a status of 400 or more, which arrives as a `ResponseError`.
+`onError` on `jobRunner` hears every failed run that no caller awaits: one a worker, a tick or `/jobs/run` ran, or one queued with `transport: false`. A run fails when its handler throws or answers a status of 400 or more, which arrives as a `ResponseError`.
 
 ```ts title="kizuna.config.ts"
 jobRunner: {
     mode: 'http',
+    transport: false,
     onError: (job, error) => {
         Sentry.captureException(error, {
             tags: {
@@ -258,6 +260,7 @@ export default defineConfig({
     jobs,
     jobRunner: {
         mode: 'long-running',
+        transport: false,
         onError: (job, error) => Sentry.captureException(error, { tags: { job } }),
     },
 });
@@ -330,6 +333,7 @@ export default defineConfig({
     },
     jobRunner: {
         mode: 'http',
+        transport: false,
         method: 'GET',
     },
 });

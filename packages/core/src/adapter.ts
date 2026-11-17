@@ -487,8 +487,8 @@ export const warnUnsupportedJobOptions = (
     const named = retrying.map((jobKey) => `"${jobKey}"`).join(', ');
     if (!transport) {
         logger.warn(
-            `[kizuna] ${named} declare \`retry\`, but no transport is configured, so a failed run is not retried. ` +
-                'Pass one as `jobRunner.transport` in `kizuna.config.ts` to make retrying real.'
+            `[kizuna] ${named} declare \`retry\`, but \`jobRunner.transport\` is \`false\`, so a failed run is not retried. ` +
+                'Pass a transport in `kizuna.config.ts` to make retrying real.'
         );
         return;
     }
