@@ -47,6 +47,10 @@ describe.each([
         expect(await messageIdsFor('contract-local.ts', parserOptions)).toEqual(['coerceReference']);
     });
 
+    it('checks a route on its own, in a group, and in a nested group', async () => {
+        expect(await messageIdsFor('contract-grouped.ts', parserOptions)).toEqual(['coerce', 'coerce', 'coerce']);
+    });
+
     it('uses the direct variant for inline contract schemas', async () => {
         expect(await messageIdsFor('contract-inline.ts', parserOptions)).toEqual(['coerce']);
     });
