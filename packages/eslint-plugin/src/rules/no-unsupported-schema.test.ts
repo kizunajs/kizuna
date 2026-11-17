@@ -71,6 +71,10 @@ describe.each([
         expect(await messageIdsFor('contract-transform.ts', parserOptions)).toEqual(['transform']);
     });
 
+    it('looks inside a union, and leaves one of values alone', async () => {
+        expect(await messageIdsFor('contract-union-fields.ts', parserOptions)).toEqual(['unsendableQuery', 'unsendableHeader']);
+    });
+
     it('flags a field its part of the request cannot carry, and leaves JSON bodies and responses alone', async () => {
         expect(await messageIdsFor('contract-fields.ts', parserOptions)).toEqual([
             'unsendablePath',

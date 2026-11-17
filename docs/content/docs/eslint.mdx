@@ -145,7 +145,7 @@ JSON bodies and responses can carry `null`, so `.nullable()` there is untouched.
 
 ### A field its part of the request cannot carry
 
-A path parameter and a header carry one value, a query carries values and lists of values, and a form carries those plus files. An object anywhere in those, a list in a header, or `BinarySchema` in a form can't be sent:
+A path parameter and a header carry one value, a query carries values and lists of values, and a form carries those plus files. An object anywhere in those, inside a union too, a list in a header, or `BinarySchema` in a form can't be sent:
 
 ```ts
 // flagged
