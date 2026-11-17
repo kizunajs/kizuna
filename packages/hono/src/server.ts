@@ -30,6 +30,8 @@ import {
     parseFetchBody,
     entriesToObject,
     headersToObject,
+    isMethodOverride,
+    METHOD_OVERRIDE_HEADER,
 } from 'kizunajs/adapter';
 import type { SecurityScheme } from 'kizunajs';
 
@@ -119,11 +121,16 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
         routeKey: string,
         route: RouteDefinition,
         lane: Routes,
-        resolvedRouter: CoreRouter<Routes, HonoHandlerContext<Env>>
+        resolvedRouter: CoreRouter<Routes, HonoHandlerContext<Env>>,
+        override = false
     ): void => {
-        const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete' | 'options';
+        const method = override ? 'post' : (route.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete' | 'options');
         const shared = sharedSegmentRoute(route.path);
         const kizunaHandler = async (c: Context<E>, next: Next) => {
+            if (override && !isMethodOverride(c.req.method, c.req.header(METHOD_OVERRIDE_HEADER), c.req.header('content-type'))) {
+                await next();
+                return;
+            }
             const url = new URL(c.req.url);
             const params: PathParamsResult = shared
                 ? shared.readParams(url.pathname)
@@ -142,7 +149,7 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
 
             const adapterRequest: AdapterRequest<Request> = {
                 request: c.req.raw,
-                method: c.req.method,
+                method: override ? 'GET' : c.req.method,
                 resolution:
                     params.kind === 'malformed-path'
                         ? params
@@ -152,10 +159,10 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
                               route,
                               params: params.params,
                           },
-                query: entriesToObject(url.searchParams),
+                query: override ? entriesToObject(new URLSearchParams(await c.req.raw.text())) : entriesToObject(url.searchParams),
                 headers: headersToObject(c.req.raw.headers),
-                readBody: (r: RouteDefinition) => parseFetchBody(c.req.raw, r),
-                readRawBody: () => c.req.raw.text(),
+                readBody: (r: RouteDefinition) => (override ? undefined : parseFetchBody(c.req.raw, r)),
+                readRawBody: () => (override ? '' : c.req.raw.text()),
             };
 
             return pipeline.handle({
@@ -182,12 +189,21 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
         );
     };
 
+    // A POST standing in for a GET registers ahead of every route, so it is seen before a POST on the same path.
+    const mountOverrides = (lane: Routes, resolvedRouter: CoreRouter<Routes, HonoHandlerContext<Env>>): void => {
+        for (const { routeKey, route } of pipeline.eachRoute(lane, resolvedRouter)) {
+            if (route.method === 'GET') mountRoute(routeKey, route, lane, resolvedRouter, true);
+        }
+    };
+
     const mountLane = (lane: Routes, resolvedRouter: CoreRouter<Routes, HonoHandlerContext<Env>>): void => {
         for (const { routeKey, route } of pipeline.eachRoute(lane, resolvedRouter)) {
             mountRoute(routeKey, route, lane, resolvedRouter);
         }
     };
 
+    mountOverrides(api.routes, api[ROUTER_META] as CoreRouter<Routes, HonoHandlerContext<Env>>);
+    mountOverrides(pluginRoutesOf(api), pluginRouterOf(api) as CoreRouter<Routes, HonoHandlerContext<Env>>);
     mountLane(api.routes, api[ROUTER_META] as CoreRouter<Routes, HonoHandlerContext<Env>>);
     mountLane(pluginRoutesOf(api), pluginRouterOf(api) as CoreRouter<Routes, HonoHandlerContext<Env>>);
 

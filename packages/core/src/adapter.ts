@@ -1901,6 +1901,24 @@ const renderResult = (
 };
 
 /**
+ * The header a POST carries to be read as a GET, for a query too long for a URL.
+ */
+export const METHOD_OVERRIDE_HEADER = 'x-http-method-override';
+
+/**
+ * Whether a request is a POST standing in for a GET: `X-HTTP-Method-Override:
+ * GET`, with the query as an `application/x-www-form-urlencoded` body. Only
+ * `GET` is honored, so a form on another site can never turn a POST into a
+ * write.
+ */
+export const isMethodOverride = (method: string, override: unknown, contentType: unknown): boolean =>
+    method.toUpperCase() === 'POST' &&
+    typeof override === 'string' &&
+    override.trim().toUpperCase() === 'GET' &&
+    typeof contentType === 'string' &&
+    contentType.split(';', 1)[0]!.trim().toLowerCase() === 'application/x-www-form-urlencoded';
+
+/**
  * A query string or form as an object. A repeated key collects every value into a list.
  */
 export const entriesToObject = (source: URLSearchParams | FormData): Record<string, unknown> => {

@@ -30,6 +30,9 @@ import {
     sharedSegmentRoute,
     type PathParamsResult,
     type Adapter,
+    entriesToObject,
+    isMethodOverride,
+    METHOD_OVERRIDE_HEADER,
 } from 'kizunajs/adapter';
 import type { SecurityScheme } from 'kizunajs';
 
@@ -203,6 +206,33 @@ export interface KizunaPluginOptions extends FastifyOptions {
     api: FastifyApi;
 }
 
+const METHOD_OVERRIDE_CONSTRAINT = 'kizunaMethodOverride';
+
+type ConstraintStrategy = Parameters<FastifyInstance['addConstraintStrategy']>[0];
+type ConstraintStore = NonNullable<ReturnType<ReturnType<ConstraintStrategy['storage']>['get']>>;
+
+/**
+ * Picks the route a method-override POST stands in for: `GET` when the request
+ * is one, and nothing otherwise, so every other request matches as usual.
+ */
+const methodOverrideStrategy: ConstraintStrategy = {
+    name: METHOD_OVERRIDE_CONSTRAINT,
+    storage: () => {
+        const stores = new Map<string, ConstraintStore>();
+        return {
+            get: (value: string) => stores.get(value) ?? null,
+            set: (value: string, store: ConstraintStore) => {
+                stores.set(value, store);
+            },
+        };
+    },
+    deriveConstraint: (request) =>
+        isMethodOverride(request.method ?? '', request.headers[METHOD_OVERRIDE_HEADER], request.headers['content-type'])
+            ? 'GET'
+            : undefined,
+    mustMatchWhenDerived: false,
+};
+
 /**
  * Fastify plugin that mounts a Kizuna API.
  *
@@ -225,12 +255,20 @@ export const fastifyKizuna = fastifyPlugin(
             route: RouteDefinition,
             lane: Routes,
             resolvedRouter: CoreRouter<Routes, FastifyHandlerContext>,
-            method: Method = route.method
+            method: Method = route.method,
+            override = false
         ): void => {
             const shared = sharedSegmentRoute(route.path);
             app.route({
-                method,
+                method: override ? 'POST' : method,
                 url: route.path,
+                ...(override
+                    ? {
+                          constraints: {
+                              [METHOD_OVERRIDE_CONSTRAINT]: 'GET',
+                          },
+                      }
+                    : {}),
                 ...(shared
                     ? {
                           onRequest: [
@@ -258,7 +296,7 @@ export const fastifyKizuna = fastifyPlugin(
                 handler: async (request: FastifyRequest, reply: FastifyReply) => {
                     const adapterRequest: AdapterRequest<FastifyRequest> = {
                         request,
-                        method: request.method,
+                        method: override ? 'GET' : request.method,
                         resolution:
                             request.kizunaParams?.kind === 'malformed-path'
                                 ? request.kizunaParams
@@ -271,10 +309,10 @@ export const fastifyKizuna = fastifyPlugin(
                                               ? request.kizunaParams.params
                                               : ((request.params ?? {}) as Record<string, string>),
                                   },
-                        query: (request.query ?? {}) as Record<string, string>,
+                        query: ((override ? request.body : request.query) ?? {}) as Record<string, string>,
                         headers: request.headers,
-                        readBody: () => request.body,
-                        readRawBody: () => request.kizunaRawBody ?? '',
+                        readBody: () => (override ? undefined : request.body),
+                        readRawBody: () => (override ? '' : (request.kizunaRawBody ?? '')),
                     };
 
                     await adapter.handle({
@@ -315,6 +353,24 @@ export const fastifyKizuna = fastifyPlugin(
                 if (route.method !== 'HEAD') mountRoute(routeKey, route, lane, resolvedRouter);
             }
         };
+
+        if (!app.hasConstraintStrategy(METHOD_OVERRIDE_CONSTRAINT)) app.addConstraintStrategy(methodOverrideStrategy);
+        if (!app.hasContentTypeParser('application/x-www-form-urlencoded')) {
+            app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_request, body, done) => {
+                done(null, entriesToObject(new URLSearchParams(body as string)));
+            });
+        }
+        // A POST standing in for a GET is its own route, which Fastify picks only when the override header asks for GET.
+        for (const [lane, resolvedRouter] of [
+            [api.routes, api[ROUTER_META]],
+            [pluginRoutesOf(api), pluginRouterOf(api)],
+        ] as const) {
+            for (const { routeKey, route } of adapter.eachRoute(lane, resolvedRouter as CoreRouter<Routes, FastifyHandlerContext>)) {
+                if (route.method === 'GET') {
+                    mountRoute(routeKey, route, lane, resolvedRouter as CoreRouter<Routes, FastifyHandlerContext>, 'POST', true);
+                }
+            }
+        }
 
         mountLane(api.routes, api[ROUTER_META] as CoreRouter<Routes, FastifyHandlerContext>);
         mountLane(pluginRoutesOf(api), pluginRouterOf(api) as CoreRouter<Routes, FastifyHandlerContext>);
