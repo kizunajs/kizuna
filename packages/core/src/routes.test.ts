@@ -521,6 +521,68 @@ describe('k.routes fields a request cannot carry', () => {
         expect(uploadAvatarWith('application/x-www-form-urlencoded', z.number())).not.toThrow();
     });
 
+    it('throws for a query field whose union holds an object', () => {
+        expect(
+            listNotesWith(
+                z.union([
+                    z.string(),
+                    z.object({
+                        status: z.string(),
+                    }),
+                ])
+            )
+        ).toThrowError(
+            'Route "listNotes" declares query field "filter" as a union holding object. A query string carries values and lists of values, so this cannot be sent.'
+        );
+    });
+
+    it('throws for a query list whose union holds an object', () => {
+        expect(
+            listNotesWith(
+                z.array(
+                    z.union([
+                        z.string(),
+                        z.object({
+                            status: z.string(),
+                        }),
+                    ])
+                )
+            )
+        ).toThrowError('as array of a union holding object');
+    });
+
+    it('accepts a query union of values, and of a value or a list of values', () => {
+        expect(listNotesWith(z.union([z.string(), z.number()]))).not.toThrow();
+        expect(listNotesWith(z.union([z.array(z.string()), z.string()]).optional())).not.toThrow();
+    });
+
+    it('throws for a header whose union holds an object', () => {
+        expect(
+            getNoteWith(
+                z.union([
+                    z.string(),
+                    z.object({
+                        id: z.string(),
+                    }),
+                ])
+            )
+        ).toThrowError('Route "getNote" declares header "x-workspace" as a union holding object. A header carries one value');
+    });
+
+    it('throws for a urlencoded form field whose union holds an object', () => {
+        expect(
+            uploadAvatarWith(
+                'application/x-www-form-urlencoded',
+                z.union([
+                    z.string(),
+                    z.object({
+                        size: z.number(),
+                    }),
+                ])
+            )
+        ).toThrowError('Route "uploadAvatar" declares form field "file" as a union holding object.');
+    });
+
     it('leaves a JSON body to carry any shape', () => {
         expect(() =>
             k.routes.users({
@@ -570,6 +632,20 @@ describe('k.routes structured path params', () => {
         expect(routeWith(z.tuple([z.string()]))).toThrowError('as tuple');
         expect(routeWith(z.map(z.string(), z.string()))).toThrowError('as map');
         expect(routeWith(z.set(z.string()))).toThrowError('as set');
+    });
+
+    it('throws for a union that holds an object', () => {
+        expect(
+            routeWith(
+                z.union([
+                    z.string(),
+                    z.object({
+                        city: z.string(),
+                    }),
+                ])
+            )
+        ).toThrowError('Route "getPlace" declares path parameter "value" as a union holding object.');
+        expect(routeWith(z.union([z.uuid(), z.int()]))).not.toThrow();
     });
 
     it('accepts scalars, enums, and a string transform that yields an array', () => {

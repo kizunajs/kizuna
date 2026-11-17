@@ -181,7 +181,7 @@ A route can only declare what its part of the request can send, and `k.routes` t
 | an `application/x-www-form-urlencoded` body | values and lists of values                                    |
 | a JSON body                                 | anything JSON can hold                                        |
 
-An object in a query or a form can't be sent. Split it into fields of their own, or move it to a JSON body.
+An object in a query or a form can't be sent. Split it into fields of their own, or move it to a JSON body. A union counts as each of its options, so `z.union([z.string(), z.number()])` is a value, and a union holding an object is refused like the object.
 
 ## Handler arguments
 

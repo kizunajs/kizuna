@@ -82,6 +82,15 @@ const assertPathParamsMatchPath = (route: RouteDefinition, routeKey: string): vo
 const STRUCTURED_TYPES: ReadonlySet<string> = new Set(['object', 'array', 'record', 'tuple', 'map', 'set']);
 
 /**
+ * The options of a union, nested ones included, or the field alone. A query,
+ * path, header or form field is sent as text, so each option has to be.
+ */
+const optionsOf = (schema: z.core.$ZodType): z.core.$ZodType[] => {
+    const def = readDef(unwrapOptionalWrappers(schema).inner);
+    return def.type === 'union' ? (def.options ?? []).flatMap(optionsOf) : [schema];
+};
+
+/**
  * Throws when a path parameter is declared as a structured type. A path segment
  * arrives as one string, so these are not supported.
  */
@@ -89,10 +98,9 @@ const assertPathParamsAreScalar = (route: RouteDefinition, routeKey: string): vo
     const shape = route.pathParams ? readObjectShape(route.pathParams) : undefined;
     if (!shape) return;
     for (const [name, fieldSchema] of Object.entries(shape)) {
-        const baseType = resolveBaseType(fieldSchema);
-        if (!STRUCTURED_TYPES.has(baseType)) continue;
+        if (optionsOf(fieldSchema).every((option) => !STRUCTURED_TYPES.has(resolveBaseType(option)))) continue;
         throw new Error(
-            `Route "${routeKey}" declares path parameter "${name}" as ${baseType}. ` +
+            `Route "${routeKey}" declares path parameter "${name}" as ${describeField(fieldSchema)}. ` +
                 `A path parameter arrives as a single string, so this is not supported.\n` +
                 `Use a scalar schema (z.string(), z.int(), z.uuid(), z.enum([...])), move the value to query, ` +
                 `or parse it yourself with z.string().transform(...).`
@@ -118,11 +126,17 @@ const listElement = (schema: z.core.$ZodType): z.core.$ZodType | undefined => {
 const isValue = (kind: string): boolean => !STRUCTURED_TYPES.has(kind) && kind !== 'file' && kind !== 'BinarySchema';
 
 /**
- * Names a field the way an error shows it: its kind, or what a list holds.
+ * Names a field the way an error shows it: its kind, what a list holds, or the
+ * option of a union that cannot be sent.
  */
 const describeField = (schema: z.core.$ZodType): string => {
+    const options = optionsOf(schema);
+    if (options.length > 1) {
+        const unsendable = options.find((option) => !isValue(fieldKind(option))) ?? options[0]!;
+        return `a union holding ${describeField(unsendable)}`;
+    }
     const element = listElement(schema);
-    return element === undefined ? fieldKind(schema) : `array of ${fieldKind(element)}`;
+    return element === undefined ? fieldKind(schema) : `array of ${describeField(element)}`;
 };
 
 const fieldsOf = (schema: z.ZodType | undefined): [string, z.core.$ZodType][] => Object.entries((schema && readObjectShape(schema)) ?? {});
@@ -132,8 +146,10 @@ const fieldsOf = (schema: z.ZodType | undefined): [string, z.core.$ZodType][] =>
  */
 const assertQuerySendable = (route: RouteDefinition, routeKey: string): void => {
     for (const [name, field] of fieldsOf(route.query)) {
-        const element = listElement(field);
-        if (element === undefined ? isValue(fieldKind(field)) : isValue(fieldKind(element))) continue;
+        const sendable = optionsOf(field).every((option) =>
+            optionsOf(listElement(option) ?? option).every((value) => isValue(fieldKind(value)))
+        );
+        if (sendable) continue;
         throw new Error(
             `Route "${routeKey}" declares query field "${name}" as ${describeField(field)}. ` +
                 'A query string carries values and lists of values, so this cannot be sent.\n' +
@@ -147,11 +163,29 @@ const assertQuerySendable = (route: RouteDefinition, routeKey: string): void => 
  */
 const assertHeadersSendable = (route: RouteDefinition, routeKey: string): void => {
     for (const [name, field] of fieldsOf(route.headers)) {
-        if (listElement(field) === undefined && isValue(fieldKind(field))) continue;
+        if (optionsOf(field).every((option) => listElement(option) === undefined && isValue(fieldKind(option)))) continue;
         throw new Error(
             `Route "${routeKey}" declares header "${name}" as ${describeField(field)}. ` +
                 'A header carries one value, so this cannot be sent.\n' +
                 'Use a scalar schema (z.string(), z.int(), z.enum([...])), or split it into headers of their own.'
+        );
+    }
+};
+
+/**
+ * A form sends a file part as a File, and only a multipart form carries one.
+ */
+const assertFormFileKind = (kind: string, name: string, multipart: boolean, routeKey: string): void => {
+    if (kind === 'BinarySchema') {
+        throw new Error(
+            `Route "${routeKey}" declares form field "${name}" as BinarySchema, but a form sends a file part as a File. ` +
+                'Declare it with FileSchema.'
+        );
+    }
+    if (kind === 'file' && !multipart) {
+        throw new Error(
+            `Route "${routeKey}" declares form field "${name}" as a file, which a urlencoded body cannot carry. ` +
+                "Send it as contentType: 'multipart/form-data'."
         );
     }
 };
@@ -163,20 +197,9 @@ const assertFormFieldsSendable = (route: RouteDefinition, routeKey: string): voi
     if (route.contentType !== 'multipart/form-data' && route.contentType !== 'application/x-www-form-urlencoded') return;
     const multipart = route.contentType === 'multipart/form-data';
     for (const [name, field] of fieldsOf(route.body)) {
-        const kind = fieldKind(listElement(field) ?? field);
-        if (kind === 'BinarySchema') {
-            throw new Error(
-                `Route "${routeKey}" declares form field "${name}" as BinarySchema, but a form sends a file part as a File. ` +
-                    'Declare it with FileSchema.'
-            );
-        }
-        if (kind === 'file' && !multipart) {
-            throw new Error(
-                `Route "${routeKey}" declares form field "${name}" as a file, which a urlencoded body cannot carry. ` +
-                    "Send it as contentType: 'multipart/form-data'."
-            );
-        }
-        if (kind === 'file' || isValue(kind)) continue;
+        const kinds = optionsOf(field).flatMap((option) => optionsOf(listElement(option) ?? option).map(fieldKind));
+        for (const kind of kinds) assertFormFileKind(kind, name, multipart, routeKey);
+        if (kinds.every((kind) => kind === 'file' || isValue(kind))) continue;
         throw new Error(
             `Route "${routeKey}" declares form field "${name}" as ${describeField(field)}. ` +
                 'A form carries values, lists of values and files, so this cannot be sent.\n' +

@@ -25,6 +25,10 @@ type Shape =
     | {
           kind: 'list';
           of: Shape;
+      }
+    | {
+          kind: 'union';
+          options: Shape[];
       };
 
 const STRUCTURED_FACTORIES: ReadonlySet<string> = new Set([
@@ -40,16 +44,7 @@ const STRUCTURED_FACTORIES: ReadonlySet<string> = new Set([
 
 const WRAPPER_FACTORIES: ReadonlySet<string> = new Set(['optional', 'nullable', 'nullish', 'readonly']);
 
-const OPAQUE_FACTORIES: ReadonlySet<string> = new Set([
-    'union',
-    'discriminatedUnion',
-    'intersection',
-    'lazy',
-    'pipe',
-    'custom',
-    'any',
-    'unknown',
-]);
+const OPAQUE_FACTORIES: ReadonlySet<string> = new Set(['intersection', 'lazy', 'pipe', 'custom', 'any', 'unknown']);
 
 const OBJECT_FACTORIES: ReadonlySet<string> = new Set(['object', 'strictObject', 'looseObject']);
 
@@ -110,6 +105,14 @@ const classify = (node: ts.Node, resolve: SchemaResolver, depth = 0): Shape => {
                 };
             }
             return unknown;
+        }
+        if (name === 'union' || name === 'discriminatedUnion') {
+            const options = name === 'union' ? argument : node.arguments[1];
+            if (!options || !ts.isArrayLiteralExpression(options)) return unknown;
+            return {
+                kind: 'union',
+                options: options.elements.map((option) => classify(option, resolve, depth + 1)),
+            };
         }
         if (WRAPPER_FACTORIES.has(name)) return argument ? classify(argument, resolve, depth + 1) : unknown;
         if (OPAQUE_FACTORIES.has(name)) return unknown;
@@ -186,10 +189,21 @@ const shapeFields = (shape: ts.Expression, viaReference: boolean): Field[] => {
     }));
 };
 
-const isValueOrUnknown = (shape: Shape): boolean => shape.kind === 'value' || shape.kind === 'unknown';
+const isValueOrUnknown = (shape: Shape): boolean =>
+    shape.kind === 'union' ? shape.options.every(isValueOrUnknown) : shape.kind === 'value' || shape.kind === 'unknown';
 
+/**
+ * A union is sent as whichever option the value matches, so each option has to be one its part can carry.
+ */
 const issueFor = (part: RequestPart, shape: Shape): FieldIssue | undefined => {
     if (shape.kind === 'unknown') return undefined;
+    if (shape.kind === 'union') {
+        for (const option of shape.options) {
+            const issue = issueFor(part, option);
+            if (issue) return issue;
+        }
+        return undefined;
+    }
     const element = shape.kind === 'list' ? shape.of : undefined;
     switch (part) {
         case 'path':
@@ -201,6 +215,7 @@ const issueFor = (part: RequestPart, shape: Shape): FieldIssue | undefined => {
         case 'multipart':
         case 'urlencoded': {
             const carried = element ?? shape;
+            if (carried.kind === 'union') return issueFor(part, carried);
             if (carried.kind === 'bytes') return 'binaryFormField';
             if (carried.kind === 'file') return part === 'multipart' ? undefined : 'fileInUrlencoded';
             return isValueOrUnknown(carried) ? undefined : 'unsendableForm';
