@@ -36,6 +36,9 @@ jobs:
             - name: Typecheck
               run: pnpm typecheck:tests
 
+            - name: Check generated files
+              run: pnpm check:demos
+
             - name: Build demos
               run: pnpm build:demos
               env:

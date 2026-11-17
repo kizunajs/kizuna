@@ -6,6 +6,7 @@
     "dev": "pnpm build && concurrently -n express,hono,next -c cyan,yellow,magenta \"pnpm --filter @kizunajs-demo/express dev\" \"pnpm --filter @kizunajs-demo/hono dev\" \"pnpm --filter @kizunajs-demo/next dev\"",
     "build": "pnpm -r --filter \"./packages/*\" build && pnpm typecheck && pnpm generate:swift",
     "build:demos": "pnpm -r --filter \"./apps/*\" --filter \"!@kizunajs-demo/swift\" --filter \"!@kizunajs-demo/kotlin\" build",
+    "check:demos": "pnpm -r --filter \"./apps/*\" --if-present kizuna:check",
     "build:docs": "pnpm --filter docs build",
     "typecheck": "pnpm -r typecheck",
     "typecheck:tests": "tsc -p tsconfig.tests.json",
