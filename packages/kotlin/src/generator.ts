@@ -12,6 +12,7 @@ import {
     isDiscriminatedUnionSchema,
     readMetaId,
     toPascalCase,
+    uniqueNames,
     shortTypeName,
     isHintPrefix,
     localTypeName,
@@ -564,32 +565,32 @@ const enumConstantName = (value: string): string => {
 const emitEnumClass = (writer: KotlinWriter, name: string, cases: string[], unknownCase: boolean, description?: string): void => {
     writer.blank();
     writer.docComment(description);
+    const constants = uniqueNames(cases.map(enumConstantName));
     if (!unknownCase) {
         writer.line('@Serializable');
         // `wireValue` carries the `@SerialName` for query/header serialization (see `stringifyQueryValue`).
         writer.block(`enum class ${name}(override val wireValue: String) : KizunaQueryValue`, () => {
             for (let index = 0; index < cases.length; index += 1) {
                 const caseName = cases[index]!;
-                const enumConstant = enumConstantName(caseName);
                 const separator = index < cases.length - 1 ? ',' : '';
-                writer.line(`@SerialName(${stringLiteral(caseName)}) ${enumConstant}(${stringLiteral(caseName)})${separator}`);
+                writer.line(`@SerialName(${stringLiteral(caseName)}) ${constants[index]!}(${stringLiteral(caseName)})${separator}`);
             }
         });
         return;
     }
     writer.line(`@Serializable(with = ${name}.Serializer::class)`);
     writer.block(`sealed interface ${name} : KizunaQueryValue`, () => {
-        for (const caseName of cases) {
-            writer.block(`data object ${enumConstantName(caseName)} : ${name}`, () => {
-                writer.line(`override val wireValue: String = ${stringLiteral(caseName)}`);
+        for (let index = 0; index < cases.length; index += 1) {
+            writer.block(`data object ${constants[index]!} : ${name}`, () => {
+                writer.line(`override val wireValue: String = ${stringLiteral(cases[index]!)}`);
             });
         }
         writer.line(`data class Unknown(override val wireValue: String) : ${name}`);
         writer.blank();
         writer.block('companion object', () => {
             writer.block(`fun fromWireValue(wireValue: String): ${name} = when (wireValue)`, () => {
-                for (const caseName of cases) {
-                    writer.line(`${stringLiteral(caseName)} -> ${enumConstantName(caseName)}`);
+                for (let index = 0; index < cases.length; index += 1) {
+                    writer.line(`${stringLiteral(cases[index]!)} -> ${constants[index]!}`);
                 }
                 writer.line('else -> Unknown(wireValue)');
             });

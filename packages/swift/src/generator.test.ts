@@ -2590,3 +2590,46 @@ describe('Swift generator: a model that holds itself', () => {
         expect(output).toContain('public let or: [EventFilter]?');
     });
 });
+
+describe('Swift generator: enum values that differ only in punctuation', () => {
+    const contractFor = (values: [string, ...string[]]) =>
+        defineConfig({
+            ...config,
+            routes: [
+                k.routes({
+                    listTasks: k.route({
+                        method: 'GET',
+                        path: '/tasks',
+                        query: z.object({
+                            sort: z.array(z.enum(values)).optional(),
+                        }),
+                        responses: {
+                            200: z.array(z.string()),
+                        },
+                    }),
+                }),
+            ],
+        }).api;
+
+    it('puts `_` in front of a value whose name is already taken', () => {
+        const output = generateSwiftClient(contractFor(['name', '-name', 'createdAt', '-createdAt']), baseConfig);
+        expect(output).toContain('case name = "name"');
+        expect(output).toContain('case _name = "-name"');
+        expect(output).toContain('case createdAt = "createdAt"');
+        expect(output).toContain('case _createdAt = "-createdAt"');
+    });
+
+    it('does the same for an enum with an unknown case', () => {
+        const output = generateSwiftClient(contractFor(['name', '-name']), {
+            ...baseConfig,
+            unknownEnumCase: true,
+        });
+        expect(output).toContain('case "-name": self = ._name');
+        expect(output).toContain('case ._name: return "-name"');
+    });
+
+    it('keeps the usual name for a value that clashes with nothing', () => {
+        const output = generateSwiftClient(contractFor(['-name', 'createdAt']), baseConfig);
+        expect(output).toContain('case name = "-name"');
+    });
+});
