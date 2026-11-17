@@ -3,7 +3,7 @@ import { z } from 'zod';
 import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
 import { Kizuna, type ApiDefinition } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
-import { ProblemDetailsSchema } from 'kizunajs/schemas';
+import { ProblemDetailsSchema, ValidationErrorSchema } from 'kizunajs/schemas';
 import { definePlugin, route } from 'kizunajs/plugin';
 import { renderOpenApi } from './generator.js';
 import { openApiPlugin } from './plugin.js';
@@ -1328,10 +1328,16 @@ describe('automatic validation error response', () => {
         const response = spec.paths['/users']?.post?.responses?.['400'];
         expect(response).toBeDefined();
         expect(response?.description).toBe('Bad Request');
-        const schema = response?.content?.['application/problem+json']?.schema as Record<string, unknown> | undefined;
-        expect(schema?.required).toContain('detail');
-        expect(schema?.required).toContain('errors');
-        const properties = schema?.properties as Record<string, Record<string, unknown>> | undefined;
+        expect(response?.content?.['application/problem+json']?.schema).toEqual({
+            $ref: '#/components/schemas/ValidationError',
+        });
+    });
+
+    it('writes the validation error once, as a component every route refers to', () => {
+        const component = spec.components?.schemas?.ValidationError as Record<string, unknown> | undefined;
+        expect(component?.required).toContain('detail');
+        expect(component?.required).toContain('errors');
+        const properties = component?.properties as Record<string, Record<string, unknown>> | undefined;
         expect(properties?.errors?.type).toBe('array');
     });
 
@@ -1368,7 +1374,38 @@ describe('automatic validation error response', () => {
         const schema = response?.content?.['application/problem+json']?.schema as Record<string, unknown> | undefined;
         const oneOf = schema?.oneOf as Array<Record<string, unknown>> | undefined;
         expect(oneOf).toHaveLength(2);
-        expect(oneOf?.[1]?.required).toContain('errors');
+        expect(oneOf?.[1]).toEqual({
+            $ref: '#/components/schemas/ValidationError',
+        });
+    });
+
+    it('refers to the validation error once when the route declares it itself', () => {
+        const spec = generateJson(
+            defineConfig({
+                ...config,
+                routes: [
+                    k.routes({
+                        createItem: k.route({
+                            method: 'POST',
+                            path: '/items',
+                            body: z.object({
+                                name: z.string(),
+                            }),
+                            responses: {
+                                201: z.object({
+                                    id: z.string(),
+                                }),
+                                400: ValidationErrorSchema,
+                            },
+                        }),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(spec.paths['/items']?.post?.responses?.['400']?.content?.['application/problem+json']?.schema).toEqual({
+            $ref: '#/components/schemas/ValidationError',
+        });
     });
 });
 
