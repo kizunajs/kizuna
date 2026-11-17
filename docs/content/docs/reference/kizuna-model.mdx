@@ -53,6 +53,26 @@ With `Kizuna.model`:
 - **Swift**: an object becomes `public struct User`, a `z.enum` becomes `public enum EventKind`, and a `z.discriminatedUnion` becomes an enum with one case per branch, shared across all routes that reference it
 - **Kotlin**: an object becomes `@Serializable data class User`, a `z.enum` becomes `enum class EventKind`, and a `z.discriminatedUnion` becomes a sealed class, shared across all routes that reference it
 
+## A model that holds itself
+
+A task with subtasks holds itself. Point the field at the model with a getter, and hold it in a list:
+
+```ts title="schemas.ts"
+export const TaskSchema = Kizuna.model({
+    title: 'Task',
+    schema: z.object({
+        title: z.string(),
+        get subtasks() {
+            return z.array(TaskSchema);
+        },
+    }),
+});
+```
+
+Every client writes one `Task` type that holds a list of itself, and the OpenAPI document refers to it with `$ref`. A record works the same as a list.
+
+`k.routes` throws on three shapes no client can write: a schema that holds itself without `Kizuna.model`, since a client refers to a type by its name; `z.lazy`, which every client would type as `unknown`; and a model held directly in a field, like `parent: TaskSchema.optional()`, since a Swift struct cannot contain itself. Hold it in a list, or hold its id.
+
 ## Extracting TypeScript types
 
 Export a type alongside the schema with `z.infer`:

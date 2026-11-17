@@ -2778,3 +2778,50 @@ describe('OpenAPI: plugin options', () => {
         );
     });
 });
+
+describe('a model that holds itself', () => {
+    const EventFilterSchema = Kizuna.model({
+        title: 'EventFilter',
+        schema: z.object({
+            city: z.string().optional(),
+            get or() {
+                return z.array(EventFilterSchema).optional();
+            },
+        }),
+    });
+
+    const spec = generateJson(
+        defineConfig({
+            ...config,
+            routes: [
+                k.routes({
+                    searchEvents: k.route({
+                        method: 'POST',
+                        path: '/events/search',
+                        summary: 'Search events',
+                        tool: true,
+                        body: EventFilterSchema,
+                        responses: {
+                            200: z.array(EventFilterSchema),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+
+    it('is a valid OpenAPI 3.1 document', async () => {
+        await expect(spec).toBeAValidOpenAPIDefinition();
+    });
+
+    it('refers to itself with $ref', () => {
+        const properties = (spec.components?.schemas?.EventFilter as { properties: Record<string, unknown> }).properties;
+        expect(properties['or']).toEqual({
+            type: 'array',
+            items: {
+                $ref: '#/components/schemas/EventFilter',
+            },
+        });
+    });
+});

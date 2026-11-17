@@ -2542,3 +2542,40 @@ describe('Kotlin generator: brands', () => {
         expect(output).toContain('val parentId: TestAPI.CenterId?');
     });
 });
+
+describe('Kotlin generator: a model that holds itself', () => {
+    const EventFilterSchema = Kizuna.model({
+        title: 'EventFilter',
+        schema: z.object({
+            city: z.string().optional(),
+            get or() {
+                return z.array(EventFilterSchema).optional();
+            },
+        }),
+    });
+
+    const output = generateKotlinClient(
+        defineConfig({
+            routes: [
+                k.routes({
+                    searchEvents: k.route({
+                        method: 'POST',
+                        path: '/events/search',
+                        summary: 'Search events',
+                        tool: true,
+                        body: EventFilterSchema,
+                        responses: {
+                            200: z.array(EventFilterSchema),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+
+    it('writes a data class that holds a list of itself', () => {
+        expect(output).toContain('data class EventFilter(');
+        expect(output).toContain('val or: List<EventFilter>? = null');
+    });
+});
