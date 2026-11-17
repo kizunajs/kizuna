@@ -22,7 +22,8 @@ import { permissionNames } from './permissions.js';
 import { GUARD } from './identity-builder.js';
 import { RESOLVER } from './request-context-builder.js';
 import { buildApi, type Api } from './api.js';
-import type { DiffSettings, GeneratedFile } from './config.js';
+import type { ConfigTypes, DiffSettings, GeneratedFile } from './config.js';
+import { assertConfigExtensions } from './config-extension.js';
 
 /**
  * Kizuna sends the guard body itself when a route's `requires` turns a caller
@@ -247,16 +248,14 @@ export type KizunaConfigInput<
         issueCodes?: readonly Codes[];
     };
     /**
-     * What `kizuna generate` writes the `Config` to.
+     * Where `kizuna generate` writes the `Config` and what else it holds.
      *
      * @example
      * typescript: {
      *     outputFile: './kizuna.types.ts',
      * },
      */
-    typescript?: {
-        outputFile?: string;
-    };
+    typescript?: ConfigTypes;
     /**
      * What `kizuna generate` writes from this API: one entry per generated
      * client.
@@ -365,11 +364,12 @@ export const defineConfig = <
     api: ConfiguredApi<R, J, P, Groups, Codes, Identities, RequestContext, GuardSchema, AdapterValue>;
     clients: readonly GeneratedFile[];
     generators: readonly GeneratedFile[];
-    typescript: { outputFile?: string } | undefined;
+    typescript: ConfigTypes | undefined;
     diff: DiffSettings | undefined;
 } => {
     const guardSchema = options.auth?.guardSchema;
     if (guardSchema) assertFillableGuardSchema(guardSchema);
+    assertConfigExtensions(options.typescript?.extend);
 
     const routes = assembleRoutes((options.routes ?? []) as readonly Routes[]);
     const jobs = options.jobs as Jobs | undefined;

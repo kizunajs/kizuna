@@ -249,7 +249,8 @@ export {
 } from './handler-pipeline.js';
 export { type HandlerContextBrand, HANDLER_CONTEXT_BRAND } from './types.js';
 export { type AutoResponsesBrand, AUTO_RESPONSES_BRAND, AUTO_GUARD_BRAND, AUTO_GUARD_WRITTEN_BRAND, type GuardStatus } from './types.js';
-export { apiEntries, type ApiEntry, type DiffSettings, type GeneratedFile } from './config.js';
+export { apiEntries, type ApiEntry, type ConfigTypes, type DiffSettings, type GeneratedFile } from './config.js';
+export type { ConfigExtension, ConfigExtensionValues } from './config-extension.js';
 export { type AnyPlugin, type PluginList, type PluginsBySlug } from './plugin.js';
 export { RESOLVER, type RequestContextBuilder, type RequestContextWithHandler } from './request-context-builder.js';
 export { GUARD, type IdentityBuilder, type IdentityWithGuard, type GuardFor, type IdentityFactories } from './identity-builder.js';

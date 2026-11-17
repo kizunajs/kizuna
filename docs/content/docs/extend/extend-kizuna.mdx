@@ -1,0 +1,103 @@
+---
+title: Extend Kizuna
+description: Add your own methods to k, typed by the same Config as everything else.
+---
+
+<BetaNotice>
+
+Extending `Kizuna` is new and still settling. `typescript.extend` and what it writes may change while v2 is in beta, so pin your version if you depend on them.
+
+</BetaNotice>
+
+`k` is an instance of the `Kizuna` class, so a class that extends it gives `k` methods of its own. Every route, group and identity on it stays typed by your `Config`.
+
+```ts title="@example/kizuna-reports/src/kizuna.ts"
+import { Kizuna as BaseKizuna, type KizunaConfigShape } from 'kizunajs';
+
+export class Kizuna<Config extends KizunaConfigShape = Record<string, never>> extends BaseKizuna<Config> {
+    report(definition: ReportDefinition) {
+        return definition;
+    }
+}
+```
+
+```ts title="src/k.ts"
+import { Kizuna } from '@example/kizuna-reports';
+import type { Config } from '../kizuna.types';
+
+export const k = new Kizuna<Config>();
+```
+
+Keep the name `Kizuna`, so `k` reads the same in every app, and build `k` from one class.
+
+## Check names against each other
+
+A report that runs after another one names it, and a typo there should not compile. Your method can only check a name it can see in `Config`, so add the names under `typescript.extend` from a `defineConfig` of your own:
+
+```ts title="@example/kizuna-reports/src/define-config.ts"
+import { defineConfig as defineApiConfig } from 'kizunajs';
+
+export const defineConfig = (options: ReportsConfig) =>
+    defineApiConfig({
+        ...options,
+        typescript: {
+            ...options.typescript,
+            extend: [
+                ...(options.typescript?.extend ?? []),
+                {
+                    reports: {
+                        names: options.reports.map((report) => report.name),
+                    },
+                },
+            ],
+        },
+    });
+```
+
+`kizuna generate` runs the config, so it writes what you added beside its own keys:
+
+```ts title="kizuna.types.ts"
+export interface Config {
+    adapter: ReturnType<typeof expressAdapter>;
+    reports: {
+        names: 'daily' | 'weekly';
+    };
+}
+```
+
+Read it back in your class, with a fallback for a `Config` that has none:
+
+```ts title="@example/kizuna-reports/src/kizuna.ts"
+type ReportNamesOf<Config> = Config extends {
+    reports: {
+        names: infer Names extends string;
+    };
+}
+    ? Names
+    : string;
+
+export class Kizuna<Config extends KizunaConfigShape = Record<string, never>> extends BaseKizuna<Config> {
+    report(definition: ReportDefinition<ReportNamesOf<Config>>) {
+        return definition;
+    }
+}
+```
+
+```ts title="src/reports.ts"
+export const weekly = k.report({
+    name: 'weekly',
+    after: 'daily',
+});
+```
+
+`after: 'dayly'` does not compile, and `kizuna generate --check` fails once a report is added and nobody regenerated.
+
+## What `typescript.extend` takes
+
+| Value             | Written as                             |
+| ----------------- | -------------------------------------- |
+| A list of strings | A union of them, `'daily' \| 'weekly'` |
+| An empty list     | `never`                                |
+| An object         | An object, each key written again      |
+
+Each entry's key becomes a key of `Config`. `defineConfig` throws when a key is one Kizuna writes itself, like `adapter` or `plugins`, and when two entries use the same key.
