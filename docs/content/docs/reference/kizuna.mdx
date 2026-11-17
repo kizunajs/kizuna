@@ -66,6 +66,8 @@ export interface Config {
 
 So a route's `auth` only accepts a declared identity, `k.routes.users(...)` only reaches a declared group, and a handler reads `auth.user`, `requestContext.analytics`, `jobs.indexUser` and your framework's own request without importing any of them.
 
+A class that extends `Kizuna` adds methods of its own to `k`, and can add to `Config` under `typescript.extend`. See [Extend Kizuna](/docs/extend/extend-kizuna).
+
 ## Example
 
 ```ts title="src/routes/users.ts"

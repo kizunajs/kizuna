@@ -183,6 +183,76 @@ export default defineConfig({ groups });
         expect(types).toContain("import type { groups } from './src/groups';");
     });
 
+    it('writes what typescript.extend adds after its own keys', () => {
+        const source = `
+import { defineConfig } from 'kizunajs';
+import { expressAdapter } from '@kizunajs/express';
+
+export default defineConfig({
+    adapter: expressAdapter(),
+});
+`;
+        const types = generateConfigTypes(source, '/app/kizuna.config.ts', '/app/kizuna.types.ts', [
+            {
+                reports: {
+                    names: ['daily', 'weekly'],
+                    schedule: {
+                        'time-zones': ['Europe/Oslo'],
+                    },
+                    archived: [],
+                },
+            },
+        ]);
+        expect(types).toContain(`export interface Config {
+    adapter: ReturnType<typeof expressAdapter>;
+    reports: {
+        names: 'daily' | 'weekly';
+        schedule: {
+            'time-zones': 'Europe/Oslo';
+        };
+        archived: never;
+    };
+}`);
+    });
+
+    it('writes a union one member per line when it would run past the print width', () => {
+        const names = ['articles', 'employees', 'frontPage', 'products', 'categories', 'locations', 'jobOpenings', 'pressReleases'];
+        const types = generateConfigTypes(
+            'import { defineConfig } from "kizunajs";\nexport default defineConfig({});',
+            undefined,
+            undefined,
+            [
+                {
+                    reports: {
+                        names: [...names, 'newsletters'],
+                    },
+                },
+            ]
+        );
+        expect(types).toContain(`    reports: {
+        names:
+            | 'articles'
+            | 'employees'`);
+        expect(types).toContain(`            | 'newsletters';
+    };`);
+    });
+
+    it('quotes a name the way Prettier does', () => {
+        const types = generateConfigTypes(
+            'import { defineConfig } from "kizunajs";\nexport default defineConfig({});',
+            undefined,
+            undefined,
+            [
+                {
+                    reports: {
+                        names: ["it's", 'plain'],
+                    },
+                },
+            ]
+        );
+        expect(types).toContain(`names: "it's" | 'plain';`);
+    });
+
     /**
      * The demos are the worked examples the docs are written from, so the
      * generator has to reproduce each one exactly.

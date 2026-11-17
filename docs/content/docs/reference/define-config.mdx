@@ -46,7 +46,7 @@ kizuna.api.mount(app);
 | `jobRunner`      | How this deployment runs them: `mode`, `path`, `method`, `transport`, `onError`. See [Jobs](/docs/jobs).                                                                      |
 | `plugins`        | What this API installs beside its own routes, as a list. See [Create a Plugin](/docs/extend/create-plugin).                                                                   |
 | `groups`         | The groups routes are filed under, from [`k.groups`](/docs/reference/k-groups).                                                                                               |
-| `typescript`     | Where `kizuna generate` writes the `Config`, as `{ outputFile }`.                                                                                                             |
+| `typescript`     | Where `kizuna generate` writes the `Config` in `outputFile` and what else it holds in `extend`. See [Extend Kizuna](/docs/extend/extend-kizuna).                              |
 | `clients`        | The clients `kizuna generate` writes from this API, each built with [`defineClient`](/docs/extend/create-client).                                                             |
 
 `jobs` is what the jobs are, and `jobRunner` is how this deployment runs them: the first is shared by every config that serves these routes, the second differs between dev and production.

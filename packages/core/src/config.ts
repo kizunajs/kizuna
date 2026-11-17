@@ -1,3 +1,4 @@
+import type { ConfigExtension } from './config-extension.js';
 import type { ApiDefinition } from './api-definition.js';
 
 /**
@@ -22,6 +23,36 @@ export interface GeneratedFile {
      * Renders the file's contents.
      */
     readonly render: (api: ApiDefinition) => string;
+}
+
+/**
+ * Where `kizuna generate` writes the `Config` and what else it holds.
+ */
+export interface ConfigTypes {
+    /**
+     * Path the `Config` is written to, resolved against the config's directory.
+     */
+    outputFile?: string;
+    /**
+     * What else `Config` holds, each entry under a name of its own. A class that
+     * extends `Kizuna` reads its entry back, so a method it adds to `k` can check
+     * a name against the others. Code that wraps `defineConfig` adds its entry
+     * and keeps the ones already there.
+     *
+     * @example
+     * typescript: {
+     *     ...options.typescript,
+     *     extend: [
+     *         ...(options.typescript?.extend ?? []),
+     *         {
+     *             reports: {
+     *                 names: options.reports.map((report) => report.name),
+     *             },
+     *         },
+     *     ],
+     * },
+     */
+    extend?: readonly ConfigExtension[];
 }
 
 /**
@@ -65,11 +96,9 @@ export interface ApiEntry {
      */
     generators?: readonly GeneratedFile[];
     /**
-     * Where `kizuna generate` writes the `Config`.
+     * Where `kizuna generate` writes the `Config` and what else it holds.
      */
-    typescript?: {
-        outputFile?: string;
-    };
+    typescript?: ConfigTypes;
     /**
      * What else `kizuna diff` treats as breaking.
      */

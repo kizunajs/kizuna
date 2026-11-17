@@ -1,4 +1,12 @@
 {
     "title": "Extend",
-    "pages": ["create-plugin", "create-adapter", "create-client", "create-generator", "create-job-transport", "wrap-fetch-client"]
+    "pages": [
+        "create-plugin",
+        "extend-kizuna",
+        "create-adapter",
+        "create-client",
+        "create-generator",
+        "create-job-transport",
+        "wrap-fetch-client"
+    ]
 }
