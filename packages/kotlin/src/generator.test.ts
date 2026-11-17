@@ -2579,3 +2579,29 @@ describe('Kotlin generator: a model that holds itself', () => {
         expect(output).toContain('val or: List<EventFilter>? = null');
     });
 });
+
+describe('Kotlin generator: an API with no enums', () => {
+    const output = generateKotlinClient(
+        defineConfig({
+            routes: [
+                k.routes({
+                    listEvents: k.route({
+                        method: 'GET',
+                        path: '/events',
+                        query: z.object({
+                            city: z.string().optional(),
+                        }),
+                        responses: {
+                            200: z.array(z.string()),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+
+    it('never names KizunaQueryValue, which only an enum declares', () => {
+        expect(output).not.toContain('KizunaQueryValue');
+    });
+});
