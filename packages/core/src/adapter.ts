@@ -65,6 +65,7 @@ import type { JobTransport } from './job-transport.js';
 export type { ResponseHeaders, RouteDefinition, RoutePath, Routes, Method } from './types.js';
 export { rawResponse, isRawResponse, type RawResponse } from './raw-response.js';
 export { encodeStreamBody, type EncodeStreamOptions, type StreamContext } from './stream.js';
+export { injectedRequestOf, responseOfInjected, type InjectedRequest, type InjectedResponse } from './injected.js';
 export { isStreamResponse } from './generator-utils.js';
 export {
     definePlugin,
@@ -436,6 +437,10 @@ export interface Adapter<HandlerContext = unknown, MountArgs extends readonly un
      * api, and what it hands back, is the framework's own.
      */
     readonly mount: (api: ApiWithRouter, ...args: MountArgs) => Mounted;
+    /**
+     * Answer one request in this process with the routes `mount` serves, using the options the adapter was made with.
+     */
+    readonly fetch?: (api: ApiWithRouter, request: Request) => Promise<Response>;
     readonly [ADAPTER_CONTEXT]?: HandlerContext;
 }
 

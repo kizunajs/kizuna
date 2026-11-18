@@ -54,6 +54,13 @@ interface MountOptions {
     responseValidation?: boolean;
 }
 
+/**
+ * An api as `defineConfig` assembles it, which answers requests in process.
+ */
+interface InProcessApi {
+    fetch: (input: string, init?: RequestInit) => Promise<Response>;
+}
+
 export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void => {
     const behaviour = ADAPTER_BEHAVIOUR[adapter.name];
 
@@ -1323,6 +1330,88 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 expect(text).not.toContain('42');
                 expect(error).toBeDefined();
             }, true);
+        },
+
+        'inProcess.answers': async () => {
+            const inProcess = adapter.createApi(userInput as never) as InProcessApi;
+            const created = await inProcess.fetch('/users', {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: 'Ada',
+                    email: 'ada@example.com',
+                }),
+            });
+            expect(created.status).toBe(201);
+            expect(await created.json()).toMatchObject({
+                name: 'Ada',
+                email: 'ada@example.com',
+            });
+            const invalid = await inProcess.fetch('/users', {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: '',
+                    email: 'not-an-email',
+                }),
+            });
+            expect(invalid.status).toBe(400);
+            expect((await inProcess.fetch('/nowhere')).status).toBe(404);
+        },
+
+        'inProcess.guards': async () => {
+            const inProcess = adapter.createApi(securedInput as never) as InProcessApi;
+            expect((await inProcess.fetch('/who-am-i')).status).toBe(401);
+            const allowed = await inProcess.fetch('/who-am-i', {
+                headers: {
+                    authorization: sessionAuthorization,
+                },
+            });
+            expect(allowed.status).toBe(200);
+            expect(await allowed.json()).toEqual({
+                userId: '1',
+            });
+        },
+
+        'inProcess.besideTransport': async () => {
+            const inProcess = adapter.createApi(userInput as never) as InProcessApi;
+            expect((await inProcess.fetch('/nowhere')).status).toBe(404);
+            await using(
+                {
+                    input: userInput,
+                },
+                async (mounted) => {
+                    for (let index = 0; index < 3; index++) {
+                        const response = await mounted.request({
+                            method: 'GET',
+                            path: '/users',
+                        });
+                        expect(response.status).toBe(200);
+                    }
+                }
+            );
+        },
+
+        'inProcess.streams': async () => {
+            const inProcess = adapter.createApi(streamInput as never) as InProcessApi;
+            streamGate.hold();
+            const response = await inProcess.fetch('/events');
+            expect(response.status).toBe(200);
+            const reader = response.body!.getReader();
+            const first = await withTimeout(
+                readStreamUntil(reader, (text) => text.includes(': keep-alive')),
+                2000,
+                'the first message'
+            );
+            expect(first).toContain('event: delta');
+            expect(first).not.toContain('event: done');
+            streamGate.release();
+            const rest = await readStreamUntil(reader, (text) => text.includes('event: done'));
+            expect(first + rest).toBe(streamedEventsText);
         },
     };
 

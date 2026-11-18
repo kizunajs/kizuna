@@ -1,6 +1,9 @@
 import type { AdapterFeatureMeta, AdapterName } from './features.js';
 
 export const ADAPTER_TYPE_FEATURES = {
+    'surface.fetch': {
+        summary: '`api.fetch` has the signature of the global `fetch`, so a client takes it as its `fetch`.',
+    },
     'surface.guardRun': {
         summary: '`k.identity.*(…).guard` returns a `GuardRun` over the adapter’s handler context.',
     },

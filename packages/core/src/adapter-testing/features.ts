@@ -205,6 +205,18 @@ export const ADAPTER_FEATURES = {
     'streams.itemValidation': {
         summary: 'With `responseValidation` on, a message failing its schema ends the stream.',
     },
+    'inProcess.answers': {
+        summary: '`api.fetch` answers a request with a JSON body, refuses an invalid one and misses an undeclared path, with no server.',
+    },
+    'inProcess.guards': {
+        summary: '`api.fetch` runs the guard: no token answers 401 and a valid one reaches the handler.',
+    },
+    'inProcess.streams': {
+        summary: '`api.fetch` hands each message of a stream on as it is written.',
+    },
+    'inProcess.besideTransport': {
+        summary: 'A request over the transport after `api.fetch` in the same process answers as it would alone.',
+    },
 } as const satisfies Record<string, AdapterFeatureMeta>;
 
 export type AdapterFeature = keyof typeof ADAPTER_FEATURES;

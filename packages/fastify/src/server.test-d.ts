@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from 'kizunajs';
+import { Kizuna, defineConfig } from 'kizunajs';
 import type { HandlerContextOf, ApiRouter } from 'kizunajs/adapter';
 import type { ToolDefinition, ToolRunResult } from 'kizunajs';
 import type { GuardRun, RequestContextRun } from 'kizunajs/adapter';
@@ -171,6 +171,14 @@ test('conforms to the shared adapter type catalogue', () => {
                 });
             };
             void thrown;
+        },
+        'surface.fetch': () => {
+            const api = defineConfig({
+                routes: [],
+                adapter: fastifyAdapter(),
+            }).api;
+            const clientFetch: typeof fetch = api.fetch;
+            void clientFetch;
         },
         'surface.guardRun': () => {
             expectTypeOf<Parameters<typeof localUser.guard>[0]>().parameter(0).toMatchTypeOf<FastifyHandlerContext>();

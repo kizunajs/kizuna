@@ -615,6 +615,10 @@ importers:
         version: 4.6.7
 
   packages/express:
+    dependencies:
+      light-my-request:
+        specifier: 6.8.0
+        version: 6.8.0
     devDependencies:
       '@types/express':
         specifier: 'catalog:'

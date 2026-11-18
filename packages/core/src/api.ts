@@ -23,6 +23,17 @@ export type Api<C extends ApiDefinition, AdapterValue> = C &
          * Register every route on the framework the adapter serves.
          */
         mount: (...args: MountArgsOf<AdapterValue>) => MountedOf<AdapterValue>;
+        /**
+         * Answer a request in this process, the way `fetch` would over HTTP. Guards, validation and the handler all
+         * run and nothing crosses the network. A path is the route's own: `/users/1`.
+         *
+         * @example
+         * const client = createClient({
+         *     baseUrl: 'http://localhost',
+         *     fetch: kizuna.api.fetch,
+         * });
+         */
+        fetch: (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
     };
 
 /**
@@ -112,7 +123,25 @@ export const buildApi = (
         return (adapter.mount as (api: unknown, ...rest: unknown[]) => unknown)(api, ...args);
     };
 
+    api.fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+        if (!adapter) {
+            throw new Error('This api has no adapter to answer requests with. Name one under `adapter` in `defineConfig`.');
+        }
+        if (!adapter.fetch) {
+            throw new Error(`The ${adapter.name} adapter cannot answer a request in process.`);
+        }
+        return adapter.fetch(api as unknown as ApiWithRouter, requestOf(input, init));
+    };
+
     return api;
+};
+
+/**
+ * A `Request` for `fetch`'s arguments. A path alone resolves against `http://localhost`.
+ */
+const requestOf = (input: string | URL | Request, init?: RequestInit): Request => {
+    if (input instanceof Request) return init === undefined ? input : new Request(input, init);
+    return new Request(new URL(input, 'http://localhost'), init);
 };
 
 /**
