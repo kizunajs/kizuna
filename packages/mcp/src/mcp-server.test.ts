@@ -1951,3 +1951,59 @@ describe('a tool whose input holds itself', () => {
         await close();
     });
 });
+
+describe('a tool whose query holds an object', () => {
+    it('hands the object to the handler as the model sent it', async () => {
+        const { client, close } = await connectMcpClient(
+            defineConfig({
+                routes: [
+                    k.routes({
+                        listEvents: k
+                            .route({
+                                method: 'GET',
+                                path: '/events',
+                                summary: 'List events',
+                                tool: true,
+                                query: z.object({
+                                    filter: z.object({
+                                        city: z.string(),
+                                    }),
+                                }),
+                                responses: {
+                                    200: z.object({
+                                        city: z.string(),
+                                    }),
+                                },
+                            })
+                            .handler(({ query }) => ({
+                                status: 200,
+                                body: {
+                                    city: query.filter.city,
+                                },
+                            })),
+                    }),
+                ],
+            }).api
+        );
+
+        const result = await client.callTool({
+            name: 'list_events',
+            arguments: {
+                query: {
+                    filter: {
+                        city: 'Bergen',
+                    },
+                },
+            },
+        });
+
+        expect(result.structuredContent).toEqual({
+            status: 200,
+            body: {
+                city: 'Bergen',
+            },
+        });
+
+        await close();
+    });
+});

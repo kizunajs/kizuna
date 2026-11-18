@@ -42,6 +42,28 @@ final class APIClientTests: XCTestCase {
         XCTAssertNotEqual(firstPage.body.users[0].id, secondPage.body.users[0].id)
     }
 
+    func testListUsersSendsANestedFilterAsJSON() async throws {
+        let response = try await client.users.listUsers(
+            .query(
+                where: API.UserWhere(
+                    or: [
+                        API.UserWhere(name: .init(contains: "ada")),
+                        API.UserWhere(
+                            and: [
+                                API.UserWhere(email: .init(contains: "@example.com")),
+                                API.UserWhere(name: .init(equals: "Linus Torvalds")),
+                            ]
+                        ),
+                    ]
+                )
+            )
+        )
+        let names = Set(response.body.users.map(\.name))
+        XCTAssertTrue(names.contains("Ada Lovelace"), "expected Ada; got \(names)")
+        XCTAssertTrue(names.contains("Linus Torvalds"), "expected Linus; got \(names)")
+        XCTAssertTrue(response.body.users.allSatisfy { $0.name.lowercased().contains("ada") || $0.name == "Linus Torvalds" })
+    }
+
     func testGetUserReturnsSeededUser() async throws {
         let result = try await client.users.getUser(
             .params(id: API.UserId("1")),

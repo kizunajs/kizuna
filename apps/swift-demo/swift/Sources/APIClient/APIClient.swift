@@ -7,6 +7,38 @@ import FoundationNetworking
 
 public enum API {
 
+    public struct UserWhere: Codable, Sendable, Equatable {
+        public let name: TextFilter?
+        public let email: TextFilter?
+        public let and: [UserWhere]?
+        public let or: [UserWhere]?
+
+        public init(
+            name: TextFilter? = nil,
+            email: TextFilter? = nil,
+            and: [UserWhere]? = nil,
+            or: [UserWhere]? = nil
+        ) {
+            self.name = name
+            self.email = email
+            self.and = and
+            self.or = or
+        }
+    }
+
+    public struct TextFilter: Codable, Sendable, Equatable {
+        public let equals: String?
+        public let contains: String?
+
+        public init(
+            equals: String? = nil,
+            contains: String? = nil
+        ) {
+            self.equals = equals
+            self.contains = contains
+        }
+    }
+
     /// A user in the system
     public struct User: Codable, Sendable, Equatable {
         public struct Avatar: Codable, Sendable, Equatable {
@@ -644,20 +676,24 @@ public final class APIClient: Sendable {
         public struct Query: Sendable {
             public let page: Int?
             public let limit: Int?
+            public let `where`: API.UserWhere?
 
             public init(
                 page: Int? = nil,
-                limit: Int? = nil
+                limit: Int? = nil,
+                `where`: API.UserWhere? = nil
             ) {
                 self.page = page
                 self.limit = limit
+                self.`where` = `where`
             }
 
             public static func query(
                 page: Int? = nil,
-                limit: Int? = nil
+                limit: Int? = nil,
+                `where`: API.UserWhere? = nil
             ) -> Self {
-                .init(page: page, limit: limit)
+                .init(page: page, limit: limit, where: `where`)
             }
         }
 
@@ -3658,6 +3694,7 @@ public struct APIUsersClient: Sendable {
         var queryItems: [URLQueryItem] = []
         queryItems += Kizuna.queryItems(name: "page", value: query.page)
         queryItems += Kizuna.queryItems(name: "limit", value: query.limit)
+        queryItems += try Kizuna.jsonQueryItems(name: "where", value: query.`where`, failure: APIClient.UsersListUsers.Failure.self)
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: queryItems, failure: APIClient.UsersListUsers.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
@@ -4815,6 +4852,14 @@ private enum Kizuna {
     static func queryItems<Value>(name: String, value: Value?) -> [URLQueryItem] {
         guard let value else { return [] }
         return stringifyQueryValue(value).map { URLQueryItem(name: name, value: $0) }
+    }
+
+    static func jsonQueryItems<Value: Encodable, Failure: KizunaFailure>(name: String, value: Value?, failure: Failure.Type) throws(Failure) -> [URLQueryItem] {
+        guard let value else { return [] }
+        let encoder = makeJSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        do { return [URLQueryItem(name: name, value: String(decoding: try encoder.encode(value), as: UTF8.self))] }
+        catch { throw Failure.requestFailed(error) }
     }
 
     static func setHeader<Value>(_ request: inout URLRequest, name: String, value: Value?) {

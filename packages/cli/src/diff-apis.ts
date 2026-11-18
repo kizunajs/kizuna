@@ -155,6 +155,11 @@ export const diffSnapshots = (before: ApiSnapshot, after: ApiSnapshot, options: 
                     level: change.breaking ? 'breaking' : 'changed',
                     key,
                     summary: `${httpLabel(arrived, key)} ${change.summary}`,
+                    ...(change.detail === undefined
+                        ? {}
+                        : {
+                              detail: change.detail,
+                          }),
                 });
             }
         }
@@ -167,6 +172,11 @@ export const diffSnapshots = (before: ApiSnapshot, after: ApiSnapshot, options: 
                     level: change.breaking ? 'breaking' : 'changed',
                     key,
                     summary: `${httpLabel(arrived, key)} ${change.summary}`,
+                    ...(change.detail === undefined
+                        ? {}
+                        : {
+                              detail: change.detail,
+                          }),
                 });
             }
         }

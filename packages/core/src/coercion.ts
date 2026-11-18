@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import type { RouteDefinition } from './types.js';
 import { readDef, readObjectShape, resolveBaseType, WRAPPER_TYPES } from './zod-internals.js';
+import { isJsonQueryField } from './generator-utils.js';
 
 /**
  * The schema kinds a path/query/header string is coerced into. A field of any
@@ -56,6 +57,14 @@ const buildCoercionPlan = (schema: z.ZodType): CoercionPlan => {
             });
             continue;
         }
+        if (isJsonQueryField(fieldSchema)) {
+            fields.push({
+                key,
+                type: 'json',
+                array: false,
+            });
+            continue;
+        }
         if (COERCIBLE_TYPES.has(baseType)) {
             fields.push({
                 key,
@@ -94,6 +103,14 @@ export const resolveCoercionPlans = (route: RouteDefinition): void => {
 
 const coerceValue = (value: unknown, type: string): unknown => {
     if (typeof value !== 'string') return value;
+    if (type === 'json') {
+        try {
+            return JSON.parse(value) as unknown;
+        } catch {
+            // Not JSON; leave it for Zod to reject.
+            return value;
+        }
+    }
     if (type === 'number' || type === 'int') {
         const coerced = Number(value);
         return Number.isNaN(coerced) ? value : coerced;

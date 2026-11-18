@@ -15,6 +15,7 @@ export interface SchemaChange {
      */
     path: string;
     summary: string;
+    detail?: string;
 }
 
 const joinPath = (parent: string, key: string): string => (parent === '' ? key : `${parent}.${key}`);
@@ -31,12 +32,32 @@ const valuesOf = (schema: SchemaNode): string[] | undefined =>
 const modelOf = (schema: SchemaNode): string | undefined =>
     schema.kind === 'model' ? (schema as Extract<SchemaNode, { kind: 'model' }>).model : undefined;
 
+const optionsOf = (schema: SchemaNode): SchemaNode[] | undefined =>
+    schema.kind === 'union' ? (schema as Extract<SchemaNode, { kind: 'union' }>).options : undefined;
+
 /**
- * What a reader sees when the kinds differ, so `array` reads as `array<string>`.
+ * Whether every value `narrow` allows is one `wide` allows too. A union holds
+ * whatever one of its options holds.
+ */
+const holds = (wide: SchemaNode, narrow: SchemaNode): boolean => {
+    const narrowOptions = optionsOf(narrow);
+    if (narrowOptions) return narrowOptions.every((option) => holds(wide, option));
+    const wideOptions = optionsOf(wide);
+    if (wideOptions && wide.kind !== narrow.kind) return wideOptions.some((option) => holds(option, narrow));
+    if (wide.kind !== narrow.kind || modelOf(wide) !== modelOf(narrow)) return false;
+    if (narrow.nullable === true && wide.nullable !== true) return false;
+    return diffSchemas(narrow, wide, 'request').every((change) => !change.breaking);
+};
+
+/**
+ * What a reader sees when the kinds differ, so `array` reads as `array<string>` and a union as `string | number`.
  */
 const describeKind = (schema: SchemaNode): string => {
     const element = elementOf(schema);
-    return element ? `array<${describeKind(element)}>` : (modelOf(schema) ?? schema.kind);
+    if (element) return `array<${describeKind(element)}>`;
+    const options = optionsOf(schema);
+    if (options) return options.map(describeKind).join(' | ');
+    return modelOf(schema) ?? schema.kind;
 };
 
 /**
@@ -67,12 +88,29 @@ export const diffSchemas = (
         return [{ breaking: direction === 'response', path, summary: `${path || 'the body'} is gone` }];
     }
 
-    if (before.kind !== after.kind || modelOf(before) !== modelOf(after)) {
+    const kindChanged = before.kind !== after.kind || modelOf(before) !== modelOf(after);
+    const bothUnions = optionsOf(before) !== undefined && optionsOf(after) !== undefined;
+    if (kindChanged || bothUnions) {
+        const label = path || 'the body';
+        const widened = holds(after, before);
+        const narrowed = holds(before, after);
+        if (!kindChanged && widened && narrowed) return [];
+        // A server that takes more than it did and a client that reads less than it could keep working.
+        if (direction === 'request' ? widened : narrowed) {
+            return [
+                {
+                    breaking: false,
+                    path,
+                    summary: `${label} ${direction === 'request' ? 'widens' : 'narrows'} from ${describeKind(before)} to ${describeKind(after)}`,
+                    detail: 'the generated client type changes, the HTTP surface does not',
+                },
+            ];
+        }
         return [
             {
                 breaking: true,
                 path,
-                summary: `${path || 'the body'} is ${describeKind(after)} instead of ${describeKind(before)}`,
+                summary: `${label} is ${describeKind(after)} instead of ${describeKind(before)}`,
             },
         ];
     }

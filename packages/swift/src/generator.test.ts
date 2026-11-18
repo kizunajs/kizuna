@@ -2484,7 +2484,7 @@ describe('Swift generator: hidden routes and plugin routes', () => {
         const output = generateSwiftClient(hiddenFixtureContract(), baseConfig);
         expect(output).toContain('listUsers');
         expect(output).not.toContain('healthCheck');
-        expect(output).not.toContain('ping');
+        expect(output).not.toMatch(/\bping\b/);
         expect(output).not.toContain('internalProbe');
     });
 });
@@ -2631,5 +2631,44 @@ describe('Swift generator: enum values that differ only in punctuation', () => {
     it('keeps the usual name for a value that clashes with nothing', () => {
         const output = generateSwiftClient(contractFor(['-name', 'createdAt']), baseConfig);
         expect(output).toContain('case name = "-name"');
+    });
+});
+
+describe('Swift generator: an object in a query', () => {
+    const output = generateSwiftClient(
+        defineConfig({
+            ...config,
+            routes: [
+                k.routes({
+                    listEvents: k.route({
+                        method: 'GET',
+                        path: '/events',
+                        query: z.object({
+                            limit: z.int().optional(),
+                            filter: z
+                                .object({
+                                    city: z.string().optional(),
+                                })
+                                .optional(),
+                        }),
+                        responses: {
+                            200: z.array(z.string()),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+
+    it('sends the object as one JSON text, and a value as before', () => {
+        expect(output).toContain(
+            'queryItems += try Kizuna.jsonQueryItems(name: "filter", value: query.filter, failure: TestAPIClient.ListEvents.Failure.self)'
+        );
+        expect(output).toContain('queryItems += Kizuna.queryItems(name: "limit", value: query.limit)');
+    });
+
+    it('encodes it with its keys sorted', () => {
+        expect(output).toContain('encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]');
     });
 });

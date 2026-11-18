@@ -93,6 +93,11 @@ export namespace API {
         text: string;
     };
 
+    export type TextFilter = {
+        equals?: string;
+        contains?: string;
+    };
+
     /**
      * A user in the system
      */
@@ -178,6 +183,13 @@ export namespace API {
         reason: "signed_out" | "session_expired";
     };
 
+    export type UserWhere = {
+        name?: TextFilter;
+        email?: TextFilter;
+        and?: Array<UserWhere>;
+        or?: Array<UserWhere>;
+    };
+
     /**
      * RFC 9457 Problem Details error response for validation failures.
      */
@@ -209,6 +221,7 @@ export namespace API {
              * 10
              */
             limit?: number;
+            where?: UserWhere;
         };
 
         export type Result =
@@ -1969,13 +1982,32 @@ const buildPath = (path: string, params: Record<string, unknown> = {}): string =
         return encodeURIComponent(serializeValue(value));
     });
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date);
+
 /**
- * An array repeats its key, and an undefined or null field is left out.
+ * JSON with every object's keys in order so one value always gives one URL.
+ */
+const sortedJson = (value: unknown): string =>
+    JSON.stringify(value, (_, inner: unknown) => {
+        if (!isPlainObject(inner)) return inner;
+        const keys = Object.keys(inner).sort();
+        return Object.fromEntries(keys.map((key) => [key, inner[key]]));
+    });
+
+const isText = (value: unknown): boolean => !isPlainObject(value) && !Array.isArray(value);
+
+/**
+ * A list of values repeats its key and anything else travels as one JSON text. An undefined or null field is left out.
  */
 const buildSearchParams = (fields: Record<string, unknown>): URLSearchParams => {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(fields)) {
         if (value === undefined || value === null) continue;
+        if (Array.isArray(value) ? !value.every(isText) : !isText(value)) {
+            params.append(key, sortedJson(value));
+            continue;
+        }
         for (const item of Array.isArray(value) ? value : [value]) params.append(key, serializeValue(item));
     }
     return params;

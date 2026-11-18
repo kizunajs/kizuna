@@ -10,8 +10,10 @@ import {
     resolveResponseHeaders,
     resolveResponseContentType,
     isJsonMediaType,
+    isJsonQueryField,
     isBinarySchema,
     readMetaId,
+    readObjectShape,
     toPascalCase,
     toCamelCase,
     uniqueNames,
@@ -161,7 +163,13 @@ const buildRouteMethod = (
         ? collectObjectFields(route.pathParams as z.ZodType, registry, `${baseHint}Params`)
         : [];
 
-    const queryFields: SwiftField[] = route.query ? collectObjectFields(route.query as z.ZodType, registry, `${baseHint}Query`) : [];
+    const queryShape = route.query ? (readObjectShape(route.query as z.ZodType) ?? {}) : {};
+    const queryFields: SwiftField[] = route.query
+        ? collectObjectFields(route.query as z.ZodType, registry, `${baseHint}Query`).map((field) => ({
+              ...field,
+              json: isJsonQueryField(queryShape[field.wireName]!),
+          }))
+        : [];
 
     const headerFields: SwiftField[] = route.headers ? collectObjectFields(route.headers as z.ZodType, registry, `${baseHint}Headers`) : [];
 
@@ -1632,6 +1640,17 @@ const emitKizunaNamespace = (
             writer.line('return stringifyQueryValue(value).map { URLQueryItem(name: name, value: $0) }');
         });
         writer.blank();
+        writer.block(
+            'static func jsonQueryItems<Value: Encodable, Failure: KizunaFailure>(name: String, value: Value?, failure: Failure.Type) throws(Failure) -> [URLQueryItem]',
+            () => {
+                writer.line('guard let value else { return [] }');
+                writer.line('let encoder = makeJSONEncoder()');
+                writer.line('encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]');
+                writer.line('do { return [URLQueryItem(name: name, value: String(decoding: try encoder.encode(value), as: UTF8.self))] }');
+                writer.line('catch { throw Failure.requestFailed(error) }');
+            }
+        );
+        writer.blank();
         writer.block('static func setHeader<Value>(_ request: inout URLRequest, name: String, value: Value?)', () => {
             writer.line('guard let value else { return }');
             writer.line('request.setValue(stringifyQueryValue(value).joined(separator: ", "), forHTTPHeaderField: name)');
@@ -1920,7 +1939,11 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
         writer.line('var queryItems: [URLQueryItem] = []');
         for (const field of method.query) {
             const accessor = groupMemberAccessor('query', field);
-            writer.line(`queryItems += Kizuna.queryItems(name: ${stringLiteral(field.wireName)}, value: ${accessor})`);
+            writer.line(
+                field.json
+                    ? `queryItems += try Kizuna.jsonQueryItems(name: ${stringLiteral(field.wireName)}, value: ${accessor}, failure: ${failure}.self)`
+                    : `queryItems += Kizuna.queryItems(name: ${stringLiteral(field.wireName)}, value: ${accessor})`
+            );
         }
         queryItemsExpression = 'queryItems';
     }

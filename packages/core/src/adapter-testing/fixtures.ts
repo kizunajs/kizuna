@@ -124,6 +124,11 @@ export const userRoutes = k.routes({
                 page: z.number().int().min(1).default(1),
                 limit: z.number().int().min(1).default(10),
                 ids: z.array(z.string()).optional(),
+                filter: z
+                    .object({
+                        name: z.string(),
+                    })
+                    .optional(),
             }),
             responses: {
                 200: z.object({
@@ -138,7 +143,9 @@ export const userRoutes = k.routes({
             },
         })
         .handler(({ query }) => {
-            const all = Array.from(users.values()).filter((user) => !query.ids || query.ids.includes(user.id));
+            const all = Array.from(users.values()).filter(
+                (user) => (!query.ids || query.ids.includes(user.id)) && (!query.filter || query.filter.name === user.name)
+            );
             const start = (query.page - 1) * query.limit;
             return {
                 status: 200,
