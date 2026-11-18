@@ -1802,7 +1802,7 @@ const emitKizunaStreaming = (writer: KotlinWriter, clientName: string): void => 
     );
 };
 
-const emitKizunaObject = (writer: KotlinWriter, options: { streaming: boolean; clientName: string }): void => {
+const emitKizunaObject = (writer: KotlinWriter, options: { streaming: boolean; queryValues: boolean; clientName: string }): void => {
     writer.blank();
     writer.block('private object Kizuna', () => {
         if (options.streaming) emitKizunaStreaming(writer, options.clientName);
@@ -1824,7 +1824,8 @@ const emitKizunaObject = (writer: KotlinWriter, options: { streaming: boolean; c
             writer.indent(() => {
                 writer.line('is Instant -> listOf(value.toString())');
                 writer.line('is List<*> -> value.filterNotNull().flatMap { stringifyQueryValue(it) }');
-                writer.line('is KizunaQueryValue -> listOf(value.wireValue)');
+                // Declared only when the API has an enum, so a client without one never names it.
+                if (options.queryValues) writer.line('is KizunaQueryValue -> listOf(value.wireValue)');
                 writer.line('is Enum<*> -> listOf(value.name)');
                 writer.line('else -> listOf(value.toString())');
             });
@@ -2152,6 +2153,7 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
 
     emitKizunaObject(writer, {
         streaming: usesStreaming,
+        queryValues: hasEnums,
         clientName,
     });
 
