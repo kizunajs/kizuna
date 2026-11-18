@@ -102,6 +102,33 @@ describe('generateFetchClient', () => {
         expect(source).toMatch(/listUsers: \{\n\s+method: 'GET',\n\s+path: '\/users',\n\s+responses: \{\n\s+200: \{\},\n\s+400: \{\},/);
     });
 
+    it('lists the validation 400 for a route that validates only its path parameters', () => {
+        const forecast = generateFetchClient(
+            defineConfig({
+                routes: [
+                    {
+                        getForecast: {
+                            method: 'GET',
+                            path: '/weather/:station',
+                            pathParams: z.object({
+                                station: z.enum(['bergen', 'oslo']),
+                            }),
+                            responses: {
+                                200: z.object({
+                                    summary: z.string(),
+                                }),
+                            },
+                        },
+                    },
+                ],
+            }).api,
+            {
+                source: '../src/contract.ts',
+            }
+        );
+        expect(forecast).toContain('| { status: 400; body: ValidationError; headers: Record<string, string> }');
+    });
+
     it('imports nothing', () => {
         expect(source).not.toMatch(/^import /m);
     });

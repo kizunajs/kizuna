@@ -9,6 +9,7 @@ import {
     isBinarySchema,
     isJsonMediaType,
     isJsonQueryField,
+    validatesRequest,
     isObjectSchema,
     isDiscriminatedUnionSchema,
     readMetaId,
@@ -307,8 +308,7 @@ const buildRouteMethod = (
             });
         }
     }
-    const hasValidation = route.body || route.query;
-    if (hasValidation) {
+    if (validatesRequest(route)) {
         const has400 = errorCases.some((candidate) => candidate.status === 400);
         errorCases.push({
             caseName: has400 ? 'validationError' : statusToCamelCase(400),

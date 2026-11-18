@@ -292,7 +292,7 @@ The other statuses arrive parsed as they do today. Aborting the `signal` in `fet
 
 ## Validation errors
 
-A route with a `body` or `query` schema can answer `400` when the request fails validation. It is in the response type already, without you declaring it.
+A route with a `pathParams`, `query`, `headers` or `body` schema can answer `400` when the request fails validation. It is in the response type already, without you declaring it.
 
 ```ts title="users.ts"
 const result = await apiClient.users.createUser({

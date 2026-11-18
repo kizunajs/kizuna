@@ -158,7 +158,8 @@ export namespace API {
         export type Result =
             | { status: 200; body: {
                 ok: boolean;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace HeadersRequired {
@@ -169,7 +170,8 @@ export namespace API {
         export type Result =
             | { status: 200; body: {
                 ok: boolean;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace TracingEchoRequestId {
@@ -294,7 +296,8 @@ export namespace API {
         export type Result =
             | { status: 200; body: {
                 ok: boolean;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EventsListEventsByYear {
@@ -305,7 +308,8 @@ export namespace API {
         export type Result =
             | { status: 200; body: {
                 ok: boolean;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace CentersGetCenter {
@@ -314,7 +318,8 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Center; headers: Record<string, string> };
+            | { status: 200; body: Center; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace CentersListCenters {
@@ -873,6 +878,7 @@ const routes: GeneratedRoutes = {
             path: '/optional-headers',
             responses: {
                 200: {},
+                400: {},
             },
         },
         required: {
@@ -880,6 +886,7 @@ const routes: GeneratedRoutes = {
             path: '/required-headers',
             responses: {
                 200: {},
+                400: {},
             },
         },
     },
@@ -950,6 +957,7 @@ const routes: GeneratedRoutes = {
             path: '/users/:userId/events/:eventId',
             responses: {
                 200: {},
+                400: {},
             },
         },
         listEventsByYear: {
@@ -957,6 +965,7 @@ const routes: GeneratedRoutes = {
             path: '/events/:year',
             responses: {
                 200: {},
+                400: {},
             },
         },
     },
@@ -966,6 +975,7 @@ const routes: GeneratedRoutes = {
             path: '/centers/:centerId',
             responses: {
                 200: {},
+                400: {},
             },
         },
         listCenters: {

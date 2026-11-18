@@ -800,6 +800,7 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+            case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -838,6 +839,7 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+            case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -968,6 +970,7 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+            case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1030,6 +1033,7 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+            case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1068,6 +1072,7 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+            case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1213,6 +1218,7 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+            case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1281,6 +1287,7 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1471,6 +1478,7 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+            case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -3773,6 +3781,9 @@ public struct APIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUserBadge.Failure.self)
             throw APIClient.UsersUserBadge.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUserBadge.Failure.self)
+            throw APIClient.UsersUserBadge.Failure.badRequest(payload)
         default:
             throw APIClient.UsersUserBadge.Failure.unexpectedStatus(statusCode, data)
         }
@@ -3794,6 +3805,9 @@ public struct APIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersLastSessionEvent.Failure.self)
             throw APIClient.UsersLastSessionEvent.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersLastSessionEvent.Failure.self)
+            throw APIClient.UsersLastSessionEvent.Failure.badRequest(payload)
         default:
             throw APIClient.UsersLastSessionEvent.Failure.unexpectedStatus(statusCode, data)
         }
@@ -3841,6 +3855,9 @@ public struct APIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersGetUser.Failure.self)
             throw APIClient.UsersGetUser.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersGetUser.Failure.self)
+            throw APIClient.UsersGetUser.Failure.badRequest(payload)
         default:
             throw APIClient.UsersGetUser.Failure.unexpectedStatus(statusCode, data)
         }
@@ -3863,6 +3880,9 @@ public struct APIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUserActivity.Failure.self)
             throw APIClient.UsersUserActivity.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUserActivity.Failure.self)
+            throw APIClient.UsersUserActivity.Failure.badRequest(payload)
         default:
             throw APIClient.UsersUserActivity.Failure.unexpectedStatus(statusCode, data)
         }
@@ -3884,6 +3904,9 @@ public struct APIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUserProfile.Failure.self)
             throw APIClient.UsersUserProfile.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUserProfile.Failure.self)
+            throw APIClient.UsersUserProfile.Failure.badRequest(payload)
         default:
             throw APIClient.UsersUserProfile.Failure.unexpectedStatus(statusCode, data)
         }
@@ -3953,6 +3976,9 @@ public struct APIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersDeleteUser.Failure.self)
             throw APIClient.UsersDeleteUser.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersDeleteUser.Failure.self)
+            throw APIClient.UsersDeleteUser.Failure.badRequest(payload)
         default:
             throw APIClient.UsersDeleteUser.Failure.unexpectedStatus(statusCode, data)
         }
@@ -3974,6 +4000,9 @@ public struct APIUsersClient: Sendable {
         case 201:
             let payload = try Kizuna.decode(APIClient.UsersArchiveUser.Response201.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersArchiveUser.Failure.self)
             return APIClient.UsersArchiveUser.Result(body: .status201(payload))
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersArchiveUser.Failure.self)
+            throw APIClient.UsersArchiveUser.Failure.badRequest(payload)
         default:
             throw APIClient.UsersArchiveUser.Failure.unexpectedStatus(statusCode, data)
         }
@@ -4058,6 +4087,9 @@ public struct APIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersCheckUser.Failure.self)
             throw APIClient.UsersCheckUser.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersCheckUser.Failure.self)
+            throw APIClient.UsersCheckUser.Failure.badRequest(payload)
         default:
             throw APIClient.UsersCheckUser.Failure.unexpectedStatus(statusCode, data)
         }

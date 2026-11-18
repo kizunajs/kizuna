@@ -7,6 +7,7 @@ import {
     isBinarySchema,
     isVoidSchema,
     isJsonQueryField,
+    validatesRequest,
     parsePath,
     readDiscriminatedUnion,
     readDiscriminatorLiteral,
@@ -433,8 +434,7 @@ const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWa
                 };
             }
 
-            const hasValidation = route.body || route.query;
-            if (hasValidation) {
+            if (validatesRequest(route)) {
                 const validationSchema = toJsonSchema(ValidationErrorSchema);
                 const existing = operation.responses['400'];
                 if (existing) {

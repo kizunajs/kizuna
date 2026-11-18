@@ -464,6 +464,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -487,6 +488,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -556,6 +558,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -589,6 +592,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -612,6 +616,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -702,6 +707,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -741,6 +747,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         data class Result(val body: Success)
 
         sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -879,6 +886,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -2246,6 +2254,12 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                     } catch (error: Exception) { throw OpenEnumAPIClient.UsersUserBadge.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.UsersUserBadge.Failure.NotFound(body = payload)
                 }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersUserBadge.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersUserBadge.Failure.BadRequest(body = payload)
+                }
                 else -> throw OpenEnumAPIClient.UsersUserBadge.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
@@ -2281,6 +2295,12 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                         json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.UsersLastSessionEvent.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.UsersLastSessionEvent.Failure.NotFound(body = payload)
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersLastSessionEvent.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersLastSessionEvent.Failure.BadRequest(body = payload)
                 }
                 else -> throw OpenEnumAPIClient.UsersLastSessionEvent.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2365,6 +2385,12 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                     } catch (error: Exception) { throw OpenEnumAPIClient.UsersGetUser.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.UsersGetUser.Failure.NotFound(body = payload)
                 }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersGetUser.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersGetUser.Failure.BadRequest(body = payload)
+                }
                 else -> throw OpenEnumAPIClient.UsersGetUser.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
@@ -2402,6 +2428,12 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                     } catch (error: Exception) { throw OpenEnumAPIClient.UsersUserActivity.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.UsersUserActivity.Failure.NotFound(body = payload)
                 }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersUserActivity.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersUserActivity.Failure.BadRequest(body = payload)
+                }
                 else -> throw OpenEnumAPIClient.UsersUserActivity.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
@@ -2437,6 +2469,12 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                         json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.UsersUserProfile.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.UsersUserProfile.Failure.NotFound(body = payload)
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersUserProfile.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersUserProfile.Failure.BadRequest(body = payload)
                 }
                 else -> throw OpenEnumAPIClient.UsersUserProfile.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2558,6 +2596,12 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                     } catch (error: Exception) { throw OpenEnumAPIClient.UsersDeleteUser.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.UsersDeleteUser.Failure.NotFound(body = payload)
                 }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersDeleteUser.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersDeleteUser.Failure.BadRequest(body = payload)
+                }
                 else -> throw OpenEnumAPIClient.UsersDeleteUser.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
@@ -2594,6 +2638,12 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                         return@use OpenEnumAPIClient.UsersArchiveUser.Result(body = OpenEnumAPIClient.UsersArchiveUser.Success.Status201(payload))
                     }
                     catch (error: Exception) { throw OpenEnumAPIClient.UsersArchiveUser.Failure.Decoding(error, statusCode, data) }
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersArchiveUser.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersArchiveUser.Failure.BadRequest(body = payload)
                 }
                 else -> throw OpenEnumAPIClient.UsersArchiveUser.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2728,6 +2778,12 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                         json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.UsersCheckUser.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.UsersCheckUser.Failure.NotFound(body = payload)
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersCheckUser.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersCheckUser.Failure.BadRequest(body = payload)
                 }
                 else -> throw OpenEnumAPIClient.UsersCheckUser.Failure.Unexpected(statusCode = statusCode, data = data)
             }

@@ -11,6 +11,7 @@ import {
     resolveResponseContentType,
     isJsonMediaType,
     isJsonQueryField,
+    validatesRequest,
     isBinarySchema,
     readMetaId,
     readObjectShape,
@@ -307,8 +308,7 @@ const buildRouteMethod = (
             });
         }
     }
-    const hasValidation = route.body || route.query;
-    if (hasValidation) {
+    if (validatesRequest(route)) {
         const has400 = errorCases.some((c) => c.status === 400);
         errorCases.push({
             caseName: has400 ? 'validationError' : statusToCamelCase(400),

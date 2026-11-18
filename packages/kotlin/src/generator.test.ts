@@ -1027,7 +1027,7 @@ describe('Kotlin generator: automatic validation error', () => {
         expect(output).toContain('data class ValidationIssue(');
     });
 
-    it('does not add validation case for route without body or query', () => {
+    it('does not add validation case for a route that validates nothing', () => {
         const contract = defineConfig({
             routes: [
                 {
@@ -2763,5 +2763,46 @@ describe('Kotlin generator: a model whose fields are all optional', () => {
 
     it('leaves a model with a required field to its constructor', () => {
         expect(output).not.toContain('fun id(');
+    });
+});
+
+describe('Kotlin generator: the automatic 400 for each validated part', () => {
+    const outputFor = (definition: Record<string, unknown>) =>
+        generateKotlinClient(
+            defineConfig({
+                routes: [
+                    k.routes({
+                        getForecast: k.route({
+                            method: 'GET',
+                            path: '/weather/:station',
+                            responses: {
+                                200: z.object({
+                                    summary: z.string(),
+                                }),
+                            },
+                            ...definition,
+                        } as never),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+
+    it('lists it for a route that validates only its path parameters', () => {
+        const output = outputFor({
+            pathParams: z.object({
+                station: z.enum(['bergen', 'oslo']),
+            }),
+        });
+        expect(output).toContain('data class BadRequest(val body: TestAPIClient.ValidationError) : Failure()');
+    });
+
+    it('lists it for a route that validates only its headers', () => {
+        const output = outputFor({
+            headers: z.object({
+                'x-request-id': z.string(),
+            }),
+        });
+        expect(output).toContain('data class BadRequest(val body: TestAPIClient.ValidationError) : Failure()');
     });
 });

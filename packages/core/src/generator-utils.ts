@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { CachePolicy, ResponseDefinition, StreamDefinition, StreamResponseDefinition } from './types.js';
+import type { CachePolicy, ResponseDefinition, RouteDefinition, StreamDefinition, StreamResponseDefinition } from './types.js';
 import { readDef, resolveBaseType, unwrapOptionalWrappers } from './zod-internals.js';
 
 // Kept out of generator.ts so importing these doesn't pull in its node:fs dependency.
@@ -31,6 +31,12 @@ export const isJsonQueryField = (schema: z.core.$ZodType): boolean =>
         const def = readDef(unwrapOptionalWrappers(option).inner);
         return holdsOnlyValues(def.type === 'array' && def.element !== undefined ? def.element : option);
     });
+
+/**
+ * Whether the server validates any part of a route's request and so may answer the automatic 400.
+ */
+export const validatesRequest = (route: Pick<RouteDefinition, 'pathParams' | 'query' | 'headers' | 'body'>): boolean =>
+    route.pathParams !== undefined || route.query !== undefined || route.headers !== undefined || route.body !== undefined;
 
 /**
  * The body schema of a response, or `undefined` for a stream, which has none.

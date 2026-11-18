@@ -1496,7 +1496,7 @@ describe('Swift generator: automatic validation error', () => {
         expect(output).toContain('struct ValidationIssue');
     });
 
-    it('does not add validation case for route without body or query', () => {
+    it('does not add validation case for a route that validates nothing', () => {
         const contractRoutes = k.routes({
             getUser: k.route({
                 method: 'GET',
@@ -2727,5 +2727,47 @@ describe('Swift generator: a model whose fields are all optional', () => {
 
     it('leaves a model with a required field to its init', () => {
         expect(output).not.toContain('public static func id(');
+    });
+});
+
+describe('Swift generator: the automatic 400 for each validated part', () => {
+    const outputFor = (definition: Record<string, unknown>) =>
+        generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: [
+                    k.routes({
+                        getForecast: k.route({
+                            method: 'GET',
+                            path: '/weather/:station',
+                            responses: {
+                                200: z.object({
+                                    summary: z.string(),
+                                }),
+                            },
+                            ...definition,
+                        } as never),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+
+    it('lists it for a route that validates only its path parameters', () => {
+        const output = outputFor({
+            pathParams: z.object({
+                station: z.enum(['bergen', 'oslo']),
+            }),
+        });
+        expect(output).toContain('case badRequest(TestAPIClient.ValidationError)');
+    });
+
+    it('lists it for a route that validates only its headers', () => {
+        const output = outputFor({
+            headers: z.object({
+                'x-request-id': z.string(),
+            }),
+        });
+        expect(output).toContain('case badRequest(TestAPIClient.ValidationError)');
     });
 });
