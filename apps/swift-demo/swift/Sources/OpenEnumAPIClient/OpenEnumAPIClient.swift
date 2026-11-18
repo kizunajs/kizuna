@@ -64,8 +64,8 @@ public enum OpenEnumAPI {
     }
 
     /// A user in the system
-    public struct User: Codable, Sendable, Equatable {
-        public struct Avatar: Codable, Sendable, Equatable {
+    public struct User: Codable, Sendable, Equatable, Identifiable {
+        public struct Avatar: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let url: String
 
@@ -77,7 +77,7 @@ public enum OpenEnumAPI {
                 self.url = url
             }
         }
-        public struct AvatarsItem: Codable, Sendable, Equatable {
+        public struct AvatarsItem: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let url: String
 
@@ -476,7 +476,7 @@ public enum OpenEnumAPI {
         }
     }
 
-    public struct EventRecord: Codable, Sendable, Equatable {
+    public struct EventRecord: Codable, Sendable, Equatable, Identifiable {
         public let id: String
         public let kind: EventKind
         public let occurredAt: Date
@@ -2088,7 +2088,7 @@ public final class OpenEnumAPIClient: Sendable {
 
     public enum WorkspaceGetWorkspace {
 
-        public struct Response: Codable, Sendable, Equatable {
+        public struct Response: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
 
@@ -2573,7 +2573,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolCallGetForecast: Codable, Sendable, Equatable {
+        public struct ToolCallGetForecast: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let needsApproval: Bool?
@@ -2657,7 +2657,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolCallPlotSignups: Codable, Sendable, Equatable {
+        public struct ToolCallPlotSignups: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let needsApproval: Bool?
@@ -2692,7 +2692,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolCallCountWords: Codable, Sendable, Equatable {
+        public struct ToolCallCountWords: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let needsApproval: Bool?
@@ -2790,7 +2790,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolResultGetForecast: Codable, Sendable, Equatable {
+        public struct ToolResultGetForecast: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let output: ToolResultGetForecastOutput
@@ -2854,7 +2854,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolResultPlotSignups: Codable, Sendable, Equatable {
+        public struct ToolResultPlotSignups: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let output: ToolResultPlotSignupsOutput
@@ -2891,7 +2891,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolResultCountWords: Codable, Sendable, Equatable {
+        public struct ToolResultCountWords: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let output: ToolResultCountWordsOutput
@@ -2915,7 +2915,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolError: Codable, Sendable, Equatable {
+        public struct ToolError: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: ToolErrorName
             public let message: String
@@ -3098,7 +3098,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct InputAnswerCall: Codable, Sendable, Equatable {
+        public struct InputAnswerCall: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let input: OpenEnumAPIClient.JSONValue?
@@ -3182,7 +3182,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolCallNotesList: Codable, Sendable, Equatable {
+        public struct ToolCallNotesList: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let needsApproval: Bool?
@@ -3198,7 +3198,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolCallNotesAdd: Codable, Sendable, Equatable {
+        public struct ToolCallNotesAdd: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let needsApproval: Bool?
@@ -3286,7 +3286,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolResultNotesList: Codable, Sendable, Equatable {
+        public struct ToolResultNotesList: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let output: ToolResultNotesListOutput
@@ -3310,7 +3310,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolResultNotesListOutputNotesItem: Codable, Sendable, Equatable {
+        public struct ToolResultNotesListOutputNotesItem: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let text: String
 
@@ -3323,7 +3323,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolResultNotesAdd: Codable, Sendable, Equatable {
+        public struct ToolResultNotesAdd: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let output: ToolResultNotesAddOutput
@@ -3339,7 +3339,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolResultNotesAddOutput: Codable, Sendable, Equatable {
+        public struct ToolResultNotesAddOutput: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let text: String
 
@@ -3352,7 +3352,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolError: Codable, Sendable, Equatable {
+        public struct ToolError: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: ToolErrorName
             public let message: String
@@ -3761,7 +3761,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ResponseNotesItem: Codable, Sendable, Equatable {
+        public struct ResponseNotesItem: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let text: String
 
@@ -3809,7 +3809,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct Response201: Codable, Sendable, Equatable {
+        public struct Response201: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let text: String
 
