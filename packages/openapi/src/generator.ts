@@ -6,6 +6,7 @@ import {
     isFileSchema,
     isBinarySchema,
     isVoidSchema,
+    isJsonQueryField,
     parsePath,
     readDiscriminatedUnion,
     readDiscriminatorLiteral,
@@ -258,6 +259,24 @@ const deriveHeadOperation = (getOperation: OpenApiOperation): OpenApiOperation =
     return operation;
 };
 
+/**
+ * A query field holding an object travels as JSON text. JSON Schema's
+ * `contentMediaType` and `contentSchema` say so and keep the object's schema.
+ */
+const jsonTextSchema = (valueSchema: Record<string, unknown>): Record<string, unknown> => {
+    const { description, ...contentSchema } = valueSchema;
+    return {
+        type: 'string',
+        ...(description === undefined
+            ? {}
+            : {
+                  description,
+              }),
+        contentMediaType: 'application/json',
+        contentSchema,
+    };
+};
+
 const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWalk<OpenApiRenderer> => {
     const paths: Record<string, Record<string, OpenApiOperation>> = {};
 
@@ -312,12 +331,14 @@ const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWa
                 const querySchema = toJsonSchema(route.query, 'input');
                 const queryProperties = (querySchema.properties ?? {}) as Record<string, Record<string, unknown>>;
                 const queryRequired = (querySchema.required ?? []) as string[];
+                const queryShape = readObjectShape(route.query) ?? {};
                 for (const [name, valueSchema] of Object.entries(queryProperties)) {
+                    const field = queryShape[name];
                     parameters.push({
                         name,
                         in: 'query',
                         required: queryRequired.includes(name),
-                        schema: valueSchema,
+                        schema: field && isJsonQueryField(field) ? jsonTextSchema(valueSchema) : valueSchema,
                     });
                 }
             }

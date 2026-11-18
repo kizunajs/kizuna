@@ -8,9 +8,11 @@ import {
     resolveResponseHeaders,
     isBinarySchema,
     isJsonMediaType,
+    isJsonQueryField,
     isObjectSchema,
     isDiscriminatedUnionSchema,
     readMetaId,
+    readObjectShape,
     toPascalCase,
     uniqueNames,
     shortTypeName,
@@ -163,7 +165,13 @@ const buildRouteMethod = (
         ? collectObjectFields(route.pathParams as z.ZodType, registry, `${baseHint}Params`)
         : [];
 
-    const queryFields: KotlinField[] = route.query ? collectObjectFields(route.query as z.ZodType, registry, `${baseHint}Query`) : [];
+    const queryShape = route.query ? (readObjectShape(route.query as z.ZodType) ?? {}) : {};
+    const queryFields: KotlinField[] = route.query
+        ? collectObjectFields(route.query as z.ZodType, registry, `${baseHint}Query`).map((field) => ({
+              ...field,
+              json: isJsonQueryField(queryShape[field.wireName]!),
+          }))
+        : [];
 
     const headerFields: KotlinField[] = route.headers
         ? collectObjectFields(route.headers as z.ZodType, registry, `${baseHint}Headers`)
@@ -1391,6 +1399,12 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
         for (const field of method.query) {
             const accessor = groupMemberAccessor('query', field);
             const appendBlock = (sourceExpression: string): void => {
+                if (field.json) {
+                    writer.line(
+                        `urlBuilder.addQueryParameter(${stringLiteral(field.wireName)}, Kizuna.encodeQueryJson(json, ${sourceExpression}))`
+                    );
+                    return;
+                }
                 writer.block(`for (stringValue in Kizuna.stringifyQueryValue(${sourceExpression}))`, () => {
                     writer.line(`urlBuilder.addQueryParameter(${stringLiteral(field.wireName)}, stringValue)`);
                 });
@@ -1803,7 +1817,10 @@ const emitKizunaStreaming = (writer: KotlinWriter, clientName: string): void => 
     );
 };
 
-const emitKizunaObject = (writer: KotlinWriter, options: { streaming: boolean; queryValues: boolean; clientName: string }): void => {
+const emitKizunaObject = (
+    writer: KotlinWriter,
+    options: { streaming: boolean; queryValues: boolean; jsonQuery: boolean; clientName: string }
+): void => {
     writer.blank();
     writer.block('private object Kizuna', () => {
         if (options.streaming) emitKizunaStreaming(writer, options.clientName);
@@ -1820,6 +1837,23 @@ const emitKizunaObject = (writer: KotlinWriter, options: { streaming: boolean; q
             writer.line('return java.net.URLEncoder.encode(text, "UTF-8").replace("+", "%20")');
         });
         writer.blank();
+        if (options.jsonQuery) {
+            writer.line("// One JSON text with every object's keys in order so one value always gives one URL.");
+            writer.block('inline fun <reified Value> encodeQueryJson(json: Json, value: Value): String', () => {
+                writer.line('return sortJsonKeys(json.encodeToJsonElement(value)).toString()');
+            });
+            writer.blank();
+            writer.block('fun sortJsonKeys(element: JsonElement): JsonElement', () => {
+                writer.line('return when (element) {');
+                writer.indent(() => {
+                    writer.line('is JsonObject -> JsonObject(element.toSortedMap().mapValues { sortJsonKeys(it.value) })');
+                    writer.line('is JsonArray -> JsonArray(element.map { sortJsonKeys(it) })');
+                    writer.line('else -> element');
+                });
+                writer.line('}');
+            });
+            writer.blank();
+        }
         writer.block('fun stringifyQueryValue(value: Any): List<String>', () => {
             writer.line('return when (value) {');
             writer.indent(() => {
@@ -2072,6 +2106,7 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
     }
     writer.line('import kotlinx.datetime.Instant');
     const usesStreaming = allMethods.some((method) => method.stream !== undefined);
+    const sendsJsonQuery = allMethods.some((method) => method.query.some((field) => field.json));
     if (usesStreaming) {
         writer.line('import kotlinx.coroutines.flow.*');
     }
@@ -2155,6 +2190,7 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
     emitKizunaObject(writer, {
         streaming: usesStreaming,
         queryValues: hasEnums,
+        jsonQuery: sendsJsonQuery,
         clientName,
     });
 

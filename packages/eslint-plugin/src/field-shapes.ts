@@ -20,7 +20,10 @@ export interface FieldViolation {
 
 type Shape =
     | {
-          kind: 'value' | 'file' | 'bytes' | 'structured' | 'unknown';
+          /**
+           * `object` is an object or a record.
+           */
+          kind: 'value' | 'file' | 'bytes' | 'object' | 'structured' | 'unknown';
       }
     | {
           kind: 'list';
@@ -31,16 +34,9 @@ type Shape =
           options: Shape[];
       };
 
-const STRUCTURED_FACTORIES: ReadonlySet<string> = new Set([
-    'object',
-    'strictObject',
-    'looseObject',
-    'record',
-    'partialRecord',
-    'tuple',
-    'map',
-    'set',
-]);
+const OBJECT_LIKE_FACTORIES: ReadonlySet<string> = new Set(['object', 'strictObject', 'looseObject', 'record', 'partialRecord']);
+
+const STRUCTURED_FACTORIES: ReadonlySet<string> = new Set(['tuple', 'map', 'set']);
 
 const WRAPPER_FACTORIES: ReadonlySet<string> = new Set(['optional', 'nullable', 'nullish', 'readonly']);
 
@@ -82,6 +78,11 @@ const classify = (node: ts.Node, resolve: SchemaResolver, depth = 0): Shape => {
     const [argument] = node.arguments;
 
     if (isZodNamespace(callee.expression)) {
+        if (OBJECT_LIKE_FACTORIES.has(name)) {
+            return {
+                kind: 'object',
+            };
+        }
         if (STRUCTURED_FACTORIES.has(name)) {
             return {
                 kind: 'structured',
@@ -133,7 +134,7 @@ const classify = (node: ts.Node, resolve: SchemaResolver, depth = 0): Shape => {
     }
     if (name === 'extend') {
         return {
-            kind: 'structured',
+            kind: 'object',
         };
     }
     if (name === 'or' || name === 'and') return unknown;
@@ -192,11 +193,19 @@ const shapeFields = (shape: ts.Expression, viaReference: boolean): Field[] => {
 const isValueOrUnknown = (shape: Shape): boolean =>
     shape.kind === 'union' ? shape.options.every(isValueOrUnknown) : shape.kind === 'value' || shape.kind === 'unknown';
 
+const holdsFile = (shape: Shape): boolean =>
+    shape.kind === 'file' ||
+    shape.kind === 'bytes' ||
+    (shape.kind === 'list' && holdsFile(shape.of)) ||
+    (shape.kind === 'union' && shape.options.some(holdsFile));
+
 /**
- * A union is sent as whichever option the value matches, so each option has to be one its part can carry.
+ * A union is sent as whichever option the value matches. Each option has to be one its part can carry. A query
+ * carries anything but a file because what is not plain text travels as JSON.
  */
 const issueFor = (part: RequestPart, shape: Shape): FieldIssue | undefined => {
     if (shape.kind === 'unknown') return undefined;
+    if (part === 'query') return holdsFile(shape) ? 'unsendableQuery' : undefined;
     if (shape.kind === 'union') {
         for (const option of shape.options) {
             const issue = issueFor(part, option);
@@ -210,8 +219,6 @@ const issueFor = (part: RequestPart, shape: Shape): FieldIssue | undefined => {
             return shape.kind === 'value' ? undefined : 'unsendablePath';
         case 'header':
             return shape.kind === 'value' ? undefined : 'unsendableHeader';
-        case 'query':
-            return isValueOrUnknown(element ?? shape) ? undefined : 'unsendableQuery';
         case 'multipart':
         case 'urlencoded': {
             const carried = element ?? shape;

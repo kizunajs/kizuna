@@ -19,7 +19,7 @@ export const routes = k.routes({
             tags: z.array(z.string()).optional(),
             sort: z.enum(['newest', 'oldest']),
             since: z.iso.datetime().optional(),
-            grid: z.array(z.array(z.string())),
+            avatar: FileSchema,
         }),
         headers: z.object({
             'x-workspace': z.array(z.string()),

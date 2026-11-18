@@ -2642,3 +2642,59 @@ describe('Kotlin generator: enum values that write the same constant', () => {
         expect(output).toContain('"a-b" -> _A_B');
     });
 });
+
+describe('Kotlin generator: an object in a query', () => {
+    const output = generateKotlinClient(
+        defineConfig({
+            routes: [
+                k.routes({
+                    listEvents: k.route({
+                        method: 'GET',
+                        path: '/events',
+                        query: z.object({
+                            limit: z.int().optional(),
+                            filter: z
+                                .object({
+                                    city: z.string().optional(),
+                                })
+                                .optional(),
+                        }),
+                        responses: {
+                            200: z.array(z.string()),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+
+    it('sends the object as one JSON text, and a value as before', () => {
+        expect(output).toContain('urlBuilder.addQueryParameter("filter", Kizuna.encodeQueryJson(json, query.filter))');
+        expect(output).toContain('for (stringValue in Kizuna.stringifyQueryValue(query.limit))');
+    });
+
+    it('encodes it with its keys sorted', () => {
+        expect(output).toContain('fun sortJsonKeys(element: JsonElement): JsonElement');
+    });
+
+    it('leaves the JSON helper out of a client that never sends one', () => {
+        const plain = generateKotlinClient(
+            defineConfig({
+                routes: [
+                    k.routes({
+                        listEvents: k.route({
+                            method: 'GET',
+                            path: '/events',
+                            responses: {
+                                200: z.array(z.string()),
+                            },
+                        }),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(plain).not.toContain('encodeQueryJson');
+    });
+});

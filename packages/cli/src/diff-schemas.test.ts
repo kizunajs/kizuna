@@ -234,3 +234,99 @@ describe('a model that holds itself', () => {
         expect(summaries(before, after, 'request')).toEqual(['BREAKING country is now required']);
     });
 });
+
+describe('a field inside an object in a query', () => {
+    const before = z.object({
+        filter: z.object({
+            city: z.string(),
+        }),
+    });
+    const after = z.object({
+        filter: z.object({
+            city: z.string(),
+            country: z.string(),
+        }),
+    });
+
+    it('breaks a request when it becomes required, like any nested field', () => {
+        expect(summaries(before, after, 'request')).toEqual(['BREAKING filter.country is now required']);
+    });
+});
+
+describe('a type that widens to a union', () => {
+    const before = z.object({
+        city: z.string(),
+    });
+    const after = z.object({
+        city: z.union([
+            z.string(),
+            z.object({
+                contains: z.string(),
+            }),
+        ]),
+    });
+
+    it('does not break a request, because the server still takes what callers send', () => {
+        expect(summaries(before, after, 'request')).toEqual(['changed  city widens from string to string | object']);
+    });
+
+    it('says the clients change and the HTTP surface does not', () => {
+        expect(diffSchemas(before, after, 'request')[0]?.detail).toBe('the generated client type changes, the HTTP surface does not');
+    });
+
+    it('breaks a response, because callers may read what they never handled', () => {
+        expect(summaries(before, after, 'response')).toEqual(['BREAKING city is string | object instead of string']);
+    });
+});
+
+describe('a union that narrows to one of its options', () => {
+    const before = z.object({
+        city: z.union([z.string(), z.number()]),
+    });
+    const after = z.object({
+        city: z.string(),
+    });
+
+    it('does not break a response, because callers already handle that option', () => {
+        expect(summaries(before, after, 'response')).toEqual(['changed  city narrows from string | number to string']);
+    });
+
+    it('breaks a request, because callers may send the option that left', () => {
+        expect(summaries(before, after, 'request')).toEqual(['BREAKING city is string instead of string | number']);
+    });
+});
+
+describe('a union that changes its options', () => {
+    const before = z.object({
+        city: z.union([z.string(), z.number()]),
+    });
+
+    it('is quiet when only the order changes', () => {
+        const after = z.object({
+            city: z.union([z.number(), z.string()]),
+        });
+        expect(summaries(before, after, 'request')).toEqual([]);
+        expect(summaries(before, after, 'response')).toEqual([]);
+    });
+
+    it('widens a request and breaks a response when an option arrives', () => {
+        const after = z.object({
+            city: z.union([z.string(), z.number(), z.boolean()]),
+        });
+        expect(summaries(before, after, 'request')).toEqual(['changed  city widens from string | number to string | number | boolean']);
+        expect(summaries(before, after, 'response')).toEqual(['BREAKING city is string | number | boolean instead of string | number']);
+    });
+});
+
+describe('a type that changes to an unrelated one', () => {
+    it('breaks both ways', () => {
+        const before = z.object({
+            count: z.string(),
+        });
+        const after = z.object({
+            count: z.number(),
+        });
+        expect(summaries(before, after, 'request')).toEqual(['BREAKING count is number instead of string']);
+        expect(summaries(before, after, 'response')).toEqual(['BREAKING count is number instead of string']);
+    });
+});

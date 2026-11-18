@@ -516,6 +516,41 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             });
             expect(created.status).toBe(201);
         },
+        'query.jsonObject': async () => {
+            await createAda();
+            await api.request({
+                method: 'POST',
+                path: '/users',
+                body: {
+                    name: 'Grace',
+                    email: 'grace@example.com',
+                },
+            });
+            const filter = encodeURIComponent(
+                JSON.stringify({
+                    name: 'Grace',
+                })
+            );
+            const response = await api.request({
+                method: 'GET',
+                path: `/users?filter=${filter}`,
+            });
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({
+                users: [
+                    {
+                        id: '2',
+                        name: 'Grace',
+                    },
+                ],
+                total: 1,
+            });
+            const invalid = await api.request({
+                method: 'GET',
+                path: '/users?filter=Grace',
+            });
+            expect(invalid.status).toBe(400);
+        },
 
         'query.repeatedKeys': async () => {
             await createAda();

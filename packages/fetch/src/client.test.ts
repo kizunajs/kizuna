@@ -120,6 +120,54 @@ describe('KizunaClient', () => {
         expect(url).toContain('page=2');
     });
 
+    it('sends an object in a query as one JSON text with its keys sorted', async () => {
+        const fetchMock = stubFetch(200, {
+            users: [],
+        });
+        const client = createClient({
+            baseUrl: 'http://localhost:3000',
+            fetch: fetchMock,
+        });
+
+        await client.users.listUsers({
+            query: {
+                filter: {
+                    role: 'admin',
+                    name: 'Ada',
+                },
+            },
+        });
+
+        const [url] = fetchMock.mock.calls[0]! as [string];
+        expect(new URL(url).searchParams.get('filter')).toBe('{"name":"Ada","role":"admin"}');
+    });
+
+    it('sends a list of objects as one JSON text', async () => {
+        const fetchMock = stubFetch(200, {
+            users: [],
+        });
+        const client = createClient({
+            baseUrl: 'http://localhost:3000',
+            fetch: fetchMock,
+        });
+
+        await client.users.listUsers({
+            query: {
+                anyOf: [
+                    {
+                        name: 'Ada',
+                    },
+                    {
+                        name: 'Linus',
+                    },
+                ],
+            },
+        });
+
+        const [url] = fetchMock.mock.calls[0]! as [string];
+        expect(new URL(url).searchParams.getAll('anyOf')).toEqual(['[{"name":"Ada"},{"name":"Linus"}]']);
+    });
+
     it('returns the parsed status and body', async () => {
         const fetchMock = stubFetch(200, {
             id: '1',

@@ -16,7 +16,7 @@ import {
 } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
 import { parsePath, type PathParamsCheck } from './path-params.js';
-import { isStreamResponse, isZodSchema } from './generator-utils.js';
+import { isJsonQueryField, isStreamResponse, isZodSchema } from './generator-utils.js';
 import { assertValidStreams, streamSchemas } from './stream.js';
 import { expandStreamTools } from './tool-events.js';
 
@@ -183,18 +183,19 @@ const describeField = (schema: z.core.$ZodType): string => {
 const fieldsOf = (schema: z.ZodType | undefined): [string, z.core.$ZodType][] => Object.entries((schema && readObjectShape(schema)) ?? {});
 
 /**
- * A query string carries values and lists of values, the way OpenAPI's default `form` style sends them.
+ * A query string carries values and lists of values in OpenAPI's default `form` style. Anything else travels
+ * as one JSON text. Only a file cannot be sent.
  */
 const assertQuerySendable = (route: RouteDefinition, routeKey: string): void => {
     for (const [name, field] of fieldsOf(route.query)) {
+        if (isJsonQueryField(field)) continue;
         const sendable = optionsOf(field).every((option) =>
             optionsOf(listElement(option) ?? option).every((value) => isValue(fieldKind(value)))
         );
         if (sendable) continue;
         throw new Error(
             `Route "${routeKey}" declares query field "${name}" as ${describeField(field)}. ` +
-                'A query string carries values and lists of values, so this cannot be sent.\n' +
-                'Split it into fields of their own, or move it to a body.'
+                'A query string carries text and JSON. A file needs a multipart form body.'
         );
     }
 };

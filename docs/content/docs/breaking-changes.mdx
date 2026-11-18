@@ -121,20 +121,29 @@ A rename is spotted by matching a departed key against an arrived one on the sam
 
 A caller sends requests and reads responses, so tightening an input and dropping an output are the two that hurt.
 
-| Change                         | Request      | Response     |
-| ------------------------------ | ------------ | ------------ |
-| A required field added         | **breaking** | changed      |
-| An optional field added        | quiet        | changed      |
-| A field removed                | changed      | **breaking** |
-| An optional field required     | **breaking** | changed      |
-| A required field optional      | changed      | **breaking** |
-| A field made nullable          | changed      | **breaking** |
-| A nullable field made non-null | **breaking** | changed      |
-| A type changed                 | **breaking** | **breaking** |
-| An enum value removed          | **breaking** | **breaking** |
-| An enum value added            | changed      | **breaking** |
+| Change                          | Request      | Response     |
+| ------------------------------- | ------------ | ------------ |
+| A required field added          | **breaking** | changed      |
+| An optional field added         | quiet        | changed      |
+| A field removed                 | changed      | **breaking** |
+| An optional field required      | **breaking** | changed      |
+| A required field optional       | changed      | **breaking** |
+| A field made nullable           | changed      | **breaking** |
+| A nullable field made non-null  | **breaking** | changed      |
+| A type widened to hold more     | changed      | **breaking** |
+| A type narrowed to what it held | **breaking** | changed      |
+| A type changed to another       | **breaking** | **breaking** |
+| An enum value removed           | **breaking** | **breaking** |
+| An enum value added             | changed      | **breaking** |
 
-That last row catches people out. Adding a value to a response enum breaks any client that generated a closed enum for it, which is what [`unknownEnumCase`](/docs/clients/swift) exists for in the Swift and Kotlin clients.
+A type widens when the new one still holds the old, like `z.string()` becoming `z.union([z.string(), NameFilterSchema])`. Every request that worked still works, so it is reported as changed with a note that the generated client type changes:
+
+```
+CHANGED  GET /users query.where.name widens from string to string | object
+         the generated client type changes, the HTTP surface does not
+```
+
+The last row catches people out. Adding a value to a response enum breaks any client that generated a closed enum for it, which is what [`unknownEnumCase`](/docs/clients/swift) exists for in the Swift and Kotlin clients.
 
 Bodies, query parameters, headers and every response body are compared, reported by path and followed into arrays:
 

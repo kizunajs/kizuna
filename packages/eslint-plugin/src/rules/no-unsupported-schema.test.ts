@@ -32,11 +32,7 @@ describe.each([
     ['without type information', { jsDocParsingMode: 'all' }],
 ])('no-unsupported-schema (%s)', (_label, parserOptions) => {
     it('flags imported schemas with the reference-variant messages, on the reference', async () => {
-        expect(await messageIdsFor('contract-violations.ts', parserOptions)).toEqual([
-            'coerceReference',
-            'unsendableQuery',
-            'coerceReference',
-        ]);
+        expect(await messageIdsFor('contract-violations.ts', parserOptions)).toEqual(['coerceReference', 'coerceReference']);
     });
 
     it('leaves a clean referenced schema alone', async () => {
@@ -80,16 +76,14 @@ describe.each([
     });
 
     it('looks inside a union, and leaves one of values alone', async () => {
-        expect(await messageIdsFor('contract-union-fields.ts', parserOptions)).toEqual(['unsendableQuery', 'unsendableHeader']);
+        expect(await messageIdsFor('contract-union-fields.ts', parserOptions)).toEqual(['unsendableHeader']);
     });
 
     it('flags a field its part of the request cannot carry, and leaves JSON bodies and responses alone', async () => {
         expect(await messageIdsFor('contract-fields.ts', parserOptions)).toEqual([
             'unsendablePath',
             'unsendableQuery',
-            'unsendableQuery',
             'unsendableHeader',
-            'unsendableQuery',
             'binaryFormField',
             'unsendableForm',
             'fileInUrlencoded',

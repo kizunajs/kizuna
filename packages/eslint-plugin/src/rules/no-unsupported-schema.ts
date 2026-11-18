@@ -245,8 +245,7 @@ export const noUnsupportedSchema = ESLintUtils.RuleCreator.withoutDocs({
                 'This schema has a .nullable() field, which a query, path, header or form field cannot carry, since none of them has a null. Use .optional() instead.',
             unsendablePath:
                 'A path parameter arrives as a single string, so a list or an object here cannot be sent. Use a scalar schema, or move the value to query.',
-            unsendableQuery:
-                'A query string carries values and lists of values, so an object, record, tuple or nested list here cannot be sent. Split it into fields of their own, or move it to a body.',
+            unsendableQuery: 'A query string carries text and JSON. A file needs a multipart form body.',
             unsendableHeader:
                 'A header carries one value, so a list or an object here cannot be sent. Use a scalar schema, or split it into headers of their own.',
             unsendableForm:

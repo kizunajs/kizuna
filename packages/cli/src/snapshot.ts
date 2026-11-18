@@ -24,6 +24,7 @@ export type SchemaNode =
     | { kind: 'array'; nullable?: true; element: SchemaNode; refinements?: number }
     | { kind: 'enum'; nullable?: true; values: string[]; refinements?: number }
     | { kind: 'model'; nullable?: true; model: string; refinements?: number }
+    | { kind: 'union'; nullable?: true; options: SchemaNode[]; refinements?: number }
     | { kind: string; nullable?: true; refinements?: number };
 
 export interface RouteSnapshot {
@@ -133,6 +134,9 @@ export const toSchemaNode = (schema: z.core.$ZodType, inside: readonly z.core.$Z
         };
     }
     if (def.type === 'literal') return { kind: 'enum', ...nullability, values: (def.values ?? []).map(String).sort(), ...carry };
+    if (def.type === 'union') {
+        return { kind: 'union', ...nullability, options: options.map((option) => toSchemaNode(option, inside)), ...carry };
+    }
 
     return { kind: def.type ?? 'unknown', ...nullability, ...carry };
 };

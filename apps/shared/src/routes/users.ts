@@ -6,6 +6,8 @@ import { ProblemDetailsSchema, BinarySchema } from 'kizunajs/schemas';
 import { z } from 'zod';
 import { k } from '../k';
 import { PaginationQuery } from '../pagination';
+import { UserWhereSchema, matchesUserWhere } from '../user-where';
+import type { User } from '../types';
 import { UserSessionEvent } from './notifications';
 import { UserId } from '../user-id';
 
@@ -136,7 +138,9 @@ export const usersRoutes = k.routes.users({
             method: 'GET',
             path: '/users',
             auth: false,
-            query: PaginationQuery,
+            query: PaginationQuery.extend({
+                where: UserWhereSchema.optional(),
+            }),
             responses: {
                 200: {
                     body: z.object({
@@ -154,7 +158,16 @@ export const usersRoutes = k.routes.users({
         })
         .handler(async ({ query }) => {
             const skip = (query.page - 1) * query.limit;
-            const [users, total] = await Promise.all([db.users.findMany({ skip, take: query.limit }), db.users.count()]);
+            const where = query.where;
+            const matching = where === undefined ? undefined : (user: User) => matchesUserWhere(user, where);
+            const [users, total] = await Promise.all([
+                db.users.findMany({
+                    skip,
+                    take: query.limit,
+                    matching,
+                }),
+                db.users.count(matching),
+            ]);
             return {
                 status: 200,
                 body: {

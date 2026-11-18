@@ -2862,3 +2862,61 @@ describe('a model that holds itself', () => {
         });
     });
 });
+
+describe('an object in a query', () => {
+    const spec = generateJson(
+        defineConfig({
+            ...config,
+            routes: [
+                k.routes({
+                    listEvents: k.route({
+                        method: 'GET',
+                        path: '/events',
+                        query: z.object({
+                            limit: z.int().optional(),
+                            filter: z
+                                .object({
+                                    city: z.string().optional(),
+                                })
+                                .optional(),
+                        }),
+                        responses: {
+                            200: z.array(z.string()),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+    const parameters = spec.paths['/events']?.get?.parameters ?? [];
+
+    it('is a valid OpenAPI 3.1 document', async () => {
+        await expect(spec).toBeAValidOpenAPIDefinition();
+    });
+
+    it('writes the object as JSON text that carries its schema', () => {
+        const filter = parameters.find((parameter) => parameter.name === 'filter');
+        expect(filter?.schema).toMatchObject({
+            type: 'string',
+            contentMediaType: 'application/json',
+            contentSchema: {
+                type: 'object',
+                properties: {
+                    city: {
+                        type: 'string',
+                    },
+                },
+            },
+        });
+    });
+
+    it('writes a value as before', () => {
+        const limit = parameters.find((parameter) => parameter.name === 'limit');
+        expect(limit?.schema).toEqual({
+            type: 'integer',
+            minimum: -9007199254740991,
+            maximum: 9007199254740991,
+        });
+    });
+});

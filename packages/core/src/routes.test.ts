@@ -557,29 +557,45 @@ describe('k.routes fields a request cannot carry', () => {
             }),
         });
 
-    it('throws for a query field that is not a value or a list of values', () => {
-        expect(
-            listNotesWith(
-                z.object({
-                    status: z.string(),
-                })
-            )
-        ).toThrowError(
-            'Route "listNotes" declares query field "filter" as object. A query string carries values and lists of values, so this cannot be sent.'
+    it('throws for a file in a query', () => {
+        expect(listNotesWith(FileSchema)).toThrowError(
+            'Route "listNotes" declares query field "filter" as file. A query string carries text and JSON. A file needs a multipart form body.'
         );
-        expect(listNotesWith(z.record(z.string(), z.string()))).toThrowError('as record');
+        expect(listNotesWith(z.array(BinarySchema))).toThrowError('as array of BinarySchema');
+    });
+
+    it('accepts anything but a file in a query and sends it as JSON', () => {
         expect(
             listNotesWith(
                 z
-                    .array(
-                        z.object({
-                            status: z.string(),
-                        })
-                    )
+                    .object({
+                        status: z.string(),
+                    })
                     .optional()
             )
-        ).toThrowError('as array of object');
-        expect(listNotesWith(z.array(z.array(z.string())))).toThrowError('as array of array');
+        ).not.toThrow();
+        expect(listNotesWith(z.record(z.string(), z.string()))).not.toThrow();
+        expect(
+            listNotesWith(
+                z.array(
+                    z.object({
+                        status: z.string(),
+                    })
+                )
+            )
+        ).not.toThrow();
+        expect(listNotesWith(z.array(z.array(z.string())))).not.toThrow();
+        expect(listNotesWith(z.tuple([z.string()]))).not.toThrow();
+        expect(
+            listNotesWith(
+                z.union([
+                    z.string(),
+                    z.object({
+                        status: z.string(),
+                    }),
+                ])
+            )
+        ).not.toThrow();
     });
 
     it('accepts a value, a list of values and a transform in a query', () => {
@@ -628,36 +644,6 @@ describe('k.routes fields a request cannot carry', () => {
         expect(uploadAvatarWith('multipart/form-data', z.array(FileSchema))).not.toThrow();
         expect(uploadAvatarWith('multipart/form-data', z.array(z.string()).optional())).not.toThrow();
         expect(uploadAvatarWith('application/x-www-form-urlencoded', z.number())).not.toThrow();
-    });
-
-    it('throws for a query field whose union holds an object', () => {
-        expect(
-            listNotesWith(
-                z.union([
-                    z.string(),
-                    z.object({
-                        status: z.string(),
-                    }),
-                ])
-            )
-        ).toThrowError(
-            'Route "listNotes" declares query field "filter" as a union holding object. A query string carries values and lists of values, so this cannot be sent.'
-        );
-    });
-
-    it('throws for a query list whose union holds an object', () => {
-        expect(
-            listNotesWith(
-                z.array(
-                    z.union([
-                        z.string(),
-                        z.object({
-                            status: z.string(),
-                        }),
-                    ])
-                )
-            )
-        ).toThrowError('as array of a union holding object');
     });
 
     it('accepts a query union of values, and of a value or a list of values', () => {

@@ -99,6 +99,40 @@ describe('a client generated from the OpenAPI document by another tool', () => {
         });
     });
 
+    it('sends an object in a query as the JSON its contentSchema describes', async () => {
+        const result = await sdk.listUsers({
+            query: {
+                where: JSON.stringify({
+                    or: [
+                        {
+                            name: {
+                                contains: 'ada',
+                            },
+                        },
+                        {
+                            and: [
+                                {
+                                    email: {
+                                        contains: '@example.com',
+                                    },
+                                },
+                                {
+                                    name: {
+                                        equals: 'Linus Torvalds',
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                }),
+            },
+        });
+        expect(result.response.status).toBe(200);
+        const { users } = result.data as { users: { name: string }[] };
+        expect(users.map((user) => user.name)).toEqual(expect.arrayContaining(['Ada Lovelace', 'Linus Torvalds']));
+        expect(users.every((user) => user.name.toLowerCase().includes('ada') || user.name === 'Linus Torvalds')).toBe(true);
+    });
+
     it('sends a JSON body, a path parameter and a header the server reads', async () => {
         const created = await sdk.createUser({
             body: {

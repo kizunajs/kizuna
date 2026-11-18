@@ -30,6 +30,10 @@ export interface KotlinField {
     isFile?: boolean;
     deprecated?: boolean;
     deprecationMessage?: string;
+    /**
+     * A query field that travels as one JSON text because it is not a value or a list of values.
+     */
+    json?: boolean;
 }
 
 export interface KotlinDataClass {

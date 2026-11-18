@@ -58,6 +58,9 @@ export const ADAPTER_FEATURES = {
         summary:
             'A POST with `X-HTTP-Method-Override: GET` and a form body is answered as the GET on that path, the body read as its query. A POST without the header still reaches the POST route.',
     },
+    'query.jsonObject': {
+        summary: 'An object query param arrives parsed from its JSON text, and text that is not JSON answers 400.',
+    },
     'body.json': {
         summary: 'A JSON body validates and reaches the handler typed.',
     },

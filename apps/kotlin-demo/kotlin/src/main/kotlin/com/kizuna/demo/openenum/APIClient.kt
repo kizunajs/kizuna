@@ -23,6 +23,20 @@ interface KizunaQueryValue {
 
 object OpenEnumAPI {
 
+    @Serializable
+    data class UserWhere(
+        val name: TextFilter? = null,
+        val email: TextFilter? = null,
+        val and: List<UserWhere>? = null,
+        val or: List<UserWhere>? = null
+    )
+
+    @Serializable
+    data class TextFilter(
+        val equals: String? = null,
+        val contains: String? = null
+    )
+
     /** A user in the system */
     @Serializable
     data class User(
@@ -314,7 +328,8 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         data class Query(
             val page: Int? = null,
-            val limit: Int? = null
+            val limit: Int? = null,
+            val where: OpenEnumAPI.UserWhere? = null
         )
 
         sealed interface Args {
@@ -322,7 +337,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
 
         object Scope {
-            fun query(page: Int? = null, limit: Int? = null): AfterQuery = AfterQuery(query = Query(page = page, limit = limit))
+            fun query(page: Int? = null, limit: Int? = null, where: OpenEnumAPI.UserWhere? = null): AfterQuery = AfterQuery(query = Query(page = page, limit = limit, where = where))
         }
 
         class AfterQuery internal constructor(override val query: Query?) : Args
@@ -2056,6 +2071,9 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             for (stringValue in Kizuna.stringifyQueryValue(query.limit)) {
                 urlBuilder.addQueryParameter("limit", stringValue)
             }
+        }
+        if (query.where != null) {
+            urlBuilder.addQueryParameter("where", Kizuna.encodeQueryJson(json, query.where))
         }
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
@@ -3911,6 +3929,19 @@ private object Kizuna {
     fun encodePathSegment(value: Any): String {
         val text = stringifyQueryValue(value).firstOrNull() ?: ""
         return java.net.URLEncoder.encode(text, "UTF-8").replace("+", "%20")
+    }
+
+    // One JSON text with every object's keys in order so one value always gives one URL.
+    inline fun <reified Value> encodeQueryJson(json: Json, value: Value): String {
+        return sortJsonKeys(json.encodeToJsonElement(value)).toString()
+    }
+
+    fun sortJsonKeys(element: JsonElement): JsonElement {
+        return when (element) {
+            is JsonObject -> JsonObject(element.toSortedMap().mapValues { sortJsonKeys(it.value) })
+            is JsonArray -> JsonArray(element.map { sortJsonKeys(it) })
+            else -> element
+        }
     }
 
     fun stringifyQueryValue(value: Any): List<String> {
