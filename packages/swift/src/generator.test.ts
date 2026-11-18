@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { Kizuna, type ApiDefinition } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import { definePlugin, route } from 'kizunajs/plugin';
+import { FileSchema } from 'kizunajs/schemas';
 import { generateSwiftClient } from './generator.js';
 
 interface Config {
@@ -2769,5 +2770,111 @@ describe('Swift generator: the automatic 400 for each validated part', () => {
             }),
         });
         expect(output).toContain('case badRequest(TestAPIClient.ValidationError)');
+    });
+});
+
+describe('Swift generator: a model with an id is Identifiable', () => {
+    const UserId = Kizuna.brand('UserId', z.string());
+    const outputFor = (fields: Record<string, z.ZodType>) =>
+        generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: [
+                    k.routes({
+                        getTask: k.route({
+                            method: 'GET',
+                            path: '/task',
+                            responses: {
+                                200: Kizuna.model({
+                                    title: 'Task',
+                                    schema: z.object({
+                                        title: z.string(),
+                                        ...fields,
+                                    }),
+                                }),
+                            },
+                        }),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+
+    it('conforms when the id is a string', () => {
+        const output = outputFor({
+            id: z.string(),
+        });
+        expect(output).toContain('public struct Task: Codable, Sendable, Equatable, Identifiable');
+    });
+
+    it('conforms when the id is an integer or a brand', () => {
+        expect(
+            outputFor({
+                id: z.int(),
+            })
+        ).toContain('public struct Task: Codable, Sendable, Equatable, Identifiable');
+        const branded = outputFor({
+            id: UserId,
+        });
+        expect(branded).toContain('public struct Task: Codable, Sendable, Equatable, Identifiable');
+        expect(branded).toContain('public let id: UserId');
+    });
+
+    it('leaves an optional or nullable id alone, since Identifiable needs one every time', () => {
+        expect(
+            outputFor({
+                id: z.string().optional(),
+            })
+        ).toContain('public struct Task: Codable, Sendable, Equatable {');
+        expect(
+            outputFor({
+                id: z.string().nullable(),
+            })
+        ).toContain('public struct Task: Codable, Sendable, Equatable {');
+    });
+
+    it('leaves a model without an id unchanged', () => {
+        expect(outputFor({})).toContain('public struct Task: Codable, Sendable, Equatable {');
+    });
+
+    it('conforms through the computed property of a deprecated id', () => {
+        const output = outputFor({
+            id: z.string().meta({
+                deprecated: true,
+            }),
+        });
+        expect(output).toContain('public struct Task: Codable, Sendable, Equatable, Identifiable');
+        expect(output).toContain('public var id: String {');
+    });
+});
+
+describe('Swift generator: a model with an id and a file', () => {
+    it('conforms to Identifiable beside Sendable and Equatable', () => {
+        const output = generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: [
+                    k.routes({
+                        uploadAttachment: k.route({
+                            method: 'POST',
+                            path: '/attachments',
+                            contentType: 'multipart/form-data',
+                            body: Kizuna.model({
+                                title: 'Attachment',
+                                schema: z.object({
+                                    id: z.string(),
+                                    file: FileSchema,
+                                }),
+                            }),
+                            responses: {
+                                204: z.void(),
+                            },
+                        }),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('public struct Attachment: Sendable, Equatable, Identifiable');
     });
 });

@@ -56,6 +56,15 @@ final class APIClientTests: XCTestCase {
         XCTAssertTrue(response.body.users.allSatisfy { $0.name.lowercased().contains("ada") || $0.name == "Linus Torvalds" })
     }
 
+    func testModelsWithAnIdAreIdentifiable() async throws {
+        let response = try await client.users.listUsers(.query(page: 1, limit: 10))
+        XCTAssertEqual(identifiers(of: response.body.users), response.body.users.map(\.id))
+    }
+
+    private func identifiers<Item: Identifiable>(of items: [Item]) -> [Item.ID] {
+        items.map(\.id)
+    }
+
     func testGetUserReturnsSeededUser() async throws {
         let result = try await client.users.getUser(
             .params(id: API.UserId("1")),

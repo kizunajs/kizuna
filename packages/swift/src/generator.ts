@@ -722,6 +722,18 @@ const emitOwnedTypes = (
     }
 };
 
+const HASHABLE_ID_TYPES: ReadonlySet<string> = new Set(['String', 'Int', 'Int64', 'Double', 'Bool', 'Date']);
+
+/**
+ * Whether a struct's `id` makes it `Identifiable`: required, never null and hashable.
+ */
+const hasStableId = (fields: readonly SwiftField[], context: EmitContext): boolean => {
+    const id = fields.find((field) => field.name === 'id');
+    if (id === undefined || id.optional || id.requiredNullable === true) return false;
+    const type = id.type.startsWith(`${context.namespaceName}.`) ? id.type.slice(context.namespaceName.length + 1) : id.type;
+    return HASHABLE_ID_TYPES.has(type) || context.registry.allBrands().some((brand) => brand.name === type);
+};
+
 const emitStruct = (
     writer: SwiftWriter,
     type: Extract<SwiftType, { kind: 'struct' }>,
@@ -732,7 +744,12 @@ const emitStruct = (
 ): void => {
     const lookupName = registryName ?? type.name;
     const hasFile = type.fields.some((field) => field.isFile);
-    const conformances = hasFile ? 'Sendable, Equatable' : 'Codable, Sendable, Equatable';
+    const conformances = [
+        ...(hasFile ? [] : ['Codable']),
+        'Sendable',
+        'Equatable',
+        ...(hasStableId(type.fields, context) ? ['Identifiable'] : []),
+    ].join(', ');
 
     const resolveOwnedType = (raw: string): string => {
         const optional = raw.endsWith('?');

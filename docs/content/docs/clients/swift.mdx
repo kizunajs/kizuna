@@ -121,7 +121,7 @@ struct UserList: View {
     @State private var users: [API.User] = []
 
     var body: some View {
-        List(users, id: \.id) { user in
+        List(users) { user in
             UserRow(user: user)
         }
         .task {
