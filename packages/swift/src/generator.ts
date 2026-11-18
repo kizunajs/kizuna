@@ -14,6 +14,7 @@ import {
     readMetaId,
     toPascalCase,
     toCamelCase,
+    uniqueNames,
     shortTypeName,
     isHintPrefix,
     localTypeName,
@@ -236,12 +237,13 @@ const buildRouteMethod = (
         if (isStreamResponse(responseValue)) {
             const mode = streamMode(responseValue);
             if (mode === 'events' && isNamedStream(responseValue.stream)) {
+                const eventCaseNames = enumCaseNames(Object.keys(responseValue.stream));
                 stream = {
                     status,
                     mode,
-                    events: Object.entries(responseValue.stream).map(([name, schema]) => ({
+                    events: Object.entries(responseValue.stream).map(([name, schema], index) => ({
                         name,
-                        caseName: sanitizeEnumCaseName(name),
+                        caseName: eventCaseNames[index]!,
                         type: mapType(schema, registry, `${baseHint}${toPascalCase(name)}`).expression,
                     })),
                 };
@@ -472,6 +474,12 @@ const sanitizeEnumCaseName = (value: string): string => {
     return /^[0-9]/.test(camel) ? `_${camel}` : camel;
 };
 
+/**
+ * Case names for a whole enum, so `name` and `-name` become `name` and `_name`
+ * where each alone would be written `name`.
+ */
+const enumCaseNames = (values: readonly string[]): string[] => uniqueNames(values.map(sanitizeEnumCaseName));
+
 const defaultArgument = (field: SwiftField): string => {
     if (!hasDefault(field)) return '';
     return ' = nil';
@@ -577,15 +585,15 @@ const unknownCaseName = (caseNames: string[]): string => {
 const emitStringEnum = (writer: SwiftWriter, name: string, cases: string[], unknownCase: boolean, description?: string): void => {
     writer.blank();
     writer.docComment(description);
+    const caseNames = enumCaseNames(cases);
     if (!unknownCase) {
         writer.block(`public enum ${name}: String, Codable, Sendable`, () => {
-            for (const caseName of cases) {
-                writer.line(`case ${escapeKeyword(sanitizeEnumCaseName(caseName))} = ${stringLiteral(caseName)}`);
+            for (let index = 0; index < cases.length; index += 1) {
+                writer.line(`case ${escapeKeyword(caseNames[index]!)} = ${stringLiteral(cases[index]!)}`);
             }
         });
         return;
     }
-    const caseNames = cases.map((caseName) => sanitizeEnumCaseName(caseName));
     const unknown = unknownCaseName(caseNames);
     writer.block(`public enum ${name}: RawRepresentable, Codable, Sendable, Hashable`, () => {
         for (const caseName of caseNames) {

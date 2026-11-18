@@ -2605,3 +2605,40 @@ describe('Kotlin generator: an API with no enums', () => {
         expect(output).not.toContain('KizunaQueryValue');
     });
 });
+
+describe('Kotlin generator: enum values that write the same constant', () => {
+    const contractFor = (values: [string, ...string[]]) =>
+        defineConfig({
+            routes: [
+                k.routes({
+                    listTasks: k.route({
+                        method: 'GET',
+                        path: '/tasks',
+                        query: z.object({
+                            sort: z.array(z.enum(values)).optional(),
+                        }),
+                        responses: {
+                            200: z.array(z.string()),
+                        },
+                    }),
+                }),
+            ],
+        }).api;
+
+    it('puts `_` in front of a value whose constant is already taken', () => {
+        const output = generateKotlinClient(contractFor(['a.b', 'a-b', 'name', 'Name']), baseConfig);
+        expect(output).toContain('@SerialName("a.b") A_B("a.b")');
+        expect(output).toContain('@SerialName("a-b") _A_B("a-b")');
+        expect(output).toContain('@SerialName("name") NAME("name")');
+        expect(output).toContain('@SerialName("Name") _NAME("Name")');
+    });
+
+    it('does the same for an enum with an unknown case', () => {
+        const output = generateKotlinClient(contractFor(['a.b', 'a-b']), {
+            ...baseConfig,
+            unknownEnumCase: true,
+        });
+        expect(output).toContain('data object _A_B : ');
+        expect(output).toContain('"a-b" -> _A_B');
+    });
+});

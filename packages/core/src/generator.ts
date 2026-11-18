@@ -69,6 +69,7 @@ export {
     isJsonMediaType,
     toPascalCase,
     toCamelCase,
+    uniqueNames,
     shortTypeName,
     isHintPrefix,
     localTypeName,

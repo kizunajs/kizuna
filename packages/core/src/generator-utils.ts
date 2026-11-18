@@ -35,6 +35,21 @@ export const resolveResponseCache = (value: ResponseDefinition | undefined): Cac
 export const resolveResponseEtag = (value: ResponseDefinition | undefined): boolean =>
     value !== undefined && !isZodSchema(value) && !isStreamResponse(value) && value.etag === true;
 
+/**
+ * Makes a list of names unique, in order. A name an earlier one already took
+ * gets `_` in front until it is free, so `name` and `-name`, both written
+ * `name`, become `name` and `_name`. A list with no clash comes back as it was.
+ */
+export const uniqueNames = (names: readonly string[]): string[] => {
+    const taken = new Set<string>();
+    return names.map((name) => {
+        let unique = name;
+        while (taken.has(unique)) unique = `_${unique}`;
+        taken.add(unique);
+        return unique;
+    });
+};
+
 export const toPascalCase = (input: string): string => {
     if (!input) return input;
     const cleaned = input.replace(/[^a-zA-Z0-9]+/g, ' ').trim();
