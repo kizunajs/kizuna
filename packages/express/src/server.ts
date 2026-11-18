@@ -29,6 +29,9 @@ import {
     sharedSegmentRoute,
     type PathParamsResult,
     type Adapter,
+    entriesToObject,
+    isMethodOverride,
+    METHOD_OVERRIDE_HEADER,
 } from 'kizunajs/adapter';
 import type { SecurityScheme } from 'kizunajs';
 
@@ -68,6 +71,10 @@ declare global {
              * Set when kizuna parsed this request's body itself.
              */
             kizunaParsedBody?: true;
+            /**
+             * The query a method-override POST carries in its form body.
+             */
+            kizunaOverrideQuery?: Record<string, unknown>;
         }
     }
 }
@@ -120,6 +127,28 @@ const bodyParserFor = (route: RouteDefinition, jsonOptions: JsonOptions | undefi
  * kizuna parsed and there was none, or `undefined` when the app's own parser
  * consumed it without keeping it.
  */
+/**
+ * Reads a method-override POST's form body as the query it stands in for. A body
+ * another middleware already parsed is used as it is.
+ */
+const readOverrideQuery = (req: Request, _res: Response, next: NextFunction): void => {
+    if (req.body !== undefined && req.body !== null && typeof req.body === 'object') {
+        req.kizunaOverrideQuery = req.body as Record<string, unknown>;
+        next();
+        return;
+    }
+    let text = '';
+    req.setEncoding('utf8');
+    req.on('data', (chunk: string) => {
+        text += chunk;
+    });
+    req.on('end', () => {
+        req.kizunaOverrideQuery = entriesToObject(new URLSearchParams(text));
+        next();
+    });
+    req.on('error', next);
+};
+
 const rawBodyOf = (req: Request): string | undefined => {
     if (req.rawBody !== undefined) return req.rawBody.toString('utf8');
     return req.kizunaParsedBody === true ? '' : undefined;
@@ -255,14 +284,19 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
         routeKey: string,
         route: RouteDefinition,
         routes: Routes,
-        router: CoreRouter<Routes, ExpressHandlerContext>
+        router: CoreRouter<Routes, ExpressHandlerContext>,
+        override = false
     ): void => {
-        const method = route.method.toLowerCase() as 'get' | 'head' | 'post' | 'put' | 'patch' | 'delete' | 'options';
-        const parseBody = bodyParserFor(route, options?.json);
+        const method = override ? 'post' : (route.method.toLowerCase() as 'get' | 'head' | 'post' | 'put' | 'patch' | 'delete' | 'options');
+        const parseBody = override ? readOverrideQuery : bodyParserFor(route, options?.json);
         const shared = sharedSegmentRoute(route.path);
         expressRouter[method](
             route.path,
             (req: Request, _res: Response, next: NextFunction) => {
+                if (override && !isMethodOverride(req.method, req.headers[METHOD_OVERRIDE_HEADER], req.headers['content-type'])) {
+                    next('route');
+                    return;
+                }
                 if (shared) {
                     const params = shared.readParams(req.path);
                     if (params.kind === 'not-found') {
@@ -278,7 +312,7 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
             async (req: Request, res: Response, next: NextFunction) => {
                 const adapterRequest: AdapterRequest<Request> = {
                     request: req,
-                    method: req.method,
+                    method: override ? 'GET' : req.method,
                     resolution:
                         req.kizunaParams?.kind === 'malformed-path'
                             ? req.kizunaParams
@@ -291,10 +325,10 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
                                           ? req.kizunaParams.params
                                           : (req.params as Record<string, string>),
                               },
-                    query: req.query,
+                    query: override ? (req.kizunaOverrideQuery ?? {}) : req.query,
                     headers: req.headers,
-                    readBody: () => req.body,
-                    readRawBody: () => rawBodyOf(req),
+                    readBody: () => (override ? undefined : req.body),
+                    readRawBody: () => (override ? '' : rawBodyOf(req)),
                 };
                 await adapter.handle({
                     routes,
@@ -317,6 +351,13 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
         );
     };
 
+    // A POST standing in for a GET registers ahead of every route, so it is seen before a POST on the same path.
+    const mountOverrides = (routes: Routes, router: CoreRouter<Routes, ExpressHandlerContext>): void => {
+        for (const { routeKey, route } of adapter.eachRoute(routes, router)) {
+            if (route.method === 'GET') mountRoute(routeKey, route, routes, router, true);
+        }
+    };
+
     const mountLane = (routes: Routes, router: CoreRouter<Routes, ExpressHandlerContext>): void => {
         // A GET layer answers HEAD too, so a declared HEAD route registers first or is never reached.
         const declaredRoutes = [...adapter.eachRoute(routes, router)].sort(
@@ -327,6 +368,8 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
         }
     };
 
+    mountOverrides(api.routes, api[ROUTER_META] as CoreRouter<Routes, ExpressHandlerContext>);
+    mountOverrides(pluginRoutesOf(api), pluginRouterOf(api) as CoreRouter<Routes, ExpressHandlerContext>);
     mountLane(api.routes, api[ROUTER_META] as CoreRouter<Routes, ExpressHandlerContext>);
     mountLane(pluginRoutesOf(api), pluginRouterOf(api) as CoreRouter<Routes, ExpressHandlerContext>);
 

@@ -54,6 +54,10 @@ export const ADAPTER_FEATURES = {
     'query.repeatedKeys': {
         summary: 'A repeated query key arrives as a list of every value.',
     },
+    'query.methodOverride': {
+        summary:
+            'A POST with `X-HTTP-Method-Override: GET` and a form body is answered as the GET on that path, the body read as its query. A POST without the header still reaches the POST route.',
+    },
     'body.json': {
         summary: 'A JSON body validates and reaches the handler typed.',
     },

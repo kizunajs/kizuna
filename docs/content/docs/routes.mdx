@@ -183,6 +183,22 @@ A route can only declare what its part of the request can send, and `k.routes` t
 
 An object in a query or a form can't be sent. Split it into fields of their own, or move it to a JSON body. A union counts as each of its options, so `z.union([z.string(), z.number()])` is a value, and a union holding an object is refused like the object.
 
+### A query too long for a URL
+
+Servers and proxies only promise to accept a URL of about 8,000 characters (RFC 9110). A longer query can travel as a POST to the same path, carrying `X-HTTP-Method-Override: GET` and the query string as a form body:
+
+```http
+POST /users
+X-HTTP-Method-Override: GET
+Content-Type: application/x-www-form-urlencoded
+
+ids=1&ids=2&limit=20
+```
+
+Kizuna answers it as the GET on that path, with the body read as its query, so the route's `query` schema checks it the same way. Only `GET` is honored, so a form on another site can never turn a POST into a write. A POST without the header still reaches the POST route on that path.
+
+A browser on another origin sends the header only after a CORS preflight, so add `X-HTTP-Method-Override` to the headers your CORS setup allows.
+
 ## Handler arguments
 
 Each handler receives an object with the validated inputs for that route:

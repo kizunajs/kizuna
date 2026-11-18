@@ -477,6 +477,46 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             });
         },
 
+        'query.methodOverride': async () => {
+            await createAda();
+            await api.request({
+                method: 'POST',
+                path: '/users',
+                body: {
+                    name: 'Grace',
+                    email: 'grace@example.com',
+                },
+            });
+            const overridden = await api.request({
+                method: 'POST',
+                path: '/users',
+                body: 'ids=1&ids=2&limit=1',
+                headers: {
+                    'content-type': 'application/x-www-form-urlencoded',
+                    'x-http-method-override': 'GET',
+                },
+            });
+            expect(overridden.status).toBe(200);
+            expect(overridden.body).toEqual({
+                users: [
+                    {
+                        id: '1',
+                        name: 'Ada',
+                    },
+                ],
+                total: 2,
+            });
+            const created = await api.request({
+                method: 'POST',
+                path: '/users',
+                body: {
+                    name: 'Linus',
+                    email: 'linus@example.com',
+                },
+            });
+            expect(created.status).toBe(201);
+        },
+
         'query.repeatedKeys': async () => {
             await createAda();
             await api.request({
