@@ -390,6 +390,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -413,6 +414,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -482,6 +484,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -515,6 +518,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -538,6 +542,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -628,6 +633,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -667,6 +673,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         data class Result(val body: Success)
 
         sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -778,6 +785,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -2016,6 +2024,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                     } catch (error: Exception) { throw APIClient.UsersUserBadge.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersUserBadge.Failure.NotFound(body = payload)
                 }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersUserBadge.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersUserBadge.Failure.BadRequest(body = payload)
+                }
                 else -> throw APIClient.UsersUserBadge.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
@@ -2051,6 +2065,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.UsersLastSessionEvent.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersLastSessionEvent.Failure.NotFound(body = payload)
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersLastSessionEvent.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersLastSessionEvent.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.UsersLastSessionEvent.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2135,6 +2155,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                     } catch (error: Exception) { throw APIClient.UsersGetUser.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersGetUser.Failure.NotFound(body = payload)
                 }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersGetUser.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersGetUser.Failure.BadRequest(body = payload)
+                }
                 else -> throw APIClient.UsersGetUser.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
@@ -2172,6 +2198,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                     } catch (error: Exception) { throw APIClient.UsersUserActivity.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersUserActivity.Failure.NotFound(body = payload)
                 }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersUserActivity.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersUserActivity.Failure.BadRequest(body = payload)
+                }
                 else -> throw APIClient.UsersUserActivity.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
@@ -2207,6 +2239,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.UsersUserProfile.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersUserProfile.Failure.NotFound(body = payload)
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersUserProfile.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersUserProfile.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.UsersUserProfile.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2328,6 +2366,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                     } catch (error: Exception) { throw APIClient.UsersDeleteUser.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersDeleteUser.Failure.NotFound(body = payload)
                 }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersDeleteUser.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersDeleteUser.Failure.BadRequest(body = payload)
+                }
                 else -> throw APIClient.UsersDeleteUser.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
@@ -2364,6 +2408,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersArchiveUser.Result(body = APIClient.UsersArchiveUser.Success.Status201(payload))
                     }
                     catch (error: Exception) { throw APIClient.UsersArchiveUser.Failure.Decoding(error, statusCode, data) }
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersArchiveUser.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersArchiveUser.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.UsersArchiveUser.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2498,6 +2548,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.UsersCheckUser.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersCheckUser.Failure.NotFound(body = payload)
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersCheckUser.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersCheckUser.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.UsersCheckUser.Failure.Unexpected(statusCode = statusCode, data = data)
             }

@@ -1347,9 +1347,48 @@ describe('automatic validation error response', () => {
         expect(response?.description).toBe('Bad Request');
     });
 
-    it('does not add 400 to routes without body or query', () => {
+    it('does not add 400 to a route that validates nothing', () => {
         const response = spec.paths['/users/{id}']?.get?.responses?.['400'];
         expect(response).toBeUndefined();
+    });
+
+    it('adds 400 to a route that validates only its path parameters or headers', () => {
+        const forecast = generateJson(
+            defineConfig({
+                ...config,
+                routes: [
+                    k.routes({
+                        getForecast: k.route({
+                            method: 'GET',
+                            path: '/weather/:station',
+                            pathParams: z.object({
+                                station: z.enum(['bergen', 'oslo']),
+                            }),
+                            responses: {
+                                200: z.object({
+                                    summary: z.string(),
+                                }),
+                            },
+                        }),
+                        getStatus: k.route({
+                            method: 'GET',
+                            path: '/status',
+                            headers: z.object({
+                                'x-request-id': z.string(),
+                            }),
+                            responses: {
+                                200: z.object({
+                                    ok: z.boolean(),
+                                }),
+                            },
+                        }),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(forecast.paths['/weather/{station}']?.get?.responses?.['400']).toBeDefined();
+        expect(forecast.paths['/status']?.get?.responses?.['400']).toBeDefined();
     });
 
     it('merges with a user-declared 400 using oneOf', () => {

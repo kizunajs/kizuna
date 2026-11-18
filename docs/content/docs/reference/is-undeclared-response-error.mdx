@@ -33,7 +33,7 @@ It extends `Error`, so `retry`, `throwOnError`, and error boundaries treat it as
 
 ## When it is thrown
 
-A route's declared statuses are the keys of its `responses`, plus `400` when the route has a `body` or `query` schema. Those arrive as `data`. Every other status throws.
+A route's declared statuses are the keys of its `responses`, plus `400` when the route has a `pathParams`, `query`, `headers` or `body` schema. Those arrive as `data`. Every other status throws.
 
 ```ts
 getUser: k

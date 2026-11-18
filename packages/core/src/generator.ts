@@ -65,6 +65,7 @@ export {
     isStreamResponse,
     isZodSchema,
     isJsonQueryField,
+    validatesRequest,
     resolveResponseCache,
     resolveResponseEtag,
     isJsonMediaType,

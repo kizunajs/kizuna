@@ -244,7 +244,8 @@ export namespace API {
 
         export type Result =
             | { status: 200; body: Uint8Array; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersLastSessionEvent {
@@ -254,7 +255,8 @@ export namespace API {
 
         export type Result =
             | { status: 200; body: UserSessionEvent; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersSearchUsers {
@@ -285,7 +287,8 @@ export namespace API {
             | { status: 200; body: User; headers: {
                 "x-request-id"?: string;
             } }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersUserActivity {
@@ -300,7 +303,8 @@ export namespace API {
                 year: number;
                 events: number;
             }; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersUserProfile {
@@ -310,7 +314,8 @@ export namespace API {
 
         export type Result =
             | { status: 200; body: User; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersCreateUser {
@@ -342,7 +347,8 @@ export namespace API {
             | { status: 200; body: {
                 success: boolean;
             }; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersArchiveUser {
@@ -358,7 +364,8 @@ export namespace API {
             | { status: 201; body: {
                 archivedAt: string;
                 userId: UserId;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersUploadAvatar {
@@ -403,7 +410,8 @@ export namespace API {
             | { status: 200; body: {
                 exists: boolean;
             }; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersDescribeUsers {
@@ -1472,6 +1480,7 @@ const routes: GeneratedRoutes = {
             responses: {
                 200: { read: 'bytes' },
                 404: {},
+                400: {},
             },
         },
         lastSessionEvent: {
@@ -1480,6 +1489,7 @@ const routes: GeneratedRoutes = {
             responses: {
                 200: {},
                 404: {},
+                400: {},
             },
         },
         searchUsers: {
@@ -1496,6 +1506,7 @@ const routes: GeneratedRoutes = {
             responses: {
                 200: {},
                 404: {},
+                400: {},
             },
         },
         userActivity: {
@@ -1504,6 +1515,7 @@ const routes: GeneratedRoutes = {
             responses: {
                 200: {},
                 404: {},
+                400: {},
             },
         },
         userProfile: {
@@ -1512,6 +1524,7 @@ const routes: GeneratedRoutes = {
             responses: {
                 200: {},
                 404: {},
+                400: {},
             },
         },
         createUser: {
@@ -1536,6 +1549,7 @@ const routes: GeneratedRoutes = {
             responses: {
                 200: {},
                 404: {},
+                400: {},
             },
         },
         archiveUser: {
@@ -1544,6 +1558,7 @@ const routes: GeneratedRoutes = {
             responses: {
                 200: {},
                 201: {},
+                400: {},
             },
         },
         uploadAvatar: {
@@ -1577,6 +1592,7 @@ const routes: GeneratedRoutes = {
             responses: {
                 200: {},
                 404: {},
+                400: {},
             },
         },
         describeUsers: {
