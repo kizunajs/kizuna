@@ -141,6 +141,8 @@ interface EmitContext {
     ownedTypeMap: Map<string, string>;
     // Header fields from the api's request context declarations; empty when none.
     requestContextFields: KotlinField[];
+    // Data classes whose fields are all optional, which get a `Builder` and a `ListBuilder`.
+    builderModelNames: ReadonlySet<string>;
 }
 
 const buildRouteMethod = (
@@ -621,7 +623,9 @@ const emitDataClass = (
     type: Extract<KotlinType, { kind: 'data-class' }>,
     ownedTypeMap: Map<string, string>,
     ownedTypeLookup: Map<string, KotlinType>,
-    registryName?: string
+    registryName?: string,
+    registry?: TypeRegistry,
+    withBuilders = false
 ): void => {
     const lookupName = registryName ?? type.name;
     const baseFields = type.discriminatorWireName
@@ -686,13 +690,105 @@ const emitDataClass = (
         writer.appendToLastLine(` : ${type.sealedParent}`);
     }
 
-    if (hasOwnedTypes) {
+    const builds = withBuilders && !hasFile && isBuilderModel(type);
+    if (hasOwnedTypes || builds) {
         writer.appendToLastLine(' {');
         writer.indent(() => {
-            emitOwnedTypes(writer, lookupName, ownedTypeMap, ownedTypeLookup);
+            if (hasOwnedTypes) emitOwnedTypes(writer, lookupName, ownedTypeMap, ownedTypeLookup, registry, withBuilders);
+            if (builds) {
+                const lookup = (name: string): KotlinType | undefined => registry?.get(name) ?? ownedTypeLookup.get(name);
+                emitBuilders(writer, type.name, adjustedFields, baseFields, lookup);
+            }
         });
         writer.line('}');
     }
+};
+
+/**
+ * A data class whose fields are all optional, so it can be written one field at a time.
+ */
+const isBuilderModel = (type: KotlinType | undefined): type is Extract<KotlinType, { kind: 'data-class' }> =>
+    type?.kind === 'data-class' &&
+    type.sealedParent === undefined &&
+    type.discriminatorWireName === undefined &&
+    type.fields.length > 0 &&
+    type.fields.every((field) => field.optional && field.requiredNullable !== true && field.isFile !== true);
+
+/**
+ * What a field holds: one value or a list of them, and the type named inside.
+ */
+const fieldTarget = (fieldType: string): { list: boolean; inner: string } => {
+    const stripped = fieldType.endsWith('?') ? fieldType.slice(0, -1) : fieldType;
+    const list = stripped.startsWith('List<') && stripped.endsWith('>');
+    return {
+        list,
+        inner: list ? stripped.slice(5, -1) : stripped,
+    };
+};
+
+/**
+ * `Builder` writes one of these field by field and `ListBuilder` a list of them, one block per item:
+ * `where { or { name { contains = "ada" } } }`.
+ */
+const emitBuilders = (
+    writer: KotlinWriter,
+    className: string,
+    fields: KotlinField[],
+    rawFields: KotlinField[],
+    lookup: (name: string) => KotlinType | undefined
+): void => {
+    const targets = fields.map((field, index) => {
+        const { list, inner } = fieldTarget(field.type);
+        return {
+            name: escapeKeyword(field.name),
+            type: field.type,
+            list,
+            inner,
+            buildable: isBuilderModel(lookup(fieldTarget(rawFields[index]!.type).inner)),
+        };
+    });
+    const blockOf = (target: (typeof targets)[number]): string => `${target.inner}.${target.list ? 'ListBuilder' : 'Builder'}`;
+
+    writer.blank();
+    writer.line('@KizunaDsl');
+    writer.block('class Builder', () => {
+        for (const target of targets) {
+            writer.line(`var ${target.name}: ${optionalize(target.type, true)} = null`);
+        }
+        for (const target of targets) {
+            if (!target.buildable) continue;
+            writer.blank();
+            writer.block(`fun ${target.name}(build: ${blockOf(target)}.() -> Unit)`, () => {
+                writer.line(`${target.name} = ${blockOf(target)}().apply(build).build()`);
+            });
+        }
+        writer.blank();
+        writer.line(`fun build(): ${className} = ${className}(${targets.map((target) => `${target.name} = ${target.name}`).join(', ')})`);
+    });
+
+    writer.blank();
+    writer.line('@KizunaDsl');
+    writer.block('class ListBuilder', () => {
+        writer.line(`private val items = mutableListOf<${className}>()`);
+        writer.blank();
+        writer.block(`fun add(item: ${className})`, () => {
+            writer.line('items += item');
+        });
+        for (const target of targets) {
+            writer.blank();
+            if (target.buildable) {
+                writer.block(`fun ${target.name}(build: ${blockOf(target)}.() -> Unit)`, () => {
+                    writer.line(`items += ${className}(${target.name} = ${blockOf(target)}().apply(build).build())`);
+                });
+            } else {
+                writer.block(`fun ${target.name}(value: ${optionalize(target.type, false)})`, () => {
+                    writer.line(`items += ${className}(${target.name} = value)`);
+                });
+            }
+        }
+        writer.blank();
+        writer.line(`fun build(): List<${className}> = items.toList()`);
+    });
 };
 
 const emitOwnedTypes = (
@@ -700,14 +796,15 @@ const emitOwnedTypes = (
     ownerName: string,
     ownedTypeMap: Map<string, string>,
     ownedTypeLookup: Map<string, KotlinType>,
-    registry?: TypeRegistry
+    registry?: TypeRegistry,
+    withBuilders = false
 ): void => {
     for (const [ownedName, owningType] of ownedTypeMap) {
         if (owningType !== ownerName) continue;
         const ownedType = ownedTypeLookup.get(ownedName);
         if (!ownedType) continue;
         const shortName = shortTypeName(ownedName, ownerName);
-        emitType(writer, { ...ownedType, name: shortName }, ownedTypeMap, ownedTypeLookup, ownedName, registry);
+        emitType(writer, { ...ownedType, name: shortName }, ownedTypeMap, ownedTypeLookup, ownedName, registry, withBuilders);
     }
 };
 
@@ -850,12 +947,13 @@ const emitType = (
     ownedTypeMap: Map<string, string> = new Map(),
     ownedTypeLookup: Map<string, KotlinType> = new Map(),
     registryName?: string,
-    registry?: TypeRegistry
+    registry?: TypeRegistry,
+    withBuilders = false
 ): void => {
     writer.blank();
     writer.docComment(type.description);
     if (type.kind === 'data-class') {
-        emitDataClass(writer, type, ownedTypeMap, ownedTypeLookup, registryName);
+        emitDataClass(writer, type, ownedTypeMap, ownedTypeLookup, registryName, registry, withBuilders);
     } else if (type.kind === 'enum-class') {
         emitEnumClass(writer, type.name, type.cases, type.unknownCase, type.description);
     } else if (registry) {
@@ -879,10 +977,11 @@ const emitTypes = (
     types: KotlinType[],
     ownedTypeMap: Map<string, string> = new Map(),
     ownedTypeLookup: Map<string, KotlinType> = new Map(),
-    registry?: TypeRegistry
+    registry?: TypeRegistry,
+    withBuilders = false
 ): void => {
     for (const type of types) {
-        emitType(writer, type, ownedTypeMap, ownedTypeLookup, undefined, registry);
+        emitType(writer, type, ownedTypeMap, ownedTypeLookup, undefined, registry, withBuilders);
     }
 };
 
@@ -1276,9 +1375,27 @@ const emitArgsScaffolding = (writer: KotlinWriter, method: RouteMethod, context:
         }
     });
 
+    const namespacePrefix = `${context.namespaceName}.`;
+    const buildableQueryFields = (channels.find((channel) => channel.varName === 'query')?.fields ?? []).flatMap((field) => {
+        const { list, inner } = fieldTarget(field.type);
+        const name = inner.startsWith(namespacePrefix) ? inner.slice(namespacePrefix.length) : inner;
+        return context.builderModelNames.has(name)
+            ? [
+                  {
+                      field,
+                      block: `${inner}.${list ? 'ListBuilder' : 'Builder'}`,
+                      result: list ? `List<${inner}>` : inner,
+                  },
+              ]
+            : [];
+    });
+
     writer.blank();
     writer.block('object Scope', () => {
         for (const target of transitionsFrom(-1)) emitTransition(-1, target);
+        for (const { field, block, result } of buildableQueryFields) {
+            writer.line(`fun ${escapeKeyword(field.name)}(build: ${block}.() -> Unit): ${result} = ${block}().apply(build).build()`);
+        }
     });
 
     for (let stateIndex = 0; stateIndex < channels.length; stateIndex += 1) {
@@ -2164,6 +2281,7 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
         requestContextFields.push(...collectObjectFields(headersSchema, registry, 'RequestContext'));
     }
 
+    const builderModelNames = new Set(sharedTypes.filter(isBuilderModel).map((type) => type.name));
     const context: EmitContext = {
         namespaceName,
         clientName,
@@ -2171,10 +2289,16 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
         fileLevelTypeNames,
         ownedTypeMap,
         requestContextFields,
+        builderModelNames,
     };
 
     writer.block(`object ${namespaceName}`, () => {
-        emitTypes(writer, topLevelSharedTypes, ownedTypeMap, ownedTypeLookup, registry);
+        if (builderModelNames.size > 0) {
+            writer.line('@DslMarker');
+            writer.line('annotation class KizunaDsl');
+        }
+        // Builders sit beside `KizunaDsl`, so only the models in this object get them.
+        emitTypes(writer, topLevelSharedTypes, ownedTypeMap, ownedTypeLookup, registry, builderModelNames.size > 0);
         for (const brand of registry.allBrands()) {
             writer.blank();
             emitBrand(writer, brand);

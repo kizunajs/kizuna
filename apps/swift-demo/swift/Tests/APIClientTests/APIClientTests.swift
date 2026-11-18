@@ -43,21 +43,13 @@ final class APIClientTests: XCTestCase {
     }
 
     func testListUsersSendsANestedFilterAsJSON() async throws {
-        let response = try await client.users.listUsers(
-            .query(
-                where: API.UserWhere(
-                    or: [
-                        API.UserWhere(name: .init(contains: "ada")),
-                        API.UserWhere(
-                            and: [
-                                API.UserWhere(email: .init(contains: "@example.com")),
-                                API.UserWhere(name: .init(equals: "Linus Torvalds")),
-                            ]
-                        ),
-                    ]
-                )
-            )
-        )
+        let response = try await client.users.listUsers(.query(where: .or([
+            .name(.contains("ada")),
+            .and([
+                .email(.contains("@example.com")),
+                .name(.equals("Linus Torvalds")),
+            ]),
+        ])))
         let names = Set(response.body.users.map(\.name))
         XCTAssertTrue(names.contains("Ada Lovelace"), "expected Ada; got \(names)")
         XCTAssertTrue(names.contains("Linus Torvalds"), "expected Linus; got \(names)")

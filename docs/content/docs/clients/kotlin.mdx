@@ -211,6 +211,34 @@ client.users.updatePreferences {
 
 See [Optional and null fields](/docs/zod#optional-and-null-fields) for which to declare.
 
+## Filters and options
+
+A model whose fields are all optional gets a builder, like the `EventWhere` filter in [An object in a query](/docs/routes#an-object-in-a-query). Each block sets one field, and inside `and { }` or `or { }` each block adds one filter to the list:
+
+```kotlin
+val events = client.events.listEvents {
+    query(
+        where = where {
+            or {
+                city {
+                    equals = "Bergen"
+                }
+                and {
+                    venue {
+                        contains = "Grieg"
+                    }
+                    city {
+                        equals = "Oslo"
+                    }
+                }
+            }
+        },
+    )
+}
+```
+
+`where { }` comes from the call's scope, so no type needs naming or importing. The constructors stay for a filter you already hold.
+
 ## Property naming
 
 By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type. A `@file:Suppress(...)` header keeps the IDE green over the generated file.

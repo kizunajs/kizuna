@@ -188,6 +188,22 @@ try await client.users.updatePreferences(
 
 See [Optional and null fields](/docs/zod#optional-and-null-fields) for which to declare.
 
+## Filters and options
+
+A model whose fields are all optional gets one factory per field, like the `EventWhere` filter in [An object in a query](/docs/routes#an-object-in-a-query). A leading dot reaches each one wherever Swift knows the type:
+
+```swift
+let events = try await client.events.listEvents(.query(where: .or([
+    .city(.equals("Bergen")),
+    .and([
+        .venue(.contains("Grieg")),
+        .city(.equals("Oslo")),
+    ]),
+])))
+```
+
+`.city(.equals("Bergen"))` is `EventWhere(city: TextFilter(equals: "Bergen"))`. The memberwise init stays for a filter that sets several fields at once.
+
 ## Property naming
 
 By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type.

@@ -2698,3 +2698,70 @@ describe('Kotlin generator: an object in a query', () => {
         expect(plain).not.toContain('encodeQueryJson');
     });
 });
+
+describe('Kotlin generator: a model whose fields are all optional', () => {
+    const TextFilterSchema = Kizuna.model({
+        title: 'TextFilter',
+        schema: z.object({
+            equals: z.string().optional(),
+            contains: z.string().optional(),
+        }),
+    });
+    const EventWhereSchema = Kizuna.model({
+        title: 'EventWhere',
+        schema: z.object({
+            city: TextFilterSchema.optional(),
+            get or() {
+                return z.array(EventWhereSchema).optional();
+            },
+        }),
+    });
+    const EventSchema = Kizuna.model({
+        title: 'Event',
+        schema: z.object({
+            id: z.string(),
+            city: z.string().optional(),
+        }),
+    });
+    const output = generateKotlinClient(
+        defineConfig({
+            routes: [
+                k.routes({
+                    listEvents: k.route({
+                        method: 'GET',
+                        path: '/events',
+                        query: z.object({
+                            where: EventWhereSchema.optional(),
+                        }),
+                        responses: {
+                            200: z.array(EventSchema),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+
+    it('gets a builder that sets one field per block', () => {
+        expect(output).toContain('annotation class KizunaDsl');
+        expect(output).toContain('fun city(build: TextFilter.Builder.() -> Unit)');
+        expect(output).toContain('fun or(build: EventWhere.ListBuilder.() -> Unit)');
+        expect(output).toContain('fun build(): EventWhere = EventWhere(city = city, or = or)');
+    });
+
+    it('gets a list builder that adds one filter per block', () => {
+        expect(output).toContain('items += EventWhere(city = TextFilter.Builder().apply(build).build())');
+        expect(output).toContain('fun build(): List<EventWhere> = items.toList()');
+    });
+
+    it('is reached from the query scope without naming the type', () => {
+        expect(output).toContain(
+            'fun where(build: TestAPI.EventWhere.Builder.() -> Unit): TestAPI.EventWhere = TestAPI.EventWhere.Builder().apply(build).build()'
+        );
+    });
+
+    it('leaves a model with a required field to its constructor', () => {
+        expect(output).not.toContain('fun id(');
+    });
+});

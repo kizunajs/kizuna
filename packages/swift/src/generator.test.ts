@@ -2672,3 +2672,60 @@ describe('Swift generator: an object in a query', () => {
         expect(output).toContain('encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]');
     });
 });
+
+describe('Swift generator: a model whose fields are all optional', () => {
+    const TextFilterSchema = Kizuna.model({
+        title: 'TextFilter',
+        schema: z.object({
+            equals: z.string().optional(),
+            contains: z.string().optional(),
+        }),
+    });
+    const EventWhereSchema = Kizuna.model({
+        title: 'EventWhere',
+        schema: z.object({
+            city: TextFilterSchema.optional(),
+            get or() {
+                return z.array(EventWhereSchema).optional();
+            },
+        }),
+    });
+    const EventSchema = Kizuna.model({
+        title: 'Event',
+        schema: z.object({
+            id: z.string(),
+            city: z.string().optional(),
+        }),
+    });
+    const output = generateSwiftClient(
+        defineConfig({
+            ...config,
+            routes: [
+                k.routes({
+                    listEvents: k.route({
+                        method: 'GET',
+                        path: '/events',
+                        query: z.object({
+                            where: EventWhereSchema.optional(),
+                        }),
+                        responses: {
+                            200: z.array(EventSchema),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+
+    it('gets one factory per field so a leading dot reaches it', () => {
+        expect(output).toContain('public static func city(_ city: TextFilter) -> Self');
+        expect(output).toContain('.init(city: city)');
+        expect(output).toContain('public static func or(_ or: [EventWhere]) -> Self');
+        expect(output).toContain('public static func contains(_ contains: String) -> Self');
+    });
+
+    it('leaves a model with a required field to its init', () => {
+        expect(output).not.toContain('public static func id(');
+    });
+});
