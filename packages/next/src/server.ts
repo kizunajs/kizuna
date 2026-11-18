@@ -400,7 +400,22 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
  *     basePath: '/api',
  * });
  */
-export const nextAdapter = (defaults?: NextHandlerOptions): Adapter<NextHandlerContext, [options?: NextHandlerOptions], HttpHandlers> => ({
-    name: 'next',
-    mount: (api, options) => mountNext(api as NextApiWithRouter, { ...defaults, ...options }),
-});
+export const nextAdapter = (defaults?: NextHandlerOptions): Adapter<NextHandlerContext, [options?: NextHandlerOptions], HttpHandlers> => {
+    const inProcess = new WeakMap<object, HttpHandler>();
+    return {
+        name: 'next',
+        mount: (api, options) => mountNext(api as NextApiWithRouter, { ...defaults, ...options }),
+        fetch: (api, request) => {
+            let handler = inProcess.get(api);
+            if (handler === undefined) {
+                // Paths are the routes' own, so the base path a route file mounts under does not apply.
+                handler = mountNext(api as NextApiWithRouter, {
+                    ...defaults,
+                    basePath: undefined,
+                }).GET;
+                inProcess.set(api, handler);
+            }
+            return handler(new NextRequest(request));
+        },
+    };
+};

@@ -1,3 +1,4 @@
+import Fastify from 'fastify';
 import type { FastifyInstance, FastifyRequest, FastifyReply, FastifyPluginAsync } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 import { Readable, Transform, pipeline } from 'node:stream';
@@ -33,6 +34,8 @@ import {
     entriesToObject,
     isMethodOverride,
     METHOD_OVERRIDE_HEADER,
+    injectedRequestOf,
+    responseOfInjected,
 } from 'kizunajs/adapter';
 import type { SecurityScheme } from 'kizunajs';
 
@@ -403,13 +406,48 @@ export const fastifyKizuna = fastifyPlugin(
  */
 export const fastifyAdapter = (
     defaults?: FastifyOptions
-): Adapter<FastifyHandlerContext, [app: FastifyInstance, options?: FastifyOptions], Promise<void>> => ({
-    name: 'fastify',
-    mount: async (api, app, options) => {
+): Adapter<FastifyHandlerContext, [app: FastifyInstance, options?: FastifyOptions], Promise<void>> => {
+    const inProcess = new WeakMap<object, Promise<FastifyInstance>>();
+    const start = async (api: object): Promise<FastifyInstance> => {
+        const app = Fastify();
         await app.register(fastifyKizuna, {
             ...defaults,
-            ...options,
             api: api as FastifyApi,
         });
-    },
-});
+        await app.ready();
+        return app;
+    };
+    const appFor = (api: object): Promise<FastifyInstance> => {
+        const existing = inProcess.get(api);
+        if (existing !== undefined) return existing;
+        const ready = start(api);
+        inProcess.set(api, ready);
+        return ready;
+    };
+    return {
+        name: 'fastify',
+        mount: async (api, app, options) => {
+            await app.register(fastifyKizuna, {
+                ...defaults,
+                ...options,
+                api: api as FastifyApi,
+            });
+        },
+        fetch: async (api, request) => {
+            const app = await appFor(api);
+            const injected = await injectedRequestOf(request);
+            const response = await app.inject({
+                method: injected.method as never,
+                url: injected.url,
+                headers: injected.headers,
+                ...(injected.body === undefined
+                    ? {}
+                    : {
+                          body: Buffer.from(injected.body),
+                      }),
+                payloadAsStream: true,
+            });
+            return responseOfInjected(response);
+        },
+    };
+};

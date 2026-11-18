@@ -1,7 +1,8 @@
 import type { Request, Response, NextFunction, RequestHandler, Router as ExpressRouter } from 'express';
-import { Router as createExpressRouter, json, urlencoded } from 'express';
+import express, { Router as createExpressRouter, json, urlencoded } from 'express';
+import { inject } from 'light-my-request';
 import { Readable, pipeline } from 'node:stream';
-import type { IncomingMessage, ServerResponse } from 'node:http';
+import { IncomingMessage, ServerResponse } from 'node:http';
 import {
     type AdapterRequest,
     type RouteDefinition,
@@ -32,6 +33,8 @@ import {
     entriesToObject,
     isMethodOverride,
     METHOD_OVERRIDE_HEADER,
+    injectedRequestOf,
+    responseOfInjected,
 } from 'kizunajs/adapter';
 import type { SecurityScheme } from 'kizunajs';
 
@@ -387,6 +390,28 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
 }
 
 /**
+ * An Express app for injected requests. light-my-request rewrites the prototypes behind an app's request and response,
+ * and Express shares those between every app in the process, so this app gets copies of its own and the app serving
+ * real requests is never touched.
+ */
+const injectableExpress = (): ReturnType<typeof express> => {
+    const app = express();
+    const ownedBy = {
+        app: {
+            configurable: true,
+            enumerable: true,
+            writable: true,
+            value: app,
+        },
+    };
+    const request = Object.create(IncomingMessage.prototype, Object.getOwnPropertyDescriptors(express.request)) as object;
+    const response = Object.create(ServerResponse.prototype, Object.getOwnPropertyDescriptors(express.response)) as object;
+    app.request = Object.create(request, ownedBy) as typeof app.request;
+    app.response = Object.create(response, ownedBy) as typeof app.response;
+    return app;
+};
+
+/**
  * Serve an API on Express. What it takes is what every route is served with.
  *
  * @example
@@ -401,7 +426,34 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
  */
 export const expressAdapter = (
     defaults?: ExpressOptions
-): Adapter<ExpressHandlerContext, [app: AppLike, options?: ExpressOptions], ExpressRouter> => ({
-    name: 'express',
-    mount: (api, app, options) => mountExpress(api as ExpressApi, app, { ...defaults, ...options }),
-});
+): Adapter<ExpressHandlerContext, [app: AppLike, options?: ExpressOptions], ExpressRouter> => {
+    const inProcess = new WeakMap<object, ReturnType<typeof express>>();
+    return {
+        name: 'express',
+        mount: (api, app, options) => mountExpress(api as ExpressApi, app, { ...defaults, ...options }),
+        // Express answers only on a socket, so the request is injected the way Fastify's own `inject` does.
+        fetch: async (api, request) => {
+            let app = inProcess.get(api);
+            if (app === undefined) {
+                app = injectableExpress();
+                mountExpress(api as ExpressApi, app, {
+                    ...defaults,
+                });
+                inProcess.set(api, app);
+            }
+            const injected = await injectedRequestOf(request);
+            const response = await inject(app as never, {
+                method: injected.method as never,
+                url: injected.url,
+                headers: injected.headers,
+                ...(injected.body === undefined
+                    ? {}
+                    : {
+                          body: Buffer.from(injected.body),
+                      }),
+                payloadAsStream: true,
+            });
+            return responseOfInjected(response);
+        },
+    };
+};

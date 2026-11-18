@@ -1,4 +1,5 @@
-import type { Context, Env, Hono, MiddlewareHandler, Next } from 'hono';
+import { Hono } from 'hono';
+import type { Context, Env, MiddlewareHandler, Next } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import {
     type AdapterRequest,
@@ -229,7 +230,21 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
  * // src/index.ts
  * kizuna.api.mount(app);
  */
-export const honoAdapter = (defaults?: HonoOptions): Adapter<HonoHandlerContext<Env>, [app: Hono, options?: HonoOptions], void> => ({
-    name: 'hono',
-    mount: (api, app, options) => mountHono(api as HonoApi, app, { ...defaults, ...options }),
-});
+export const honoAdapter = (defaults?: HonoOptions): Adapter<HonoHandlerContext<Env>, [app: Hono, options?: HonoOptions], void> => {
+    const inProcess = new WeakMap<object, Hono>();
+    return {
+        name: 'hono',
+        mount: (api, app, options) => mountHono(api as HonoApi, app, { ...defaults, ...options }),
+        fetch: async (api, request) => {
+            let app = inProcess.get(api);
+            if (app === undefined) {
+                app = new Hono();
+                mountHono(api as HonoApi, app, {
+                    ...defaults,
+                });
+                inProcess.set(api, app);
+            }
+            return app.fetch(request);
+        },
+    };
+};

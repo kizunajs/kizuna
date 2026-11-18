@@ -234,6 +234,26 @@ const { body } = await apiClient.users.listUsers({
 });
 ```
 
+## In process
+
+Server code in the same app can call its own routes without HTTP. A server component, a script or a test passes `kizuna.api.fetch` as the client's `fetch`:
+
+```ts title="src/lib/server-client.ts"
+import kizuna from '../../kizuna.config';
+import { createClient } from './api-client.generated';
+
+export const serverClient = createClient({
+    baseUrl: 'http://localhost',
+    fetch: kizuna.api.fetch,
+});
+```
+
+Guards, validation and the handler run as they would over HTTP, and nothing leaves the process. Express and Fastify answer through an injected request, so no server starts. Three things differ from a request over the network:
+
+- **Paths are the routes' own.** A base path given to `mount` does not apply, so `/users/1` is `/users/1`.
+- **The adapter's own options apply.** What `expressAdapter({ responseValidation: true })` was given counts. What `mount` alone was given does not.
+- **The request carries only what you pass.** There is no browser, so send the `authorization` header a guard reads.
+
 ## Retries
 
 A busy server answers `503 Service Unavailable` or `429 Too Many Requests` and says in `Retry-After` when to come back. Turn retries on and the client waits that long and sends the request again:
