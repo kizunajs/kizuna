@@ -22,6 +22,8 @@ interface KizunaQueryValue {
 }
 
 object OpenEnumAPI {
+    @DslMarker
+    annotation class KizunaDsl
 
     @Serializable
     data class UserWhere(
@@ -29,13 +31,95 @@ object OpenEnumAPI {
         val email: TextFilter? = null,
         val and: List<UserWhere>? = null,
         val or: List<UserWhere>? = null
-    )
+    ) {
+
+        @KizunaDsl
+        class Builder {
+            var name: TextFilter? = null
+            var email: TextFilter? = null
+            var and: List<UserWhere>? = null
+            var or: List<UserWhere>? = null
+
+            fun name(build: TextFilter.Builder.() -> Unit) {
+                name = TextFilter.Builder().apply(build).build()
+            }
+
+            fun email(build: TextFilter.Builder.() -> Unit) {
+                email = TextFilter.Builder().apply(build).build()
+            }
+
+            fun and(build: UserWhere.ListBuilder.() -> Unit) {
+                and = UserWhere.ListBuilder().apply(build).build()
+            }
+
+            fun or(build: UserWhere.ListBuilder.() -> Unit) {
+                or = UserWhere.ListBuilder().apply(build).build()
+            }
+
+            fun build(): UserWhere = UserWhere(name = name, email = email, and = and, or = or)
+        }
+
+        @KizunaDsl
+        class ListBuilder {
+            private val items = mutableListOf<UserWhere>()
+
+            fun add(item: UserWhere) {
+                items += item
+            }
+
+            fun name(build: TextFilter.Builder.() -> Unit) {
+                items += UserWhere(name = TextFilter.Builder().apply(build).build())
+            }
+
+            fun email(build: TextFilter.Builder.() -> Unit) {
+                items += UserWhere(email = TextFilter.Builder().apply(build).build())
+            }
+
+            fun and(build: UserWhere.ListBuilder.() -> Unit) {
+                items += UserWhere(and = UserWhere.ListBuilder().apply(build).build())
+            }
+
+            fun or(build: UserWhere.ListBuilder.() -> Unit) {
+                items += UserWhere(or = UserWhere.ListBuilder().apply(build).build())
+            }
+
+            fun build(): List<UserWhere> = items.toList()
+        }
+    }
 
     @Serializable
     data class TextFilter(
         val equals: String? = null,
         val contains: String? = null
-    )
+    ) {
+
+        @KizunaDsl
+        class Builder {
+            var equals: String? = null
+            var contains: String? = null
+
+            fun build(): TextFilter = TextFilter(equals = equals, contains = contains)
+        }
+
+        @KizunaDsl
+        class ListBuilder {
+            private val items = mutableListOf<TextFilter>()
+
+            fun add(item: TextFilter) {
+                items += item
+            }
+
+            fun equals(value: String?) {
+                items += TextFilter(equals = value)
+            }
+
+            fun contains(value: String?) {
+                items += TextFilter(contains = value)
+            }
+
+            fun build(): List<TextFilter> = items.toList()
+        }
+    }
 
     /** A user in the system */
     @Serializable
@@ -338,6 +422,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         object Scope {
             fun query(page: Int? = null, limit: Int? = null, where: OpenEnumAPI.UserWhere? = null): AfterQuery = AfterQuery(query = Query(page = page, limit = limit, where = where))
+            fun where(build: OpenEnumAPI.UserWhere.Builder.() -> Unit): OpenEnumAPI.UserWhere = OpenEnumAPI.UserWhere.Builder().apply(build).build()
         }
 
         class AfterQuery internal constructor(override val query: Query?) : Args

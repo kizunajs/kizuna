@@ -24,6 +24,22 @@ public enum API {
             self.and = and
             self.or = or
         }
+
+        public static func name(_ name: TextFilter) -> Self {
+            .init(name: name)
+        }
+
+        public static func email(_ email: TextFilter) -> Self {
+            .init(email: email)
+        }
+
+        public static func and(_ and: [UserWhere]) -> Self {
+            .init(and: and)
+        }
+
+        public static func or(_ or: [UserWhere]) -> Self {
+            .init(or: or)
+        }
     }
 
     public struct TextFilter: Codable, Sendable, Equatable {
@@ -36,6 +52,14 @@ public enum API {
         ) {
             self.equals = equals
             self.contains = contains
+        }
+
+        public static func equals(_ equals: String) -> Self {
+            .init(equals: equals)
+        }
+
+        public static func contains(_ contains: String) -> Self {
+            .init(contains: contains)
         }
     }
 
@@ -2468,6 +2492,10 @@ public final class APIClient: Sendable {
 
             public init(unit: ToolCallGetForecastInputQueryUnit? = nil) {
                 self.unit = unit
+            }
+
+            public static func unit(_ unit: ToolCallGetForecastInputQueryUnit) -> Self {
+                .init(unit: unit)
             }
         }
 

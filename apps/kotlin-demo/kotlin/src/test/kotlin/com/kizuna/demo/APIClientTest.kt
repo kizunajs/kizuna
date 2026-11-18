@@ -55,29 +55,21 @@ class APIClientTest {
     fun testListUsersSendsANestedFilterAsJson() = runTest {
         val response = client.users.listUsers {
             query(
-                where = API.UserWhere(
-                    or = listOf(
-                        API.UserWhere(
-                            name = API.TextFilter(
-                                contains = "ada",
-                            ),
-                        ),
-                        API.UserWhere(
-                            and = listOf(
-                                API.UserWhere(
-                                    email = API.TextFilter(
-                                        contains = "@example.com",
-                                    ),
-                                ),
-                                API.UserWhere(
-                                    name = API.TextFilter(
-                                        equals = "Linus Torvalds",
-                                    ),
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
+                where = where {
+                    or {
+                        name {
+                            contains = "ada"
+                        }
+                        and {
+                            email {
+                                contains = "@example.com"
+                            }
+                            name {
+                                equals = "Linus Torvalds"
+                            }
+                        }
+                    }
+                },
             )
         }
         val names = response.body.users.map { it.name }

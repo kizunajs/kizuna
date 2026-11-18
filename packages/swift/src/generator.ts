@@ -801,7 +801,26 @@ const emitStruct = (
         }
         writer.blank();
         emitMemberwiseInit(writer, adjustedFields, storageName);
+        if (!hasFile && hasOnlyOptionalFields(adjustedFields)) emitFieldFactories(writer, adjustedFields);
     });
+};
+
+const hasOnlyOptionalFields = (fields: SwiftField[]): boolean =>
+    fields.length > 0 && fields.every((field) => field.optional && field.requiredNullable !== true);
+
+/**
+ * A model whose fields are all optional gets one factory per field. A leading dot then reaches it wherever the type is
+ * known: `.or([.name(.contains("ada"))])`.
+ */
+const emitFieldFactories = (writer: SwiftWriter, fields: SwiftField[]): void => {
+    for (const field of fields) {
+        const name = escapeKeyword(field.name);
+        const type = field.type.endsWith('?') ? field.type.slice(0, -1) : field.type;
+        writer.blank();
+        writer.block(`public static func ${name}(_ ${name}: ${type}) -> Self`, () => {
+            writer.line(`.init(${field.name}: ${name})`);
+        });
+    }
 };
 
 /**
