@@ -283,8 +283,7 @@ export const similarFixOf = (search: SimilarSearch): { title: string; sentence: 
     }
     return {
         title: `Link ${pages} to ${winner}`,
-        sentence:
-            search.others.length === 1 ? `It gets a link to ${winner} in a draft.` : `Each page gets a link to ${winner} in a draft.`,
+        sentence: search.others.length === 1 ? `It gets a link to ${winner} in a draft.` : `Each page gets a link to ${winner} in a draft.`,
         action: `Add links to ${winner}`,
     };
 };

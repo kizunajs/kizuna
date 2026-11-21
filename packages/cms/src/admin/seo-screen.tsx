@@ -114,7 +114,7 @@ export function SeoScreen({ connection, site }: { connection: Connection; site: 
             title="SEO"
             actions={
                 <>
-                    {answer === undefined ? null : <span className="k-seo__checked">Checked {relativeTimeOf(answer.checkedAt)}</span>}
+                    {answer === undefined ? null : <span className="k-site-seo__checked">Checked {relativeTimeOf(answer.checkedAt)}</span>}
                     <button
                         type="button"
                         className="k-button k-button--secondary k-button--small"
@@ -174,7 +174,7 @@ export function SeoScreen({ connection, site }: { connection: Connection; site: 
     return (
         <>
             {header}
-            <div className="k-admin__body k-dashboard k-seo" data-columns={Math.max(stats.length, 2)}>
+            <div className="k-admin__body k-dashboard k-site-seo" data-columns={Math.max(stats.length, 2)}>
                 {problem === undefined ? null : (
                     <p className="k-error" role="alert">
                         {problem}
@@ -278,7 +278,7 @@ export function SeoScreen({ connection, site }: { connection: Connection; site: 
                                 {citations.map((citation) => (
                                     <tr key={citation.question} className="k-table__row">
                                         {pageCell(citation.url, citation.question)}
-                                        <td data-kind="number" className="k-seo__engines">
+                                        <td data-kind="number" className="k-site-seo__engines">
                                             {citation.engines.join(', ')}
                                         </td>
                                     </tr>
@@ -321,7 +321,7 @@ export function SeoScreen({ connection, site }: { connection: Connection; site: 
                         </PanelCard>
                     )}
                 </div>
-                {answer.label === null ? null : <p className="k-seo__credit">Numbers from {answer.label}</p>}
+                {answer.label === null ? null : <p className="k-site-seo__credit">Numbers from {answer.label}</p>}
             </div>
         </>
     );

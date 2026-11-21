@@ -6348,32 +6348,6 @@
 
     /* SEO screens */
 
-    /* A score's band, green from 80, yellow from 50 and red under it, in tokens an app can set. */
-    :root,
-    :root[data-theme='dark'] {
-        --k-good: oklch(70% 0.15 152);
-        --k-fair: oklch(82% 0.15 88);
-        --k-poor: oklch(66% 0.19 25);
-        --k-good-text: oklch(82% 0.11 155);
-        --k-fair-text: oklch(86% 0.12 90);
-        --k-poor-text: oklch(78% 0.11 20);
-        --k-good-surface: oklch(72% 0.13 155 / 0.14);
-        --k-fair-surface: oklch(82% 0.14 90 / 0.16);
-        --k-poor-surface: oklch(68% 0.14 20 / 0.15);
-    }
-
-    :root[data-theme='light'] {
-        --k-good: oklch(66% 0.15 152);
-        --k-fair: oklch(80% 0.15 88);
-        --k-poor: oklch(61% 0.2 25);
-        --k-good-text: oklch(46% 0.12 152);
-        --k-fair-text: oklch(52% 0.11 75);
-        --k-poor-text: oklch(50% 0.18 25);
-        --k-good-surface: oklch(66% 0.15 152 / 0.13);
-        --k-fair-surface: oklch(84% 0.15 92 / 0.3);
-        --k-poor-surface: oklch(61% 0.2 25 / 0.11);
-    }
-
     /* A count tinted by its band, the only colour on these screens. */
     .k-band-pill {
         display: inline-flex;
@@ -6394,32 +6368,32 @@
     }
 
     .k-band-pill[data-band='good'] {
-        background: var(--k-good-surface);
-        color: var(--k-good-text);
+        background: var(--k-seo-good-surface);
+        color: var(--k-seo-good-text);
     }
 
     .k-band-pill[data-band='fair'] {
-        background: var(--k-fair-surface);
-        color: var(--k-fair-text);
+        background: var(--k-seo-fair-surface);
+        color: var(--k-seo-fair-text);
     }
 
     .k-band-pill[data-band='poor'] {
-        background: var(--k-poor-surface);
-        color: var(--k-poor-text);
+        background: var(--k-seo-poor-surface);
+        color: var(--k-seo-poor-text);
     }
 
     /* SEO: the dashboard's tiles and panels, with when the numbers were checked beside the header's buttons. */
-    .k-seo__checked {
+    .k-site-seo__checked {
         font-size: 13px;
         white-space: nowrap;
         color: var(--k-muted);
     }
 
-    .k-dashboard-table td.k-seo__engines {
+    .k-dashboard-table td.k-site-seo__engines {
         white-space: nowrap;
     }
 
-    .k-seo__credit {
+    .k-site-seo__credit {
         margin: 4px 0 0;
         font-size: 12.5px;
         color: var(--k-muted);
@@ -6438,12 +6412,12 @@
     }
 
     .k-link-map__filter[aria-pressed='true'][data-band='poor'] {
-        background: var(--k-poor);
+        background: var(--k-seo-poor);
         color: oklch(99% 0 0);
     }
 
     .k-link-map__filter[aria-pressed='true'][data-band='fair'] {
-        background: var(--k-fair);
+        background: var(--k-seo-fair);
         color: oklch(28% 0.05 85);
     }
 
@@ -6494,12 +6468,12 @@
     }
 
     .k-link-map__card[data-kind='broken'] {
-        box-shadow: inset 0 0 0 1px var(--k-poor);
+        box-shadow: inset 0 0 0 1px var(--k-seo-poor);
         cursor: default;
     }
 
     .k-link-map__card[data-kind='broken'] .k-map__card-path {
-        color: var(--k-poor-text);
+        color: var(--k-seo-poor-text);
     }
 
     .k-link-map__out {
@@ -6523,8 +6497,8 @@
     }
 
     .k-domain-tile--broken {
-        background: var(--k-poor-surface);
-        color: var(--k-poor-text);
+        background: var(--k-seo-poor-surface);
+        color: var(--k-seo-poor-text);
     }
 
     /* Links between pages are solid, to other sites dotted grey, and to a target that is gone dashed red. */
@@ -6542,7 +6516,7 @@
     }
 
     .k-link-map .k-link-map__line[data-broken] {
-        stroke: var(--k-poor);
+        stroke: var(--k-seo-poor);
         stroke-dasharray: 4 4;
         stroke-linecap: butt;
         stroke-width: 1.5;
