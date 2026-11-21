@@ -172,6 +172,10 @@ const normalizeMeta = ({ zodSchema, jsonSchema }: { zodSchema: z.core.$ZodType; 
         jsonSchema['x-kizuna-brand'] = jsonSchema.brand;
         delete jsonSchema.brand;
     }
+    if ('extensible' in jsonSchema) {
+        jsonSchema['x-kizuna-extensible'] = jsonSchema.extensible;
+        delete jsonSchema.extensible;
+    }
     delete jsonSchema.id;
 };
 

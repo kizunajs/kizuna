@@ -2820,17 +2820,19 @@ public final class APIClient: Sendable {
             for event in events {
                 switch event {
                 case .tool_call(let payload):
-                    var tracked = at(payload.id, payload.name)
+                    let id = payload.id
+                    var tracked = at(id, payload.name)
                     tracked.call = payload
                     if payload.needsApproval == true, tracked.state == .running {
                         tracked.state = .needsApproval
                     }
-                    calls[payload.id] = tracked
+                    calls[id] = tracked
                 case .tool_result(let payload):
-                    var tracked = at(payload.id, payload.name)
+                    let id = payload.id
+                    var tracked = at(id, payload.name)
                     tracked.state = .done
                     tracked.result = payload
-                    calls[payload.id] = tracked
+                    calls[id] = tracked
                 case .tool_error(let payload):
                     var tracked = at(payload.id, payload.name.rawValue)
                     tracked.state = .failed
@@ -3229,17 +3231,19 @@ public final class APIClient: Sendable {
             for event in events {
                 switch event {
                 case .tool_call(let payload):
-                    var tracked = at(payload.id, payload.name)
+                    let id = payload.id
+                    var tracked = at(id, payload.name)
                     tracked.call = payload
                     if payload.needsApproval == true, tracked.state == .running {
                         tracked.state = .needsApproval
                     }
-                    calls[payload.id] = tracked
+                    calls[id] = tracked
                 case .tool_result(let payload):
-                    var tracked = at(payload.id, payload.name)
+                    let id = payload.id
+                    var tracked = at(id, payload.name)
                     tracked.state = .done
                     tracked.result = payload
-                    calls[payload.id] = tracked
+                    calls[id] = tracked
                 case .tool_error(let payload):
                     var tracked = at(payload.id, payload.name.rawValue)
                     tracked.state = .failed

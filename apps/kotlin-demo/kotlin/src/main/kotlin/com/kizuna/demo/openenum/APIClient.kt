@@ -157,9 +157,7 @@ object OpenEnumAPI {
         val detail: String
     )
 
-    @OptIn(ExperimentalSerializationApi::class)
-    @JsonClassDiscriminator("kind")
-    @Serializable
+    @Serializable(with = UserSessionEvent.Serializer::class)
     sealed interface UserSessionEvent {
         @SerialName("login")
         @Serializable
@@ -202,6 +200,34 @@ object OpenEnumAPI {
                 }
             }
         }
+
+        /** A variant this client was generated before. It holds the discriminator, and cannot be sent back. */
+        data class Unknown(val wireValue: String) : UserSessionEvent
+
+        object Serializer : KSerializer<UserSessionEvent> {
+            override val descriptor: SerialDescriptor = buildClassSerialDescriptor("UserSessionEvent")
+
+            override fun deserialize(decoder: Decoder): UserSessionEvent {
+                val input = decoder as JsonDecoder
+                val element = input.decodeJsonElement().jsonObject
+                val body = JsonObject(element - "kind")
+                return when (val kind = element["kind"]?.jsonPrimitive?.contentOrNull) {
+                    "login" -> input.json.decodeFromJsonElement(Login.serializer(), body)
+                    "logout" -> input.json.decodeFromJsonElement(Logout.serializer(), body)
+                    else -> Unknown(kind ?: "")
+                }
+            }
+
+            override fun serialize(encoder: Encoder, value: UserSessionEvent) {
+                val output = encoder as JsonEncoder
+                val (kind, body) = when (value) {
+                    is Login -> "login" to output.json.encodeToJsonElement(Login.serializer(), value)
+                    is Logout -> "logout" to output.json.encodeToJsonElement(Logout.serializer(), value)
+                    is Unknown -> throw SerializationException("This client does not know the variant ${value.wireValue}, so it cannot send it.")
+                }
+                output.encodeJsonElement(JsonObject(mapOf("kind" to JsonPrimitive(kind)) + body.jsonObject))
+            }
+        }
     }
 
     @Serializable
@@ -226,10 +252,37 @@ object OpenEnumAPI {
         val until: String?
     )
 
-    @OptIn(ExperimentalSerializationApi::class)
-    @JsonClassDiscriminator("channel")
-    @Serializable
-    sealed interface NotificationEvent
+    @Serializable(with = NotificationEvent.Serializer::class)
+    sealed interface NotificationEvent {
+
+        /** A variant this client was generated before. It holds the discriminator, and cannot be sent back. */
+        data class Unknown(val wireValue: String) : NotificationEvent
+
+        object Serializer : KSerializer<NotificationEvent> {
+            override val descriptor: SerialDescriptor = buildClassSerialDescriptor("NotificationEvent")
+
+            override fun deserialize(decoder: Decoder): NotificationEvent {
+                val input = decoder as JsonDecoder
+                val element = input.decodeJsonElement().jsonObject
+                val body = JsonObject(element - "channel")
+                return when (val kind = element["channel"]?.jsonPrimitive?.contentOrNull) {
+                    "email" -> input.json.decodeFromJsonElement(EmailEvent.serializer(), body)
+                    "sms" -> input.json.decodeFromJsonElement(SmsEvent.serializer(), body)
+                    else -> Unknown(kind ?: "")
+                }
+            }
+
+            override fun serialize(encoder: Encoder, value: NotificationEvent) {
+                val output = encoder as JsonEncoder
+                val (kind, body) = when (value) {
+                    is EmailEvent -> "email" to output.json.encodeToJsonElement(EmailEvent.serializer(), value)
+                    is SmsEvent -> "sms" to output.json.encodeToJsonElement(SmsEvent.serializer(), value)
+                    is Unknown -> throw SerializationException("This client does not know the variant ${value.wireValue}, so it cannot send it.")
+                }
+                output.encodeJsonElement(JsonObject(mapOf("channel" to JsonPrimitive(kind)) + body.jsonObject))
+            }
+        }
+    }
 
     @SerialName("email")
     @Serializable
@@ -1329,11 +1382,9 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
             val outputTokens: Int
         )
 
-        @OptIn(ExperimentalSerializationApi::class)
-        @JsonClassDiscriminator("name")
-        @Serializable
+        @Serializable(with = ToolCall.Serializer::class)
         sealed interface ToolCall {
-            val id: String
+            val id: String?
             val name: String
             val needsApproval: Boolean?
 
@@ -1357,6 +1408,40 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
                 override val id: String get() = value.id
                 override val name: String get() = value.name
                 override val needsApproval: Boolean? get() = value.needsApproval
+            }
+
+            /** A variant this client was generated before. It holds the discriminator, and cannot be sent back. */
+            data class Unknown(val wireValue: String) : ToolCall {
+                override val id: String? get() = null
+                override val name: String get() = wireValue
+                override val needsApproval: Boolean? get() = null
+            }
+
+            object Serializer : KSerializer<ToolCall> {
+                override val descriptor: SerialDescriptor = buildClassSerialDescriptor("ToolCall")
+
+                override fun deserialize(decoder: Decoder): ToolCall {
+                    val input = decoder as JsonDecoder
+                    val element = input.decodeJsonElement().jsonObject
+                    val body = JsonObject(element - "name")
+                    return when (val kind = element["name"]?.jsonPrimitive?.contentOrNull) {
+                        "getForecast" -> GetForecast(input.json.decodeFromJsonElement(ToolCallGetForecast.serializer(), body))
+                        "plotSignups" -> PlotSignups(input.json.decodeFromJsonElement(ToolCallPlotSignups.serializer(), body))
+                        "countWords" -> CountWords(input.json.decodeFromJsonElement(ToolCallCountWords.serializer(), body))
+                        else -> Unknown(kind ?: "")
+                    }
+                }
+
+                override fun serialize(encoder: Encoder, value: ToolCall) {
+                    val output = encoder as JsonEncoder
+                    val (kind, body) = when (value) {
+                        is GetForecast -> "getForecast" to output.json.encodeToJsonElement(ToolCallGetForecast.serializer(), value.value)
+                        is PlotSignups -> "plotSignups" to output.json.encodeToJsonElement(ToolCallPlotSignups.serializer(), value.value)
+                        is CountWords -> "countWords" to output.json.encodeToJsonElement(ToolCallCountWords.serializer(), value.value)
+                        is Unknown -> throw SerializationException("This client does not know the variant ${value.wireValue}, so it cannot send it.")
+                    }
+                    output.encodeJsonElement(JsonObject(mapOf("name" to JsonPrimitive(kind)) + body.jsonObject))
+                }
             }
         }
 
@@ -1435,11 +1520,9 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         @Serializable
         data class ToolCallCountWordsInputBody(val text: String)
 
-        @OptIn(ExperimentalSerializationApi::class)
-        @JsonClassDiscriminator("name")
-        @Serializable
+        @Serializable(with = ToolResult.Serializer::class)
         sealed interface ToolResult {
-            val id: String
+            val id: String?
             val name: String
 
             @SerialName("getForecast")
@@ -1459,6 +1542,39 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
             data class CountWords(val value: ToolResultCountWords) : ToolResult {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
+            }
+
+            /** A variant this client was generated before. It holds the discriminator, and cannot be sent back. */
+            data class Unknown(val wireValue: String) : ToolResult {
+                override val id: String? get() = null
+                override val name: String get() = wireValue
+            }
+
+            object Serializer : KSerializer<ToolResult> {
+                override val descriptor: SerialDescriptor = buildClassSerialDescriptor("ToolResult")
+
+                override fun deserialize(decoder: Decoder): ToolResult {
+                    val input = decoder as JsonDecoder
+                    val element = input.decodeJsonElement().jsonObject
+                    val body = JsonObject(element - "name")
+                    return when (val kind = element["name"]?.jsonPrimitive?.contentOrNull) {
+                        "getForecast" -> GetForecast(input.json.decodeFromJsonElement(ToolResultGetForecast.serializer(), body))
+                        "plotSignups" -> PlotSignups(input.json.decodeFromJsonElement(ToolResultPlotSignups.serializer(), body))
+                        "countWords" -> CountWords(input.json.decodeFromJsonElement(ToolResultCountWords.serializer(), body))
+                        else -> Unknown(kind ?: "")
+                    }
+                }
+
+                override fun serialize(encoder: Encoder, value: ToolResult) {
+                    val output = encoder as JsonEncoder
+                    val (kind, body) = when (value) {
+                        is GetForecast -> "getForecast" to output.json.encodeToJsonElement(ToolResultGetForecast.serializer(), value.value)
+                        is PlotSignups -> "plotSignups" to output.json.encodeToJsonElement(ToolResultPlotSignups.serializer(), value.value)
+                        is CountWords -> "countWords" to output.json.encodeToJsonElement(ToolResultCountWords.serializer(), value.value)
+                        is Unknown -> throw SerializationException("This client does not know the variant ${value.wireValue}, so it cannot send it.")
+                    }
+                    output.encodeJsonElement(JsonObject(mapOf("name" to JsonPrimitive(kind)) + body.jsonObject))
+                }
             }
         }
 
@@ -1601,10 +1717,14 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
             for (event in events) {
                 when (event) {
                     is Event.ToolCall -> {
-                        val tracked = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)
-                        calls[event.data.id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
+                        val id = event.data.id ?: continue
+                        val tracked = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(call = event.data)
+                        calls[id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
                     }
-                    is Event.ToolResult -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    is Event.ToolResult -> {
+                        val id = event.data.id ?: continue
+                        calls[id] = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    }
                     is Event.ToolError -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name.wireValue)).copy(state = ToolCallRecord.State.Failed, message = event.data.message)
                     else -> Unit
                 }
@@ -1654,11 +1774,9 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         @Serializable
         data class Delta(val text: String)
 
-        @OptIn(ExperimentalSerializationApi::class)
-        @JsonClassDiscriminator("name")
-        @Serializable
+        @Serializable(with = ToolCall.Serializer::class)
         sealed interface ToolCall {
-            val id: String
+            val id: String?
             val name: String
             val needsApproval: Boolean?
 
@@ -1675,6 +1793,38 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
                 override val id: String get() = value.id
                 override val name: String get() = value.name
                 override val needsApproval: Boolean? get() = value.needsApproval
+            }
+
+            /** A variant this client was generated before. It holds the discriminator, and cannot be sent back. */
+            data class Unknown(val wireValue: String) : ToolCall {
+                override val id: String? get() = null
+                override val name: String get() = wireValue
+                override val needsApproval: Boolean? get() = null
+            }
+
+            object Serializer : KSerializer<ToolCall> {
+                override val descriptor: SerialDescriptor = buildClassSerialDescriptor("ToolCall")
+
+                override fun deserialize(decoder: Decoder): ToolCall {
+                    val input = decoder as JsonDecoder
+                    val element = input.decodeJsonElement().jsonObject
+                    val body = JsonObject(element - "name")
+                    return when (val kind = element["name"]?.jsonPrimitive?.contentOrNull) {
+                        "notes.list" -> Notes_list(input.json.decodeFromJsonElement(ToolCallNotesList.serializer(), body))
+                        "notes.add" -> Notes_add(input.json.decodeFromJsonElement(ToolCallNotesAdd.serializer(), body))
+                        else -> Unknown(kind ?: "")
+                    }
+                }
+
+                override fun serialize(encoder: Encoder, value: ToolCall) {
+                    val output = encoder as JsonEncoder
+                    val (kind, body) = when (value) {
+                        is Notes_list -> "notes.list" to output.json.encodeToJsonElement(ToolCallNotesList.serializer(), value.value)
+                        is Notes_add -> "notes.add" to output.json.encodeToJsonElement(ToolCallNotesAdd.serializer(), value.value)
+                        is Unknown -> throw SerializationException("This client does not know the variant ${value.wireValue}, so it cannot send it.")
+                    }
+                    output.encodeJsonElement(JsonObject(mapOf("name" to JsonPrimitive(kind)) + body.jsonObject))
+                }
             }
         }
 
@@ -1699,11 +1849,9 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         @Serializable
         data class ToolCallNotesAddInputBody(val text: String)
 
-        @OptIn(ExperimentalSerializationApi::class)
-        @JsonClassDiscriminator("name")
-        @Serializable
+        @Serializable(with = ToolResult.Serializer::class)
         sealed interface ToolResult {
-            val id: String
+            val id: String?
             val name: String
 
             @SerialName("notes.list")
@@ -1717,6 +1865,37 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
             data class Notes_add(val value: ToolResultNotesAdd) : ToolResult {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
+            }
+
+            /** A variant this client was generated before. It holds the discriminator, and cannot be sent back. */
+            data class Unknown(val wireValue: String) : ToolResult {
+                override val id: String? get() = null
+                override val name: String get() = wireValue
+            }
+
+            object Serializer : KSerializer<ToolResult> {
+                override val descriptor: SerialDescriptor = buildClassSerialDescriptor("ToolResult")
+
+                override fun deserialize(decoder: Decoder): ToolResult {
+                    val input = decoder as JsonDecoder
+                    val element = input.decodeJsonElement().jsonObject
+                    val body = JsonObject(element - "name")
+                    return when (val kind = element["name"]?.jsonPrimitive?.contentOrNull) {
+                        "notes.list" -> Notes_list(input.json.decodeFromJsonElement(ToolResultNotesList.serializer(), body))
+                        "notes.add" -> Notes_add(input.json.decodeFromJsonElement(ToolResultNotesAdd.serializer(), body))
+                        else -> Unknown(kind ?: "")
+                    }
+                }
+
+                override fun serialize(encoder: Encoder, value: ToolResult) {
+                    val output = encoder as JsonEncoder
+                    val (kind, body) = when (value) {
+                        is Notes_list -> "notes.list" to output.json.encodeToJsonElement(ToolResultNotesList.serializer(), value.value)
+                        is Notes_add -> "notes.add" to output.json.encodeToJsonElement(ToolResultNotesAdd.serializer(), value.value)
+                        is Unknown -> throw SerializationException("This client does not know the variant ${value.wireValue}, so it cannot send it.")
+                    }
+                    output.encodeJsonElement(JsonObject(mapOf("name" to JsonPrimitive(kind)) + body.jsonObject))
+                }
             }
         }
 
@@ -1820,10 +1999,14 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
             for (event in events) {
                 when (event) {
                     is Event.ToolCall -> {
-                        val tracked = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)
-                        calls[event.data.id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
+                        val id = event.data.id ?: continue
+                        val tracked = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(call = event.data)
+                        calls[id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
                     }
-                    is Event.ToolResult -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    is Event.ToolResult -> {
+                        val id = event.data.id ?: continue
+                        calls[id] = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    }
                     is Event.ToolError -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name.wireValue)).copy(state = ToolCallRecord.State.Failed, message = event.data.message)
                     else -> Unit
                 }

@@ -10,6 +10,7 @@ import {
     readDeprecation,
     readMetaBrand,
     readMetaDescription,
+    readMetaExtensible,
     readMetaId,
     readModelSchema,
     readObjectShape,
@@ -61,6 +62,10 @@ export interface SwiftDiscriminatedEnum {
         payloadType: string;
         payloadRegistryName: string;
     }>;
+    /**
+     * Decode a discriminator no variant matches as `unknown(String)` instead of throwing.
+     */
+    unknownCase: boolean;
     description?: string;
 }
 
@@ -261,6 +266,7 @@ const mapUnbrandedType = (schema: z.core.$ZodType, registry: TypeRegistry, hint:
                 name: enumName,
                 discriminator: discriminated.discriminator,
                 variants: [],
+                unknownCase: registry.unknownEnumCase || readMetaExtensible(schema),
                 description: readMetaDescription(schema),
             });
             const variants: SwiftDiscriminatedEnum['variants'] = [];
@@ -286,6 +292,7 @@ const mapUnbrandedType = (schema: z.core.$ZodType, registry: TypeRegistry, hint:
                 name: enumName,
                 discriminator: discriminated.discriminator,
                 variants,
+                unknownCase: registry.unknownEnumCase || readMetaExtensible(schema),
                 description: readMetaDescription(schema),
             });
         }
@@ -426,7 +433,7 @@ const mapUnbrandedType = (schema: z.core.$ZodType, registry: TypeRegistry, hint:
                     name: enumName,
                     cases,
                     description: readMetaDescription(schema),
-                    unknownCase: registry.unknownEnumCase,
+                    unknownCase: registry.unknownEnumCase || readMetaExtensible(schema),
                 });
             }
             return {

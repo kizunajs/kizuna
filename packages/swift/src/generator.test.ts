@@ -2128,6 +2128,94 @@ describe('Swift generator: unknownEnumCase', () => {
         expect(output).toContain('case _unknown(String)');
         expect(output).toContain('default: self = ._unknown(rawValue)');
     });
+
+    const activityContract = (): ApiDefinition => {
+        const Activity = Kizuna.model({
+            title: 'Activity',
+            schema: z.discriminatedUnion('kind', [
+                z.object({
+                    kind: z.literal('taskCreated'),
+                    id: z.string(),
+                    title: z.string(),
+                }),
+                z.object({
+                    kind: z.literal('commentAdded'),
+                    id: z.string(),
+                    body: z.string(),
+                }),
+            ]),
+        });
+        const contractRoutes = k.routes({
+            listActivity: k.route({
+                method: 'GET',
+                path: '/activity',
+                responses: {
+                    200: z.array(Activity),
+                },
+            }),
+        });
+        return defineConfig({
+            ...config,
+            routes: [contractRoutes],
+        }).api;
+    };
+
+    it('throws on an unknown union variant by default', () => {
+        const output = generateSwiftClient(activityContract(), baseConfig);
+        expect(output).not.toMatch(/case unknown\(String\)/);
+        expect(output).toContain('Unknown discriminator');
+        expect(output).toContain('public var id: String {');
+    });
+
+    it('decodes an unknown union variant as unknown(String) when enabled, and refuses to encode it', () => {
+        const output = generateSwiftClient(activityContract(), tolerantConfig);
+        expect(output).toContain('case unknown(String)');
+        expect(output).toContain('    self = .unknown(kind)');
+        expect(output).not.toContain('Unknown discriminator');
+        expect(output).toContain('case .unknown(let kind):');
+        expect(output).toContain('throw EncodingError.invalidValue');
+    });
+
+    it('reads the discriminator of an unknown variant, and other shared fields as optional', () => {
+        const output = generateSwiftClient(activityContract(), tolerantConfig);
+        expect(output).toContain('public var kind: String {');
+        expect(output).toContain('case .unknown(let value): return value');
+        expect(output).toContain('public var id: String? {');
+        expect(output).toContain('case .unknown: return nil');
+    });
+
+    it('gives an extensible model the unknown case without the flag, and leaves the rest strict', () => {
+        const OrderStatus = Kizuna.model({
+            title: 'OrderStatus',
+            schema: z.enum(['open', 'shipped']),
+            extensible: true,
+        });
+        const Priority = Kizuna.model({
+            title: 'Priority',
+            schema: z.enum(['low', 'high']),
+        });
+        const contractRoutes = k.routes({
+            getOrder: k.route({
+                method: 'GET',
+                path: '/orders/:id',
+                responses: {
+                    200: z.object({
+                        status: OrderStatus,
+                        priority: Priority,
+                    }),
+                },
+            }),
+        });
+        const output = generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: [contractRoutes],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('public enum OrderStatus: RawRepresentable, Codable, Sendable, Hashable');
+        expect(output).toContain('public enum Priority: String, Codable, Sendable');
+    });
 });
 
 describe('Swift generator: union variants nest under their union', () => {

@@ -60,10 +60,10 @@ export interface KotlinConfig {
      */
     camelCaseProperties?: boolean;
     /**
-     * Emit each `z.enum` as a `sealed interface` with an `Unknown(wireValue)`
-     * member, so unrecognised wire values decode instead of throwing. The raw
-     * string round-trips on encode and in query params. Discriminated unions are
-     * unaffected and still throw on an unknown discriminator.
+     * Give each `z.enum` and discriminated union an `Unknown(wireValue)` member,
+     * so a value this client doesn't know decodes instead of throwing.
+     *
+     * An unknown union value can't be sent.
      *
      * @default false
      */
@@ -118,7 +118,8 @@ interface RouteMethod {
 interface StreamDescriptor {
     status: number;
     mode: 'events' | 'text' | 'binary';
-    events?: Array<{ name: string; caseName: string; type: string }>;
+    // `unknownCase` when the event's union takes variants this client doesn't know, so its shared fields may be missing.
+    events?: Array<{ name: string; caseName: string; type: string; unknownCase: boolean }>;
     messageType?: string;
 }
 
@@ -254,11 +255,16 @@ const buildRouteMethod = (
                 stream = {
                     status,
                     mode,
-                    events: Object.entries(responseValue.stream).map(([name, schema]) => ({
-                        name,
-                        caseName: toPascalCase(name),
-                        type: mapType(schema, registry, `${baseHint}${toPascalCase(name)}`).expression,
-                    })),
+                    events: Object.entries(responseValue.stream).map(([name, schema]) => {
+                        const type = mapType(schema, registry, `${baseHint}${toPascalCase(name)}`).expression;
+                        const found = registry.get(type);
+                        return {
+                            name,
+                            caseName: toPascalCase(name),
+                            type,
+                            unknownCase: found?.kind === 'sealed-class' && found.unknownCase,
+                        };
+                    }),
                 };
             } else if (mode === 'events') {
                 stream = {
@@ -836,12 +842,16 @@ const emitSealedClass = (
     ownedTypeMap: Map<string, string>,
     ownedTypeLookup: Map<string, KotlinType>
 ): void => {
-    writer.line(`@OptIn(ExperimentalSerializationApi::class)`);
-    writer.line(`@JsonClassDiscriminator(${stringLiteral(type.discriminator)})`);
-    writer.line('@Serializable');
+    if (type.unknownCase) {
+        writer.line(`@Serializable(with = ${type.name}.Serializer::class)`);
+    } else {
+        writer.line(`@OptIn(ExperimentalSerializationApi::class)`);
+        writer.line(`@JsonClassDiscriminator(${stringLiteral(type.discriminator)})`);
+        writer.line('@Serializable');
+    }
 
     const nestedVariants = type.variants.filter((variant) => variant.nested);
-    if (nestedVariants.length === 0) {
+    if (nestedVariants.length === 0 && !type.unknownCase) {
         writer.line(`sealed interface ${type.name}`);
         return;
     }
@@ -875,9 +885,12 @@ const emitSealedClass = (
               )
             : [];
 
+    // An unknown variant carries only its discriminator, so every other shared field may be missing.
+    const sharedOptional = (field: { optional: boolean; wireName: string }) =>
+        field.optional || (type.unknownCase && field.wireName !== type.discriminator);
     writer.block(`sealed interface ${type.name}`, () => {
         for (const field of sharedFields) {
-            const typeExpression = optionalize(ownedTypePath(field.type, ownedTypeMap, registry), field.optional);
+            const typeExpression = optionalize(ownedTypePath(field.type, ownedTypeMap, registry), sharedOptional(field));
             writer.line(`val ${escapeKeyword(field.name)}: ${typeExpression}`);
         }
         if (sharedFields.length > 0) writer.blank();
@@ -938,6 +951,92 @@ const emitSealedClass = (
                 );
             }
         }
+        if (type.unknownCase) {
+            emitUnknownVariant(writer, type, sharedFields, registry, ownedTypeMap);
+        }
+    });
+};
+
+/**
+ * A union's `Unknown` member and the serializer that falls back to it: it reads the discriminator, decodes the
+ * matching variant from the rest of the object, and writes the discriminator back on encode.
+ */
+const emitUnknownVariant = (
+    writer: KotlinWriter,
+    type: Extract<KotlinType, { kind: 'sealed-class' }>,
+    sharedFields: readonly { name: string; type: string; optional: boolean; wireName: string }[],
+    registry: TypeRegistry,
+    ownedTypeMap: Map<string, string>
+): void => {
+    const taken = new Set(type.variants.map((variant) => variant.caseName));
+    let unknown = 'Unknown';
+    while (taken.has(unknown)) unknown = `${unknown}Variant`;
+    const discriminator = stringLiteral(type.discriminator);
+
+    // How each variant is reached from inside the interface, and whether it wraps its payload in `value`.
+    const cases = type.variants.map((variant) => {
+        const payload = registry.all().find((candidate) => candidate.name === variant.payloadType);
+        const inline = payload !== undefined && payload.kind === 'data-class' && payload.fields.length > 0;
+        const wrapped = variant.nested && !inline;
+        return {
+            literal: stringLiteral(variant.literal),
+            className: variant.nested ? variant.caseName : ownedTypePath(variant.payloadType, ownedTypeMap, registry),
+            payloadPath: ownedTypePath(variant.payloadType, ownedTypeMap, registry),
+            wrapped,
+        };
+    });
+
+    writer.blank();
+    writer.docComment('A variant this client was generated before. It holds the discriminator, and cannot be sent back.');
+    const overrides = sharedFields.map((field) =>
+        field.wireName === type.discriminator
+            ? `override val ${escapeKeyword(field.name)}: String get() = wireValue`
+            : `override val ${escapeKeyword(field.name)}: ${optionalize(ownedTypePath(field.type, ownedTypeMap, registry), true)} get() = null`
+    );
+    if (overrides.length === 0) {
+        writer.line(`data class ${unknown}(val wireValue: String) : ${type.name}`);
+    } else {
+        writer.block(`data class ${unknown}(val wireValue: String) : ${type.name}`, () => {
+            for (const line of overrides) writer.line(line);
+        });
+    }
+
+    writer.blank();
+    writer.block(`object Serializer : KSerializer<${type.name}>`, () => {
+        writer.line(`override val descriptor: SerialDescriptor = buildClassSerialDescriptor(${stringLiteral(type.name)})`);
+        writer.blank();
+        writer.block(`override fun deserialize(decoder: Decoder): ${type.name}`, () => {
+            writer.line('val input = decoder as JsonDecoder');
+            writer.line('val element = input.decodeJsonElement().jsonObject');
+            writer.line(`val body = JsonObject(element - ${discriminator})`);
+            writer.block(`return when (val kind = element[${discriminator}]?.jsonPrimitive?.contentOrNull)`, () => {
+                for (const each of cases) {
+                    writer.line(
+                        each.wrapped
+                            ? `${each.literal} -> ${each.className}(input.json.decodeFromJsonElement(${each.payloadPath}.serializer(), body))`
+                            : `${each.literal} -> input.json.decodeFromJsonElement(${each.className}.serializer(), body)`
+                    );
+                }
+                writer.line(`else -> ${unknown}(kind ?: "")`);
+            });
+        });
+        writer.blank();
+        writer.block(`override fun serialize(encoder: Encoder, value: ${type.name})`, () => {
+            writer.line('val output = encoder as JsonEncoder');
+            writer.block('val (kind, body) = when (value)', () => {
+                for (const each of cases) {
+                    writer.line(
+                        each.wrapped
+                            ? `is ${each.className} -> ${each.literal} to output.json.encodeToJsonElement(${each.payloadPath}.serializer(), value.value)`
+                            : `is ${each.className} -> ${each.literal} to output.json.encodeToJsonElement(${each.className}.serializer(), value)`
+                    );
+                }
+                writer.line(
+                    `is ${unknown} -> throw SerializationException("This client does not know the variant \${value.wireValue}, so it cannot send it.")`
+                );
+            });
+            writer.line(`output.encodeJsonElement(JsonObject(mapOf(${discriminator} to JsonPrimitive(kind)) + body.jsonObject))`);
+        });
     });
 };
 
@@ -1048,6 +1147,9 @@ const emitOperationResultTypes = (writer: KotlinWriter, method: RouteMethod, con
     if (streamEvents) {
         const eventNames = new Set(streamEvents.map((event) => event.name));
         const tracksTools = eventNames.has('tool_call') && eventNames.has('tool_result');
+        // A call from a tool this client doesn't know has no id to track it by.
+        const readId = (eventName: string) =>
+            `val id = event.data.id${streamEvents.find((event) => event.name === eventName)?.unknownCase ? ' ?: continue' : ''}`;
         if (tracksTools) {
             writer.blank();
             writer.line('/** One tool call, with its result once it answered. */');
@@ -1079,17 +1181,21 @@ const emitOperationResultTypes = (writer: KotlinWriter, method: RouteMethod, con
                     writer.indent(() => {
                         writer.line('is Event.ToolCall -> {');
                         writer.indent(() => {
+                            writer.line(readId('tool_call'));
+                            writer.line('val tracked = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(call = event.data)');
                             writer.line(
-                                'val tracked = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)'
-                            );
-                            writer.line(
-                                'calls[event.data.id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked'
+                                'calls[id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked'
                             );
                         });
                         writer.line('}');
-                        writer.line(
-                            'is Event.ToolResult -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)'
-                        );
+                        writer.line('is Event.ToolResult -> {');
+                        writer.indent(() => {
+                            writer.line(readId('tool_result'));
+                            writer.line(
+                                'calls[id] = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)'
+                            );
+                        });
+                        writer.line('}');
                         if (eventNames.has('tool_error')) {
                             writer.line(
                                 'is Event.ToolError -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name.wireValue)).copy(state = ToolCallRecord.State.Failed, message = event.data.message)'
@@ -2216,7 +2322,9 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
     }
     writer.line('import kotlinx.serialization.*');
     writer.line('import kotlinx.serialization.json.*');
-    const hasTolerantEnums = registry.all().some((type) => type.kind === 'enum-class' && type.unknownCase);
+    const hasTolerantEnums = registry
+        .all()
+        .some((type) => (type.kind === 'enum-class' || type.kind === 'sealed-class') && type.unknownCase);
     if (hasTolerantEnums) {
         writer.line('import kotlinx.serialization.descriptors.*');
         writer.line('import kotlinx.serialization.encoding.*');

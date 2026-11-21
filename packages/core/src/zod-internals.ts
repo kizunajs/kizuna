@@ -390,6 +390,15 @@ export const readMetaDescription = (schema: z.core.$ZodType): string | undefined
 /**
  * Returns a schema's `brand` metadata, set by `Kizuna.brand`, or undefined.
  */
+/**
+ * Whether an enum or union is extensible, so clients take members they don't know. Set by
+ * `Kizuna.model({ extensible: true })`, or on the schema itself with `.meta({ extensible: true })`.
+ */
+export const readMetaExtensible = (schema: z.core.$ZodType): boolean => {
+    const model = readModelSchema(schema);
+    return readMeta(schema)?.extensible === true || (model !== undefined && readMeta(model)?.extensible === true);
+};
+
 export const readMetaBrand = (schema: z.core.$ZodType): string | undefined => {
     const brand = readMeta(schema)?.brand;
     return typeof brand === 'string' ? brand : undefined;

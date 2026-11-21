@@ -1434,10 +1434,14 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
             for (event in events) {
                 when (event) {
                     is Event.ToolCall -> {
-                        val tracked = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)
-                        calls[event.data.id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
+                        val id = event.data.id
+                        val tracked = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(call = event.data)
+                        calls[id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
                     }
-                    is Event.ToolResult -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    is Event.ToolResult -> {
+                        val id = event.data.id
+                        calls[id] = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    }
                     is Event.ToolError -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name.wireValue)).copy(state = ToolCallRecord.State.Failed, message = event.data.message)
                     else -> Unit
                 }
@@ -1632,10 +1636,14 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
             for (event in events) {
                 when (event) {
                     is Event.ToolCall -> {
-                        val tracked = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)
-                        calls[event.data.id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
+                        val id = event.data.id
+                        val tracked = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(call = event.data)
+                        calls[id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
                     }
-                    is Event.ToolResult -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    is Event.ToolResult -> {
+                        val id = event.data.id
+                        calls[id] = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    }
                     is Event.ToolError -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name.wireValue)).copy(state = ToolCallRecord.State.Failed, message = event.data.message)
                     else -> Unit
                 }

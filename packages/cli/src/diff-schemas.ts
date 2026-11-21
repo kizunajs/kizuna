@@ -32,6 +32,8 @@ const valuesOf = (schema: SchemaNode): string[] | undefined =>
 const modelOf = (schema: SchemaNode): string | undefined =>
     schema.kind === 'model' ? (schema as Extract<SchemaNode, { kind: 'model' }>).model : undefined;
 
+const isExtensible = (schema: SchemaNode): boolean => (schema as { extensible?: true }).extensible === true;
+
 const optionsOf = (schema: SchemaNode): SchemaNode[] | undefined =>
     schema.kind === 'union' ? (schema as Extract<SchemaNode, { kind: 'union' }>).options : undefined;
 
@@ -95,8 +97,10 @@ export const diffSchemas = (
         const widened = holds(after, before);
         const narrowed = holds(before, after);
         if (!kindChanged && widened && narrowed) return [];
-        // A server that takes more than it did and a client that reads less than it could keep working.
-        if (direction === 'request' ? widened : narrowed) {
+        // A server that takes more than it did and a client that reads less than it could keep working,
+        // and so does a client reading an extensible union, built to take members it doesn't know.
+        const extensibleWidening = direction === 'response' && widened && !kindChanged && isExtensible(after);
+        if (extensibleWidening || (direction === 'request' ? widened : narrowed)) {
             return [
                 {
                     breaking: false,
@@ -191,8 +195,9 @@ export const diffSchemas = (
             changes.push({ breaking: true, path, summary: `${path || 'the body'} no longer accepts ${removed.join(', ')}` });
         }
         if (added.length > 0) {
+            // An extensible enum's clients are built to read values they don't know.
             changes.push({
-                breaking: direction === 'response',
+                breaking: direction === 'response' && !isExtensible(after),
                 path,
                 summary:
                     direction === 'response'

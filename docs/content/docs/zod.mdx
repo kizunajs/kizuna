@@ -42,11 +42,12 @@ We wanted every client to behave the same, whatever the language, and one deeply
 
 `.meta()` is where a schema says things validation cannot. Kizuna reads Zod's own `title` and `description`, and `kizunajs` adds its own:
 
-| Property     | Type                                 | Where it lands                                                                                                                                                            |
-| ------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `deprecated` | `boolean \| string`                  | `deprecated: true` in the OpenAPI document, `@available(*, deprecated)` in Swift, `@Deprecated` in Kotlin. A string carries the message into outputs with a place for it. |
-| `example`    | The schema's type, or an array of it | JSON Schema `examples` in the OpenAPI document                                                                                                                            |
-| `brand`      | `string`                             | A named type in every client and `x-kizuna-brand` in the OpenAPI document. Set it with [`Kizuna.brand`](#branded-ids).                                                    |
+| Property     | Type                                 | Where it lands                                                                                                                                                                                                                                       |
+| ------------ | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `deprecated` | `boolean \| string`                  | `deprecated: true` in the OpenAPI document, `@available(*, deprecated)` in Swift, `@Deprecated` in Kotlin. A string carries the message into outputs with a place for it.                                                                            |
+| `example`    | The schema's type, or an array of it | JSON Schema `examples` in the OpenAPI document                                                                                                                                                                                                       |
+| `brand`      | `string`                             | A named type in every client and `x-kizuna-brand` in the OpenAPI document. Set it with [`Kizuna.brand`](#branded-ids).                                                                                                                               |
+| `extensible` | `boolean`                            | On an enum or discriminated union that will gain members: an `unknown` member in the Swift and Kotlin clients, and `x-kizuna-extensible` in the OpenAPI document. See [`Kizuna.model`](/docs/reference/kizuna-model#a-model-that-will-gain-members). |
 
 ```ts
 const UserSchema = z.object({

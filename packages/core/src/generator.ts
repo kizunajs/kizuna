@@ -31,6 +31,7 @@ export {
     readModelSchema,
     readMetaDescription,
     readMetaBrand,
+    readMetaExtensible,
     readMetaExamples,
     readDeprecation,
     readDiscriminatorLiteral,
