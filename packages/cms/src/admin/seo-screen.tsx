@@ -3,10 +3,22 @@ import { RotateCw } from 'lucide-react';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
 import { NameCell, NumberCell, PanelCard, PanelTable } from './dashboard.js';
-import { hrefOf } from './navigation.js';
+import { hrefOf, replaceQuery, useAddress } from './navigation.js';
 import { PageHeader } from './page-header.js';
 import { Loading, problemOf } from './parts.js';
-import { competeAdviceOf, competeBandOf, pageNamerOf, siteStatsOf, wholeOf, type SeoBand, type SiteSeoAnswer } from './seo-screens.js';
+import {
+    competeAdviceOf,
+    competeBandOf,
+    pageNamerOf,
+    similarBandOf,
+    similarFixOf,
+    siteStatsOf,
+    wholeOf,
+    type SeoBand,
+    type SimilarPagesAnswer,
+    type SimilarSearch,
+    type SiteSeoAnswer,
+} from './seo-screens.js';
 import { relativeTimeOf } from './time.js';
 
 /**
@@ -28,16 +40,17 @@ export const seoHrefOf = (kind: 'seo' | 'link-map' | 'too-similar', site: string
     });
 
 /**
- * The query the SEO routes take: the site, with a CMS of one site naming
- * none.
+ * The key a CMS of one site answers to, as the server's options name it.
+ */
+const DEFAULT_SITE = 'default';
+
+/**
+ * The query the SEO routes take: the site, or `default` for a CMS of one
+ * site.
  */
 export const siteQueryOf = (site: string | undefined, extra: Record<string, string> = {}): { query: Record<string, string> } => ({
     query: {
-        ...(site === undefined
-            ? {}
-            : {
-                  site,
-              }),
+        site: site ?? DEFAULT_SITE,
         ...extra,
     },
 });
@@ -315,10 +328,92 @@ export function SeoScreen({ connection, site }: { connection: Connection; site: 
 }
 
 /**
- * Too similar: the pages that compete for the same searches. A placeholder
- * until its own screen is built.
+ * One search's card: its pages with the one to keep, why it matters, and
+ * the fix.
  */
-export function TooSimilarScreen({ site }: { site: string | undefined }) {
+function SimilarDetail({ search }: { search: SimilarSearch }) {
+    const fix = similarFixOf(search);
+    const documentHref = (ref: string): string =>
+        hrefOf({
+            kind: 'document',
+            ref,
+        });
+    return (
+        <section className="k-panel k-similar__detail" aria-labelledby="k-similar-title">
+            <div className="k-panel__head k-similar__head">
+                <h2 id="k-similar-title" className="k-similar__title">
+                    {search.keyword}
+                </h2>
+                <span className="k-panel__description">{wholeOf(search.volume)} searches a month</span>
+            </div>
+            <PanelTable
+                label={search.keyword}
+                headings={[
+                    {
+                        text: 'Page',
+                    },
+                    {
+                        text: 'Position',
+                        number: true,
+                    },
+                    {
+                        text: `Same as ${search.winner.title}`,
+                        number: true,
+                    },
+                ]}
+                empty="">
+                {[
+                    <tr key={search.winner.ref} className="k-table__row">
+                        <NameCell label={search.winner.title} detail={search.winner.path} href={documentHref(search.winner.ref)} />
+                        <NumberCell value={search.winner.position === undefined ? '–' : wholeOf(search.winner.position)} />
+                        <NumberCell value={<BandPill band="good">Keep</BandPill>} />
+                    </tr>,
+                    ...search.others.map((page) => (
+                        <tr key={page.ref} className="k-table__row">
+                            <NameCell label={page.title} detail={page.path} href={documentHref(page.ref)} />
+                            <NumberCell value={page.position === undefined ? '–' : wholeOf(page.position)} />
+                            <NumberCell value={`${Math.round(page.similarity * 100)}%`} />
+                        </tr>
+                    )),
+                ]}
+            </PanelTable>
+            <div className="k-similar__section">
+                <h3 className="k-similar__section-title">Why it matters</h3>
+                <p className="k-similar__text">{search.why}</p>
+            </div>
+            <div className="k-similar__section">
+                <h3 className="k-similar__section-title">{fix.title}</h3>
+                <p className="k-similar__text">{fix.sentence}</p>
+                <a className="k-button k-button--primary k-button--small k-similar__action" href={documentHref(search.winner.ref)}>
+                    {fix.action}
+                </a>
+            </div>
+        </section>
+    );
+}
+
+/**
+ * Too similar: the searches several of the site's pages compete for, each
+ * with a fix. The search open is in the address, so a link opens it again.
+ */
+export function TooSimilarScreen({ connection, site }: { connection: Connection; site: string | undefined }) {
+    const [answer, setAnswer] = useState<SimilarPagesAnswer | undefined>();
+    const [problem, setProblem] = useState<string | undefined>();
+    const chosen = useAddress().searchParams.get('search') ?? undefined;
+
+    useEffect(() => {
+        void connection.call<SimilarPagesAnswer>('editing_similar_pages', siteQueryOf(site)).then((reply) => {
+            if (reply.status !== 200) {
+                setProblem(problemOf(reply, 'The searches did not load'));
+                return;
+            }
+            setAnswer(reply.body);
+        });
+    }, [connection, site]);
+
+    const searches = answer?.searches ?? [];
+    const open = searches.find((search) => search.keyword === chosen) ?? searches[0];
+
     return (
         <>
             <PageHeader
@@ -330,7 +425,40 @@ export function TooSimilarScreen({ site }: { site: string | undefined }) {
                     },
                 ]}
             />
-            <div className="k-admin__body" />
+            <div className="k-admin__body">
+                {answer === undefined ? (
+                    <Loading problem={problem} />
+                ) : open === undefined ? (
+                    <div className="k-list-results__empty">
+                        <h2 className="k-list-results__empty-title">No pages compete for the same search.</h2>
+                    </div>
+                ) : (
+                    <div className="k-similar">
+                        <nav className="k-similar__list" aria-label="Searches">
+                            <p className="k-similar__count">{searches.length === 1 ? '1 search' : `${searches.length} searches`}</p>
+                            {searches.map((search) => (
+                                <button
+                                    key={search.keyword}
+                                    type="button"
+                                    className="k-similar__entry"
+                                    aria-current={search === open ? 'true' : undefined}
+                                    onClick={() =>
+                                        replaceQuery({
+                                            search: search.keyword,
+                                        })
+                                    }>
+                                    <span className="k-similar__entry-text">
+                                        <span className="k-similar__entry-name k-ellipsis">{search.keyword}</span>
+                                        <span className="k-similar__entry-volume">{wholeOf(search.volume)} a month</span>
+                                    </span>
+                                    <BandPill band={similarBandOf(search)}>{search.others.length + 1} pages</BandPill>
+                                </button>
+                            ))}
+                        </nav>
+                        <SimilarDetail search={open} />
+                    </div>
+                )}
+            </div>
         </>
     );
 }

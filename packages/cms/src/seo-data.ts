@@ -303,6 +303,66 @@ const fakePage = (address: string, locale: string, now: () => Date): PageSeoData
 };
 
 /**
+ * The searches the fake says several pages compete for, each with the words
+ * of the addresses it prefers, its positions, and how alike the others are
+ * to the best.
+ */
+const COMPETING = [
+    {
+        keyword: {
+            en: 'how often to water houseplants',
+            nb: 'hvor ofte vanne stueplanter',
+        },
+        volume: 4400,
+        prefers: ['water', 'watering', 'plant-care', 'vanning', 'stell'],
+        positions: [31, 48, 52],
+        similarity: [0.92, 0.88],
+    },
+    {
+        keyword: {
+            en: 'monstera care',
+            nb: 'monstera stell',
+        },
+        volume: 2900,
+        prefers: ['monstera', 'plant-doctor', 'plants', 'planter', 'guides', 'guider'],
+        positions: [12, 19, 27],
+        similarity: [0.71, 0.64],
+    },
+    {
+        keyword: {
+            en: 'plant shop london',
+            nb: 'plantebutikk oslo',
+        },
+        volume: 600,
+        prefers: ['visit', 'shop', 'shops', 'delivery', 'butikker', 'oslo', 'kundeservice'],
+        positions: [9, 14],
+        similarity: [0.58],
+    },
+];
+
+/**
+ * Three searches several of the pages compete for: the pages whose
+ * addresses fit each search, filled up with the site's other pages.
+ */
+const competingOf = (urls: readonly string[], locale: string): NonNullable<SiteSeoData['competing']> => {
+    const inner = [...urls].filter((url) => new URL(url).pathname !== '/').sort();
+    if (inner.length < 2) return [];
+    return COMPETING.map((search) => {
+        const fitting = inner.filter((url) => search.prefers.some((word) => new URL(url).pathname.split('/').some((part) => part.includes(word))));
+        const picked = [...fitting, ...inner.filter((url) => !fitting.includes(url))].slice(0, search.positions.length);
+        return {
+            keyword: locale.startsWith('nb') ? search.keyword.nb : search.keyword.en,
+            volume: search.volume,
+            urls: picked.map((url, index) => ({
+                url,
+                position: search.positions[index]!,
+                similarity: index === 0 ? 1 : search.similarity[index - 1]!,
+            })),
+        };
+    });
+};
+
+/**
  * Made-up SEO data for demos and tests, so the overview shows something
  * before a real provider is wired up. Each number comes from a hash of the
  * page's address, so it stays the same between calls, and the keywords are
@@ -344,19 +404,6 @@ export const fakeSeoData = (options: { label?: string; now?: () => Date } = {}):
             for (const page of pages) {
                 for (const backlink of page.data.backlinks ?? []) domains.set(backlink.domain, (domains.get(backlink.domain) ?? 0) + 1);
             }
-            const byWord = new Map<string, Array<{ url: string; position: number }>>();
-            for (const page of pages) {
-                const path = new URL(page.url).pathname;
-                for (const word of path.split(/[/\-_.]+/).filter((part) => part.length > 3 && /^\p{L}+$/u.test(part))) {
-                    byWord.set(word, [
-                        ...(byWord.get(word) ?? []),
-                        {
-                            url: page.url,
-                            position: page.data.keywords?.[0]?.position ?? 30,
-                        },
-                    ]);
-                }
-            }
             return {
                 checkedAt: now().toISOString(),
                 scores:
@@ -394,21 +441,10 @@ export const fakeSeoData = (options: { label?: string; now?: () => Date } = {}):
                         links,
                     }))
                     .sort((left, right) => right.links - left.links),
-                competing: [...byWord]
-                    .filter(([, urls]) => urls.length > 1)
-                    .map(([word, urls]) => {
-                        const ranked = [...urls].sort((left, right) => left.position - right.position);
-                        return {
-                            keyword: word,
-                            volume: between(draw, 2, 50) * 100,
-                            urls: ranked.map((entry, index) => ({
-                                url: entry.url,
-                                position: entry.position,
-                                similarity: index === 0 ? 1 : Math.round((0.5 + draw() * 0.45) * 100) / 100,
-                            })),
-                        };
-                    })
-                    .slice(0, 10),
+                competing: competingOf(
+                    pages.map((page) => page.url),
+                    locale
+                ),
             };
         },
     };

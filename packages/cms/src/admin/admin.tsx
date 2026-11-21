@@ -551,7 +551,7 @@ export function Admin({ config }: { config: AdminConfig }) {
         if (screen.kind === 'link-map') {
             return <LinkMapScreen key={screen.site ?? ''} connection={connection} sites={sites} site={screen.site} />;
         }
-        if (screen.kind === 'too-similar') return <TooSimilarScreen site={screen.site} />;
+        if (screen.kind === 'too-similar') return <TooSimilarScreen key={screen.site ?? ''} connection={connection} site={screen.site} />;
         if (screen.kind === 'map') return <MapScreen connection={connection} sites={sites} site={screen.site} />;
         if (screen.kind === 'scheduled') return <ScheduledScreen connection={connection} site={screen.site} sites={sites} />;
         if (screen.kind === 'release') return <ReleaseScreen connection={connection} id={screen.id} site={screen.site} sites={sites} />;

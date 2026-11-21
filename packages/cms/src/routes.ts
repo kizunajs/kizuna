@@ -110,6 +110,7 @@ import { collectionActionRoutes, itemActions } from './action-routes.js';
 import { listViewsRoute, viewRoutes } from './view-routes.js';
 import { dashboardRoute } from './dashboard-routes.js';
 import { pageMapRoute } from './page-map-routes.js';
+import { seoRoutes } from './seo-routes.js';
 import { scheduleRoutes } from './schedule-routes.js';
 import { redirectRoutes } from './redirect-routes.js';
 import { cancelSchedule, scheduleDocument } from './schedules.js';
@@ -3975,6 +3976,11 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             linkTargets: linkTargetsRoute,
             resolveLinkTarget,
             linkedFrom: linkedFromRoute,
+            ...seoRoutes({
+                editor,
+                editingBase,
+                guarded,
+            }),
             createPreview,
             people: {
                 list: listPeople,

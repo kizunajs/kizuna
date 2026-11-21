@@ -153,6 +153,39 @@ export const PageScoresSchema = Kizuna.model({
     }),
 });
 
+const SimilarPageSchema = z.object({
+    ref: z.string(),
+    title: z.string(),
+    path: z.string(),
+    position: z.number().optional().describe('Where it ranks for the search, 1 at the top.'),
+});
+
+export const SimilarPagesSchema = Kizuna.model({
+    title: 'CMS.SimilarPages',
+    schema: z.object({
+        checkedAt: z.string(),
+        label: z.string().nullable(),
+        searches: z
+            .array(
+                z.object({
+                    keyword: z.string(),
+                    volume: z.number().describe('How many people search for it each month.'),
+                    winner: SimilarPageSchema.describe('The page that ranks best, which the others give way to.'),
+                    others: z.array(
+                        SimilarPageSchema.extend({
+                            similarity: z.number().describe('How alike it is to the winner, from 0 to 1.'),
+                        })
+                    ),
+                    fix: z
+                        .enum(['merge', 'link'])
+                        .describe('`merge` when another page is 85% or more the same as the winner, otherwise `link`.'),
+                    why: z.string().describe('One sentence on what the competing costs.'),
+                })
+            )
+            .describe('Largest search first.'),
+    }),
+});
+
 type LinkEnd = z.output<typeof LinkEndSchema>;
 type LinkNode = z.output<typeof LinkMapSchema>['nodes'][number];
 type LinkEdge = z.output<typeof LinkMapSchema>['edges'][number];
@@ -537,6 +570,41 @@ const endOf = async (
                   },
               }),
     };
+};
+
+/**
+ * How alike another page has to be to the winner before merging it beats
+ * linking it.
+ */
+export const MERGE_SIMILARITY = 0.85;
+
+const NUMBER_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+
+const listed = (titles: readonly string[]): string =>
+    titles.length <= 1 ? (titles[0] ?? '') : `${titles.slice(0, -1).join(', ')} and ${titles[titles.length - 1]}`;
+
+/**
+ * One sentence on what competing for a search costs: how the searches split,
+ * and whether any page reaches the first page of results.
+ */
+export const similarWhy = (input: {
+    volume: number;
+    fix: 'merge' | 'link';
+    winner: { title: string; position?: number };
+    others: ReadonlyArray<{ title: string }>;
+}): string => {
+    const count = input.others.length + 1;
+    const pages = `${NUMBER_WORDS[count] ?? count} pages`;
+    const volume = new Intl.NumberFormat('en').format(input.volume);
+    const others = listed(input.others.map((page) => page.title));
+    const verb = input.others.length === 1 ? 's' : '';
+    const outcome =
+        input.winner.position !== undefined && input.winner.position <= 10
+            ? `only ${input.winner.title} reaches the first page`
+            : 'none reaches the first page';
+    return input.fix === 'merge'
+        ? `${others} say${verb} nearly what ${input.winner.title} says, so search splits the ${volume} searches between ${pages} and ${outcome}.`
+        : `${others} compete${verb} with ${input.winner.title} for the ${volume} searches, so search cannot tell which of the ${pages} to show and ${outcome}.`;
 };
 
 /**
@@ -1157,10 +1225,135 @@ export const seoRoutes = (input: { editor: RouteAuth; editingBase: `/${string}`;
         }) as never
     );
 
+    const similarPages = route({
+        method: 'GET',
+        path: `${input.editingBase}/seo/similar-pages`,
+        auth: input.editor,
+        summary: "List the searches several of a site's pages compete for, with the page to keep and the fix",
+        description:
+            'From `seoData` on cms(): each search more than one page or item of the site ranks for, the page ranking best as `winner`, and how alike each other page is to it. `fix` is `merge` when one is 85% or more the same, otherwise `link`, and `why` says what the competing costs. Empty without `seoData`.',
+        tool: true,
+        query: z.object({
+            site: z.string().optional().describe("The site, like uk, or 'default' for a CMS without sites."),
+            refresh: z.boolean().optional().describe('Ask the service again rather than answer what it said today.'),
+        }),
+        responses: {
+            200: {
+                body: SimilarPagesSchema,
+                cache: 'no-store',
+            },
+            404: ProblemDetailsSchema,
+            502: ProblemDetailsSchema,
+        },
+    }).handler(
+        input.guarded(async (cms, args) => {
+            const query = (args.query ?? {}) as { site?: string; refresh?: boolean };
+            const site = siteFrom(cms, args, query.site);
+            const seoData = cms.options.seoData;
+            const base = siteBaseOf(cms, site);
+            if (seoData === undefined || base === undefined) {
+                return {
+                    status: 200,
+                    body: {
+                        checkedAt: new Date().toISOString(),
+                        label: seoData?.label ?? null,
+                        searches: [],
+                    },
+                };
+            }
+            const refresh = query.refresh === true;
+            const pages = await pagesWithData(cms, site, refresh);
+            const baseUrl = new URL(base);
+            const prefix = baseUrl.pathname.replace(/\/+$/, '');
+            const byAddress = new Map(pages.map(({ page }) => [`${base}${page.path}`, page]));
+            const byPath = new Map(pages.map(({ page }) => [`${prefix}${page.path}`, page]));
+            const pageAt = (address: string) => {
+                const exact = byAddress.get(address);
+                if (exact !== undefined || !URL.canParse(address)) return exact;
+                const url = new URL(address);
+                return url.origin === baseUrl.origin ? byPath.get(url.pathname) : undefined;
+            };
+            let data: SiteSeoData;
+            try {
+                data = await siteData(seoData, baseUrl.origin, localeOf(cms, site), refresh);
+            } catch (error) {
+                throw new CmsHttpError(502, {
+                    detail: `${seoData.label} did not answer for ${base}: ${error instanceof Error ? error.message : String(error)}`,
+                });
+            }
+            const searches = [];
+            for (const competing of data.competing ?? []) {
+                const matched = new Map<
+                    string,
+                    { page: Awaited<ReturnType<typeof pagesOn>>[number]; position?: number; similarity?: number }
+                >();
+                for (const entry of competing.urls) {
+                    const page = pageAt(entry.url);
+                    if (page === undefined || matched.has(page.ref)) continue;
+                    matched.set(page.ref, {
+                        page,
+                        ...(entry.position === undefined
+                            ? {}
+                            : {
+                                  position: entry.position,
+                              }),
+                        ...(entry.similarity === undefined
+                            ? {}
+                            : {
+                                  similarity: entry.similarity,
+                              }),
+                    });
+                }
+                if (matched.size < 2) continue;
+                const [best, ...rest] = [...matched.values()].sort(
+                    (left, right) => (left.position ?? Number.POSITIVE_INFINITY) - (right.position ?? Number.POSITIVE_INFINITY)
+                );
+                const shown = (entry: NonNullable<typeof best>) => ({
+                    ref: entry.page.ref,
+                    title: entry.page.title,
+                    path: entry.page.path,
+                    ...(entry.position === undefined
+                        ? {}
+                        : {
+                              position: entry.position,
+                          }),
+                });
+                const winner = shown(best!);
+                const others = rest.map((entry) => ({
+                    ...shown(entry),
+                    similarity: entry.similarity ?? 0,
+                }));
+                const fix: 'merge' | 'link' = others.some((other) => other.similarity >= MERGE_SIMILARITY) ? 'merge' : 'link';
+                searches.push({
+                    keyword: competing.keyword,
+                    volume: competing.volume,
+                    winner,
+                    others,
+                    fix,
+                    why: similarWhy({
+                        volume: competing.volume,
+                        fix,
+                        winner,
+                        others,
+                    }),
+                });
+            }
+            return {
+                status: 200,
+                body: {
+                    checkedAt: data.checkedAt,
+                    label: seoData.label,
+                    searches: searches.sort((left, right) => right.volume - left.volume),
+                },
+            };
+        }) as never
+    );
+
     return {
         pageSeo,
         siteSeo,
         linkMap,
         pageScores,
+        similarPages,
     };
 };
