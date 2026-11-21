@@ -5,6 +5,7 @@ import {
     walkApi,
     flattenJobs,
     readDef,
+    readMetaExtensible,
     readMetaId,
     readModelSchema,
     readObjectShape,
@@ -22,9 +23,9 @@ import type { z } from 'zod';
 export type SchemaNode =
     | { kind: 'object'; nullable?: true; fields: Record<string, { optional: boolean; schema: SchemaNode }>; refinements?: number }
     | { kind: 'array'; nullable?: true; element: SchemaNode; refinements?: number }
-    | { kind: 'enum'; nullable?: true; values: string[]; refinements?: number }
+    | { kind: 'enum'; nullable?: true; values: string[]; extensible?: true; refinements?: number }
     | { kind: 'model'; nullable?: true; model: string; refinements?: number }
-    | { kind: 'union'; nullable?: true; options: SchemaNode[]; refinements?: number }
+    | { kind: 'union'; nullable?: true; options: SchemaNode[]; extensible?: true; refinements?: number }
     | { kind: string; nullable?: true; refinements?: number };
 
 export interface RouteSnapshot {
@@ -84,6 +85,13 @@ const refinementCount = (schema: z.core.$ZodType): number | undefined => {
     return custom === 0 ? undefined : custom;
 };
 
+const extensibleOf = (schema: z.core.$ZodType): { extensible?: true } =>
+    readMetaExtensible(schema)
+        ? {
+              extensible: true,
+          }
+        : {};
+
 /**
  * A Zod schema reduced to the shape a comparison reads. A model that holds
  * itself is written out once, and inside itself as a reference by its title.
@@ -130,12 +138,19 @@ export const toSchemaNode = (schema: z.core.$ZodType, inside: readonly z.core.$Z
             values: Object.values(def.entries ?? {})
                 .map(String)
                 .sort(),
+            ...extensibleOf(inner),
             ...carry,
         };
     }
     if (def.type === 'literal') return { kind: 'enum', ...nullability, values: (def.values ?? []).map(String).sort(), ...carry };
     if (def.type === 'union') {
-        return { kind: 'union', ...nullability, options: options.map((option) => toSchemaNode(option, inside)), ...carry };
+        return {
+            kind: 'union',
+            ...nullability,
+            options: options.map((option) => toSchemaNode(option, inside)),
+            ...extensibleOf(inner),
+            ...carry,
+        };
     }
 
     return { kind: def.type ?? 'unknown', ...nullability, ...carry };

@@ -22,6 +22,7 @@ Kizuna.model(options: ModelOptions): ZodType
 | `title`       | `string`  | Yes      | The name used in generated output (`User`, `Event`, etc.) |
 | `description` | `string`  | No       | Description included in the OpenAPI spec                  |
 | `schema`      | `ZodType` | Yes      | The Zod schema defining the shape and validation          |
+| `extensible`  | `boolean` | No       | An enum or discriminated union that will gain members     |
 
 ## Returns
 
@@ -52,6 +53,32 @@ With `Kizuna.model`:
 - **TypeScript**: the schema becomes `export type User` in the `API` namespace, and every route that uses it references the name
 - **Swift**: an object becomes `public struct User`, a `z.enum` becomes `public enum EventKind`, and a `z.discriminatedUnion` becomes an enum with one case per branch, shared across all routes that reference it
 - **Kotlin**: an object becomes `@Serializable data class User`, a `z.enum` becomes `enum class EventKind`, and a `z.discriminatedUnion` becomes a sealed class, shared across all routes that reference it
+
+## A model that will gain members
+
+An enum or discriminated union that gets new members later, like the kinds of activity in a feed, is `extensible`:
+
+```ts title="schemas.ts"
+export const ActivitySchema = Kizuna.model({
+    title: 'Activity',
+    schema: z.discriminatedUnion('kind', [TaskCreatedSchema, CommentAddedSchema]),
+    extensible: true,
+});
+```
+
+The Swift and Kotlin clients then decode a member they were generated before as `unknown`, so an app that is already installed keeps working when the API adds one:
+
+```swift
+switch activity {
+case .taskCreated(let task): TaskRow(task)
+case .commentAdded(let comment): CommentRow(comment)
+case .unknown: EmptyView()
+}
+```
+
+An unknown value can't be sent back. The OpenAPI document marks the schema `x-kizuna-extensible: true`.
+
+A schema that isn't a model says the same with `.meta({ extensible: true })`. To give every enum and union in a client an unknown member, turn on the generators' [`unknownEnumCase`](/docs/clients/swift) instead.
 
 ## A model that holds itself
 

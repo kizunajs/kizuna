@@ -56,10 +56,10 @@ export interface SwiftConfig {
      */
     camelCaseProperties?: boolean;
     /**
-     * Emit each `z.enum` as a `RawRepresentable` enum with a `case unknown(String)`
-     * fallback, so unrecognised wire values decode instead of throwing. The raw
-     * string round-trips on encode and in query params. Discriminated unions are
-     * unaffected and still throw on an unknown discriminator.
+     * Give each `z.enum` and discriminated union a `case unknown(String)`, so a
+     * value this client doesn't know decodes instead of throwing.
+     *
+     * An unknown union value can't be sent.
      *
      * @default false
      */
@@ -112,7 +112,8 @@ interface RouteMethod {
 interface StreamDescriptor {
     status: number;
     mode: 'events' | 'text' | 'binary';
-    events?: Array<{ name: string; caseName: string; type: string }>;
+    // `unknownCase` when the event's union takes variants this client doesn't know, so its shared fields may be missing.
+    events?: Array<{ name: string; caseName: string; type: string; unknownCase: boolean }>;
     messageType?: string;
 }
 
@@ -250,11 +251,16 @@ const buildRouteMethod = (
                 stream = {
                     status,
                     mode,
-                    events: Object.entries(responseValue.stream).map(([name, schema], index) => ({
-                        name,
-                        caseName: eventCaseNames[index]!,
-                        type: mapType(schema, registry, `${baseHint}${toPascalCase(name)}`).expression,
-                    })),
+                    events: Object.entries(responseValue.stream).map(([name, schema], index) => {
+                        const type = mapType(schema, registry, `${baseHint}${toPascalCase(name)}`).expression;
+                        const found = registry.get(type);
+                        return {
+                            name,
+                            caseName: eventCaseNames[index]!,
+                            type,
+                            unknownCase: found?.kind === 'discriminated-enum' && found.unknownCase,
+                        };
+                    }),
                 };
             } else if (mode === 'events') {
                 stream = {
@@ -882,6 +888,11 @@ const emitDiscriminatedEnum = (
         for (const variant of type.variants) {
             writer.line(`case ${escapeKeyword(variant.caseName)}(${variant.payloadType})`);
         }
+        const unknown = unknownCaseName(type.variants.map((variant) => variant.caseName));
+        if (type.unknownCase) {
+            writer.docComment('A variant this client was generated before. It holds the discriminator, and cannot be sent back.');
+            writer.line(`case ${escapeKeyword(unknown)}(String)`);
+        }
 
         // Static factory per variant (`.email(to:subject:)`); the payload struct is built here with the
         // discriminator literal injected.
@@ -929,12 +940,22 @@ const emitDiscriminatedEnum = (
             );
             for (const field of shared) {
                 const relative = ownedTypeMap && relativeOwnedPath(field.type, ownedTypeMap, lookupName);
-                const fieldType = optionalize(relative ?? resolveType(field.type, undefined, context), field.optional);
+                const isDiscriminator = field.wireName === type.discriminator || field.name === type.discriminator;
+                // An unknown variant carries only its discriminator, so every other shared field may be missing.
+                const optional = field.optional || (type.unknownCase && !isDiscriminator);
+                const fieldType = optionalize(relative ?? resolveType(field.type, undefined, context), optional);
                 writer.blank();
                 writer.block(`public var ${escapeKeyword(field.name)}: ${fieldType}`, () => {
                     writer.line('switch self {');
                     for (const { variant } of variantStructs) {
                         writer.line(`case .${escapeKeyword(variant.caseName)}(let payload): return payload.${escapeKeyword(field.name)}`);
+                    }
+                    if (type.unknownCase) {
+                        writer.line(
+                            isDiscriminator && field.type === 'String'
+                                ? `case .${escapeKeyword(unknown)}(let value): return value`
+                                : `case .${escapeKeyword(unknown)}: return nil`
+                        );
                     }
                     writer.line('}');
                 });
@@ -956,9 +977,13 @@ const emitDiscriminatedEnum = (
                 writer.line(`    self = .${escapeKeyword(variant.caseName)}(try single.decode(${variant.payloadType}.self))`);
             }
             writer.line('default:');
-            writer.line(
-                '    throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \\(kind)")'
-            );
+            if (type.unknownCase) {
+                writer.line(`    self = .${escapeKeyword(unknown)}(kind)`);
+            } else {
+                writer.line(
+                    '    throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \\(kind)")'
+                );
+            }
             writer.line('}');
         });
         writer.blank();
@@ -968,6 +993,12 @@ const emitDiscriminatedEnum = (
             for (const variant of type.variants) {
                 writer.line(`case .${escapeKeyword(variant.caseName)}(let payload):`);
                 writer.line('    try single.encode(payload)');
+            }
+            if (type.unknownCase) {
+                writer.line(`case .${escapeKeyword(unknown)}(let kind):`);
+                writer.line(
+                    '    throw EncodingError.invalidValue(self, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "This client does not know the variant \\(kind), so it cannot send it."))'
+                );
             }
             writer.line('}');
         });
@@ -1125,6 +1156,11 @@ const emitToolTracking = (writer: SwiftWriter, method: RouteMethod): void => {
     if (!events) return;
     const names = new Set(events.map((event) => event.name));
     if (!names.has('tool_call') || !names.has('tool_result')) return;
+    // A call from a tool this client doesn't know has no id to track it by.
+    const readId = (eventName: string) =>
+        events.find((event) => event.name === eventName)?.unknownCase
+            ? '    guard let id = payload.id else { continue }'
+            : '    let id = payload.id';
 
     writer.blank();
     writer.block('public struct ToolCallRecord: Identifiable, Sendable, Equatable', () => {
@@ -1164,19 +1200,21 @@ const emitToolTracking = (writer: SwiftWriter, method: RouteMethod): void => {
             writer.line('switch event {');
             if (names.has('tool_call')) {
                 writer.line('case .tool_call(let payload):');
-                writer.line('    var tracked = at(payload.id, payload.name)');
+                writer.line(readId('tool_call'));
+                writer.line('    var tracked = at(id, payload.name)');
                 writer.line('    tracked.call = payload');
                 writer.line('    if payload.needsApproval == true, tracked.state == .running {');
                 writer.line('        tracked.state = .needsApproval');
                 writer.line('    }');
-                writer.line('    calls[payload.id] = tracked');
+                writer.line('    calls[id] = tracked');
             }
             if (names.has('tool_result')) {
                 writer.line('case .tool_result(let payload):');
-                writer.line('    var tracked = at(payload.id, payload.name)');
+                writer.line(readId('tool_result'));
+                writer.line('    var tracked = at(id, payload.name)');
                 writer.line('    tracked.state = .done');
                 writer.line('    tracked.result = payload');
-                writer.line('    calls[payload.id] = tracked');
+                writer.line('    calls[id] = tracked');
             }
             if (names.has('tool_error')) {
                 writer.line('case .tool_error(let payload):');

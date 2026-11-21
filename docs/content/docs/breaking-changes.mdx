@@ -143,7 +143,7 @@ CHANGED  GET /users query.where.name widens from string to string | object
          the generated client type changes, the HTTP surface does not
 ```
 
-The last row catches people out. Adding a value to a response enum breaks any client that generated a closed enum for it, which is what [`unknownEnumCase`](/docs/clients/swift) exists for in the Swift and Kotlin clients.
+The last row catches people out. Adding a value to a response enum breaks any client that generated a closed enum for it. An enum or discriminated union marked [`extensible`](/docs/reference/kizuna-model#a-model-that-will-gain-members) is the exception: its Swift and Kotlin clients take a member they don't know, so a new value or a new member of the union is reported as changed. [`unknownEnumCase`](/docs/clients/swift) does the same for every enum and union in one client, but `kizuna diff` can't see a client's settings, so it still reports those as breaking.
 
 Bodies, query parameters, headers and every response body are compared, reported by path and followed into arrays:
 

@@ -10,6 +10,7 @@ import {
     readDeprecation,
     readMetaBrand,
     readMetaDescription,
+    readMetaExtensible,
     readMetaId,
     readModelSchema,
     readObjectShape,
@@ -74,6 +75,10 @@ export interface KotlinSealedClass {
         // Anonymous members nest inside the interface; named models emit top-level.
         nested: boolean;
     }>;
+    /**
+     * Decode a discriminator no variant matches as `Unknown` instead of throwing.
+     */
+    unknownCase: boolean;
     description?: string;
 }
 
@@ -281,6 +286,7 @@ const mapUnbrandedType = (schema: z.core.$ZodType, registry: TypeRegistry, hint:
                 name: enumName,
                 discriminator: discriminated.discriminator,
                 variants: [],
+                unknownCase: registry.unknownEnumCase || readMetaExtensible(schema),
                 description: readMetaDescription(schema),
             });
             const variants: KotlinSealedClass['variants'] = [];
@@ -319,6 +325,7 @@ const mapUnbrandedType = (schema: z.core.$ZodType, registry: TypeRegistry, hint:
                 name: enumName,
                 discriminator: discriminated.discriminator,
                 variants,
+                unknownCase: registry.unknownEnumCase || readMetaExtensible(schema),
                 description: readMetaDescription(schema),
             });
         }
@@ -457,7 +464,7 @@ const mapUnbrandedType = (schema: z.core.$ZodType, registry: TypeRegistry, hint:
                     name: enumName,
                     cases,
                     description: readMetaDescription(schema),
-                    unknownCase: registry.unknownEnumCase,
+                    unknownCase: registry.unknownEnumCase || readMetaExtensible(schema),
                 });
             }
             return {

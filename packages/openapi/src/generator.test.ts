@@ -1623,6 +1623,34 @@ describe('brands from metadata', () => {
         expect(parameter.schema?.['brand']).toBeUndefined();
     });
 
+    it('marks an extensible model with an x-kizuna-extensible extension', () => {
+        const extensibleRoutes = k.routes({
+            getOrder: k.route({
+                method: 'GET',
+                path: '/orders/:id',
+                responses: {
+                    200: z.object({
+                        status: Kizuna.model({
+                            title: 'OrderStatus',
+                            schema: z.enum(['open', 'shipped']),
+                            extensible: true,
+                        }),
+                    }),
+                },
+            }),
+        });
+        const extensibleSpec = generateJson(
+            defineConfig({
+                ...config,
+                routes: [extensibleRoutes],
+            }).api,
+            baseConfig
+        );
+        const status = extensibleSpec.components?.schemas?.['OrderStatus'] as Record<string, unknown> | undefined;
+        expect(status?.['x-kizuna-extensible']).toBe(true);
+        expect(status?.['extensible']).toBeUndefined();
+    });
+
     it('emits the brand on a response field', () => {
         const body = operation?.responses?.['200']?.content?.['application/json']?.schema as
             Record<string, Record<string, Record<string, unknown>>> | undefined;

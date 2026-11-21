@@ -232,6 +232,8 @@ public enum OpenEnumAPI {
         }
         case login(Login)
         case logout(Logout)
+        /// A variant this client was generated before. It holds the discriminator, and cannot be sent back.
+        case unknown(String)
         public static func login(at: Date, ipAddress: String, userAgent: String) -> UserSessionEvent {
             .login(Login(kind: "login", at: at, ipAddress: ipAddress, userAgent: userAgent))
         }
@@ -243,13 +245,15 @@ public enum OpenEnumAPI {
             switch self {
             case .login(let payload): return payload.kind
             case .logout(let payload): return payload.kind
+            case .unknown(let value): return value
             }
         }
 
-        public var at: Date {
+        public var at: Date? {
             switch self {
             case .login(let payload): return payload.at
             case .logout(let payload): return payload.at
+            case .unknown: return nil
             }
         }
 
@@ -267,7 +271,7 @@ public enum OpenEnumAPI {
             case "logout":
                 self = .logout(try single.decode(Logout.self))
             default:
-                throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+                self = .unknown(kind)
             }
         }
 
@@ -278,6 +282,8 @@ public enum OpenEnumAPI {
                 try single.encode(payload)
             case .logout(let payload):
                 try single.encode(payload)
+            case .unknown(let kind):
+                throw EncodingError.invalidValue(self, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "This client does not know the variant \(kind), so it cannot send it."))
             }
         }
     }
@@ -366,6 +372,8 @@ public enum OpenEnumAPI {
     public enum NotificationEvent: Codable, Sendable, Equatable {
         case email(EmailEvent)
         case sms(SmsEvent)
+        /// A variant this client was generated before. It holds the discriminator, and cannot be sent back.
+        case unknown(String)
         public static func email(to: String, subject: String) -> NotificationEvent {
             .email(EmailEvent(channel: "email", to: to, subject: subject))
         }
@@ -377,6 +385,7 @@ public enum OpenEnumAPI {
             switch self {
             case .email(let payload): return payload.channel
             case .sms(let payload): return payload.channel
+            case .unknown(let value): return value
             }
         }
 
@@ -394,7 +403,7 @@ public enum OpenEnumAPI {
             case "sms":
                 self = .sms(try single.decode(SmsEvent.self))
             default:
-                throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+                self = .unknown(kind)
             }
         }
 
@@ -405,6 +414,8 @@ public enum OpenEnumAPI {
                 try single.encode(payload)
             case .sms(let payload):
                 try single.encode(payload)
+            case .unknown(let kind):
+                throw EncodingError.invalidValue(self, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "This client does not know the variant \(kind), so it cannot send it."))
             }
         }
     }
@@ -2506,6 +2517,8 @@ public final class OpenEnumAPIClient: Sendable {
             case getForecast(ToolCallGetForecast)
             case plotSignups(ToolCallPlotSignups)
             case countWords(ToolCallCountWords)
+            /// A variant this client was generated before. It holds the discriminator, and cannot be sent back.
+            case unknown(String)
             public static func getForecast(id: String, needsApproval: Bool? = nil, input: OpenEnumAPIClient.AssistantReply.ToolCallGetForecastInput) -> ToolCall {
                 .getForecast(ToolCallGetForecast(id: id, name: "getForecast", needsApproval: needsApproval, input: input))
             }
@@ -2516,11 +2529,12 @@ public final class OpenEnumAPIClient: Sendable {
                 .countWords(ToolCallCountWords(id: id, name: "countWords", needsApproval: needsApproval, input: input))
             }
 
-            public var id: String {
+            public var id: String? {
                 switch self {
                 case .getForecast(let payload): return payload.id
                 case .plotSignups(let payload): return payload.id
                 case .countWords(let payload): return payload.id
+                case .unknown: return nil
                 }
             }
 
@@ -2529,6 +2543,7 @@ public final class OpenEnumAPIClient: Sendable {
                 case .getForecast(let payload): return payload.name
                 case .plotSignups(let payload): return payload.name
                 case .countWords(let payload): return payload.name
+                case .unknown(let value): return value
                 }
             }
 
@@ -2537,6 +2552,7 @@ public final class OpenEnumAPIClient: Sendable {
                 case .getForecast(let payload): return payload.needsApproval
                 case .plotSignups(let payload): return payload.needsApproval
                 case .countWords(let payload): return payload.needsApproval
+                case .unknown: return nil
                 }
             }
 
@@ -2556,7 +2572,7 @@ public final class OpenEnumAPIClient: Sendable {
                 case "countWords":
                     self = .countWords(try single.decode(ToolCallCountWords.self))
                 default:
-                    throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+                    self = .unknown(kind)
                 }
             }
 
@@ -2569,6 +2585,8 @@ public final class OpenEnumAPIClient: Sendable {
                     try single.encode(payload)
                 case .countWords(let payload):
                     try single.encode(payload)
+                case .unknown(let kind):
+                    throw EncodingError.invalidValue(self, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "This client does not know the variant \(kind), so it cannot send it."))
                 }
             }
         }
@@ -2731,6 +2749,8 @@ public final class OpenEnumAPIClient: Sendable {
             case getForecast(ToolResultGetForecast)
             case plotSignups(ToolResultPlotSignups)
             case countWords(ToolResultCountWords)
+            /// A variant this client was generated before. It holds the discriminator, and cannot be sent back.
+            case unknown(String)
             public static func getForecast(id: String, output: OpenEnumAPIClient.AssistantReply.ToolResultGetForecastOutput) -> ToolResult {
                 .getForecast(ToolResultGetForecast(id: id, name: "getForecast", output: output))
             }
@@ -2741,11 +2761,12 @@ public final class OpenEnumAPIClient: Sendable {
                 .countWords(ToolResultCountWords(id: id, name: "countWords", output: output))
             }
 
-            public var id: String {
+            public var id: String? {
                 switch self {
                 case .getForecast(let payload): return payload.id
                 case .plotSignups(let payload): return payload.id
                 case .countWords(let payload): return payload.id
+                case .unknown: return nil
                 }
             }
 
@@ -2754,6 +2775,7 @@ public final class OpenEnumAPIClient: Sendable {
                 case .getForecast(let payload): return payload.name
                 case .plotSignups(let payload): return payload.name
                 case .countWords(let payload): return payload.name
+                case .unknown(let value): return value
                 }
             }
 
@@ -2773,7 +2795,7 @@ public final class OpenEnumAPIClient: Sendable {
                 case "countWords":
                     self = .countWords(try single.decode(ToolResultCountWords.self))
                 default:
-                    throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+                    self = .unknown(kind)
                 }
             }
 
@@ -2786,6 +2808,8 @@ public final class OpenEnumAPIClient: Sendable {
                     try single.encode(payload)
                 case .countWords(let payload):
                     try single.encode(payload)
+                case .unknown(let kind):
+                    throw EncodingError.invalidValue(self, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "This client does not know the variant \(kind), so it cannot send it."))
                 }
             }
         }
@@ -3021,17 +3045,19 @@ public final class OpenEnumAPIClient: Sendable {
             for event in events {
                 switch event {
                 case .tool_call(let payload):
-                    var tracked = at(payload.id, payload.name)
+                    guard let id = payload.id else { continue }
+                    var tracked = at(id, payload.name)
                     tracked.call = payload
                     if payload.needsApproval == true, tracked.state == .running {
                         tracked.state = .needsApproval
                     }
-                    calls[payload.id] = tracked
+                    calls[id] = tracked
                 case .tool_result(let payload):
-                    var tracked = at(payload.id, payload.name)
+                    guard let id = payload.id else { continue }
+                    var tracked = at(id, payload.name)
                     tracked.state = .done
                     tracked.result = payload
-                    calls[payload.id] = tracked
+                    calls[id] = tracked
                 case .tool_error(let payload):
                     var tracked = at(payload.id, payload.name.rawValue)
                     tracked.state = .failed
@@ -3125,6 +3151,8 @@ public final class OpenEnumAPIClient: Sendable {
         public enum ToolCall: Codable, Sendable, Equatable {
             case notes_list(ToolCallNotesList)
             case notes_add(ToolCallNotesAdd)
+            /// A variant this client was generated before. It holds the discriminator, and cannot be sent back.
+            case unknown(String)
             public static func notes_list(id: String, needsApproval: Bool? = nil) -> ToolCall {
                 .notes_list(ToolCallNotesList(id: id, name: "notes.list", needsApproval: needsApproval))
             }
@@ -3132,10 +3160,11 @@ public final class OpenEnumAPIClient: Sendable {
                 .notes_add(ToolCallNotesAdd(id: id, name: "notes.add", needsApproval: needsApproval, input: input))
             }
 
-            public var id: String {
+            public var id: String? {
                 switch self {
                 case .notes_list(let payload): return payload.id
                 case .notes_add(let payload): return payload.id
+                case .unknown: return nil
                 }
             }
 
@@ -3143,6 +3172,7 @@ public final class OpenEnumAPIClient: Sendable {
                 switch self {
                 case .notes_list(let payload): return payload.name
                 case .notes_add(let payload): return payload.name
+                case .unknown(let value): return value
                 }
             }
 
@@ -3150,6 +3180,7 @@ public final class OpenEnumAPIClient: Sendable {
                 switch self {
                 case .notes_list(let payload): return payload.needsApproval
                 case .notes_add(let payload): return payload.needsApproval
+                case .unknown: return nil
                 }
             }
 
@@ -3167,7 +3198,7 @@ public final class OpenEnumAPIClient: Sendable {
                 case "notes.add":
                     self = .notes_add(try single.decode(ToolCallNotesAdd.self))
                 default:
-                    throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+                    self = .unknown(kind)
                 }
             }
 
@@ -3178,6 +3209,8 @@ public final class OpenEnumAPIClient: Sendable {
                     try single.encode(payload)
                 case .notes_add(let payload):
                     try single.encode(payload)
+                case .unknown(let kind):
+                    throw EncodingError.invalidValue(self, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "This client does not know the variant \(kind), so it cannot send it."))
                 }
             }
         }
@@ -3236,6 +3269,8 @@ public final class OpenEnumAPIClient: Sendable {
         public enum ToolResult: Codable, Sendable, Equatable {
             case notes_list(ToolResultNotesList)
             case notes_add(ToolResultNotesAdd)
+            /// A variant this client was generated before. It holds the discriminator, and cannot be sent back.
+            case unknown(String)
             public static func notes_list(id: String, output: OpenEnumAPIClient.AssistantChat.ToolResultNotesListOutput) -> ToolResult {
                 .notes_list(ToolResultNotesList(id: id, name: "notes.list", output: output))
             }
@@ -3243,10 +3278,11 @@ public final class OpenEnumAPIClient: Sendable {
                 .notes_add(ToolResultNotesAdd(id: id, name: "notes.add", output: output))
             }
 
-            public var id: String {
+            public var id: String? {
                 switch self {
                 case .notes_list(let payload): return payload.id
                 case .notes_add(let payload): return payload.id
+                case .unknown: return nil
                 }
             }
 
@@ -3254,6 +3290,7 @@ public final class OpenEnumAPIClient: Sendable {
                 switch self {
                 case .notes_list(let payload): return payload.name
                 case .notes_add(let payload): return payload.name
+                case .unknown(let value): return value
                 }
             }
 
@@ -3271,7 +3308,7 @@ public final class OpenEnumAPIClient: Sendable {
                 case "notes.add":
                     self = .notes_add(try single.decode(ToolResultNotesAdd.self))
                 default:
-                    throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+                    self = .unknown(kind)
                 }
             }
 
@@ -3282,6 +3319,8 @@ public final class OpenEnumAPIClient: Sendable {
                     try single.encode(payload)
                 case .notes_add(let payload):
                     try single.encode(payload)
+                case .unknown(let kind):
+                    throw EncodingError.invalidValue(self, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "This client does not know the variant \(kind), so it cannot send it."))
                 }
             }
         }
@@ -3457,17 +3496,19 @@ public final class OpenEnumAPIClient: Sendable {
             for event in events {
                 switch event {
                 case .tool_call(let payload):
-                    var tracked = at(payload.id, payload.name)
+                    guard let id = payload.id else { continue }
+                    var tracked = at(id, payload.name)
                     tracked.call = payload
                     if payload.needsApproval == true, tracked.state == .running {
                         tracked.state = .needsApproval
                     }
-                    calls[payload.id] = tracked
+                    calls[id] = tracked
                 case .tool_result(let payload):
-                    var tracked = at(payload.id, payload.name)
+                    guard let id = payload.id else { continue }
+                    var tracked = at(id, payload.name)
                     tracked.state = .done
                     tracked.result = payload
-                    calls[payload.id] = tracked
+                    calls[id] = tracked
                 case .tool_error(let payload):
                     var tracked = at(payload.id, payload.name.rawValue)
                     tracked.state = .failed

@@ -137,13 +137,13 @@ The generated client holds the route shapes and the schemas, and is what a brows
 
 ## Client options
 
-| Option                | Applies to           | Description                                                               |
-| --------------------- | -------------------- | ------------------------------------------------------------------------- |
-| `output`              | all                  | Path the generated file is written to                                     |
-| `namespace`           | Fetch, Swift, Kotlin | Name of the generated namespace, `API` by default                         |
-| `package`             | Kotlin               | Package the generated file declares                                       |
-| `camelCaseProperties` | Swift, Kotlin        | Convert wire field names to camelCase, mapping the wire name back         |
-| `unknownEnumCase`     | Swift, Kotlin        | Give every enum an `unknown` case, so an unrecognised value still decodes |
+| Option                | Applies to           | Description                                                                                       |
+| --------------------- | -------------------- | ------------------------------------------------------------------------------------------------- |
+| `output`              | all                  | Path the generated file is written to                                                             |
+| `namespace`           | Fetch, Swift, Kotlin | Name of the generated namespace, `API` by default                                                 |
+| `package`             | Kotlin               | Package the generated file declares                                                               |
+| `camelCaseProperties` | Swift, Kotlin        | Convert wire field names to camelCase, mapping the wire name back                                 |
+| `unknownEnumCase`     | Swift, Kotlin        | Give every enum and discriminated union an `unknown` case, so an unrecognised value still decodes |
 
 ## Two clients of one language
 

@@ -2135,6 +2135,92 @@ describe('Kotlin generator: unknownEnumCase', () => {
         const output = generateKotlinClient(enumContract(['encoding', 'encoded', 'failed']), baseConfig);
         expect(output).not.toContain('import kotlinx.serialization.descriptors.*');
     });
+
+    const activityContract = (extensible: boolean): ApiDefinition =>
+        defineConfig({
+            routes: [
+                {
+                    listActivity: {
+                        method: 'GET',
+                        path: '/activity',
+                        responses: {
+                            200: z.array(
+                                Kizuna.model({
+                                    title: 'Activity',
+                                    schema: z.discriminatedUnion('kind', [
+                                        z.object({
+                                            kind: z.literal('taskCreated'),
+                                            id: z.string(),
+                                            title: z.string(),
+                                        }),
+                                        z.object({
+                                            kind: z.literal('commentAdded'),
+                                            id: z.string(),
+                                            body: z.string(),
+                                        }),
+                                    ]),
+                                    extensible,
+                                })
+                            ),
+                        },
+                    },
+                },
+            ],
+        }).api;
+
+    it('keeps a union strict by default', () => {
+        const output = generateKotlinClient(activityContract(false), baseConfig);
+        expect(output).toContain('@JsonClassDiscriminator("kind")');
+        expect(output).not.toContain('data class Unknown(val wireValue: String) : Activity');
+    });
+
+    it('gives a union an Unknown member and a serializer that falls back to it when enabled', () => {
+        const output = generateKotlinClient(activityContract(false), tolerantConfig);
+        expect(output).toContain('@Serializable(with = Activity.Serializer::class)');
+        expect(output).toContain('data class Unknown(val wireValue: String) : Activity');
+        expect(output).toContain('"taskCreated" -> input.json.decodeFromJsonElement(TaskCreated.serializer(), body)');
+        expect(output).toContain('else -> Unknown(kind ?: "")');
+        expect(output).toContain('output.encodeJsonElement(JsonObject(mapOf("kind" to JsonPrimitive(kind)) + body.jsonObject))');
+        expect(output).toContain('is Unknown -> throw SerializationException');
+        expect(output).toContain('import kotlinx.serialization.descriptors.*');
+    });
+
+    it('gives an extensible union the Unknown member without the flag', () => {
+        const output = generateKotlinClient(activityContract(true), baseConfig);
+        expect(output).toContain('data class Unknown(val wireValue: String) : Activity');
+        expect(output).not.toContain('@JsonClassDiscriminator("kind")');
+    });
+
+    it('gives an extensible enum the Unknown member without the flag, and leaves other enums strict', () => {
+        const output = generateKotlinClient(
+            defineConfig({
+                routes: [
+                    {
+                        getOrder: {
+                            method: 'GET',
+                            path: '/orders/:id',
+                            responses: {
+                                200: z.object({
+                                    status: Kizuna.model({
+                                        title: 'OrderStatus',
+                                        schema: z.enum(['open', 'shipped']),
+                                        extensible: true,
+                                    }),
+                                    priority: Kizuna.model({
+                                        title: 'Priority',
+                                        schema: z.enum(['low', 'high']),
+                                    }),
+                                }),
+                            },
+                        },
+                    },
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('data class Unknown(override val wireValue: String) : OrderStatus');
+        expect(output).toContain('enum class Priority(override val wireValue: String) : KizunaQueryValue');
+    });
 });
 
 describe('Kotlin generator: union variants owned by a name-prefix class', () => {

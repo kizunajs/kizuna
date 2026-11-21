@@ -28,4 +28,24 @@ final class OpenEnumTests: XCTestCase {
         XCTAssertEqual(record.id, "evt_1")
         XCTAssertEqual(record.userId, "user_1")
     }
+
+    func testDecodesAUnionMemberItDoesNotKnow() throws {
+        let json = """
+        {"kind":"passkey_added","at":"2026-01-01T00:00:00Z"}
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let event = try decoder.decode(OpenEnumAPI.UserSessionEvent.self, from: Data(json.utf8))
+        XCTAssertEqual(event, .unknown("passkey_added"))
+        XCTAssertNil(event.at)
+    }
+
+    func testRefusesToSendAUnionMemberItDoesNotKnow() {
+        XCTAssertThrowsError(try JSONEncoder().encode(OpenEnumAPI.UserSessionEvent.unknown("passkey_added")))
+    }
+
+    func testSkipsAToolCallFromAToolItDoesNotKnow() {
+        let records = OpenEnumAPIClient.AssistantChat.readToolCalls([.tool_call(.unknown("calendar_add"))])
+        XCTAssertEqual(records, [])
+    }
 }

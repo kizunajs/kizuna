@@ -164,6 +164,64 @@ describe('enums, where direction decides everything', () => {
     });
 });
 
+describe('extensible enums and unions, whose clients take members they do not know', () => {
+    const statusOf = (values: [string, ...string[]]) =>
+        z.object({
+            status: z.enum(values).meta({
+                extensible: true,
+            }),
+        });
+
+    it('do not break a response when a value is added', () => {
+        expect(summaries(statusOf(['open', 'shipped']), statusOf(['open', 'shipped', 'returned']), 'response')).toEqual([
+            'changed  status can now be returned',
+        ]);
+    });
+
+    it('still break either direction when a value is removed', () => {
+        expect(summaries(statusOf(['open', 'shipped']), statusOf(['open']), 'response')).toEqual([
+            'BREAKING status no longer accepts shipped',
+        ]);
+    });
+
+    const TaskCreated = z.object({
+        kind: z.literal('taskCreated'),
+        title: z.string(),
+    });
+    const CommentAdded = z.object({
+        kind: z.literal('commentAdded'),
+        body: z.string(),
+    });
+    const TaskDeleted = z.object({
+        kind: z.literal('taskDeleted'),
+    });
+    const feedOf = (options: [z.ZodObject, ...z.ZodObject[]], extensible: boolean) =>
+        z.object({
+            activity: z.discriminatedUnion('kind', options).meta({
+                extensible,
+            }),
+        });
+
+    it('do not break a response when a union gains a member', () => {
+        const changes = summaries(
+            feedOf([TaskCreated, CommentAdded], true),
+            feedOf([TaskCreated, CommentAdded, TaskDeleted], true),
+            'response'
+        );
+        expect(changes).toHaveLength(1);
+        expect(changes[0]).toMatch(/^changed /);
+    });
+
+    it('break a response when a union that is not extensible gains a member', () => {
+        const changes = summaries(
+            feedOf([TaskCreated, CommentAdded], false),
+            feedOf([TaskCreated, CommentAdded, TaskDeleted], false),
+            'response'
+        );
+        expect(changes[0]).toMatch(/^BREAKING /);
+    });
+});
+
 describe('nested shapes', () => {
     it('names the field by its path', () => {
         const before = z.object({ address: z.object({ city: z.string() }) });
