@@ -99,6 +99,14 @@ export const SiteSeoSchema = Kizuna.model({
                 url: z.string(),
             })
         ),
+        pages: z.int().describe('How many pages and items the site shows at an address.'),
+        backlinkDomains: z.array(
+            z.object({
+                domain: z.string(),
+                links: z.int(),
+                favicon: z.string().optional(),
+            })
+        ),
         competing: z.array(
             z.object({
                 keyword: z.string(),
@@ -125,6 +133,7 @@ export const LinkMapSchema = Kizuna.model({
                     .describe('What edges name it by: the ref of a page or item, `external:<domain>`, or the ref a broken link holds.'),
                 kind: z.enum(['page', 'external', 'broken']),
                 ref: z.string().optional(),
+                site: z.string().nullable().optional().describe('For a page or item, its site, or null for shared content.'),
                 title: z.string(),
                 path: z.string().optional(),
                 linksIn: z.int().optional(),
@@ -1012,6 +1021,8 @@ export const seoRoutes = (input: { editor: RouteAuth; editingBase: `/${string}`;
                         .slice(0, 10),
                     keywords: data?.keywords ?? [],
                     citations: data?.citations ?? [],
+                    pages: rows.length,
+                    backlinkDomains: data?.backlinkDomains ?? [],
                     competing: data?.competing ?? [],
                 },
             };
@@ -1048,6 +1059,7 @@ export const seoRoutes = (input: { editor: RouteAuth; editingBase: `/${string}`;
                     id: page.ref,
                     kind: 'page',
                     ref: page.ref,
+                    site: parseRef(page.ref)?.site ?? null,
                     title: page.title,
                     path: page.path,
                     linksIn: 0,
