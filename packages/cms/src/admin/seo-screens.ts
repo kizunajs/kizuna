@@ -192,12 +192,12 @@ export const pageNamerOf = (pages: readonly SiteSeoPage[]): ((url: string) => { 
 /**
  * How similar two pages must be before the advice is to merge them.
  */
-const MERGE_SIMILARITY = 0.8;
+const MERGE_SIMILARITY = 0.85;
 
 /**
  * What to do about pages that compete for one search: keep the one that
- * ranks best, and merge the rest into it when they say the same, or point
- * them at it when they do not.
+ * ranks best, and merge the rest into it when they say the same, or link
+ * them to it when they do not.
  */
 export const competeAdviceOf = (competing: SiteSeoCompeting, nameOf: (url: string) => { title: string }): string => {
     const ranked = [...competing.urls].sort(
@@ -206,7 +206,7 @@ export const competeAdviceOf = (competing: SiteSeoCompeting, nameOf: (url: strin
     const [keeper, ...rest] = ranked;
     if (keeper === undefined) return '';
     const title = nameOf(keeper.url).title;
-    return rest.some((candidate) => (candidate.similarity ?? 0) >= MERGE_SIMILARITY) ? `Merge into ${title}` : `Point to ${title}`;
+    return rest.some((candidate) => (candidate.similarity ?? 0) >= MERGE_SIMILARITY) ? `Merge into ${title}` : `Link to ${title}`;
 };
 
 /**

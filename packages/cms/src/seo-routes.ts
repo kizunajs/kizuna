@@ -784,15 +784,17 @@ export const seoRoutes = (input: { editor: RouteAuth; editingBase: `/${string}`;
                         : (listing?.routes[0]?.site ?? cms.siteNames()[0] ?? DEFAULT_SITE);
             const context = contextFor(cms, args, site);
             const locale = localeOf(cms, site, ref.locale);
-            const href = await linkHref(
-                cms,
-                formatRef(source),
-                {
-                    site,
-                    locale: ref.locale,
-                },
-                'draft'
-            );
+            // A page has its address before it holds any content, as the lists show it.
+            const href =
+                (await linkHref(
+                    cms,
+                    formatRef(source),
+                    {
+                        site,
+                        locale: ref.locale,
+                    },
+                    'draft'
+                )) ?? (source.type === 'page' && ref.locale === undefined ? state.target.path : undefined);
             const base = siteBaseOf(cms, site);
             const url =
                 href === undefined ? undefined : /^https?:\/\//i.test(href) ? href : base === undefined ? undefined : `${base}${href}`;
@@ -1039,6 +1041,7 @@ export const seoRoutes = (input: { editor: RouteAuth; editingBase: `/${string}`;
         tool: true,
         query: z.object({
             site: z.string().optional().describe("The site, like uk, or 'default' for a CMS without sites."),
+            refresh: z.boolean().optional().describe('Ask the service again rather than answer what it said today.'),
         }),
         responses: {
             200: {
@@ -1049,10 +1052,11 @@ export const seoRoutes = (input: { editor: RouteAuth; editingBase: `/${string}`;
         },
     }).handler(
         input.guarded(async (cms, args) => {
-            const query = (args.query ?? {}) as { site?: string };
+            const query = (args.query ?? {}) as { site?: string; refresh?: boolean };
             const site = siteFrom(cms, args, query.site);
             const context = contextFor(cms, args, site);
-            const pages = await pagesWithData(cms, site, false);
+            const refresh = query.refresh === true;
+            const pages = await pagesWithData(cms, site, refresh);
             const nodes = new Map<string, LinkNode>();
             for (const { page } of pages) {
                 nodes.set(page.ref, {
@@ -1072,7 +1076,7 @@ export const seoRoutes = (input: { editor: RouteAuth; editingBase: `/${string}`;
             const base = siteBaseOf(cms, site);
             if (seoData !== undefined && base !== undefined) {
                 try {
-                    const data = await siteData(seoData, new URL(base).origin, localeOf(cms, site), false);
+                    const data = await siteData(seoData, new URL(base).origin, localeOf(cms, site), refresh);
                     for (const domain of data.backlinkDomains ?? [])
                         if (domain.favicon !== undefined) favicons.set(domain.domain, domain.favicon);
                 } catch {
@@ -1205,6 +1209,7 @@ export const seoRoutes = (input: { editor: RouteAuth; editingBase: `/${string}`;
             'The scores `seoData` on cms() gives each page and item on the site, by ref, for the lists to show. Empty without `seoData`.',
         query: z.object({
             site: z.string().optional().describe("The site, like uk, or 'default' for a CMS without sites."),
+            refresh: z.boolean().optional().describe('Ask the service again rather than answer what it said today.'),
         }),
         responses: {
             200: {
@@ -1215,11 +1220,11 @@ export const seoRoutes = (input: { editor: RouteAuth; editingBase: `/${string}`;
         },
     }).handler(
         input.guarded(async (cms, args) => {
-            const query = (args.query ?? {}) as { site?: string };
+            const query = (args.query ?? {}) as { site?: string; refresh?: boolean };
             const site = siteFrom(cms, args, query.site);
             const scores: Record<string, SeoScores> = {};
             if (cms.options.seoData !== undefined) {
-                for (const { page, data } of await pagesWithData(cms, site, false)) {
+                for (const { page, data } of await pagesWithData(cms, site, query.refresh === true)) {
                     if (data !== undefined) {
                         scores[page.ref] = {
                             search: data.scores.search,

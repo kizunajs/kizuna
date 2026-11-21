@@ -3,7 +3,7 @@ import { defineConfig } from 'kizunajs';
 import { nextAdapter } from '@kizunajs/next';
 import { mcpPlugin } from '@kizunajs/mcp';
 import { resendPlugin } from '@kizunajs/resend';
-import { cms } from '@kizunajs/cms';
+import { cms, fakeSeoData } from '@kizunajs/cms';
 import { fetchClient, fetchIds } from '@kizunajs/fetch';
 import { editor } from './src/identities';
 import { Employees } from './src/employees';
@@ -114,6 +114,7 @@ export default defineConfig({
         media: {
             storage: localMediaStorage,
         },
+        seoData: fakeSeoData(),
         apiPath: '/api',
         adminPath: '/admin',
         preview: {

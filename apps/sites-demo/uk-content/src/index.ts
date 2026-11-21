@@ -20,6 +20,29 @@ export namespace API {
      */
     export type ArticleId = string & KizunaBrand<"ArticleId">;
 
+    export namespace CMS {
+        export type RedirectTable = {
+            /**
+             * Moves on with every change to the site's redirects, and is the response's ETag.
+             */
+            version: number;
+            redirects: Array<{
+                /**
+                 * The path a visitor asks for, language prefix included, with a query when the old address had one.
+                 */
+                from: string;
+                /**
+                 * A path on the site, or an absolute URL.
+                 */
+                to: string;
+                /**
+                 * 308 for an address that moved for good, 307 for one that moved for now.
+                 */
+                status: 307 | 308;
+            }>;
+        };
+    }
+
     /**
      * A branded `string`. Responses hand one back, and `toEmployeeId` makes one from a plain value.
      */
@@ -1462,6 +1485,21 @@ export namespace API {
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
+
+    export namespace ContentSitesUkRedirects {
+        export type Headers = {
+            "if-none-match"?: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.RedirectTable; headers: {
+                etag: string;
+            } }
+            | { status: 304; body: undefined; headers: {
+                etag: string;
+            } }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
 }
 
 export interface Client {
@@ -1725,6 +1763,18 @@ export interface Client {
                         }, API.ContentSitesUkCollectionsEventsGet.Result>;
                     };
                 };
+                /**
+                 * List the uk site's redirects
+                 *
+                 * Each old address and where it goes now, for a proxy to answer with a real 307 or 308 before the site renders anything. Send the ETag back as If-None-Match to get 304 until something changes.
+                 *
+                 * @example
+                 * const result = await client.content.sites.uk.redirects();
+                 */
+                redirects: ClientMethod<'GET', false, {
+                    headers?: API.ContentSitesUkRedirects.Headers;
+                    fetchOptions?: RequestInit;
+                }, API.ContentSitesUkRedirects.Result>;
             };
         };
     };
@@ -1955,6 +2005,15 @@ const routes: GeneratedRoutes = {
                         },
                     },
                 },
+                redirects: {
+                    method: 'GET',
+                    path: '/content/sites/uk/redirects',
+                    responses: {
+                        200: {},
+                        304: {},
+                        400: {},
+                    },
+                },
             },
         },
     },
@@ -2152,13 +2211,32 @@ const buildPath = (path: string, params: Record<string, unknown> = {}): string =
         return encodeURIComponent(serializeValue(value));
     });
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date);
+
 /**
- * An array repeats its key, and an undefined or null field is left out.
+ * JSON with every object's keys in order so one value always gives one URL.
+ */
+const sortedJson = (value: unknown): string =>
+    JSON.stringify(value, (_, inner: unknown) => {
+        if (!isPlainObject(inner)) return inner;
+        const keys = Object.keys(inner).sort();
+        return Object.fromEntries(keys.map((key) => [key, inner[key]]));
+    });
+
+const isText = (value: unknown): boolean => !isPlainObject(value) && !Array.isArray(value);
+
+/**
+ * A list of values repeats its key and anything else travels as one JSON text. An undefined or null field is left out.
  */
 const buildSearchParams = (fields: Record<string, unknown>): URLSearchParams => {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(fields)) {
         if (value === undefined || value === null) continue;
+        if (Array.isArray(value) ? !value.every(isText) : !isText(value)) {
+            params.append(key, sortedJson(value));
+            continue;
+        }
         for (const item of Array.isArray(value) ? value : [value]) params.append(key, serializeValue(item));
     }
     return params;

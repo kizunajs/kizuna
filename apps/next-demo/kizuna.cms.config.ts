@@ -3,7 +3,7 @@ import { fetchClient } from '@kizunajs/fetch';
 import { nextAdapter } from '@kizunajs/next';
 import { mcpPlugin } from '@kizunajs/mcp';
 import { openApiPlugin } from '@kizunajs/openapi';
-import { cms } from '@kizunajs/cms';
+import { cms, fakeSeoData } from '@kizunajs/cms';
 import { app, editor } from './src/cms/identities';
 import { Articles, Employees, Footer, Header } from './src/cms/content';
 import { Products } from './src/cms/relationships';
@@ -82,6 +82,7 @@ export default defineConfig({
             },
         },
         media: process.env.CMS_S3_BUCKET === undefined ? { storage: localMediaStorage } : undefined,
+        seoData: fakeSeoData(),
         apiPath: '/cms-api',
         adminPath: '/admin',
         preview: {

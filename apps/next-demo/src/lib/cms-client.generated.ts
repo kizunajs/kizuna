@@ -834,6 +834,35 @@ export namespace API {
             }>;
         };
 
+        export type LinkMap = {
+            nodes: Array<{
+                /**
+                 * What edges name it by: the ref of a page or item, `external:<domain>`, or the ref a broken link holds.
+                 */
+                id: string;
+                kind: "page" | "external" | "broken";
+                ref?: string;
+                /**
+                 * For a page or item, its site, or null for shared content.
+                 */
+                site?: string | null;
+                title: string;
+                path?: string;
+                linksIn?: number;
+                brokenOut?: number;
+                domain?: string;
+                favicon?: string;
+                reason?: "unpublished" | "trash" | "missing";
+            }>;
+            edges: Array<{
+                from: string;
+                to: string;
+                broken: boolean;
+                external: boolean;
+                anchor?: string;
+            }>;
+        };
+
         export type LinkTargets = {
             targets: Array<{
                 /**
@@ -1186,6 +1215,139 @@ export namespace API {
                  * Whether the target is not live: never published, in the trash, or gone.
                  */
                 broken: boolean;
+            }>;
+        };
+
+        export type PageScores = {
+            /**
+             * By ref, for each page and item on the site the service has scores for.
+             */
+            scores: Record<string, {
+                /**
+                 * How well it does in search results, from 0 to 100. 80 and over is good, under 50 poor.
+                 */
+                search: number;
+                /**
+                 * How well AI answers cite it, from 0 to 100.
+                 */
+                answers: number;
+            }>;
+        };
+
+        export type PageSeo = {
+            checkedAt: string;
+            /**
+             * The service the scores, keywords and AI answers come from, or null without one.
+             */
+            label: string | null;
+            scores: {
+                /**
+                 * How well it does in search results, from 0 to 100. 80 and over is good, under 50 poor.
+                 */
+                search: number;
+                /**
+                 * How well AI answers cite it, from 0 to 100.
+                 */
+                answers: number;
+            } | null;
+            /**
+             * The CMS's own checks first, then the service's.
+             */
+            checks: Array<{
+                level: "urgent" | "suggested";
+                /**
+                 * What is wrong and what to do about it.
+                 */
+                text: string;
+                /**
+                 * The field to fix it in, like `seo` or `body`.
+                 */
+                field?: string;
+            }>;
+            keywords: Array<{
+                keyword: string;
+                /**
+                 * Where it ranks in search results, 1 at the top.
+                 */
+                position?: number;
+                /**
+                 * How many people search for it each month.
+                 */
+                volume?: number;
+                /**
+                 * How many places it moved since the last check, up when positive.
+                 */
+                change?: number;
+            }>;
+            citations: Array<{
+                question: string;
+                /**
+                 * The AI search engines whose answers cite it.
+                 */
+                engines: Array<string>;
+            }>;
+            links: {
+                in: Array<{
+                    kind: "page" | "external" | "broken";
+                    /**
+                     * The page or item, for a link inside the CMS.
+                     */
+                    ref?: string;
+                    title: string;
+                    path?: string;
+                    /**
+                     * The other site, for an external link.
+                     */
+                    domain?: string;
+                    /**
+                     * The full address, for an external link.
+                     */
+                    url?: string;
+                    /**
+                     * The words the link shows.
+                     */
+                    anchor?: string;
+                    /**
+                     * Why a broken link goes nowhere.
+                     */
+                    reason?: "unpublished" | "trash" | "missing";
+                }>;
+                out: Array<{
+                    kind: "page" | "external" | "broken";
+                    /**
+                     * The page or item, for a link inside the CMS.
+                     */
+                    ref?: string;
+                    title: string;
+                    path?: string;
+                    /**
+                     * The other site, for an external link.
+                     */
+                    domain?: string;
+                    /**
+                     * The full address, for an external link.
+                     */
+                    url?: string;
+                    /**
+                     * The words the link shows.
+                     */
+                    anchor?: string;
+                    /**
+                     * Why a broken link goes nowhere.
+                     */
+                    reason?: "unpublished" | "trash" | "missing";
+                }>;
+            };
+            /**
+             * Pages that mention this one but do not link to it.
+             */
+            couldLinkHere: Array<{
+                ref: string;
+                title: string;
+                /**
+                 * The words in that page that could carry the link.
+                 */
+                phrase: string;
             }>;
         };
 
@@ -1654,6 +1816,124 @@ export namespace API {
              * The id of the person who looks after it, from the people list, or null for nobody.
              */
             owner: string | null;
+        };
+
+        export type SimilarPages = {
+            checkedAt: string;
+            label: string | null;
+            /**
+             * Largest search first.
+             */
+            searches: Array<{
+                keyword: string;
+                /**
+                 * How many people search for it each month.
+                 */
+                volume: number;
+                /**
+                 * The page that ranks best, which the others give way to.
+                 */
+                winner: {
+                    ref: string;
+                    title: string;
+                    path: string;
+                    /**
+                     * Where it ranks for the search, 1 at the top.
+                     */
+                    position?: number;
+                };
+                others: Array<{
+                    ref: string;
+                    title: string;
+                    path: string;
+                    /**
+                     * Where it ranks for the search, 1 at the top.
+                     */
+                    position?: number;
+                    /**
+                     * How alike it is to the winner, from 0 to 1.
+                     */
+                    similarity: number;
+                }>;
+                /**
+                 * `merge` when another page is 85% or more the same as the winner, otherwise `link`.
+                 */
+                fix: "merge" | "link";
+                /**
+                 * One sentence on what the competing costs.
+                 */
+                why: string;
+            }>;
+        };
+
+        export type SiteSeo = {
+            checkedAt: string;
+            label: string | null;
+            scores: {
+                /**
+                 * How well it does in search results, from 0 to 100. 80 and over is good, under 50 poor.
+                 */
+                search: number;
+                /**
+                 * How well AI answers cite it, from 0 to 100.
+                 */
+                answers: number;
+            } | null;
+            mostToFix: Array<{
+                ref: string;
+                title: string;
+                path: string;
+                /**
+                 * How many things there are to fix on it.
+                 */
+                checks: number;
+                /**
+                 * Its search score, or without a service, the CMS's own from its checks.
+                 */
+                score: number;
+            }>;
+            keywords: Array<{
+                keyword: string;
+                /**
+                 * Where it ranks in search results, 1 at the top.
+                 */
+                position?: number;
+                /**
+                 * How many people search for it each month.
+                 */
+                volume?: number;
+                /**
+                 * How many places it moved since the last check, up when positive.
+                 */
+                change?: number;
+                url: string;
+            }>;
+            citations: Array<{
+                question: string;
+                /**
+                 * The AI search engines whose answers cite it.
+                 */
+                engines: Array<string>;
+                url: string;
+            }>;
+            /**
+             * How many pages and items the site shows at an address.
+             */
+            pages: number;
+            backlinkDomains: Array<{
+                domain: string;
+                links: number;
+                favicon?: string;
+            }>;
+            competing: Array<{
+                keyword: string;
+                volume: number;
+                urls: Array<{
+                    url: string;
+                    position?: number;
+                    similarity?: number;
+                }>;
+            }>;
         };
 
         export type SitesWidget = {
@@ -4506,6 +4786,123 @@ export namespace API {
             | { status: 403; body: ProblemDetails; headers: Record<string, string> };
     }
 
+    export namespace EditingPageSeo {
+        export type Query = {
+            /**
+             * The page or item, like page:uk:plantCarePage or item:offices:k3j9x2, with @nb for a language.
+             */
+            ref: string;
+            /**
+             * The site to read a shared item on. Without it, the first that shows it.
+             */
+            site?: string;
+            /**
+             * Ask the service again rather than answer what it said today.
+             */
+            refresh?: boolean;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.PageSeo; headers: Record<string, string> }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 502; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingSiteSeo {
+        export type Query = {
+            /**
+             * The site, like uk, or 'default' for a CMS without sites.
+             */
+            site?: string;
+            /**
+             * Ask the service again rather than answer what it said today.
+             */
+            refresh?: boolean;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.SiteSeo; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 502; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingLinkMap {
+        export type Query = {
+            /**
+             * The site, like uk, or 'default' for a CMS without sites.
+             */
+            site?: string;
+            /**
+             * Ask the service again rather than answer what it said today.
+             */
+            refresh?: boolean;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.LinkMap; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingPageScores {
+        export type Query = {
+            /**
+             * The site, like uk, or 'default' for a CMS without sites.
+             */
+            site?: string;
+            /**
+             * Ask the service again rather than answer what it said today.
+             */
+            refresh?: boolean;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.PageScores; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingSimilarPages {
+        export type Query = {
+            /**
+             * The site, like uk, or 'default' for a CMS without sites.
+             */
+            site?: string;
+            /**
+             * Ask the service again rather than answer what it said today.
+             */
+            refresh?: boolean;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.SimilarPages; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 502; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
     export namespace EditingCreatePreview {
         export type Body = {
             /**
@@ -6785,6 +7182,75 @@ export interface Client {
             fetchOptions?: RequestInit;
         }, API.EditingLinkedFrom.Result>;
         /**
+         * Read how a page or an item does in search and AI answers, and what to fix
+         *
+         * The CMS's own checks on the search title, the description and the links, the links to it and from it, and pages that mention it without a link. With `seoData` on cms(), also its scores, keywords and the questions whose AI answers cite it, kept for a day unless `refresh` asks again.
+         *
+         * @example
+         * const result = await client.editing.pageSeo({
+         *     query: {
+         *         ref: 'string',
+         *     },
+         * });
+         */
+        pageSeo: ClientMethod<'GET', false, {
+            query: API.EditingPageSeo.Query;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.EditingPageSeo.Result>;
+        /**
+         * Read how a site does in search and AI answers, and which pages have the most to fix
+         *
+         * The site's pages and items with the most to fix, by the CMS's own checks and the service's. With `seoData` on cms(), also the site's scores, keywords, the questions whose AI answers cite it, and searches where several of its pages compete. Kept for a day unless `refresh` asks again.
+         *
+         * @example
+         * const result = await client.editing.siteSeo();
+         */
+        siteSeo: ClientMethod<'GET', false, {
+            query?: API.EditingSiteSeo.Query;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.EditingSiteSeo.Result>;
+        /**
+         * Map the links between a site's pages, to other sites, and to pages that are gone
+         *
+         * Every page and item on the site, the links between them read from their content, the other sites they link to and, with `seoData` on cms(), the other sites that link to them. A link to a page that is unpublished, in the trash or gone is `broken`, and its target is a node of its own.
+         *
+         * @example
+         * const result = await client.editing.linkMap();
+         */
+        linkMap: ClientMethod<'GET', false, {
+            query?: API.EditingLinkMap.Query;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.EditingLinkMap.Result>;
+        /**
+         * Read the search and AI answer scores of a site's pages and items
+         *
+         * The scores `seoData` on cms() gives each page and item on the site, by ref, for the lists to show. Empty without `seoData`.
+         *
+         * @example
+         * const result = await client.editing.pageScores();
+         */
+        pageScores: ClientMethod<'GET', false, {
+            query?: API.EditingPageScores.Query;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.EditingPageScores.Result>;
+        /**
+         * List the searches several of a site's pages compete for, with the page to keep and the fix
+         *
+         * From `seoData` on cms(): each search more than one page or item of the site ranks for, the page ranking best as `winner`, and how alike each other page is to it. `fix` is `merge` when one is 85% or more the same, otherwise `link`, and `why` says what the competing costs. Empty without `seoData`.
+         *
+         * @example
+         * const result = await client.editing.similarPages();
+         */
+        similarPages: ClientMethod<'GET', false, {
+            query?: API.EditingSimilarPages.Query;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.EditingSimilarPages.Result>;
+        /**
          * Open the site's draft
          *
          * A link into draft mode that holds for ten minutes, for the editor to frame the site or open it in a tab.
@@ -8440,6 +8906,64 @@ const routes: GeneratedRoutes = {
                 400: {},
                 401: {},
                 403: {},
+            },
+        },
+        pageSeo: {
+            method: 'GET',
+            path: '/editing/seo/page',
+            responses: {
+                200: {},
+                400: {},
+                401: {},
+                403: {},
+                404: {},
+                502: {},
+            },
+        },
+        siteSeo: {
+            method: 'GET',
+            path: '/editing/seo/site',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                404: {},
+                502: {},
+                400: {},
+            },
+        },
+        linkMap: {
+            method: 'GET',
+            path: '/editing/seo/link-map',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                404: {},
+                400: {},
+            },
+        },
+        pageScores: {
+            method: 'GET',
+            path: '/editing/seo/page-scores',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                404: {},
+                400: {},
+            },
+        },
+        similarPages: {
+            method: 'GET',
+            path: '/editing/seo/similar-pages',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                404: {},
+                502: {},
+                400: {},
             },
         },
         createPreview: {

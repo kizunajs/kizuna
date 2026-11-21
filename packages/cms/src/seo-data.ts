@@ -348,7 +348,9 @@ const competingOf = (urls: readonly string[], locale: string): NonNullable<SiteS
     const inner = [...urls].filter((url) => new URL(url).pathname !== '/').sort();
     if (inner.length < 2) return [];
     return COMPETING.map((search) => {
-        const fitting = inner.filter((url) => search.prefers.some((word) => new URL(url).pathname.split('/').some((part) => part.includes(word))));
+        const fitting = inner.filter((url) =>
+            search.prefers.some((word) => new URL(url).pathname.split('/').some((part) => part.includes(word)))
+        );
         const picked = [...fitting, ...inner.filter((url) => !fitting.includes(url))].slice(0, search.positions.length);
         return {
             keyword: locale.startsWith('nb') ? search.keyword.nb : search.keyword.en,

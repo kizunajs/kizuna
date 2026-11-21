@@ -422,6 +422,7 @@ describe('editing_page_seo', () => {
         });
         const answer = await get('/editing/seo/page', {
             ref: 'page:uk:plantCarePage',
+            refresh: true,
         });
         expect(answer.status).toBe(200);
         expect(asked).toEqual([
@@ -487,19 +488,19 @@ describe('editing_page_seo', () => {
             ],
             out: [
                 {
-                    kind: 'page',
-                    ref: 'page:uk:plantDoctorPage',
-                    title: 'Plant doctor',
-                    path: '/plant-care/plant-doctor',
-                    anchor: 'the doctor',
-                },
-                {
                     kind: 'external',
                     title: 'careguides.example.org',
                     domain: 'careguides.example.org',
                     path: '/watering/winter',
                     url: 'https://careguides.example.org/watering/winter',
                     anchor: 'Winter watering',
+                },
+                {
+                    kind: 'page',
+                    ref: 'page:uk:plantDoctorPage',
+                    title: 'Plant doctor',
+                    path: '/plant-care/plant-doctor',
+                    anchor: 'the doctor',
                 },
             ],
         });
@@ -624,6 +625,7 @@ describe('editing_site_seo', () => {
         });
         const answer = await get('/editing/seo/site', {
             site: 'uk',
+            refresh: true,
         });
         expect(answer.status).toBe(200);
         expect(answer.body).toMatchObject({
@@ -651,7 +653,7 @@ describe('editing_site_seo', () => {
                 ref: 'page:uk:plantDoctorPage',
                 title: 'Plant doctor',
                 path: '/plant-care/plant-doctor',
-                checks: 2,
+                checks: 3,
                 score: 90,
             },
         ]);
@@ -713,6 +715,7 @@ describe('editing_link_map', () => {
         });
         const answer = await get('/editing/seo/link-map', {
             site: 'uk',
+            refresh: true,
         });
         expect(answer.status).toBe(200);
         expect(answer.body.edges).toEqual(
@@ -789,6 +792,7 @@ describe('editing_page_scores', () => {
         });
         const answer = await get('/editing/seo/page-scores', {
             site: 'uk',
+            refresh: true,
         });
         expect(answer.body.scores).toEqual({
             'page:uk:frontPage': {
@@ -901,6 +905,7 @@ describe('editing_similar_pages', () => {
         });
         const answer = await get('/editing/seo/similar-pages', {
             site: 'uk',
+            refresh: true,
         });
         expect(answer.status).toBe(200);
         expect(answer.body).toEqual({

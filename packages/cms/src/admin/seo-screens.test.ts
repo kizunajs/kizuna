@@ -169,7 +169,7 @@ describe('competeAdviceOf', () => {
                 },
                 nameOf
             )
-        ).toBe('Point to Tasks');
+        ).toBe('Link to Tasks');
     });
 
     it('reads three pages or more as poor and two as fair', () => {

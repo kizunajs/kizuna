@@ -239,6 +239,61 @@ Two things sound like they should matter and the evidence says they do not. Stru
 
 Search Console reports AI results under "Web", and Bing Webmaster Tools has a report of its own for Copilot citations.
 
+## The SEO overview
+
+The admin shows editors how each page does in search and in AI answers, and what to fix. The SEO button beside Live Preview opens it for the page being edited, the lists show each page's two scores, and each site has an SEO screen with the pages that have the most to fix, a link map and the searches where its own pages compete.
+
+The CMS checks some things itself, with nothing to set up: search titles and descriptions against the lengths search results show in full, links to pages that are unpublished, in the trash or gone, pages nothing links to, and pages that mention a page without linking to it.
+
+Scores, keywords, the questions AI answers cite a page for and the links from other sites come from a service you name under `seoData`:
+
+```ts title="kizuna.config.ts"
+import { cms, fakeSeoData } from '@kizunajs/cms';
+
+content: cms({
+    db,
+    pages,
+    seoData: fakeSeoData(),
+}),
+```
+
+`fakeSeoData()` makes the numbers up from each page's address, so a demo shows the overview before a real service is wired up.
+
+### Writing a provider
+
+A provider is an object with a `label`, which the admin credits beside the numbers, and two functions. `page` answers for one address and `site` for a site's origin:
+
+```ts title="src/seo-data.ts"
+import type { SeoData } from '@kizunajs/cms';
+
+export const seoData: SeoData = {
+    label: 'Search reports',
+    page: async ({ url, locale }) => {
+        const report = await fetchPageReport(url, locale);
+        return {
+            checkedAt: report.date,
+            scores: {
+                search: report.searchScore,
+                answers: report.answerScore,
+            },
+            keywords: report.keywords,
+        };
+    },
+    site: async ({ origin, locale }) => {
+        const report = await fetchSiteReport(origin, locale);
+        return {
+            checkedAt: report.date,
+            scores: {
+                search: report.searchScore,
+                answers: report.answerScore,
+            },
+        };
+    },
+};
+```
+
+Besides the scores, every list in an answer is optional, and the admin leaves out a section it has no data for. A page can also answer `checks`, `citations`, `backlinks` and the `outboundStatus` of the URLs it links to, and a site `keywords`, `citations`, `backlinkDomains` and the `competing` searches its pages share. The CMS keeps each answer for a day, and Check again in the admin asks the service again.
+
 ## Moving from another platform
 
 A move keeps its search standing when every old address answers. Export the old platform's redirect table and crawl the live site, including blog posts, PDFs and uploaded files, and import the map:
