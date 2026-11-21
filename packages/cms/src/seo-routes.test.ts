@@ -300,7 +300,7 @@ describe('fakeSeoData', () => {
         expect(other.keywords?.[0]?.keyword).toBe('delivery');
     });
 
-    it('gives a site three competing searches among the pages it was asked about', async () => {
+    it('gives a site the competing searches that at least two of its pages fit', async () => {
         const fake = fakeSeoData();
         for (const path of ['/', '/plant-care', '/plant-care/plant-doctor', '/visit', '/delivery', '/events']) {
             await fake.page({
@@ -320,11 +320,7 @@ describe('fakeSeoData', () => {
         ).toEqual([
             {
                 keyword: 'how often to water houseplants',
-                urls: ['/plant-care', '/plant-care/plant-doctor', '/delivery'],
-            },
-            {
-                keyword: 'monstera care',
-                urls: ['/plant-care/plant-doctor', '/delivery', '/events'],
+                urls: ['/plant-care', '/plant-care/plant-doctor'],
             },
             {
                 keyword: 'plant shop london',
@@ -332,6 +328,24 @@ describe('fakeSeoData', () => {
             },
         ]);
         expect(site.keywords?.every((keyword) => keyword.url.startsWith('http://uk.localhost:3041/'))).toBe(true);
+    });
+
+    it('gives a site whose pages fit no search no competing searches, and no keywords for its front page or about page', async () => {
+        const fake = fakeSeoData();
+        for (const path of ['/', '/about', '/about/history', '/careers']) {
+            await fake.page({
+                url: `http://group.localhost:3040${path}`,
+                locale: 'en',
+            });
+        }
+        const site = await fake.site({
+            origin: 'http://group.localhost:3040',
+            locale: 'en',
+        });
+        expect(site.competing).toEqual([]);
+        expect(
+            site.keywords?.some((keyword) => ['http://group.localhost:3040/', 'http://group.localhost:3040/about'].includes(keyword.url))
+        ).toBe(false);
     });
 
     it('is refused by cms() when it lacks what the CMS asks of it', () => {

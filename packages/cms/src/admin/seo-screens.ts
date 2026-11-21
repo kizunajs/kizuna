@@ -277,13 +277,13 @@ export const similarFixOf = (search: SimilarSearch): { title: string; sentence: 
         const one = search.others.length === 1;
         return {
             title: `Merge ${pages} into ${winner}`,
-            sentence: `${one ? 'Its' : 'Their'} own text goes into a draft of ${winner} and ${one ? 'its address redirects' : 'their addresses redirect'} to it. Nothing changes on the site until you publish the draft.`,
-            action: `Merge into a draft of ${winner}`,
+            sentence: `Move what only ${one ? 'it says' : 'they say'} into ${winner}, then redirect ${one ? 'its address' : 'their addresses'} to it from Redirects.`,
+            action: `Open ${winner}`,
         };
     }
     return {
         title: `Link ${pages} to ${winner}`,
-        sentence: search.others.length === 1 ? `It gets a link to ${winner} in a draft.` : `Each page gets a link to ${winner} in a draft.`,
-        action: `Add links to ${winner}`,
+        sentence: `Add a link to ${winner} where ${search.others.length === 1 ? 'it repeats' : 'they repeat'} what ${winner} says.`,
+        action: `Open ${winner}`,
     };
 };

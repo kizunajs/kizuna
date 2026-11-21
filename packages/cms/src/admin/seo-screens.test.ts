@@ -203,25 +203,24 @@ describe('similarFixOf', () => {
         why: 'Search splits the searches between the pages.',
     });
 
-    it('merges both pages into the winner, in a draft', () => {
+    it('says how to merge both pages into the winner, and opens it', () => {
         expect(similarFixOf(search('merge', 2))).toEqual({
             title: 'Merge both pages into Tasks',
-            sentence:
-                'Their own text goes into a draft of Tasks and their addresses redirect to it. Nothing changes on the site until you publish the draft.',
-            action: 'Merge into a draft of Tasks',
+            sentence: 'Move what only they say into Tasks, then redirect their addresses to it from Redirects.',
+            action: 'Open Tasks',
         });
     });
 
     it('names a single page it merges', () => {
         expect(similarFixOf(search('merge', 1)).title).toBe('Merge Guide 1 into Tasks');
-        expect(similarFixOf(search('merge', 1)).sentence).toContain('Its own text');
+        expect(similarFixOf(search('merge', 1)).sentence).toContain('what only it says');
     });
 
     it('links the pages to the winner otherwise', () => {
         expect(similarFixOf(search('link', 3))).toEqual({
             title: 'Link the 3 pages to Tasks',
-            sentence: 'Each page gets a link to Tasks in a draft.',
-            action: 'Add links to Tasks',
+            sentence: 'Add a link to Tasks where they repeat what Tasks says.',
+            action: 'Open Tasks',
         });
     });
 

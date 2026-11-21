@@ -166,6 +166,32 @@ export function SeoScreen({ connection, site }: { connection: Connection; site: 
     };
     const keywords = [...(answer.keywords ?? [])].sort((left, right) => (right.volume ?? 0) - (left.volume ?? 0)).slice(0, ROWS);
     const citations = (answer.citations ?? []).filter((citation) => citation.engines.length > 0).slice(0, ROWS);
+    const citationsCard =
+        answer.citations === undefined ? null : (
+            <PanelCard label="Cited in AI answers">
+                <PanelTable
+                    label="Cited in AI answers"
+                    headings={[
+                        {
+                            text: 'Question',
+                        },
+                        {
+                            text: 'Cited by',
+                            number: true,
+                        },
+                    ]}
+                    empty="No AI answer cites the site yet.">
+                    {citations.map((citation) => (
+                        <tr key={citation.question} className="k-table__row">
+                            {pageCell(citation.url, citation.question)}
+                            <td data-kind="number" className="k-site-seo__engines">
+                                {citation.engines.join(', ')}
+                            </td>
+                        </tr>
+                    ))}
+                </PanelTable>
+            </PanelCard>
+        );
     const competing = [...(answer.competing ?? [])]
         .filter((group) => group.urls.length > 1)
         .sort((left, right) => right.urls.length - left.urls.length || right.volume - left.volume)
@@ -195,131 +221,113 @@ export function SeoScreen({ connection, site }: { connection: Connection; site: 
                         ))}
                     </div>
                 )}
-                <div className="k-dashboard__panels">
-                    <PanelCard label="Most to fix">
-                        <PanelTable
-                            label="Most to fix"
-                            headings={[
-                                {
-                                    text: 'Page',
-                                },
-                                {
-                                    text: 'To fix',
-                                    number: true,
-                                },
-                                ...(answer.scores === null
-                                    ? []
-                                    : [
-                                          {
-                                              text: 'SEO',
-                                              number: true,
-                                          },
-                                      ]),
-                            ]}
-                            empty="Nothing to fix.">
-                            {answer.mostToFix.slice(0, ROWS).map((page) => (
-                                <tr key={page.ref} className="k-table__row">
-                                    <NameCell
-                                        label={page.title}
-                                        detail={page.path}
-                                        href={hrefOf({
-                                            kind: 'document',
-                                            ref: page.ref,
-                                        })}
-                                    />
-                                    <NumberCell value={wholeOf(page.checks)} />
-                                    {answer.scores === null ? null : <NumberCell value={page.score === null ? '–' : wholeOf(page.score)} />}
-                                </tr>
-                            ))}
-                        </PanelTable>
-                    </PanelCard>
-                    {answer.keywords === undefined ? null : (
-                        <PanelCard label="Keywords">
+                <div className="k-site-seo__columns">
+                    <div className="k-site-seo__column">
+                        <PanelCard label="Most to fix">
                             <PanelTable
-                                label="Keywords"
+                                label="Most to fix"
                                 headings={[
                                     {
-                                        text: 'Keyword',
+                                        text: 'Page',
                                     },
                                     {
-                                        text: 'Position',
+                                        text: 'To fix',
                                         number: true,
                                     },
-                                    {
-                                        text: 'Searches a month',
-                                        number: true,
-                                    },
+                                    ...(answer.scores === null
+                                        ? []
+                                        : [
+                                              {
+                                                  text: 'SEO',
+                                                  number: true,
+                                              },
+                                          ]),
                                 ]}
-                                empty="No keywords yet.">
-                                {keywords.map((keyword) => (
-                                    <tr key={keyword.keyword} className="k-table__row">
-                                        {pageCell(keyword.url, keyword.keyword)}
-                                        <NumberCell value={keyword.position === undefined ? '–' : wholeOf(keyword.position)} />
-                                        <NumberCell value={keyword.volume === undefined ? '–' : wholeOf(keyword.volume)} />
-                                    </tr>
-                                ))}
-                            </PanelTable>
-                        </PanelCard>
-                    )}
-                    {answer.citations === undefined ? null : (
-                        <PanelCard label="Cited in AI answers">
-                            <PanelTable
-                                label="Cited in AI answers"
-                                headings={[
-                                    {
-                                        text: 'Question',
-                                    },
-                                    {
-                                        text: 'Cited by',
-                                        number: true,
-                                    },
-                                ]}
-                                empty="No AI answer cites the site yet.">
-                                {citations.map((citation) => (
-                                    <tr key={citation.question} className="k-table__row">
-                                        {pageCell(citation.url, citation.question)}
-                                        <td data-kind="number" className="k-site-seo__engines">
-                                            {citation.engines.join(', ')}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </PanelTable>
-                        </PanelCard>
-                    )}
-                    {answer.competing === undefined ? null : (
-                        <PanelCard label="Pages that compete">
-                            <PanelTable
-                                label="Pages that compete"
-                                headings={[
-                                    {
-                                        text: 'Search',
-                                    },
-                                    {
-                                        text: 'Pages',
-                                        number: true,
-                                    },
-                                    {
-                                        text: 'Searches a month',
-                                        number: true,
-                                    },
-                                ]}
-                                empty="No pages compete for one search.">
-                                {competing.map((group) => (
-                                    <tr key={group.keyword} className="k-table__row">
+                                empty="Nothing to fix.">
+                                {answer.mostToFix.slice(0, ROWS).map((page) => (
+                                    <tr key={page.ref} className="k-table__row">
                                         <NameCell
-                                            label={group.keyword}
-                                            detail={competeAdviceOf(group, nameOf)}
-                                            href={seoHrefOf('too-similar', site)}
+                                            label={page.title}
+                                            detail={page.path}
+                                            href={hrefOf({
+                                                kind: 'document',
+                                                ref: page.ref,
+                                            })}
                                         />
-                                        <NumberCell
-                                            value={<BandPill band={competeBandOf(group.urls.length)}>{group.urls.length}</BandPill>}
-                                        />
-                                        <NumberCell value={wholeOf(group.volume)} />
+                                        <NumberCell value={wholeOf(page.checks)} />
+                                        {answer.scores === null ? null : (
+                                            <NumberCell value={page.score === null ? '–' : wholeOf(page.score)} />
+                                        )}
                                     </tr>
                                 ))}
                             </PanelTable>
                         </PanelCard>
-                    )}
+                        {citationsCard}
+                    </div>
+                    <div className="k-site-seo__column">
+                        {answer.keywords === undefined ? null : (
+                            <PanelCard label="Keywords">
+                                <PanelTable
+                                    label="Keywords"
+                                    headings={[
+                                        {
+                                            text: 'Keyword',
+                                        },
+                                        {
+                                            text: 'Position',
+                                            number: true,
+                                        },
+                                        {
+                                            text: 'Searches a month',
+                                            number: true,
+                                        },
+                                    ]}
+                                    empty="No keywords yet.">
+                                    {keywords.map((keyword) => (
+                                        <tr key={keyword.keyword} className="k-table__row">
+                                            {pageCell(keyword.url, keyword.keyword)}
+                                            <NumberCell value={keyword.position === undefined ? '–' : wholeOf(keyword.position)} />
+                                            <NumberCell value={keyword.volume === undefined ? '–' : wholeOf(keyword.volume)} />
+                                        </tr>
+                                    ))}
+                                </PanelTable>
+                            </PanelCard>
+                        )}
+                        {answer.competing === undefined ? null : (
+                            <PanelCard label="Pages that compete">
+                                <PanelTable
+                                    label="Pages that compete"
+                                    headings={[
+                                        {
+                                            text: 'Search',
+                                        },
+                                        {
+                                            text: 'Pages',
+                                            number: true,
+                                        },
+                                        {
+                                            text: 'Searches a month',
+                                            number: true,
+                                        },
+                                    ]}
+                                    empty="No pages compete for one search.">
+                                    {competing.map((group) => (
+                                        <tr key={group.keyword} className="k-table__row">
+                                            <NameCell
+                                                label={group.keyword}
+                                                detail={competeAdviceOf(group, nameOf)}
+                                                href={seoHrefOf('too-similar', site)}
+                                            />
+                                            <NumberCell
+                                                value={<BandPill band={competeBandOf(group.urls.length)}>{group.urls.length}</BandPill>}
+                                            />
+                                            <NumberCell value={wholeOf(group.volume)} />
+                                        </tr>
+                                    ))}
+                                </PanelTable>
+                            </PanelCard>
+                        )}
+                    </div>
                 </div>
                 {answer.label === null ? null : <p className="k-site-seo__credit">Numbers from {answer.label}</p>}
             </div>

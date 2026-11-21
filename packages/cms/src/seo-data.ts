@@ -206,12 +206,12 @@ const between = (draw: () => number, low: number, high: number): number => low +
 
 const WORDING: Record<string, { searches: string[]; questions: string[] }> = {
     en: {
-        searches: ['{words}', 'best {words}', '{words} near me', '{words} prices', '{words} tips'],
-        questions: ['What is the best {words}?', 'Where can I find {words}?', 'How do I choose {words}?'],
+        searches: ['{words}', '{words} uk', '{words} advice'],
+        questions: ['Where can I read about {words}?', 'Who gives good advice on {words}?'],
     },
     nb: {
-        searches: ['{words}', 'beste {words}', '{words} i nærheten', '{words} pris', '{words} tips'],
-        questions: ['Hva er beste {words}?', 'Hvor finner jeg {words}?', 'Hvordan velger jeg {words}?'],
+        searches: ['{words}', '{words} norge', '{words} råd'],
+        questions: ['Hvor kan jeg lese om {words}?', 'Hvem gir gode råd om {words}?'],
     },
 };
 
@@ -220,15 +220,22 @@ const ENGINES = ['ChatGPT', 'Perplexity', 'Google AI Overviews', 'Copilot'];
 const LINKING_SITES = ['cityguide', 'localnews', 'weekendtips', 'homeblog', 'shopfinder', 'gardenforum', 'reviewhub', 'neighbourhood'];
 
 /**
- * The words of a page's address, like `plant care` for `/en/plant-care`,
- * or the site's own name for its front page.
+ * Words people do not search for on their own, like `about` in `/about`.
+ */
+const FILLER = new Set(['about', 'home', 'index', 'page', 'pages', 'en', 'om', 'hjem', 'side']);
+
+/**
+ * The words of a page's address people would search for, like `plant care`
+ * for `/en/plant-care`, or nothing for `/` and `/about`.
  */
 const wordsOf = (url: URL, locale: string): string => {
-    const words = url.pathname
-        .split(/[/\-_.]+/)
+    const segments = url.pathname.split('/').filter((segment) => segment !== '' && segment !== locale);
+    const last = segments.at(-1) ?? '';
+    const words = last
+        .split(/[-_.]+/)
         .map((word) => decodeURIComponent(word).toLowerCase())
-        .filter((word) => word !== '' && word !== locale && /^\p{L}+$/u.test(word));
-    return words.length === 0 ? (url.hostname.split('.').find((part) => part !== 'www') ?? url.hostname) : words.slice(-3).join(' ');
+        .filter((word) => word !== '' && !FILLER.has(word) && /^\p{L}+$/u.test(word));
+    return words.slice(0, 3).join(' ');
 };
 
 const fill = (template: string, words: string): string => template.replace('{words}', words);
@@ -244,19 +251,23 @@ const fakePage = (address: string, locale: string, now: () => Date): PageSeoData
     const wording = WORDING[locale.split('-')[0]!] ?? WORDING['en']!;
     const search = between(draw, 35, 97);
     const answers = between(draw, 20, 94);
-    const keywords: SeoKeyword[] = wording.searches.slice(0, between(draw, 3, wording.searches.length)).map((template) => ({
-        keyword: fill(template, words),
-        position: between(draw, 1, 60),
-        volume: between(draw, 1, 60) * 10 * between(draw, 1, 10),
-        change: between(draw, -5, 5),
-    }));
-    const citations: SeoCitation[] = wording.questions.slice(0, between(draw, 0, wording.questions.length)).map((template) => ({
-        question: fill(template, words),
-        engines: ENGINES.filter(() => draw() < 0.4),
-    }));
+    const keywords: SeoKeyword[] = (words === '' ? [] : wording.searches.slice(0, between(draw, 1, wording.searches.length))).map(
+        (template) => ({
+            keyword: fill(template, words),
+            position: between(draw, 1, 60),
+            volume: between(draw, 1, 60) * 10 * between(draw, 1, 10),
+            change: between(draw, -5, 5),
+        })
+    );
+    const citations: SeoCitation[] = (words === '' ? [] : wording.questions.slice(0, between(draw, 0, wording.questions.length))).map(
+        (template) => ({
+            question: fill(template, words),
+            engines: ENGINES.filter(() => draw() < 0.4),
+        })
+    );
     const backlinks: SeoBacklink[] = Array.from(
         {
-            length: between(draw, 0, 4),
+            length: words === '' ? 0 : between(draw, 0, 4),
         },
         (_, index) => {
             const domain = `${LINKING_SITES[(hashOf(url.href) + index) % LINKING_SITES.length]}.example.com`;
@@ -341,26 +352,29 @@ const COMPETING = [
 ];
 
 /**
- * Three searches several of the pages compete for: the pages whose
- * addresses fit each search, filled up with the site's other pages.
+ * The searches several of the pages compete for: each one shows only when
+ * at least two of the site's pages have addresses that fit it.
  */
 const competingOf = (urls: readonly string[], locale: string): NonNullable<SiteSeoData['competing']> => {
     const inner = [...urls].filter((url) => new URL(url).pathname !== '/').sort();
     if (inner.length < 2) return [];
-    return COMPETING.map((search) => {
+    return COMPETING.flatMap((search) => {
         const fitting = inner.filter((url) =>
             search.prefers.some((word) => new URL(url).pathname.split('/').some((part) => part.includes(word)))
         );
-        const picked = [...fitting, ...inner.filter((url) => !fitting.includes(url))].slice(0, search.positions.length);
-        return {
-            keyword: locale.startsWith('nb') ? search.keyword.nb : search.keyword.en,
-            volume: search.volume,
-            urls: picked.map((url, index) => ({
-                url,
-                position: search.positions[index]!,
-                similarity: index === 0 ? 1 : search.similarity[index - 1]!,
-            })),
-        };
+        const picked = fitting.slice(0, search.positions.length);
+        if (picked.length < 2) return [];
+        return [
+            {
+                keyword: locale.startsWith('nb') ? search.keyword.nb : search.keyword.en,
+                volume: search.volume,
+                urls: picked.map((url, index) => ({
+                    url,
+                    position: search.positions[index]!,
+                    similarity: index === 0 ? 1 : search.similarity[index - 1]!,
+                })),
+            },
+        ];
     });
 };
 
