@@ -267,43 +267,39 @@ function MapCanvas({
     // Nodes and edges change only with the layout. Hovering and finding restyle them through the stylesheet below, so React Flow never lays them out again.
     const nodes = useMemo<Node[]>(
         () => [
-            ...layout.columns.map(
-                (column): Node<HeadData> => ({
-                    id: `head:${keyOf(column.site)}`,
-                    type: 'head',
-                    position: {
-                        x: column.x,
-                        y: column.y,
-                    },
-                    width: column.width,
-                    height: 44,
-                    data: {
-                        column,
-                        site: siteNamed(column.site),
-                    },
-                    selectable: false,
-                    focusable: false,
-                })
-            ),
-            ...layout.cards.map(
-                (card): Node<CardData> => ({
-                    id: card.id,
-                    type: 'card',
-                    position: {
-                        x: card.x,
-                        y: card.y,
-                    },
-                    width: CARD_WIDTH,
-                    height: CARD_HEIGHT,
-                    data: {
-                        card,
-                        site: siteNamed(card.node.site),
-                        onToggle: toggle,
-                    },
-                    selectable: false,
-                    focusable: false,
-                })
-            ),
+            ...layout.columns.map((column): Node<HeadData> => ({
+                id: `head:${keyOf(column.site)}`,
+                type: 'head',
+                position: {
+                    x: column.x,
+                    y: column.y,
+                },
+                width: column.width,
+                height: 44,
+                data: {
+                    column,
+                    site: siteNamed(column.site),
+                },
+                selectable: false,
+                focusable: false,
+            })),
+            ...layout.cards.map((card): Node<CardData> => ({
+                id: card.id,
+                type: 'card',
+                position: {
+                    x: card.x,
+                    y: card.y,
+                },
+                width: CARD_WIDTH,
+                height: CARD_HEIGHT,
+                data: {
+                    card,
+                    site: siteNamed(card.node.site),
+                    onToggle: toggle,
+                },
+                selectable: false,
+                focusable: false,
+            })),
         ],
         [layout, siteNamed, toggle]
     );
@@ -328,21 +324,19 @@ function MapCanvas({
                         },
                     }) as Edge
             ),
-            ...layout.links.map(
-                (line): Edge<LinkData> => ({
-                    id: line.id,
-                    source: line.from,
-                    target: line.to,
-                    sourceHandle: `${line.sourceHandle}-source`,
-                    targetHandle: `${line.targetHandle}-target`,
-                    type: 'link',
-                    selectable: false,
-                    focusable: false,
-                    data: {
-                        broken: line.broken,
-                    },
-                })
-            ),
+            ...layout.links.map((line): Edge<LinkData> => ({
+                id: line.id,
+                source: line.from,
+                target: line.to,
+                sourceHandle: `${line.sourceHandle}-source`,
+                targetHandle: `${line.targetHandle}-target`,
+                type: 'link',
+                selectable: false,
+                focusable: false,
+                data: {
+                    broken: line.broken,
+                },
+            })),
         ],
         [layout]
     );

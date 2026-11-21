@@ -123,6 +123,13 @@ export namespace API {
     export namespace UsersListUsers {
         export type Query = {
             page?: number;
+            filter?: {
+                role?: "admin" | "member";
+                name?: string;
+            };
+            anyOf?: Array<{
+                name: string;
+            }>;
         };
 
         export type Result =
@@ -172,7 +179,8 @@ export namespace API {
         export type Result =
             | { status: 200; body: {
                 ok: boolean;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace HeadersRequired {
@@ -183,7 +191,8 @@ export namespace API {
         export type Result =
             | { status: 200; body: {
                 ok: boolean;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace TracingEchoRequestId {
@@ -308,7 +317,8 @@ export namespace API {
         export type Result =
             | { status: 200; body: {
                 ok: boolean;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EventsListEventsByYear {
@@ -319,7 +329,8 @@ export namespace API {
         export type Result =
             | { status: 200; body: {
                 ok: boolean;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace CentersGetCenter {
@@ -328,7 +339,8 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Center; headers: Record<string, string> };
+            | { status: 200; body: Center; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace CentersListCenters {
@@ -911,6 +923,7 @@ const routes: GeneratedRoutes = {
             path: '/optional-headers',
             responses: {
                 200: {},
+                400: {},
             },
         },
         required: {
@@ -918,6 +931,7 @@ const routes: GeneratedRoutes = {
             path: '/required-headers',
             responses: {
                 200: {},
+                400: {},
             },
         },
     },
@@ -988,6 +1002,7 @@ const routes: GeneratedRoutes = {
             path: '/users/:userId/events/:eventId',
             responses: {
                 200: {},
+                400: {},
             },
         },
         listEventsByYear: {
@@ -995,6 +1010,7 @@ const routes: GeneratedRoutes = {
             path: '/events/:year',
             responses: {
                 200: {},
+                400: {},
             },
         },
     },
@@ -1004,6 +1020,7 @@ const routes: GeneratedRoutes = {
             path: '/centers/:centerId',
             responses: {
                 200: {},
+                400: {},
             },
         },
         listCenters: {
@@ -1286,13 +1303,32 @@ const buildPath = (path: string, params: Record<string, unknown> = {}): string =
         return encodeURIComponent(serializeValue(value));
     });
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date);
+
 /**
- * An array repeats its key, and an undefined or null field is left out.
+ * JSON with every object's keys in order so one value always gives one URL.
+ */
+const sortedJson = (value: unknown): string =>
+    JSON.stringify(value, (_, inner: unknown) => {
+        if (!isPlainObject(inner)) return inner;
+        const keys = Object.keys(inner).sort();
+        return Object.fromEntries(keys.map((key) => [key, inner[key]]));
+    });
+
+const isText = (value: unknown): boolean => !isPlainObject(value) && !Array.isArray(value);
+
+/**
+ * A list of values repeats its key and anything else travels as one JSON text. An undefined or null field is left out.
  */
 const buildSearchParams = (fields: Record<string, unknown>): URLSearchParams => {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(fields)) {
         if (value === undefined || value === null) continue;
+        if (Array.isArray(value) ? !value.every(isText) : !isText(value)) {
+            params.append(key, sortedJson(value));
+            continue;
+        }
         for (const item of Array.isArray(value) ? value : [value]) params.append(key, serializeValue(item));
     }
     return params;

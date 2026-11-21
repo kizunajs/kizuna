@@ -824,7 +824,8 @@ describe('declaring dashboards with sites', () => {
         defineConfig({
             adapter: expressAdapter(),
             jobRunner: {
-                mode: 'in-process',
+                mode: 'long-running',
+                transport: false,
             },
             auth: {
                 identities: {

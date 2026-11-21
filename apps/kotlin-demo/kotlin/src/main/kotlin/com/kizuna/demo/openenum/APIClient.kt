@@ -22,6 +22,104 @@ interface KizunaQueryValue {
 }
 
 object OpenEnumAPI {
+    @DslMarker
+    annotation class KizunaDsl
+
+    @Serializable
+    data class UserWhere(
+        val name: TextFilter? = null,
+        val email: TextFilter? = null,
+        val and: List<UserWhere>? = null,
+        val or: List<UserWhere>? = null
+    ) {
+
+        @KizunaDsl
+        class Builder {
+            var name: TextFilter? = null
+            var email: TextFilter? = null
+            var and: List<UserWhere>? = null
+            var or: List<UserWhere>? = null
+
+            fun name(build: TextFilter.Builder.() -> Unit) {
+                name = TextFilter.Builder().apply(build).build()
+            }
+
+            fun email(build: TextFilter.Builder.() -> Unit) {
+                email = TextFilter.Builder().apply(build).build()
+            }
+
+            fun and(build: UserWhere.ListBuilder.() -> Unit) {
+                and = UserWhere.ListBuilder().apply(build).build()
+            }
+
+            fun or(build: UserWhere.ListBuilder.() -> Unit) {
+                or = UserWhere.ListBuilder().apply(build).build()
+            }
+
+            fun build(): UserWhere = UserWhere(name = name, email = email, and = and, or = or)
+        }
+
+        @KizunaDsl
+        class ListBuilder {
+            private val items = mutableListOf<UserWhere>()
+
+            fun add(item: UserWhere) {
+                items += item
+            }
+
+            fun name(build: TextFilter.Builder.() -> Unit) {
+                items += UserWhere(name = TextFilter.Builder().apply(build).build())
+            }
+
+            fun email(build: TextFilter.Builder.() -> Unit) {
+                items += UserWhere(email = TextFilter.Builder().apply(build).build())
+            }
+
+            fun and(build: UserWhere.ListBuilder.() -> Unit) {
+                items += UserWhere(and = UserWhere.ListBuilder().apply(build).build())
+            }
+
+            fun or(build: UserWhere.ListBuilder.() -> Unit) {
+                items += UserWhere(or = UserWhere.ListBuilder().apply(build).build())
+            }
+
+            fun build(): List<UserWhere> = items.toList()
+        }
+    }
+
+    @Serializable
+    data class TextFilter(
+        val equals: String? = null,
+        val contains: String? = null
+    ) {
+
+        @KizunaDsl
+        class Builder {
+            var equals: String? = null
+            var contains: String? = null
+
+            fun build(): TextFilter = TextFilter(equals = equals, contains = contains)
+        }
+
+        @KizunaDsl
+        class ListBuilder {
+            private val items = mutableListOf<TextFilter>()
+
+            fun add(item: TextFilter) {
+                items += item
+            }
+
+            fun equals(value: String?) {
+                items += TextFilter(equals = value)
+            }
+
+            fun contains(value: String?) {
+                items += TextFilter(contains = value)
+            }
+
+            fun build(): List<TextFilter> = items.toList()
+        }
+    }
 
     /** A user in the system */
     @Serializable
@@ -59,9 +157,7 @@ object OpenEnumAPI {
         val detail: String
     )
 
-    @OptIn(ExperimentalSerializationApi::class)
-    @JsonClassDiscriminator("kind")
-    @Serializable
+    @Serializable(with = UserSessionEvent.Serializer::class)
     sealed interface UserSessionEvent {
         @SerialName("login")
         @Serializable
@@ -104,6 +200,34 @@ object OpenEnumAPI {
                 }
             }
         }
+
+        /** A variant this client was generated before. It holds the discriminator, and cannot be sent back. */
+        data class Unknown(val wireValue: String) : UserSessionEvent
+
+        object Serializer : KSerializer<UserSessionEvent> {
+            override val descriptor: SerialDescriptor = buildClassSerialDescriptor("UserSessionEvent")
+
+            override fun deserialize(decoder: Decoder): UserSessionEvent {
+                val input = decoder as JsonDecoder
+                val element = input.decodeJsonElement().jsonObject
+                val body = JsonObject(element - "kind")
+                return when (val kind = element["kind"]?.jsonPrimitive?.contentOrNull) {
+                    "login" -> input.json.decodeFromJsonElement(Login.serializer(), body)
+                    "logout" -> input.json.decodeFromJsonElement(Logout.serializer(), body)
+                    else -> Unknown(kind ?: "")
+                }
+            }
+
+            override fun serialize(encoder: Encoder, value: UserSessionEvent) {
+                val output = encoder as JsonEncoder
+                val (kind, body) = when (value) {
+                    is Login -> "login" to output.json.encodeToJsonElement(Login.serializer(), value)
+                    is Logout -> "logout" to output.json.encodeToJsonElement(Logout.serializer(), value)
+                    is Unknown -> throw SerializationException("This client does not know the variant ${value.wireValue}, so it cannot send it.")
+                }
+                output.encodeJsonElement(JsonObject(mapOf("kind" to JsonPrimitive(kind)) + body.jsonObject))
+            }
+        }
     }
 
     @Serializable
@@ -128,10 +252,37 @@ object OpenEnumAPI {
         val until: String?
     )
 
-    @OptIn(ExperimentalSerializationApi::class)
-    @JsonClassDiscriminator("channel")
-    @Serializable
-    sealed interface NotificationEvent
+    @Serializable(with = NotificationEvent.Serializer::class)
+    sealed interface NotificationEvent {
+
+        /** A variant this client was generated before. It holds the discriminator, and cannot be sent back. */
+        data class Unknown(val wireValue: String) : NotificationEvent
+
+        object Serializer : KSerializer<NotificationEvent> {
+            override val descriptor: SerialDescriptor = buildClassSerialDescriptor("NotificationEvent")
+
+            override fun deserialize(decoder: Decoder): NotificationEvent {
+                val input = decoder as JsonDecoder
+                val element = input.decodeJsonElement().jsonObject
+                val body = JsonObject(element - "channel")
+                return when (val kind = element["channel"]?.jsonPrimitive?.contentOrNull) {
+                    "email" -> input.json.decodeFromJsonElement(EmailEvent.serializer(), body)
+                    "sms" -> input.json.decodeFromJsonElement(SmsEvent.serializer(), body)
+                    else -> Unknown(kind ?: "")
+                }
+            }
+
+            override fun serialize(encoder: Encoder, value: NotificationEvent) {
+                val output = encoder as JsonEncoder
+                val (kind, body) = when (value) {
+                    is EmailEvent -> "email" to output.json.encodeToJsonElement(EmailEvent.serializer(), value)
+                    is SmsEvent -> "sms" to output.json.encodeToJsonElement(SmsEvent.serializer(), value)
+                    is Unknown -> throw SerializationException("This client does not know the variant ${value.wireValue}, so it cannot send it.")
+                }
+                output.encodeJsonElement(JsonObject(mapOf("channel" to JsonPrimitive(kind)) + body.jsonObject))
+            }
+        }
+    }
 
     @SerialName("email")
     @Serializable
@@ -314,7 +465,8 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         data class Query(
             val page: Int? = null,
-            val limit: Int? = null
+            val limit: Int? = null,
+            val where: OpenEnumAPI.UserWhere? = null
         )
 
         sealed interface Args {
@@ -322,7 +474,8 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
 
         object Scope {
-            fun query(page: Int? = null, limit: Int? = null): AfterQuery = AfterQuery(query = Query(page = page, limit = limit))
+            fun query(page: Int? = null, limit: Int? = null, where: OpenEnumAPI.UserWhere? = null): AfterQuery = AfterQuery(query = Query(page = page, limit = limit, where = where))
+            fun where(build: OpenEnumAPI.UserWhere.Builder.() -> Unit): OpenEnumAPI.UserWhere = OpenEnumAPI.UserWhere.Builder().apply(build).build()
         }
 
         class AfterQuery internal constructor(override val query: Query?) : Args
@@ -364,6 +517,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -387,6 +541,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -456,6 +611,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -489,6 +645,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -512,6 +669,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -602,6 +760,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -641,6 +800,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         data class Result(val body: Success)
 
         sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -779,6 +939,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -1221,11 +1382,9 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
             val outputTokens: Int
         )
 
-        @OptIn(ExperimentalSerializationApi::class)
-        @JsonClassDiscriminator("name")
-        @Serializable
+        @Serializable(with = ToolCall.Serializer::class)
         sealed interface ToolCall {
-            val id: String
+            val id: String?
             val name: String
             val needsApproval: Boolean?
 
@@ -1249,6 +1408,40 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
                 override val id: String get() = value.id
                 override val name: String get() = value.name
                 override val needsApproval: Boolean? get() = value.needsApproval
+            }
+
+            /** A variant this client was generated before. It holds the discriminator, and cannot be sent back. */
+            data class Unknown(val wireValue: String) : ToolCall {
+                override val id: String? get() = null
+                override val name: String get() = wireValue
+                override val needsApproval: Boolean? get() = null
+            }
+
+            object Serializer : KSerializer<ToolCall> {
+                override val descriptor: SerialDescriptor = buildClassSerialDescriptor("ToolCall")
+
+                override fun deserialize(decoder: Decoder): ToolCall {
+                    val input = decoder as JsonDecoder
+                    val element = input.decodeJsonElement().jsonObject
+                    val body = JsonObject(element - "name")
+                    return when (val kind = element["name"]?.jsonPrimitive?.contentOrNull) {
+                        "getForecast" -> GetForecast(input.json.decodeFromJsonElement(ToolCallGetForecast.serializer(), body))
+                        "plotSignups" -> PlotSignups(input.json.decodeFromJsonElement(ToolCallPlotSignups.serializer(), body))
+                        "countWords" -> CountWords(input.json.decodeFromJsonElement(ToolCallCountWords.serializer(), body))
+                        else -> Unknown(kind ?: "")
+                    }
+                }
+
+                override fun serialize(encoder: Encoder, value: ToolCall) {
+                    val output = encoder as JsonEncoder
+                    val (kind, body) = when (value) {
+                        is GetForecast -> "getForecast" to output.json.encodeToJsonElement(ToolCallGetForecast.serializer(), value.value)
+                        is PlotSignups -> "plotSignups" to output.json.encodeToJsonElement(ToolCallPlotSignups.serializer(), value.value)
+                        is CountWords -> "countWords" to output.json.encodeToJsonElement(ToolCallCountWords.serializer(), value.value)
+                        is Unknown -> throw SerializationException("This client does not know the variant ${value.wireValue}, so it cannot send it.")
+                    }
+                    output.encodeJsonElement(JsonObject(mapOf("name" to JsonPrimitive(kind)) + body.jsonObject))
+                }
             }
         }
 
@@ -1327,11 +1520,9 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         @Serializable
         data class ToolCallCountWordsInputBody(val text: String)
 
-        @OptIn(ExperimentalSerializationApi::class)
-        @JsonClassDiscriminator("name")
-        @Serializable
+        @Serializable(with = ToolResult.Serializer::class)
         sealed interface ToolResult {
-            val id: String
+            val id: String?
             val name: String
 
             @SerialName("getForecast")
@@ -1351,6 +1542,39 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
             data class CountWords(val value: ToolResultCountWords) : ToolResult {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
+            }
+
+            /** A variant this client was generated before. It holds the discriminator, and cannot be sent back. */
+            data class Unknown(val wireValue: String) : ToolResult {
+                override val id: String? get() = null
+                override val name: String get() = wireValue
+            }
+
+            object Serializer : KSerializer<ToolResult> {
+                override val descriptor: SerialDescriptor = buildClassSerialDescriptor("ToolResult")
+
+                override fun deserialize(decoder: Decoder): ToolResult {
+                    val input = decoder as JsonDecoder
+                    val element = input.decodeJsonElement().jsonObject
+                    val body = JsonObject(element - "name")
+                    return when (val kind = element["name"]?.jsonPrimitive?.contentOrNull) {
+                        "getForecast" -> GetForecast(input.json.decodeFromJsonElement(ToolResultGetForecast.serializer(), body))
+                        "plotSignups" -> PlotSignups(input.json.decodeFromJsonElement(ToolResultPlotSignups.serializer(), body))
+                        "countWords" -> CountWords(input.json.decodeFromJsonElement(ToolResultCountWords.serializer(), body))
+                        else -> Unknown(kind ?: "")
+                    }
+                }
+
+                override fun serialize(encoder: Encoder, value: ToolResult) {
+                    val output = encoder as JsonEncoder
+                    val (kind, body) = when (value) {
+                        is GetForecast -> "getForecast" to output.json.encodeToJsonElement(ToolResultGetForecast.serializer(), value.value)
+                        is PlotSignups -> "plotSignups" to output.json.encodeToJsonElement(ToolResultPlotSignups.serializer(), value.value)
+                        is CountWords -> "countWords" to output.json.encodeToJsonElement(ToolResultCountWords.serializer(), value.value)
+                        is Unknown -> throw SerializationException("This client does not know the variant ${value.wireValue}, so it cannot send it.")
+                    }
+                    output.encodeJsonElement(JsonObject(mapOf("name" to JsonPrimitive(kind)) + body.jsonObject))
+                }
             }
         }
 
@@ -1493,10 +1717,14 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
             for (event in events) {
                 when (event) {
                     is Event.ToolCall -> {
-                        val tracked = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)
-                        calls[event.data.id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
+                        val id = event.data.id ?: continue
+                        val tracked = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(call = event.data)
+                        calls[id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
                     }
-                    is Event.ToolResult -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    is Event.ToolResult -> {
+                        val id = event.data.id ?: continue
+                        calls[id] = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    }
                     is Event.ToolError -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name.wireValue)).copy(state = ToolCallRecord.State.Failed, message = event.data.message)
                     else -> Unit
                 }
@@ -1546,11 +1774,9 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         @Serializable
         data class Delta(val text: String)
 
-        @OptIn(ExperimentalSerializationApi::class)
-        @JsonClassDiscriminator("name")
-        @Serializable
+        @Serializable(with = ToolCall.Serializer::class)
         sealed interface ToolCall {
-            val id: String
+            val id: String?
             val name: String
             val needsApproval: Boolean?
 
@@ -1567,6 +1793,38 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
                 override val id: String get() = value.id
                 override val name: String get() = value.name
                 override val needsApproval: Boolean? get() = value.needsApproval
+            }
+
+            /** A variant this client was generated before. It holds the discriminator, and cannot be sent back. */
+            data class Unknown(val wireValue: String) : ToolCall {
+                override val id: String? get() = null
+                override val name: String get() = wireValue
+                override val needsApproval: Boolean? get() = null
+            }
+
+            object Serializer : KSerializer<ToolCall> {
+                override val descriptor: SerialDescriptor = buildClassSerialDescriptor("ToolCall")
+
+                override fun deserialize(decoder: Decoder): ToolCall {
+                    val input = decoder as JsonDecoder
+                    val element = input.decodeJsonElement().jsonObject
+                    val body = JsonObject(element - "name")
+                    return when (val kind = element["name"]?.jsonPrimitive?.contentOrNull) {
+                        "notes.list" -> Notes_list(input.json.decodeFromJsonElement(ToolCallNotesList.serializer(), body))
+                        "notes.add" -> Notes_add(input.json.decodeFromJsonElement(ToolCallNotesAdd.serializer(), body))
+                        else -> Unknown(kind ?: "")
+                    }
+                }
+
+                override fun serialize(encoder: Encoder, value: ToolCall) {
+                    val output = encoder as JsonEncoder
+                    val (kind, body) = when (value) {
+                        is Notes_list -> "notes.list" to output.json.encodeToJsonElement(ToolCallNotesList.serializer(), value.value)
+                        is Notes_add -> "notes.add" to output.json.encodeToJsonElement(ToolCallNotesAdd.serializer(), value.value)
+                        is Unknown -> throw SerializationException("This client does not know the variant ${value.wireValue}, so it cannot send it.")
+                    }
+                    output.encodeJsonElement(JsonObject(mapOf("name" to JsonPrimitive(kind)) + body.jsonObject))
+                }
             }
         }
 
@@ -1591,11 +1849,9 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         @Serializable
         data class ToolCallNotesAddInputBody(val text: String)
 
-        @OptIn(ExperimentalSerializationApi::class)
-        @JsonClassDiscriminator("name")
-        @Serializable
+        @Serializable(with = ToolResult.Serializer::class)
         sealed interface ToolResult {
-            val id: String
+            val id: String?
             val name: String
 
             @SerialName("notes.list")
@@ -1609,6 +1865,37 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
             data class Notes_add(val value: ToolResultNotesAdd) : ToolResult {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
+            }
+
+            /** A variant this client was generated before. It holds the discriminator, and cannot be sent back. */
+            data class Unknown(val wireValue: String) : ToolResult {
+                override val id: String? get() = null
+                override val name: String get() = wireValue
+            }
+
+            object Serializer : KSerializer<ToolResult> {
+                override val descriptor: SerialDescriptor = buildClassSerialDescriptor("ToolResult")
+
+                override fun deserialize(decoder: Decoder): ToolResult {
+                    val input = decoder as JsonDecoder
+                    val element = input.decodeJsonElement().jsonObject
+                    val body = JsonObject(element - "name")
+                    return when (val kind = element["name"]?.jsonPrimitive?.contentOrNull) {
+                        "notes.list" -> Notes_list(input.json.decodeFromJsonElement(ToolResultNotesList.serializer(), body))
+                        "notes.add" -> Notes_add(input.json.decodeFromJsonElement(ToolResultNotesAdd.serializer(), body))
+                        else -> Unknown(kind ?: "")
+                    }
+                }
+
+                override fun serialize(encoder: Encoder, value: ToolResult) {
+                    val output = encoder as JsonEncoder
+                    val (kind, body) = when (value) {
+                        is Notes_list -> "notes.list" to output.json.encodeToJsonElement(ToolResultNotesList.serializer(), value.value)
+                        is Notes_add -> "notes.add" to output.json.encodeToJsonElement(ToolResultNotesAdd.serializer(), value.value)
+                        is Unknown -> throw SerializationException("This client does not know the variant ${value.wireValue}, so it cannot send it.")
+                    }
+                    output.encodeJsonElement(JsonObject(mapOf("name" to JsonPrimitive(kind)) + body.jsonObject))
+                }
             }
         }
 
@@ -1712,10 +1999,14 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
             for (event in events) {
                 when (event) {
                     is Event.ToolCall -> {
-                        val tracked = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)
-                        calls[event.data.id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
+                        val id = event.data.id ?: continue
+                        val tracked = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(call = event.data)
+                        calls[id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
                     }
-                    is Event.ToolResult -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    is Event.ToolResult -> {
+                        val id = event.data.id ?: continue
+                        calls[id] = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    }
                     is Event.ToolError -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name.wireValue)).copy(state = ToolCallRecord.State.Failed, message = event.data.message)
                     else -> Unit
                 }
@@ -2057,6 +2348,9 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                 urlBuilder.addQueryParameter("limit", stringValue)
             }
         }
+        if (query.where != null) {
+            urlBuilder.addQueryParameter("where", Kizuna.encodeQueryJson(json, query.where))
+        }
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("GET", null)
@@ -2143,6 +2437,12 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                     } catch (error: Exception) { throw OpenEnumAPIClient.UsersUserBadge.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.UsersUserBadge.Failure.NotFound(body = payload)
                 }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersUserBadge.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersUserBadge.Failure.BadRequest(body = payload)
+                }
                 else -> throw OpenEnumAPIClient.UsersUserBadge.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
@@ -2178,6 +2478,12 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                         json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.UsersLastSessionEvent.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.UsersLastSessionEvent.Failure.NotFound(body = payload)
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersLastSessionEvent.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersLastSessionEvent.Failure.BadRequest(body = payload)
                 }
                 else -> throw OpenEnumAPIClient.UsersLastSessionEvent.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2262,6 +2568,12 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                     } catch (error: Exception) { throw OpenEnumAPIClient.UsersGetUser.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.UsersGetUser.Failure.NotFound(body = payload)
                 }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersGetUser.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersGetUser.Failure.BadRequest(body = payload)
+                }
                 else -> throw OpenEnumAPIClient.UsersGetUser.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
@@ -2299,6 +2611,12 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                     } catch (error: Exception) { throw OpenEnumAPIClient.UsersUserActivity.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.UsersUserActivity.Failure.NotFound(body = payload)
                 }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersUserActivity.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersUserActivity.Failure.BadRequest(body = payload)
+                }
                 else -> throw OpenEnumAPIClient.UsersUserActivity.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
@@ -2334,6 +2652,12 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                         json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.UsersUserProfile.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.UsersUserProfile.Failure.NotFound(body = payload)
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersUserProfile.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersUserProfile.Failure.BadRequest(body = payload)
                 }
                 else -> throw OpenEnumAPIClient.UsersUserProfile.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2455,6 +2779,12 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                     } catch (error: Exception) { throw OpenEnumAPIClient.UsersDeleteUser.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.UsersDeleteUser.Failure.NotFound(body = payload)
                 }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersDeleteUser.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersDeleteUser.Failure.BadRequest(body = payload)
+                }
                 else -> throw OpenEnumAPIClient.UsersDeleteUser.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
@@ -2491,6 +2821,12 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                         return@use OpenEnumAPIClient.UsersArchiveUser.Result(body = OpenEnumAPIClient.UsersArchiveUser.Success.Status201(payload))
                     }
                     catch (error: Exception) { throw OpenEnumAPIClient.UsersArchiveUser.Failure.Decoding(error, statusCode, data) }
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersArchiveUser.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersArchiveUser.Failure.BadRequest(body = payload)
                 }
                 else -> throw OpenEnumAPIClient.UsersArchiveUser.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2625,6 +2961,12 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                         json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.UsersCheckUser.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.UsersCheckUser.Failure.NotFound(body = payload)
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersCheckUser.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersCheckUser.Failure.BadRequest(body = payload)
                 }
                 else -> throw OpenEnumAPIClient.UsersCheckUser.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -3911,6 +4253,19 @@ private object Kizuna {
     fun encodePathSegment(value: Any): String {
         val text = stringifyQueryValue(value).firstOrNull() ?: ""
         return java.net.URLEncoder.encode(text, "UTF-8").replace("+", "%20")
+    }
+
+    // One JSON text with every object's keys in order so one value always gives one URL.
+    inline fun <reified Value> encodeQueryJson(json: Json, value: Value): String {
+        return sortJsonKeys(json.encodeToJsonElement(value)).toString()
+    }
+
+    fun sortJsonKeys(element: JsonElement): JsonElement {
+        return when (element) {
+            is JsonObject -> JsonObject(element.toSortedMap().mapValues { sortJsonKeys(it.value) })
+            is JsonArray -> JsonArray(element.map { sortJsonKeys(it) })
+            else -> element
+        }
     }
 
     fun stringifyQueryValue(value: Any): List<String> {

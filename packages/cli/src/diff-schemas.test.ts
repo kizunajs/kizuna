@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { Kizuna } from 'kizunajs';
 import { diffSchemas as diffSchemaNodes } from './diff-schemas.js';
 import { toSchemaNode } from './snapshot.js';
 
@@ -163,6 +164,64 @@ describe('enums, where direction decides everything', () => {
     });
 });
 
+describe('extensible enums and unions, whose clients take members they do not know', () => {
+    const statusOf = (values: [string, ...string[]]) =>
+        z.object({
+            status: z.enum(values).meta({
+                extensible: true,
+            }),
+        });
+
+    it('do not break a response when a value is added', () => {
+        expect(summaries(statusOf(['open', 'shipped']), statusOf(['open', 'shipped', 'returned']), 'response')).toEqual([
+            'changed  status can now be returned',
+        ]);
+    });
+
+    it('still break either direction when a value is removed', () => {
+        expect(summaries(statusOf(['open', 'shipped']), statusOf(['open']), 'response')).toEqual([
+            'BREAKING status no longer accepts shipped',
+        ]);
+    });
+
+    const TaskCreated = z.object({
+        kind: z.literal('taskCreated'),
+        title: z.string(),
+    });
+    const CommentAdded = z.object({
+        kind: z.literal('commentAdded'),
+        body: z.string(),
+    });
+    const TaskDeleted = z.object({
+        kind: z.literal('taskDeleted'),
+    });
+    const feedOf = (options: [z.ZodObject, ...z.ZodObject[]], extensible: boolean) =>
+        z.object({
+            activity: z.discriminatedUnion('kind', options).meta({
+                extensible,
+            }),
+        });
+
+    it('do not break a response when a union gains a member', () => {
+        const changes = summaries(
+            feedOf([TaskCreated, CommentAdded], true),
+            feedOf([TaskCreated, CommentAdded, TaskDeleted], true),
+            'response'
+        );
+        expect(changes).toHaveLength(1);
+        expect(changes[0]).toMatch(/^changed /);
+    });
+
+    it('break a response when a union that is not extensible gains a member', () => {
+        const changes = summaries(
+            feedOf([TaskCreated, CommentAdded], false),
+            feedOf([TaskCreated, CommentAdded, TaskDeleted], false),
+            'response'
+        );
+        expect(changes[0]).toMatch(/^BREAKING /);
+    });
+});
+
 describe('nested shapes', () => {
     it('names the field by its path', () => {
         const before = z.object({ address: z.object({ city: z.string() }) });
@@ -201,5 +260,131 @@ describe('nothing changing', () => {
 
         expect(diffSchemas(schema, schema, 'request')).toEqual([]);
         expect(diffSchemas(undefined, undefined, 'response')).toEqual([]);
+    });
+});
+
+describe('a model that holds itself', () => {
+    const before = Kizuna.model({
+        title: 'EventFilter',
+        schema: z.object({
+            city: z.string().optional(),
+            get or() {
+                return z.array(before).optional();
+            },
+        }),
+    });
+    const after = Kizuna.model({
+        title: 'EventFilter',
+        schema: z.object({
+            city: z.string().optional(),
+            country: z.string(),
+            get or() {
+                return z.array(after).optional();
+            },
+        }),
+    });
+
+    it('is quiet when nothing changed', () => {
+        expect(summaries(before, before, 'request')).toEqual([]);
+    });
+
+    it('reports a field it gains once, not once per level', () => {
+        expect(summaries(before, after, 'request')).toEqual(['BREAKING country is now required']);
+    });
+});
+
+describe('a field inside an object in a query', () => {
+    const before = z.object({
+        filter: z.object({
+            city: z.string(),
+        }),
+    });
+    const after = z.object({
+        filter: z.object({
+            city: z.string(),
+            country: z.string(),
+        }),
+    });
+
+    it('breaks a request when it becomes required, like any nested field', () => {
+        expect(summaries(before, after, 'request')).toEqual(['BREAKING filter.country is now required']);
+    });
+});
+
+describe('a type that widens to a union', () => {
+    const before = z.object({
+        city: z.string(),
+    });
+    const after = z.object({
+        city: z.union([
+            z.string(),
+            z.object({
+                contains: z.string(),
+            }),
+        ]),
+    });
+
+    it('does not break a request, because the server still takes what callers send', () => {
+        expect(summaries(before, after, 'request')).toEqual(['changed  city widens from string to string | object']);
+    });
+
+    it('says the clients change and the HTTP surface does not', () => {
+        expect(diffSchemas(before, after, 'request')[0]?.detail).toBe('the generated client type changes, the HTTP surface does not');
+    });
+
+    it('breaks a response, because callers may read what they never handled', () => {
+        expect(summaries(before, after, 'response')).toEqual(['BREAKING city is string | object instead of string']);
+    });
+});
+
+describe('a union that narrows to one of its options', () => {
+    const before = z.object({
+        city: z.union([z.string(), z.number()]),
+    });
+    const after = z.object({
+        city: z.string(),
+    });
+
+    it('does not break a response, because callers already handle that option', () => {
+        expect(summaries(before, after, 'response')).toEqual(['changed  city narrows from string | number to string']);
+    });
+
+    it('breaks a request, because callers may send the option that left', () => {
+        expect(summaries(before, after, 'request')).toEqual(['BREAKING city is string instead of string | number']);
+    });
+});
+
+describe('a union that changes its options', () => {
+    const before = z.object({
+        city: z.union([z.string(), z.number()]),
+    });
+
+    it('is quiet when only the order changes', () => {
+        const after = z.object({
+            city: z.union([z.number(), z.string()]),
+        });
+        expect(summaries(before, after, 'request')).toEqual([]);
+        expect(summaries(before, after, 'response')).toEqual([]);
+    });
+
+    it('widens a request and breaks a response when an option arrives', () => {
+        const after = z.object({
+            city: z.union([z.string(), z.number(), z.boolean()]),
+        });
+        expect(summaries(before, after, 'request')).toEqual(['changed  city widens from string | number to string | number | boolean']);
+        expect(summaries(before, after, 'response')).toEqual(['BREAKING city is string | number | boolean instead of string | number']);
+    });
+});
+
+describe('a type that changes to an unrelated one', () => {
+    it('breaks both ways', () => {
+        const before = z.object({
+            count: z.string(),
+        });
+        const after = z.object({
+            count: z.number(),
+        });
+        expect(summaries(before, after, 'request')).toEqual(['BREAKING count is number instead of string']);
+        expect(summaries(before, after, 'response')).toEqual(['BREAKING count is number instead of string']);
     });
 });

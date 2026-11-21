@@ -1,10 +1,59 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { readMetaId, readMetaDescription } from './generator.js';
+import { readMetaDescription, readMetaExtensible, readMetaId } from './generator.js';
 import { Kizuna } from './kizuna.js';
 import { toolJsonSchema } from './tool-definitions.js';
 
 describe('Kizuna.model', () => {
+    it('marks an enum or a discriminated union extensible', () => {
+        const OrderStatus = Kizuna.model({
+            title: 'OrderStatus',
+            schema: z.enum(['open', 'shipped']),
+            extensible: true,
+        });
+        const Activity = Kizuna.model({
+            title: 'Activity',
+            schema: z.discriminatedUnion('kind', [
+                z.object({
+                    kind: z.literal('taskCreated'),
+                }),
+            ]),
+            extensible: true,
+        });
+        expect(readMetaExtensible(OrderStatus)).toBe(true);
+        expect(readMetaExtensible(Activity)).toBe(true);
+        expect(
+            readMetaExtensible(
+                Kizuna.model({
+                    title: 'Priority',
+                    schema: z.enum(['low', 'high']),
+                })
+            )
+        ).toBe(false);
+    });
+
+    it("reads extensible from a schema's own metadata too", () => {
+        expect(
+            readMetaExtensible(
+                z.enum(['open', 'shipped']).meta({
+                    extensible: true,
+                })
+            )
+        ).toBe(true);
+    });
+
+    it('refuses extensible on anything but an enum or a discriminated union', () => {
+        expect(() =>
+            Kizuna.model({
+                title: 'User',
+                schema: z.object({
+                    id: z.string(),
+                }),
+                extensible: true,
+            })
+        ).toThrow("Model 'User' is `extensible`, which only an enum or a discriminated union can be.");
+    });
+
     it('sets the meta id from title', () => {
         const User = Kizuna.model({
             title: 'User',

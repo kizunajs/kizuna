@@ -412,7 +412,8 @@ describe('layout over the API', () => {
     const db = drizzle(new PGlite());
     const config = defineConfig({
         jobRunner: {
-            mode: 'in-process',
+            mode: 'long-running',
+            transport: false,
         },
         adapter: expressAdapter(),
         auth: {

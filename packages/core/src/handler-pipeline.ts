@@ -230,9 +230,9 @@ type AuthOf<R> = R extends { auth: infer Value } ? Value : false;
  * // { member: { workspaceUserId: string; role: 'owner' | 'admin' | readonly ('owner' | 'admin')[]; permissions: readonly ('workspace:read' | 'workspace:delete')[] } }
  */
 export type ContextFromAuth<Value, Identities> = {
-    [Name in AuthIdentityNames<Value> & keyof Identities as [keyof GuardSuccess<Identities[Name]>] extends [never]
-        ? never
-        : Name]: GuardSuccess<Identities[Name]>;
+    [
+        Name in AuthIdentityNames<Value> & keyof Identities as [keyof GuardSuccess<Identities[Name]>] extends [never] ? never : Name
+    ]: GuardSuccess<Identities[Name]>;
 };
 
 /**

@@ -40,8 +40,8 @@ export const stripPaths = <T>(value: T): T => vercelStegaClean(value);
 const isDisplayText = (schema: z.core.$ZodType): boolean => {
     const inner = unwrapOptionalWrappers(schema).inner;
     if (readDef(inner).type !== 'string' || readMetaBrand(schema) !== undefined || readMetaBrand(inner) !== undefined) return false;
-    const bag = (inner as { _zod: { bag: { format?: string; patterns?: Set<RegExp> } } })._zod.bag;
-    return bag.format === undefined && (bag.patterns === undefined || bag.patterns.size === 0);
+    const def = inner._zod.def as { format?: string; checks?: readonly z.core.$ZodCheck[] };
+    return def.format === undefined && !(def.checks ?? []).some((check) => check._zod.def.check === 'string_format');
 };
 
 /**

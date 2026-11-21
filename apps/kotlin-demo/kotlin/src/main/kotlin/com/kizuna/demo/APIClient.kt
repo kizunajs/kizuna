@@ -20,6 +20,104 @@ interface KizunaQueryValue {
 }
 
 object API {
+    @DslMarker
+    annotation class KizunaDsl
+
+    @Serializable
+    data class UserWhere(
+        val name: TextFilter? = null,
+        val email: TextFilter? = null,
+        val and: List<UserWhere>? = null,
+        val or: List<UserWhere>? = null
+    ) {
+
+        @KizunaDsl
+        class Builder {
+            var name: TextFilter? = null
+            var email: TextFilter? = null
+            var and: List<UserWhere>? = null
+            var or: List<UserWhere>? = null
+
+            fun name(build: TextFilter.Builder.() -> Unit) {
+                name = TextFilter.Builder().apply(build).build()
+            }
+
+            fun email(build: TextFilter.Builder.() -> Unit) {
+                email = TextFilter.Builder().apply(build).build()
+            }
+
+            fun and(build: UserWhere.ListBuilder.() -> Unit) {
+                and = UserWhere.ListBuilder().apply(build).build()
+            }
+
+            fun or(build: UserWhere.ListBuilder.() -> Unit) {
+                or = UserWhere.ListBuilder().apply(build).build()
+            }
+
+            fun build(): UserWhere = UserWhere(name = name, email = email, and = and, or = or)
+        }
+
+        @KizunaDsl
+        class ListBuilder {
+            private val items = mutableListOf<UserWhere>()
+
+            fun add(item: UserWhere) {
+                items += item
+            }
+
+            fun name(build: TextFilter.Builder.() -> Unit) {
+                items += UserWhere(name = TextFilter.Builder().apply(build).build())
+            }
+
+            fun email(build: TextFilter.Builder.() -> Unit) {
+                items += UserWhere(email = TextFilter.Builder().apply(build).build())
+            }
+
+            fun and(build: UserWhere.ListBuilder.() -> Unit) {
+                items += UserWhere(and = UserWhere.ListBuilder().apply(build).build())
+            }
+
+            fun or(build: UserWhere.ListBuilder.() -> Unit) {
+                items += UserWhere(or = UserWhere.ListBuilder().apply(build).build())
+            }
+
+            fun build(): List<UserWhere> = items.toList()
+        }
+    }
+
+    @Serializable
+    data class TextFilter(
+        val equals: String? = null,
+        val contains: String? = null
+    ) {
+
+        @KizunaDsl
+        class Builder {
+            var equals: String? = null
+            var contains: String? = null
+
+            fun build(): TextFilter = TextFilter(equals = equals, contains = contains)
+        }
+
+        @KizunaDsl
+        class ListBuilder {
+            private val items = mutableListOf<TextFilter>()
+
+            fun add(item: TextFilter) {
+                items += item
+            }
+
+            fun equals(value: String?) {
+                items += TextFilter(equals = value)
+            }
+
+            fun contains(value: String?) {
+                items += TextFilter(contains = value)
+            }
+
+            fun build(): List<TextFilter> = items.toList()
+        }
+    }
 
     /** A user in the system */
     @Serializable
@@ -240,7 +338,8 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         data class Query(
             val page: Int? = null,
-            val limit: Int? = null
+            val limit: Int? = null,
+            val where: API.UserWhere? = null
         )
 
         sealed interface Args {
@@ -248,7 +347,8 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
 
         object Scope {
-            fun query(page: Int? = null, limit: Int? = null): AfterQuery = AfterQuery(query = Query(page = page, limit = limit))
+            fun query(page: Int? = null, limit: Int? = null, where: API.UserWhere? = null): AfterQuery = AfterQuery(query = Query(page = page, limit = limit, where = where))
+            fun where(build: API.UserWhere.Builder.() -> Unit): API.UserWhere = API.UserWhere.Builder().apply(build).build()
         }
 
         class AfterQuery internal constructor(override val query: Query?) : Args
@@ -290,6 +390,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -313,6 +414,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -382,6 +484,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -415,6 +518,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -438,6 +542,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -528,6 +633,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -567,6 +673,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         data class Result(val body: Success)
 
         sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -678,6 +785,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -1326,10 +1434,14 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
             for (event in events) {
                 when (event) {
                     is Event.ToolCall -> {
-                        val tracked = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)
-                        calls[event.data.id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
+                        val id = event.data.id
+                        val tracked = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(call = event.data)
+                        calls[id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
                     }
-                    is Event.ToolResult -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    is Event.ToolResult -> {
+                        val id = event.data.id
+                        calls[id] = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    }
                     is Event.ToolError -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name.wireValue)).copy(state = ToolCallRecord.State.Failed, message = event.data.message)
                     else -> Unit
                 }
@@ -1524,10 +1636,14 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
             for (event in events) {
                 when (event) {
                     is Event.ToolCall -> {
-                        val tracked = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)
-                        calls[event.data.id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
+                        val id = event.data.id
+                        val tracked = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(call = event.data)
+                        calls[id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
                     }
-                    is Event.ToolResult -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    is Event.ToolResult -> {
+                        val id = event.data.id
+                        calls[id] = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    }
                     is Event.ToolError -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name.wireValue)).copy(state = ToolCallRecord.State.Failed, message = event.data.message)
                     else -> Unit
                 }
@@ -1827,6 +1943,9 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                 urlBuilder.addQueryParameter("limit", stringValue)
             }
         }
+        if (query.where != null) {
+            urlBuilder.addQueryParameter("where", Kizuna.encodeQueryJson(json, query.where))
+        }
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("GET", null)
@@ -1913,6 +2032,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                     } catch (error: Exception) { throw APIClient.UsersUserBadge.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersUserBadge.Failure.NotFound(body = payload)
                 }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersUserBadge.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersUserBadge.Failure.BadRequest(body = payload)
+                }
                 else -> throw APIClient.UsersUserBadge.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
@@ -1948,6 +2073,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.UsersLastSessionEvent.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersLastSessionEvent.Failure.NotFound(body = payload)
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersLastSessionEvent.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersLastSessionEvent.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.UsersLastSessionEvent.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2032,6 +2163,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                     } catch (error: Exception) { throw APIClient.UsersGetUser.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersGetUser.Failure.NotFound(body = payload)
                 }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersGetUser.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersGetUser.Failure.BadRequest(body = payload)
+                }
                 else -> throw APIClient.UsersGetUser.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
@@ -2069,6 +2206,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                     } catch (error: Exception) { throw APIClient.UsersUserActivity.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersUserActivity.Failure.NotFound(body = payload)
                 }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersUserActivity.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersUserActivity.Failure.BadRequest(body = payload)
+                }
                 else -> throw APIClient.UsersUserActivity.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
@@ -2104,6 +2247,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.UsersUserProfile.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersUserProfile.Failure.NotFound(body = payload)
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersUserProfile.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersUserProfile.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.UsersUserProfile.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2225,6 +2374,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                     } catch (error: Exception) { throw APIClient.UsersDeleteUser.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersDeleteUser.Failure.NotFound(body = payload)
                 }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersDeleteUser.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersDeleteUser.Failure.BadRequest(body = payload)
+                }
                 else -> throw APIClient.UsersDeleteUser.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
@@ -2261,6 +2416,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersArchiveUser.Result(body = APIClient.UsersArchiveUser.Success.Status201(payload))
                     }
                     catch (error: Exception) { throw APIClient.UsersArchiveUser.Failure.Decoding(error, statusCode, data) }
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersArchiveUser.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersArchiveUser.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.UsersArchiveUser.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2395,6 +2556,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.UsersCheckUser.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersCheckUser.Failure.NotFound(body = payload)
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersCheckUser.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersCheckUser.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.UsersCheckUser.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -3681,6 +3848,19 @@ private object Kizuna {
     fun encodePathSegment(value: Any): String {
         val text = stringifyQueryValue(value).firstOrNull() ?: ""
         return java.net.URLEncoder.encode(text, "UTF-8").replace("+", "%20")
+    }
+
+    // One JSON text with every object's keys in order so one value always gives one URL.
+    inline fun <reified Value> encodeQueryJson(json: Json, value: Value): String {
+        return sortJsonKeys(json.encodeToJsonElement(value)).toString()
+    }
+
+    fun sortJsonKeys(element: JsonElement): JsonElement {
+        return when (element) {
+            is JsonObject -> JsonObject(element.toSortedMap().mapValues { sortJsonKeys(it.value) })
+            is JsonArray -> JsonArray(element.map { sortJsonKeys(it) })
+            else -> element
+        }
     }
 
     fun stringifyQueryValue(value: Any): List<String> {

@@ -107,7 +107,8 @@ const content = cms({
 });
 const config = defineConfig({
     jobRunner: {
-        mode: 'in-process',
+        mode: 'long-running',
+        transport: false,
     },
     adapter: expressAdapter(),
     auth: {
@@ -299,7 +300,8 @@ describe('page checks', () => {
     const assemble = (path: string, definition: typeof ArticlePage | typeof FrontPage, collections = [Articles]) =>
         defineConfig({
             jobRunner: {
-                mode: 'in-process',
+                mode: 'long-running',
+                transport: false,
             },
             auth: {
                 identities: {
@@ -354,7 +356,8 @@ describe('brand checks', () => {
         expect(() =>
             defineConfig({
                 jobRunner: {
-                    mode: 'in-process',
+                    mode: 'long-running',
+                    transport: false,
                 },
                 auth: {
                     identities: {

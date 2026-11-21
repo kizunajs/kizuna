@@ -71,11 +71,10 @@ export type DashboardSite<Sites = undefined> = [Sites] extends [undefined]
       ? SiteFieldsOf<Sites> & {
             key: keyof SiteEntriesOf<Sites> & string;
         }
-      :
-            | (SiteValues & {
-                  key: string;
-              })
-            | undefined;
+      : | (SiteValues & {
+              key: string;
+          })
+        | undefined;
 
 /**
  * Sites as the CMS runs the dashboard: declared or not.

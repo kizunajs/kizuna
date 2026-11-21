@@ -52,6 +52,33 @@ class APIClientTest {
     }
 
     @Test
+    fun testListUsersSendsANestedFilterAsJson() = runTest {
+        val response = client.users.listUsers {
+            query(
+                where = where {
+                    or {
+                        name {
+                            contains = "ada"
+                        }
+                        and {
+                            email {
+                                contains = "@example.com"
+                            }
+                            name {
+                                equals = "Linus Torvalds"
+                            }
+                        }
+                    }
+                },
+            )
+        }
+        val names = response.body.users.map { it.name }
+        assertTrue("Ada Lovelace" in names)
+        assertTrue("Linus Torvalds" in names)
+        assertTrue(response.body.users.all { "ada" in it.name.lowercase() || it.name == "Linus Torvalds" })
+    }
+
+    @Test
     fun testGetUserReturnsSeededUser() = runTest {
         val response = client.users.getUser {
             params(

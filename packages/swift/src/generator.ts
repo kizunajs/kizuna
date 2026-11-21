@@ -10,10 +10,14 @@ import {
     resolveResponseHeaders,
     resolveResponseContentType,
     isJsonMediaType,
+    isJsonQueryField,
+    validatesRequest,
     isBinarySchema,
     readMetaId,
+    readObjectShape,
     toPascalCase,
     toCamelCase,
+    uniqueNames,
     shortTypeName,
     isHintPrefix,
     localTypeName,
@@ -58,10 +62,10 @@ export interface SwiftConfig {
      */
     camelCaseProperties?: boolean;
     /**
-     * Emit each `z.enum` as a `RawRepresentable` enum with a `case unknown(String)`
-     * fallback, so unrecognised wire values decode instead of throwing. The raw
-     * string round-trips on encode and in query params. Discriminated unions are
-     * unaffected and still throw on an unknown discriminator.
+     * Give each `z.enum` and discriminated union a `case unknown(String)`, so a
+     * value this client doesn't know decodes instead of throwing.
+     *
+     * An unknown union value can't be sent.
      *
      * @default false
      */
@@ -121,7 +125,8 @@ interface RouteMethod {
 interface StreamDescriptor {
     status: number;
     mode: 'events' | 'text' | 'binary';
-    events?: Array<{ name: string; caseName: string; type: string }>;
+    // `unknownCase` when the event's union takes variants this client doesn't know, so its shared fields may be missing.
+    events?: Array<{ name: string; caseName: string; type: string; unknownCase: boolean }>;
     messageType?: string;
 }
 
@@ -173,7 +178,13 @@ const buildRouteMethod = (
         ? collectObjectFields(route.pathParams as z.ZodType, registry, `${baseHint}Params`)
         : [];
 
-    const queryFields: SwiftField[] = route.query ? collectObjectFields(route.query as z.ZodType, registry, `${baseHint}Query`) : [];
+    const queryShape = route.query ? (readObjectShape(route.query as z.ZodType) ?? {}) : {};
+    const queryFields: SwiftField[] = route.query
+        ? collectObjectFields(route.query as z.ZodType, registry, `${baseHint}Query`).map((field) => ({
+              ...field,
+              json: isJsonQueryField(queryShape[field.wireName]!),
+          }))
+        : [];
 
     const headerFields: SwiftField[] = route.headers ? collectObjectFields(route.headers as z.ZodType, registry, `${baseHint}Headers`) : [];
 
@@ -249,14 +260,20 @@ const buildRouteMethod = (
         if (isStreamResponse(responseValue)) {
             const mode = streamMode(responseValue);
             if (mode === 'events' && isNamedStream(responseValue.stream)) {
+                const eventCaseNames = enumCaseNames(Object.keys(responseValue.stream));
                 stream = {
                     status,
                     mode,
-                    events: Object.entries(responseValue.stream).map(([name, schema]) => ({
-                        name,
-                        caseName: sanitizeEnumCaseName(name),
-                        type: mapType(schema, registry, `${baseHint}${toPascalCase(name)}`).expression,
-                    })),
+                    events: Object.entries(responseValue.stream).map(([name, schema], index) => {
+                        const type = mapType(schema, registry, `${baseHint}${toPascalCase(name)}`).expression;
+                        const found = registry.get(type);
+                        return {
+                            name,
+                            caseName: eventCaseNames[index]!,
+                            type,
+                            unknownCase: found?.kind === 'discriminated-enum' && found.unknownCase,
+                        };
+                    }),
                 };
             } else if (mode === 'events') {
                 stream = {
@@ -310,8 +327,7 @@ const buildRouteMethod = (
             });
         }
     }
-    const hasValidation = route.body || route.query;
-    if (hasValidation) {
+    if (validatesRequest(route)) {
         const has400 = errorCases.some((c) => c.status === 400);
         errorCases.push({
             caseName: has400 ? 'validationError' : statusToCamelCase(400),
@@ -485,6 +501,12 @@ const sanitizeEnumCaseName = (value: string): string => {
     return /^[0-9]/.test(camel) ? `_${camel}` : camel;
 };
 
+/**
+ * Case names for a whole enum, so `name` and `-name` become `name` and `_name`
+ * where each alone would be written `name`.
+ */
+const enumCaseNames = (values: readonly string[]): string[] => uniqueNames(values.map(sanitizeEnumCaseName));
+
 const defaultArgument = (field: SwiftField): string => {
     if (!hasDefault(field)) return '';
     return ' = nil';
@@ -590,15 +612,15 @@ const unknownCaseName = (caseNames: string[]): string => {
 const emitStringEnum = (writer: SwiftWriter, name: string, cases: string[], unknownCase: boolean, description?: string): void => {
     writer.blank();
     writer.docComment(description);
+    const caseNames = enumCaseNames(cases);
     if (!unknownCase) {
         writer.block(`public enum ${name}: String, Codable, Sendable`, () => {
-            for (const caseName of cases) {
-                writer.line(`case ${escapeKeyword(sanitizeEnumCaseName(caseName))} = ${stringLiteral(caseName)}`);
+            for (let index = 0; index < cases.length; index += 1) {
+                writer.line(`case ${escapeKeyword(caseNames[index]!)} = ${stringLiteral(cases[index]!)}`);
             }
         });
         return;
     }
-    const caseNames = cases.map((caseName) => sanitizeEnumCaseName(caseName));
     const unknown = unknownCaseName(caseNames);
     writer.block(`public enum ${name}: RawRepresentable, Codable, Sendable, Hashable`, () => {
         for (const caseName of caseNames) {
@@ -813,6 +835,18 @@ const emitOwnedTypes = (
     }
 };
 
+const HASHABLE_ID_TYPES: ReadonlySet<string> = new Set(['String', 'Int', 'Int64', 'Double', 'Bool', 'Date']);
+
+/**
+ * Whether a struct's `id` makes it `Identifiable`: required, never null and hashable.
+ */
+const hasStableId = (fields: readonly SwiftField[], context: EmitContext): boolean => {
+    const id = fields.find((field) => field.name === 'id');
+    if (id === undefined || id.optional || id.requiredNullable === true) return false;
+    const type = id.type.startsWith(`${context.namespaceName}.`) ? id.type.slice(context.namespaceName.length + 1) : id.type;
+    return HASHABLE_ID_TYPES.has(type) || context.registry.allBrands().some((brand) => brand.name === type);
+};
+
 const emitStruct = (
     writer: SwiftWriter,
     type: Extract<SwiftType, { kind: 'struct' }>,
@@ -823,7 +857,12 @@ const emitStruct = (
 ): void => {
     const lookupName = registryName ?? type.name;
     const hasFile = type.fields.some((field) => field.isFile);
-    const conformances = hasFile ? 'Sendable, Equatable' : 'Codable, Sendable, Equatable';
+    const conformances = [
+        ...(hasFile ? [] : ['Codable']),
+        'Sendable',
+        'Equatable',
+        ...(hasStableId(type.fields, context) ? ['Identifiable'] : []),
+    ].join(', ');
 
     const resolveOwnedType = (raw: string): string => {
         const optional = raw.endsWith('?');
@@ -892,7 +931,26 @@ const emitStruct = (
         }
         writer.blank();
         emitMemberwiseInit(writer, adjustedFields, storageName);
+        if (!hasFile && hasOnlyOptionalFields(adjustedFields)) emitFieldFactories(writer, adjustedFields);
     });
+};
+
+const hasOnlyOptionalFields = (fields: SwiftField[]): boolean =>
+    fields.length > 0 && fields.every((field) => field.optional && field.requiredNullable !== true);
+
+/**
+ * A model whose fields are all optional gets one factory per field. A leading dot then reaches it wherever the type is
+ * known: `.or([.name(.contains("ada"))])`.
+ */
+const emitFieldFactories = (writer: SwiftWriter, fields: SwiftField[]): void => {
+    for (const field of fields) {
+        const name = escapeKeyword(field.name);
+        const type = field.type.endsWith('?') ? field.type.slice(0, -1) : field.type;
+        writer.blank();
+        writer.block(`public static func ${name}(_ ${name}: ${type}) -> Self`, () => {
+            writer.line(`.init(${field.name}: ${name})`);
+        });
+    }
 };
 
 /**
@@ -936,6 +994,11 @@ const emitDiscriminatedEnum = (
         }
         for (const variant of type.variants) {
             writer.line(`case ${escapeKeyword(variant.caseName)}(${variant.payloadType})`);
+        }
+        const unknown = unknownCaseName(type.variants.map((variant) => variant.caseName));
+        if (type.unknownCase) {
+            writer.docComment('A variant this client was generated before. It holds the discriminator, and cannot be sent back.');
+            writer.line(`case ${escapeKeyword(unknown)}(String)`);
         }
 
         // Static factory per variant (`.email(to:subject:)`); the payload struct is built here with the
@@ -984,12 +1047,22 @@ const emitDiscriminatedEnum = (
             );
             for (const field of shared) {
                 const relative = ownedTypeMap && relativeOwnedPath(field.type, ownedTypeMap, lookupName);
-                const fieldType = optionalize(relative ?? resolveType(field.type, undefined, context), field.optional);
+                const isDiscriminator = field.wireName === type.discriminator || field.name === type.discriminator;
+                // An unknown variant carries only its discriminator, so every other shared field may be missing.
+                const optional = field.optional || (type.unknownCase && !isDiscriminator);
+                const fieldType = optionalize(relative ?? resolveType(field.type, undefined, context), optional);
                 writer.blank();
                 writer.block(`public var ${escapeKeyword(field.name)}: ${fieldType}`, () => {
                     writer.line('switch self {');
                     for (const { variant } of variantStructs) {
                         writer.line(`case .${escapeKeyword(variant.caseName)}(let payload): return payload.${escapeKeyword(field.name)}`);
+                    }
+                    if (type.unknownCase) {
+                        writer.line(
+                            isDiscriminator && field.type === 'String'
+                                ? `case .${escapeKeyword(unknown)}(let value): return value`
+                                : `case .${escapeKeyword(unknown)}: return nil`
+                        );
                     }
                     writer.line('}');
                 });
@@ -1011,9 +1084,13 @@ const emitDiscriminatedEnum = (
                 writer.line(`    self = .${escapeKeyword(variant.caseName)}(try single.decode(${variant.payloadType}.self))`);
             }
             writer.line('default:');
-            writer.line(
-                '    throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \\(kind)")'
-            );
+            if (type.unknownCase) {
+                writer.line(`    self = .${escapeKeyword(unknown)}(kind)`);
+            } else {
+                writer.line(
+                    '    throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \\(kind)")'
+                );
+            }
             writer.line('}');
         });
         writer.blank();
@@ -1023,6 +1100,12 @@ const emitDiscriminatedEnum = (
             for (const variant of type.variants) {
                 writer.line(`case .${escapeKeyword(variant.caseName)}(let payload):`);
                 writer.line('    try single.encode(payload)');
+            }
+            if (type.unknownCase) {
+                writer.line(`case .${escapeKeyword(unknown)}(let kind):`);
+                writer.line(
+                    '    throw EncodingError.invalidValue(self, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "This client does not know the variant \\(kind), so it cannot send it."))'
+                );
             }
             writer.line('}');
         });
@@ -1180,6 +1263,11 @@ const emitToolTracking = (writer: SwiftWriter, method: RouteMethod): void => {
     if (!events) return;
     const names = new Set(events.map((event) => event.name));
     if (!names.has('tool_call') || !names.has('tool_result')) return;
+    // A call from a tool this client doesn't know has no id to track it by.
+    const readId = (eventName: string) =>
+        events.find((event) => event.name === eventName)?.unknownCase
+            ? '    guard let id = payload.id else { continue }'
+            : '    let id = payload.id';
 
     writer.blank();
     writer.block('public struct ToolCallRecord: Identifiable, Sendable, Equatable', () => {
@@ -1219,19 +1307,21 @@ const emitToolTracking = (writer: SwiftWriter, method: RouteMethod): void => {
             writer.line('switch event {');
             if (names.has('tool_call')) {
                 writer.line('case .tool_call(let payload):');
-                writer.line('    var tracked = at(payload.id, payload.name)');
+                writer.line(readId('tool_call'));
+                writer.line('    var tracked = at(id, payload.name)');
                 writer.line('    tracked.call = payload');
                 writer.line('    if payload.needsApproval == true, tracked.state == .running {');
                 writer.line('        tracked.state = .needsApproval');
                 writer.line('    }');
-                writer.line('    calls[payload.id] = tracked');
+                writer.line('    calls[id] = tracked');
             }
             if (names.has('tool_result')) {
                 writer.line('case .tool_result(let payload):');
-                writer.line('    var tracked = at(payload.id, payload.name)');
+                writer.line(readId('tool_result'));
+                writer.line('    var tracked = at(id, payload.name)');
                 writer.line('    tracked.state = .done');
                 writer.line('    tracked.result = payload');
-                writer.line('    calls[payload.id] = tracked');
+                writer.line('    calls[id] = tracked');
             }
             if (names.has('tool_error')) {
                 writer.line('case .tool_error(let payload):');
@@ -1731,6 +1821,17 @@ const emitKizunaNamespace = (
             writer.line('return stringifyQueryValue(value).map { URLQueryItem(name: name, value: $0) }');
         });
         writer.blank();
+        writer.block(
+            'static func jsonQueryItems<Value: Encodable, Failure: KizunaFailure>(name: String, value: Value?, failure: Failure.Type) throws(Failure) -> [URLQueryItem]',
+            () => {
+                writer.line('guard let value else { return [] }');
+                writer.line('let encoder = makeJSONEncoder()');
+                writer.line('encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]');
+                writer.line('do { return [URLQueryItem(name: name, value: String(decoding: try encoder.encode(value), as: UTF8.self))] }');
+                writer.line('catch { throw Failure.requestFailed(error) }');
+            }
+        );
+        writer.blank();
         writer.block('static func setHeader<Value>(_ request: inout URLRequest, name: String, value: Value?)', () => {
             writer.line('guard let value else { return }');
             writer.line('request.setValue(stringifyQueryValue(value).joined(separator: ", "), forHTTPHeaderField: name)');
@@ -2019,7 +2120,11 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
         writer.line('var queryItems: [URLQueryItem] = []');
         for (const field of method.query) {
             const accessor = groupMemberAccessor('query', field);
-            writer.line(`queryItems += Kizuna.queryItems(name: ${stringLiteral(field.wireName)}, value: ${accessor})`);
+            writer.line(
+                field.json
+                    ? `queryItems += try Kizuna.jsonQueryItems(name: ${stringLiteral(field.wireName)}, value: ${accessor}, failure: ${failure}.self)`
+                    : `queryItems += Kizuna.queryItems(name: ${stringLiteral(field.wireName)}, value: ${accessor})`
+            );
         }
         queryItemsExpression = 'queryItems';
     }

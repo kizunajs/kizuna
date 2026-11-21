@@ -226,7 +226,8 @@ describe('jobs a content provider declares', () => {
         const { api } = defineConfig({
             content: contentWithJobs(refreshJobs()),
             jobRunner: {
-                mode: 'in-process',
+                mode: 'long-running',
+                transport: false,
             },
         });
 
@@ -257,6 +258,7 @@ describe('jobs a content provider declares', () => {
             content: contentWithJobs(refreshJobs()),
             jobRunner: {
                 mode: 'http',
+                transport: false,
             },
         });
 
@@ -277,6 +279,7 @@ describe('jobs a content provider declares', () => {
             content: contentWithJobs(refreshJobs('scheduler')),
             jobRunner: {
                 mode: 'http',
+                transport: false,
             },
         });
 
@@ -289,6 +292,7 @@ describe('jobs a content provider declares', () => {
                 content: contentWithJobs(refreshJobs()),
                 jobRunner: {
                     mode: 'http',
+                    transport: false,
                 },
             })
         ).toThrow(
@@ -305,6 +309,7 @@ describe('jobs a content provider declares', () => {
                 content: contentWithJobs(refreshJobs()),
                 jobRunner: {
                     mode: 'http',
+                    transport: false,
                 },
             })
         ).toThrow('Pass an identity to `k.jobs`');
@@ -328,7 +333,8 @@ describe('jobs a content provider declares', () => {
                 }),
                 content: contentWithJobs(refreshJobs()),
                 jobRunner: {
-                    mode: 'in-process',
+                    mode: 'long-running',
+                    transport: false,
                 },
             })
         ).toThrow("`content` declares its jobs under 'content'");
@@ -343,6 +349,7 @@ describe('jobs a content provider declares', () => {
                 content: contentWithJobs(refreshJobs('scheduler')),
                 jobRunner: {
                     mode: 'http',
+                    transport: false,
                 },
             })
         ).toThrow("The jobs name the identities 'worker' and 'scheduler'");

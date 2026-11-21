@@ -84,6 +84,7 @@ const contract = defineConfig({
     routes: [routes],
     jobRunner: {
         mode: 'http',
+        transport: false,
     },
     jobs,
 }).api;
@@ -193,7 +194,8 @@ describe('startJobsDevRunner', () => {
             ...config,
             adapter: expressAdapter(),
             jobRunner: {
-                mode: 'in-process',
+                mode: 'long-running',
+                transport: false,
             },
             routes: [routes],
             jobs,

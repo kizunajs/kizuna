@@ -6,6 +6,9 @@ import {
     flattenJobs,
     readDef,
     readMetaBrand,
+    readMetaExtensible,
+    readMetaId,
+    readModelSchema,
     readObjectShape,
     resolveResponseBody,
     toToolName,
@@ -22,8 +25,17 @@ import type { z } from 'zod';
 export type SchemaNode =
     | { kind: 'object'; nullable?: true; fields: Record<string, { optional: boolean; schema: SchemaNode }>; refinements?: number }
     | { kind: 'array'; nullable?: true; element: SchemaNode; refinements?: number }
-    | { kind: 'enum'; nullable?: true; values: string[]; refinements?: number }
-    | { kind: 'union'; nullable?: true; discriminator: string; options: Record<string, SchemaNode>; refinements?: number }
+    | { kind: 'enum'; nullable?: true; values: string[]; extensible?: true; refinements?: number }
+    | { kind: 'model'; nullable?: true; model: string; refinements?: number }
+    | {
+          kind: 'union';
+          nullable?: true;
+          discriminator: string;
+          options: Record<string, SchemaNode>;
+          extensible?: true;
+          refinements?: number;
+      }
+    | { kind: 'union'; nullable?: true; options: SchemaNode[]; extensible?: true; refinements?: number }
     | { kind: string; nullable?: true; brand?: string; refinements?: number };
 
 export interface RouteSnapshot {
@@ -121,13 +133,33 @@ export interface SchemaNodeOptions {
     brands?: boolean;
 }
 
+const extensibleOf = (schema: z.core.$ZodType): { extensible?: true } =>
+    readMetaExtensible(schema)
+        ? {
+              extensible: true,
+          }
+        : {};
+
 /**
- * A Zod schema reduced to the shape a comparison reads.
+ * A Zod schema reduced to the shape a comparison reads. A model that holds
+ * itself is written out once, and inside itself as a reference by its title.
+ *
+ * `inside` is the objects the walk is in, so it can tell when it has gone round.
  */
-export const toSchemaNode = (schema: z.core.$ZodType, nodeOptions: SchemaNodeOptions = {}): SchemaNode => {
+export const toSchemaNode = (
+    schema: z.core.$ZodType,
+    nodeOptions: SchemaNodeOptions = {},
+    inside: readonly z.core.$ZodType[] = []
+): SchemaNode => {
     const { inner, nullable } = unwrapOptionalWrappers(schema);
     const def = readDef(inner);
-    const child = (nested: z.core.$ZodType): SchemaNode => toSchemaNode(nested, nodeOptions);
+    const nullability: { nullable?: true } = nullable ? { nullable: true } : {};
+    const child = (nested: z.core.$ZodType, within: readonly z.core.$ZodType[] = inside): SchemaNode =>
+        toSchemaNode(nested, nodeOptions, within);
+
+    // A model copied by `.describe()` or `.meta()` is still the model.
+    const identity = readModelSchema(inner) ?? inner;
+    if (inside.includes(identity)) return { kind: 'model', ...nullability, model: readMetaId(inner) ?? '' };
 
     // `z.union([UserSchema, z.null()])` says what `.nullable()` says.
     const options = def.type === 'union' ? (def.options ?? []) : [];
@@ -139,7 +171,6 @@ export const toSchemaNode = (schema: z.core.$ZodType, nodeOptions: SchemaNodeOpt
         };
     }
 
-    const nullability: { nullable?: true } = nullable ? { nullable: true } : {};
     const refinements = refinementCount(inner);
     const carry = refinements === undefined ? {} : { refinements };
 
@@ -156,6 +187,7 @@ export const toSchemaNode = (schema: z.core.$ZodType, nodeOptions: SchemaNodeOpt
             ...nullability,
             discriminator,
             options: tagged,
+            ...extensibleOf(inner),
             ...carry,
         };
     }
@@ -163,8 +195,9 @@ export const toSchemaNode = (schema: z.core.$ZodType, nodeOptions: SchemaNodeOpt
     const shape = readObjectShape(inner);
     if (shape) {
         const fields: Record<string, { optional: boolean; schema: SchemaNode }> = {};
+        const within = [...inside, identity];
         for (const [key, field] of Object.entries(shape)) {
-            fields[key] = { optional: unwrapOptionalWrappers(field).optional, schema: child(field) };
+            fields[key] = { optional: unwrapOptionalWrappers(field).optional, schema: child(field, within) };
         }
         return { kind: 'object', ...nullability, fields, ...carry };
     }
@@ -177,10 +210,20 @@ export const toSchemaNode = (schema: z.core.$ZodType, nodeOptions: SchemaNodeOpt
             values: Object.values(def.entries ?? {})
                 .map(String)
                 .sort(),
+            ...extensibleOf(inner),
             ...carry,
         };
     }
     if (def.type === 'literal') return { kind: 'enum', ...nullability, values: (def.values ?? []).map(String).sort(), ...carry };
+    if (def.type === 'union') {
+        return {
+            kind: 'union',
+            ...nullability,
+            options: options.map((option) => child(option)),
+            ...extensibleOf(inner),
+            ...carry,
+        };
+    }
 
     const brand = nodeOptions.brands === false ? undefined : (readMetaBrand(schema) ?? readMetaBrand(inner));
     return {

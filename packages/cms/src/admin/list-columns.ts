@@ -111,15 +111,13 @@ export const collectionColumnsOf = (options: ListOptions | undefined): ListColum
               }
             : column
     ),
-    ...(options?.columns ?? []).map(
-        (column): ListColumn => ({
-            key: `${FIELD_COLUMN}${column.field}`,
-            label: column.label ?? humanize(column.field),
-            kind: 'text',
-            shown: column.shown,
-            sortable: column.sortable,
-        })
-    ),
+    ...(options?.columns ?? []).map((column): ListColumn => ({
+        key: `${FIELD_COLUMN}${column.field}`,
+        label: column.label ?? humanize(column.field),
+        kind: 'text',
+        shown: column.shown,
+        sortable: column.sortable,
+    })),
 ];
 
 /**

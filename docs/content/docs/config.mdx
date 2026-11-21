@@ -45,15 +45,15 @@ See [`defineConfig`](/docs/reference/define-config) for every field it takes.
 
 ## What each key brings
 
-| Key              | What it brings                                                                                                                                                                                                              |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `auth`           | The identities a route's `auth` can require. Each carries its own guard, so this is all the config needs. An identity used without a guard refuses to assemble. See [Authentication](/docs/authentication).                 |
-| `requestContext` | Values every handler receives, resolved once per request. Resolvers run on every route, before the guards, and never deny. See [Request Context](/docs/request-context).                                                    |
-| `jobs`           | Scheduled work. `api.mount` serves the two [job endpoints](/docs/jobs#the-two-job-endpoints) unless `jobRunner.mode` is `'in-process'`, and every handler receives a typed `jobs` runner so a route can run one in process. |
-| `plugins`        | Routes, jobs and helpers installed beside your own, as a list. See [below](#using-what-a-plugin-offers), and [Create a Plugin](/docs/extend/create-plugin) to write one.                                                    |
-| `content`        | The content editors change: its routes, its documents and a reader at `kizuna.content`. See [Content](#content).                                                                                                            |
-| `validation`     | The `code` values [`k.issue`](/docs/reference/k-issue) may emit beyond Zod's own.                                                                                                                                           |
-| `groups`         | The groups routes are filed under, each an OpenAPI tag. See [`k.groups`](/docs/reference/k-groups).                                                                                                                         |
+| Key              | What it brings                                                                                                                                                                                                                |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth`           | The identities a route's `auth` can require. Each carries its own guard, so this is all the config needs. An identity used without a guard refuses to assemble. See [Authentication](/docs/authentication).                   |
+| `requestContext` | Values every handler receives, resolved once per request. Resolvers run on every route, before the guards, and never deny. See [Request Context](/docs/request-context).                                                      |
+| `jobs`           | Scheduled work. `api.mount` serves the two [job endpoints](/docs/jobs#the-two-job-endpoints) unless `jobRunner.mode` is `'long-running'`, and every handler receives a typed `jobs` runner so a route can run one in process. |
+| `plugins`        | Routes, jobs and helpers installed beside your own, as a list. See [below](#using-what-a-plugin-offers), and [Create a Plugin](/docs/extend/create-plugin) to write one.                                                      |
+| `content`        | The content editors change: its routes, its documents and a reader at `kizuna.content`. See [Content](#content).                                                                                                              |
+| `validation`     | The `code` values [`k.issue`](/docs/reference/k-issue) may emit beyond Zod's own.                                                                                                                                             |
+| `groups`         | The groups routes are filed under, each an OpenAPI tag. See [`k.groups`](/docs/reference/k-groups).                                                                                                                           |
 
 ## Using what a plugin offers
 
@@ -171,13 +171,13 @@ The generated client holds the route shapes and the schemas, and is what a brows
 
 ## Client options
 
-| Option                | Applies to           | Description                                                               |
-| --------------------- | -------------------- | ------------------------------------------------------------------------- |
-| `output`              | all                  | Path the generated file is written to                                     |
-| `namespace`           | Fetch, Swift, Kotlin | Name of the generated namespace, `API` by default                         |
-| `package`             | Kotlin               | Package the generated file declares                                       |
-| `camelCaseProperties` | Swift, Kotlin        | Convert wire field names to camelCase, mapping the wire name back         |
-| `unknownEnumCase`     | Swift, Kotlin        | Give every enum an `unknown` case, so an unrecognised value still decodes |
+| Option                | Applies to           | Description                                                                                       |
+| --------------------- | -------------------- | ------------------------------------------------------------------------------------------------- |
+| `output`              | all                  | Path the generated file is written to                                                             |
+| `namespace`           | Fetch, Swift, Kotlin | Name of the generated namespace, `API` by default                                                 |
+| `package`             | Kotlin               | Package the generated file declares                                                               |
+| `camelCaseProperties` | Swift, Kotlin        | Convert wire field names to camelCase, mapping the wire name back                                 |
+| `unknownEnumCase`     | Swift, Kotlin        | Give every enum and discriminated union an `unknown` case, so an unrecognised value still decodes |
 
 ## Two clients of one language
 

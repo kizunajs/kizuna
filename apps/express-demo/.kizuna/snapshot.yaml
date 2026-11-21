@@ -16,6 +16,51 @@ routes:
           optional: true
           schema:
             kind: number
+        where:
+          optional: true
+          schema:
+            kind: object
+            fields:
+              name:
+                optional: true
+                schema:
+                  kind: object
+                  fields:
+                    equals:
+                      optional: true
+                      schema:
+                        kind: string
+                    contains:
+                      optional: true
+                      schema:
+                        kind: string
+              email:
+                optional: true
+                schema:
+                  kind: object
+                  fields:
+                    equals:
+                      optional: true
+                      schema:
+                        kind: string
+                    contains:
+                      optional: true
+                      schema:
+                        kind: string
+              and:
+                optional: true
+                schema:
+                  kind: array
+                  element:
+                    kind: model
+                    model: UserWhere
+              or:
+                optional: true
+                schema:
+                  kind: array
+                  element:
+                    kind: model
+                    model: UserWhere
     responses:
       "200":
         kind: object
@@ -1161,6 +1206,11 @@ routes:
           optional: true
           schema:
             kind: union
+            options:
+              - kind: array
+                element:
+                  kind: string
+              - kind: pipe
     responses:
       "200":
         kind: object

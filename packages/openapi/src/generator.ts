@@ -6,6 +6,8 @@ import {
     isFileSchema,
     isBinarySchema,
     isVoidSchema,
+    isJsonQueryField,
+    validatesRequest,
     parsePath,
     readDiscriminatedUnion,
     readDiscriminatorLiteral,
@@ -28,6 +30,7 @@ import {
     encodeForWire,
 } from 'kizunajs/generator';
 import { getStatusText } from 'kizunajs';
+import { ValidationErrorSchema } from 'kizunajs/schemas';
 import type { ApiDefinition, RequiredPermissions, SecurityRequirement } from 'kizunajs';
 import { OPENAPI_PLUGIN_SLUG } from './plugin.js';
 import type { StreamResponseDefinition } from 'kizunajs';
@@ -169,8 +172,29 @@ const normalizeMeta = ({ zodSchema, jsonSchema }: { zodSchema: z.core.$ZodType; 
         jsonSchema['x-kizuna-brand'] = jsonSchema.brand;
         delete jsonSchema.brand;
     }
+    if ('extensible' in jsonSchema) {
+        jsonSchema['x-kizuna-extensible'] = jsonSchema.extensible;
+        delete jsonSchema.extensible;
+    }
     delete jsonSchema.id;
 };
+
+const inlineRootRef = (raw: Record<string, unknown>): Record<string, unknown> => {
+    const { $ref: ref, ...rest } = raw;
+    const defs = raw.$defs as Record<string, Record<string, unknown>> | undefined;
+    if (typeof ref !== 'string' || !ref.startsWith(ZOD_DEF_REF_BASE)) return raw;
+    const id = ref.slice(ZOD_DEF_REF_BASE.length);
+    const target = defs?.[id];
+    return target && !globalRegistrySchemas().has(id)
+        ? {
+              ...target,
+              ...rest,
+          }
+        : raw;
+};
+
+const convert = (schema: z.ZodType, io: 'input' | 'output'): Record<string, unknown> =>
+    inlineRootRef(z.toJSONSchema(schema, { unrepresentable: 'any', io, override: normalizeMeta }) as Record<string, unknown>);
 
 const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Record<string, unknown> => {
     const id = readModelSchema(schema) === schema ? readMetaId(schema) : undefined;
@@ -181,19 +205,13 @@ const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Rec
     }
     const discriminated = readDiscriminatedUnion(schema);
     if (discriminated) {
-        const raw = rewriteRefs(
-            omit(z.toJSONSchema(schema, { unrepresentable: 'any', io, override: normalizeMeta }) as Record<string, unknown>, [
-                '$defs',
-                '$schema',
-            ])
-        ) as Record<string, unknown>;
+        const raw = rewriteRefs(omit(convert(schema, io), ['$defs', '$schema'])) as Record<string, unknown>;
         return {
             ...raw,
             discriminator: buildDiscriminatorBlock(discriminated.discriminator, discriminated.options),
         };
     }
-    const raw = z.toJSONSchema(schema, { unrepresentable: 'any', io, override: normalizeMeta }) as Record<string, unknown>;
-    const result = rewriteRefs(omit(raw, ['$defs', '$schema'])) as Record<string, unknown>;
+    const result = rewriteRefs(omit(convert(schema, io), ['$defs', '$schema'])) as Record<string, unknown>;
     applyFileBinary(schema, result);
     return result;
 };
@@ -248,6 +266,24 @@ const deriveHeadOperation = (getOperation: OpenApiOperation): OpenApiOperation =
         delete response.content;
     }
     return operation;
+};
+
+/**
+ * A query field holding an object travels as JSON text. JSON Schema's
+ * `contentMediaType` and `contentSchema` say so and keep the object's schema.
+ */
+const jsonTextSchema = (valueSchema: Record<string, unknown>): Record<string, unknown> => {
+    const { description, ...contentSchema } = valueSchema;
+    return {
+        type: 'string',
+        ...(description === undefined
+            ? {}
+            : {
+                  description,
+              }),
+        contentMediaType: 'application/json',
+        contentSchema,
+    };
 };
 
 const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWalk<OpenApiRenderer> => {
@@ -309,12 +345,14 @@ const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWa
                 const querySchema = toJsonSchema(route.query, 'input');
                 const queryProperties = (querySchema.properties ?? {}) as Record<string, Record<string, unknown>>;
                 const queryRequired = (querySchema.required ?? []) as string[];
+                const queryShape = readObjectShape(route.query) ?? {};
                 for (const [name, valueSchema] of Object.entries(queryProperties)) {
+                    const field = queryShape[name];
                     parameters.push({
                         name,
                         in: 'query',
                         required: queryRequired.includes(name),
-                        schema: valueSchema,
+                        schema: field && isJsonQueryField(field) ? jsonTextSchema(valueSchema) : valueSchema,
                     });
                 }
             }
@@ -409,33 +447,8 @@ const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWa
                 };
             }
 
-            const hasValidation = route.body || route.query;
-            if (hasValidation) {
-                const validationSchema = {
-                    type: 'object',
-                    required: ['type', 'title', 'status', 'detail', 'errors'],
-                    properties: {
-                        type: { type: 'string' },
-                        title: { type: 'string' },
-                        status: { type: 'integer' },
-                        detail: { type: 'string' },
-                        errors: {
-                            type: 'array',
-                            items: {
-                                type: 'object',
-                                required: ['code', 'path', 'message'],
-                                properties: {
-                                    code: { type: 'string' },
-                                    path: {
-                                        type: 'array',
-                                        items: { type: 'string' },
-                                    },
-                                    message: { type: 'string' },
-                                },
-                            },
-                        },
-                    },
-                };
+            if (validatesRequest(route)) {
+                const validationSchema = toJsonSchema(ValidationErrorSchema);
                 const existing = operation.responses['400'];
                 if (existing) {
                     const existingSchema = existing.content?.['application/problem+json']?.schema;
@@ -443,9 +456,12 @@ const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWa
                         description: getStatusText(400),
                         content: {
                             'application/problem+json': {
-                                schema: {
-                                    oneOf: [existingSchema, validationSchema].filter(Boolean),
-                                },
+                                schema:
+                                    existingSchema?.$ref === validationSchema.$ref
+                                        ? validationSchema
+                                        : {
+                                              oneOf: [existingSchema, validationSchema].filter(Boolean),
+                                          },
                             },
                         },
                     };

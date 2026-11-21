@@ -39,7 +39,7 @@ kizuna generate
 | `output`              | Where the generated `.swift` file goes                                                                       |
 | `namespace`           | Public enum wrapping all generated types, `API` by default                                                   |
 | `camelCaseProperties` | Convert wire field names to camelCase properties with CodingKeys                                             |
-| `unknownEnumCase`     | Emit enums with an `unknown(String)` fallback so new server values don't break decoding                      |
+| `unknownEnumCase`     | Give every enum and discriminated union an `unknown(String)` case, so new server values don't break decoding |
 | `groups`              | Only the routes in these [groups](/docs/reference/k-groups), and the models they use. Every route by default |
 
 The path is relative to the config, so a client can land outside the TypeScript project. When the iOS app lives in the same repository, `../ios/MyApp/Generated/APIClient.swift` writes straight into it. An app in its own repository takes the generated file the way it takes any other vendored source, by copying it in from a build step or committing it.
@@ -122,7 +122,7 @@ struct UserList: View {
     @State private var users: [API.User] = []
 
     var body: some View {
-        List(users, id: \.id) { user in
+        List(users) { user in
             UserRow(user: user)
         }
         .task {
@@ -188,6 +188,22 @@ try await client.users.updatePreferences(
 ```
 
 See [Optional and null fields](/docs/zod#optional-and-null-fields) for which to declare.
+
+## Filters and options
+
+A model whose fields are all optional gets one factory per field, like the `EventWhere` filter in [An object in a query](/docs/routes#an-object-in-a-query). A leading dot reaches each one wherever Swift knows the type:
+
+```swift
+let events = try await client.events.listEvents(.query(where: .or([
+    .city(.equals("Bergen")),
+    .and([
+        .venue(.contains("Grieg")),
+        .city(.equals("Oslo")),
+    ]),
+])))
+```
+
+`.city(.equals("Bergen"))` is `EventWhere(city: TextFilter(equals: "Bergen"))`. The memberwise init stays for a filter that sets several fields at once.
 
 ## Property naming
 

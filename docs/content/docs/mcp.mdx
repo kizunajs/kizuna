@@ -313,7 +313,7 @@ With `oauth` configured, denials from that identity move to the HTTP level, wher
 - A token that lacks a permission its role holds answers `403` with `error="insufficient_scope"` and the permissions it is missing.
 - A role that lacks a permission the route requires answers a plain `403`.
 
-The guard runs once per request, its context reaches handlers under `auth.<scheme>` as always, and every other identity keeps the in-band tool errors above.
+The guard runs once per request, with the params of the tool call it carries, so a request carries one `tools/call`. A JSON-RPC batch with more than one answers `400`. Its context reaches handlers under `auth.<scheme>` as always, and every other identity keeps the in-band tool errors above.
 
 ## Options
 

@@ -216,18 +216,14 @@ export const resolveVoice = async (cms: CmsService, site?: string, language?: st
         glossary:
             language === undefined || language === null
                 ? [
-                      ...group.glossary.map(
-                          (term): VoiceTerm => ({
-                              ...term,
-                              from: 'group',
-                          })
-                      ),
-                      ...forSite.glossary.map(
-                          (term): VoiceTerm => ({
-                              ...term,
-                              from: 'site',
-                          })
-                      ),
+                      ...group.glossary.map((term): VoiceTerm => ({
+                          ...term,
+                          from: 'group',
+                      })),
+                      ...forSite.glossary.map((term): VoiceTerm => ({
+                          ...term,
+                          from: 'site',
+                      })),
                   ]
                 : termsFor(group.glossary, forSite.glossary, language),
     };

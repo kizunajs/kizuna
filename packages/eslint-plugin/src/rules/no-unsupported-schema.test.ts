@@ -32,11 +32,7 @@ describe.each([
     ['without type information', { jsDocParsingMode: 'all' }],
 ])('no-unsupported-schema (%s)', (_label, parserOptions) => {
     it('flags imported schemas with the reference-variant messages, on the reference', async () => {
-        expect(await messageIdsFor('contract-violations.ts', parserOptions)).toEqual([
-            'coerceReference',
-            'unsendableQuery',
-            'coerceReference',
-        ]);
+        expect(await messageIdsFor('contract-violations.ts', parserOptions)).toEqual(['coerceReference', 'coerceReference']);
     });
 
     it('leaves a clean referenced schema alone', async () => {
@@ -45,6 +41,10 @@ describe.each([
 
     it('uses the reference variant for a named same-file schema', async () => {
         expect(await messageIdsFor('contract-local.ts', parserOptions)).toEqual(['coerceReference']);
+    });
+
+    it('checks a route on its own, in a group, and in a nested group', async () => {
+        expect(await messageIdsFor('contract-grouped.ts', parserOptions)).toEqual(['coerce', 'coerce', 'coerce']);
     });
 
     it('uses the direct variant for inline contract schemas', async () => {
@@ -59,6 +59,10 @@ describe.each([
         expect(await messageIdsFor('contract-collection.ts', parserOptions)).toEqual(['collection', 'collection']);
     });
 
+    it('flags z.undefined(), which has no JSON form', async () => {
+        expect(await messageIdsFor('contract-undefined.ts', parserOptions)).toEqual(['undefined']);
+    });
+
     it('flags a union of objects with nothing on the wire naming the branch', async () => {
         expect(await messageIdsFor('contract-union.ts', parserOptions)).toEqual(['union']);
     });
@@ -71,13 +75,15 @@ describe.each([
         expect(await messageIdsFor('contract-transform.ts', parserOptions)).toEqual(['transform']);
     });
 
+    it('looks inside a union, and leaves one of values alone', async () => {
+        expect(await messageIdsFor('contract-union-fields.ts', parserOptions)).toEqual(['unsendableHeader']);
+    });
+
     it('flags a field its part of the request cannot carry, and leaves JSON bodies and responses alone', async () => {
         expect(await messageIdsFor('contract-fields.ts', parserOptions)).toEqual([
             'unsendablePath',
             'unsendableQuery',
-            'unsendableQuery',
             'unsendableHeader',
-            'unsendableQuery',
             'binaryFormField',
             'unsendableForm',
             'fileInUrlencoded',

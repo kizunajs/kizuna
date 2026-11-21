@@ -8,11 +8,11 @@ export type SchemaResolver = (identifier: ts.Identifier) => ts.Expression | unde
 
 /**
  * The ways a kizuna schema can be illegal: `coerce` (uses `z.coerce`),
- * `collection` (`z.set` or `z.map`), `union` (a union of objects with no
- * discriminator), `transform` (a transform on a response body), and `nullable`
- * (a required `.nullable()` field where the wire has no null).
+ * `collection` (`z.set` or `z.map`), `undefined` (`z.undefined()`), `union` (a
+ * union of objects with no discriminator), `transform` (a transform on a response
+ * body), and `nullable` (a required `.nullable()` field where the wire has no null).
  */
-export type SchemaIssue = 'coerce' | 'collection' | 'union' | 'transform' | 'nullable';
+export type SchemaIssue = 'coerce' | 'collection' | 'undefined' | 'union' | 'transform' | 'nullable';
 
 /**
  * What carries the schema. A query, path, header or form field is text, which has no null.
@@ -143,6 +143,9 @@ export const collectSchemaIssues = (
             if (ts.isPropertyAccessExpression(callee) && callee.name.text === 'nullable') add('nullable', callee, viaReference);
             else if (zodCall(node, 'nullable')) add('nullable', callee, viaReference);
         }
+
+        const undefinedCall = zodCall(node, 'undefined');
+        if (undefinedCall) add('undefined', undefinedCall.expression, viaReference);
 
         const union = zodCall(node, 'union');
         const [options] = union?.arguments ?? [];

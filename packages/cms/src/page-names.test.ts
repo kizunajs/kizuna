@@ -62,7 +62,8 @@ const serviceWith = (pages: Record<string, string>): CmsService => {
     });
     const config = defineConfig({
         jobRunner: {
-            mode: 'in-process',
+            mode: 'long-running',
+            transport: false,
         },
         auth: {
             identities: {
@@ -203,7 +204,8 @@ const serviceOf = (content: ReturnType<typeof cms>): CmsService =>
         pluginExportsOf(
             defineConfig({
                 jobRunner: {
-                    mode: 'in-process',
+                    mode: 'long-running',
+                    transport: false,
                 },
                 auth: {
                     identities: {

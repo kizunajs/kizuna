@@ -159,13 +159,22 @@ A caller sends requests and reads responses, so tightening an input and dropping
 | A required field optional                 | changed      | **breaking** |
 | A field made nullable                     | changed      | **breaking** |
 | A nullable field made non-null            | **breaking** | changed      |
-| A type changed                            | **breaking** | **breaking** |
+| A type widened to hold more               | changed      | **breaking** |
+| A type narrowed to what it held           | **breaking** | changed      |
+| A type changed to another                 | **breaking** | **breaking** |
 | A `z.discriminatedUnion()` option removed | **breaking** | **breaking** |
 | A `z.discriminatedUnion()` option added   | changed      | **breaking** |
 | An enum value removed                     | **breaking** | **breaking** |
 | An enum value added                       | changed      | **breaking** |
 
-That last row catches people out. Adding a value to a response enum breaks any client that generated a closed enum for it, which is what [`unknownEnumCase`](/docs/clients/swift) exists for in the Swift and Kotlin clients.
+A type widens when the new one still holds the old, like `z.string()` becoming `z.union([z.string(), NameFilterSchema])`. Every request that worked still works, so it is reported as changed with a note that the generated client type changes:
+
+```
+CHANGED  GET /users query.where.name widens from string to string | object
+         the generated client type changes, the HTTP surface does not
+```
+
+The last row catches people out. Adding a value to a response enum breaks any client that generated a closed enum for it. An enum or discriminated union marked [`extensible`](/docs/reference/kizuna-model#a-model-that-will-gain-members) is the exception: its Swift and Kotlin clients take a member they don't know, so a new value or a new member of the union is reported as changed. [`unknownEnumCase`](/docs/clients/swift) does the same for every enum and union in one client, but `kizuna diff` can't see a client's settings, so it still reports those as breaking.
 
 Bodies, query parameters, headers and every response body are compared, reported by path and followed into arrays:
 

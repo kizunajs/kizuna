@@ -83,7 +83,8 @@ const editor = k.identity
 const pglite = new PGlite();
 const config = defineConfig({
     jobRunner: {
-        mode: 'in-process',
+        mode: 'long-running',
+        transport: false,
     },
     adapter: {
         ...expressAdapter(),

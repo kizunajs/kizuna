@@ -33,6 +33,8 @@ const app = express();
 kizuna.api.mount(app);
 ```
 
+`kizuna.api.fetch` answers a request in this process with the same routes, the way `fetch` would over HTTP. See [In process](/docs/clients/fetch#in-process).
+
 ## What it takes
 
 | Field            | What it is                                                                                                                                                                    |
@@ -47,7 +49,7 @@ kizuna.api.mount(app);
 | `plugins`        | What this API installs beside its own routes, as a list. See [Create a Plugin](/docs/extend/create-plugin).                                                                   |
 | `content`        | The content editors change, from a provider such as `cms()` from `@kizunajs/cms`. Its routes join this API's. See [Config](/docs/config#content).                             |
 | `groups`         | The groups routes are filed under, from [`k.groups`](/docs/reference/k-groups).                                                                                               |
-| `typescript`     | Where `kizuna generate` writes the `Config`, as `{ outputFile }`.                                                                                                             |
+| `typescript`     | Where `kizuna generate` writes the `Config` in `outputFile` and what else it holds in `extend`. See [Extend Kizuna](/docs/extend/extend-kizuna).                              |
 | `clients`        | The clients `kizuna generate` writes from this API, each built with [`defineClient`](/docs/extend/create-client).                                                             |
 
 `jobs` is what the jobs are, and `jobRunner` is how this deployment runs them: the first is shared by every config that serves these routes, the second differs between dev and production.
@@ -110,11 +112,12 @@ export default defineConfig({
     jobs,
     jobRunner: {
         mode: 'http',
+        transport: false,
     },
 });
 ```
 
-`jobRunner` is required once `jobs` declares one, and its `mode` says how they run: `'http'` serves the two job endpoints, `'in-process'` leaves them unmounted for `startJobs` to tick. A job carries its own identity, so it declares no `auth`, and it stays out of `api.routes`, the OpenAPI document, and the generated Swift, Kotlin and MCP surfaces. See [Jobs](/docs/jobs).
+`jobRunner` is required once `jobs` declares one, and its `mode` says how they run: `'http'` serves the two job endpoints, `'long-running'` leaves them unmounted for `startJobs` to tick. A job carries its own identity, so it declares no `auth`, and it stays out of `api.routes`, the OpenAPI document, and the generated Swift, Kotlin and MCP surfaces. See [Jobs](/docs/jobs).
 
 ## Plugins
 

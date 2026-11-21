@@ -29,9 +29,11 @@ import {
     pluginRoutesOf,
     pluginExportsOf,
     pluginRouterOf,
+    isMethodOverride,
+    METHOD_OVERRIDE_HEADER,
 } from 'kizunajs/adapter';
 import type { SecurityScheme } from 'kizunajs';
-import { type NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 export { NextRequest, NextResponse } from 'next/server';
 
@@ -94,6 +96,24 @@ const jsonResponse = (status: number, body: unknown, headers: Record<string, str
         status,
         headers,
     });
+
+/**
+ * The GET a method-override POST stands in for: its form body appended to the
+ * URL's query, so the GET route reads it as it reads any query.
+ */
+const asGetRequest = async (request: NextRequest): Promise<NextRequest> => {
+    const url = new URL(request.url);
+    for (const [key, value] of new URLSearchParams(await request.text())) url.searchParams.append(key, value);
+    const headers = new Headers(request.headers);
+    headers.delete('content-type');
+    headers.delete('content-length');
+    headers.delete(METHOD_OVERRIDE_HEADER);
+    return new NextRequest(url, {
+        method: 'GET',
+        headers,
+        signal: request.signal,
+    });
+};
 
 export const handleNextRequest = async <T extends Routes>(
     request: NextRequest,
@@ -314,7 +334,14 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
 
     const hasPluginRoutes = Object.keys(pluginRoutes).length > 0;
 
-    const handler = async (request: NextRequest) => {
+    const handler = async (incoming: NextRequest) => {
+        const request = isMethodOverride(
+            incoming.method,
+            incoming.headers.get(METHOD_OVERRIDE_HEADER),
+            incoming.headers.get('content-type')
+        )
+            ? await asGetRequest(incoming)
+            : incoming;
         if (hasPluginRoutes) {
             const pathname = new URL(request.url).pathname;
             const claimedByApi = matchRoute(request.method, pathname, api.routes, options?.basePath).kind === 'matched';
@@ -450,8 +477,23 @@ export const nextContentRuntime: ContentRuntime = {
     },
 };
 
-export const nextAdapter = (defaults?: NextHandlerOptions): Adapter<NextHandlerContext, [options?: NextHandlerOptions], HttpHandlers> => ({
-    name: 'next',
-    mount: (api, options) => mountNext(api as NextApiWithRouter, { ...defaults, ...options }),
-    content: nextContentRuntime,
-});
+export const nextAdapter = (defaults?: NextHandlerOptions): Adapter<NextHandlerContext, [options?: NextHandlerOptions], HttpHandlers> => {
+    const inProcess = new WeakMap<object, HttpHandler>();
+    return {
+        name: 'next',
+        mount: (api, options) => mountNext(api as NextApiWithRouter, { ...defaults, ...options }),
+        content: nextContentRuntime,
+        fetch: (api, request) => {
+            let handler = inProcess.get(api);
+            if (handler === undefined) {
+                // Paths are the routes' own, so the base path a route file mounts under does not apply.
+                handler = mountNext(api as NextApiWithRouter, {
+                    ...defaults,
+                    basePath: undefined,
+                }).GET;
+                inProcess.set(api, handler);
+            }
+            return handler(new NextRequest(request));
+        },
+    };
+};

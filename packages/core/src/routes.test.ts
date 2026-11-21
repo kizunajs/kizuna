@@ -156,6 +156,115 @@ describe('k.routes', () => {
     });
 });
 
+const EventFilterSchema = Kizuna.model({
+    title: 'EventFilter',
+    schema: z.object({
+        city: z.string().optional(),
+        get or() {
+            return z.array(EventFilterSchema).optional();
+        },
+    }),
+});
+
+const FolderSchema = Kizuna.model({
+    title: 'Folder',
+    schema: z.object({
+        name: z.string(),
+        get folders() {
+            return z.record(z.string(), FolderSchema);
+        },
+    }),
+});
+
+const CategorySchema = z.object({
+    name: z.string(),
+    get subcategories() {
+        return z.array(CategorySchema);
+    },
+});
+
+const TaskSchema = Kizuna.model({
+    title: 'Task',
+    schema: z.object({
+        title: z.string(),
+        get parent() {
+            return TaskSchema.optional();
+        },
+    }),
+});
+
+const CommentSchema: z.ZodType = z.lazy(() =>
+    z.object({
+        text: z.string(),
+        replies: z.array(CommentSchema),
+    })
+);
+
+const routeAnswering = (schema: z.ZodType) =>
+    k.route({
+        method: 'GET',
+        path: '/items',
+        responses: {
+            200: schema,
+        },
+    });
+
+describe('k.routes schemas that hold themselves', () => {
+    it('accepts a model that holds itself in a list', () => {
+        expect(() =>
+            k.routes.users({
+                searchEvents: k.route({
+                    method: 'POST',
+                    path: '/events/search',
+                    body: EventFilterSchema,
+                    responses: {
+                        200: z.array(EventFilterSchema),
+                    },
+                }),
+            })
+        ).not.toThrow();
+    });
+
+    it('accepts a model that holds itself in a record', () => {
+        expect(() =>
+            k.routes.users({
+                getFolder: routeAnswering(FolderSchema),
+            })
+        ).not.toThrow();
+    });
+
+    it('throws on a schema that holds itself without a name', () => {
+        expect(() =>
+            k.routes.users({
+                listCategories: routeAnswering(CategorySchema),
+            })
+        ).toThrowError(
+            'Route "listCategories" holds a schema inside itself at "responses.200.subcategories". A client can only refer to a schema by its name, ' +
+                "so wrap it in Kizuna.model({ title: 'Comment', schema: ... })."
+        );
+    });
+
+    it('throws on a model that holds itself directly in a field', () => {
+        expect(() =>
+            k.routes.users({
+                getTask: routeAnswering(TaskSchema),
+            })
+        ).toThrowError(
+            'Route "getTask" holds a model directly inside itself at "responses.200.parent". A Swift struct cannot contain itself, so hold it in a list, or hold its id.'
+        );
+    });
+
+    it('throws on z.lazy and shows the getter', () => {
+        expect(() =>
+            k.routes.users({
+                listComments: routeAnswering(CommentSchema),
+            })
+        ).toThrowError(
+            'Route "listComments" uses z.lazy at "responses.200", which has no type a client can name.\nMake the schema a Kizuna.model'
+        );
+    });
+});
+
 describe('k.routes z.coerce ban', () => {
     it('throws when a top-level query schema is coerced', () => {
         expect(() =>
@@ -448,29 +557,45 @@ describe('k.routes fields a request cannot carry', () => {
             }),
         });
 
-    it('throws for a query field that is not a value or a list of values', () => {
-        expect(
-            listNotesWith(
-                z.object({
-                    status: z.string(),
-                })
-            )
-        ).toThrowError(
-            'Route "listNotes" declares query field "filter" as object. A query string carries values and lists of values, so this cannot be sent.'
+    it('throws for a file in a query', () => {
+        expect(listNotesWith(FileSchema)).toThrowError(
+            'Route "listNotes" declares query field "filter" as file. A query string carries text and JSON. A file needs a multipart form body.'
         );
-        expect(listNotesWith(z.record(z.string(), z.string()))).toThrowError('as record');
+        expect(listNotesWith(z.array(BinarySchema))).toThrowError('as array of BinarySchema');
+    });
+
+    it('accepts anything but a file in a query and sends it as JSON', () => {
         expect(
             listNotesWith(
                 z
-                    .array(
-                        z.object({
-                            status: z.string(),
-                        })
-                    )
+                    .object({
+                        status: z.string(),
+                    })
                     .optional()
             )
-        ).toThrowError('as array of object');
-        expect(listNotesWith(z.array(z.array(z.string())))).toThrowError('as array of array');
+        ).not.toThrow();
+        expect(listNotesWith(z.record(z.string(), z.string()))).not.toThrow();
+        expect(
+            listNotesWith(
+                z.array(
+                    z.object({
+                        status: z.string(),
+                    })
+                )
+            )
+        ).not.toThrow();
+        expect(listNotesWith(z.array(z.array(z.string())))).not.toThrow();
+        expect(listNotesWith(z.tuple([z.string()]))).not.toThrow();
+        expect(
+            listNotesWith(
+                z.union([
+                    z.string(),
+                    z.object({
+                        status: z.string(),
+                    }),
+                ])
+            )
+        ).not.toThrow();
     });
 
     it('accepts a value, a list of values and a transform in a query', () => {
@@ -519,6 +644,38 @@ describe('k.routes fields a request cannot carry', () => {
         expect(uploadAvatarWith('multipart/form-data', z.array(FileSchema))).not.toThrow();
         expect(uploadAvatarWith('multipart/form-data', z.array(z.string()).optional())).not.toThrow();
         expect(uploadAvatarWith('application/x-www-form-urlencoded', z.number())).not.toThrow();
+    });
+
+    it('accepts a query union of values, and of a value or a list of values', () => {
+        expect(listNotesWith(z.union([z.string(), z.number()]))).not.toThrow();
+        expect(listNotesWith(z.union([z.array(z.string()), z.string()]).optional())).not.toThrow();
+    });
+
+    it('throws for a header whose union holds an object', () => {
+        expect(
+            getNoteWith(
+                z.union([
+                    z.string(),
+                    z.object({
+                        id: z.string(),
+                    }),
+                ])
+            )
+        ).toThrowError('Route "getNote" declares header "x-workspace" as a union holding object. A header carries one value');
+    });
+
+    it('throws for a urlencoded form field whose union holds an object', () => {
+        expect(
+            uploadAvatarWith(
+                'application/x-www-form-urlencoded',
+                z.union([
+                    z.string(),
+                    z.object({
+                        size: z.number(),
+                    }),
+                ])
+            )
+        ).toThrowError('Route "uploadAvatar" declares form field "file" as a union holding object.');
     });
 
     it('leaves a JSON body to carry any shape', () => {
@@ -570,6 +727,20 @@ describe('k.routes structured path params', () => {
         expect(routeWith(z.tuple([z.string()]))).toThrowError('as tuple');
         expect(routeWith(z.map(z.string(), z.string()))).toThrowError('as map');
         expect(routeWith(z.set(z.string()))).toThrowError('as set');
+    });
+
+    it('throws for a union that holds an object', () => {
+        expect(
+            routeWith(
+                z.union([
+                    z.string(),
+                    z.object({
+                        city: z.string(),
+                    }),
+                ])
+            )
+        ).toThrowError('Route "getPlace" declares path parameter "value" as a union holding object.');
+        expect(routeWith(z.union([z.uuid(), z.int()]))).not.toThrow();
     });
 
     it('accepts scalars, enums, and a string transform that yields an array', () => {

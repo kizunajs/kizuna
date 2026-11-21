@@ -1,6 +1,8 @@
 import { isCompiledJob, jobAt, toJobResponse, type CompiledJob, type JobHandlerReturn, type JobHandlers, type Jobs } from './jobs.js';
 import { ResponseError } from './response-error.js';
 import type { JobMessage, JobTransport } from './job-transport.js';
+import { waitUntil } from './wait-until.js';
+import type { ResponseHeaders } from './types.js';
 import type { z } from 'zod';
 
 /**
@@ -49,8 +51,8 @@ export interface JobFn<Job extends CompiledJob> {
      */
     run: (...args: JobRunArgs<Job>) => Promise<JobHandlerReturn<Job['definition']>>;
     /**
-     * Put the job in line and answer without waiting for it. With no transport
-     * configured the job runs in this process and is lost on a crash.
+     * Put the job in line and answer without waiting for it. With
+     * `transport: false` the job runs in this process and is lost on a crash.
      */
     queue: (...args: JobQueueArgs<Job>) => Promise<void>;
 }
@@ -83,8 +85,10 @@ export class JobInputError extends Error {
 }
 
 /**
- * Called when a job queued without a transport rejects. Without one, the
- * failure is logged.
+ * Called for every failed run of a job that no caller awaits: one a worker,
+ * `/jobs/dispatch` or `/jobs/run` ran, or one queued with `transport: false`. A
+ * run fails when its handler throws or answers a status of 400 or more, which
+ * arrives as a `ResponseError`. Without one, the failure is logged.
  */
 export type JobErrorHandler = (job: string, error: unknown) => void;
 
@@ -121,6 +125,38 @@ export const jobFnAt = (runner: unknown, jobKey: string): JobFnByKey | undefined
     }
     const candidate = node as { run?: unknown; queue?: unknown } | undefined;
     return typeof candidate?.run === 'function' && typeof candidate.queue === 'function' ? (candidate as JobFnByKey) : undefined;
+};
+
+/**
+ * Run a job no caller awaits, rejecting when it fails and reporting the
+ * failure to `onError`, or to `logger` without one.
+ */
+export const attemptJob = async (
+    run: () => Promise<unknown>,
+    jobKey: string,
+    onError: JobErrorHandler | undefined,
+    logger: Pick<Console, 'error'> = console
+): Promise<unknown> => {
+    try {
+        const response = (await run()) as {
+            status: number;
+            body: unknown;
+            headers?: ResponseHeaders;
+        };
+        if (response.status >= 400) throw new ResponseError(response);
+        return response;
+    } catch (error) {
+        if (!onError) {
+            logger.error(`[kizuna] Job "${jobKey}" failed:`, error);
+        } else {
+            try {
+                onError(jobKey, error);
+            } catch (hookError) {
+                logger.error('[kizuna] The jobs onError threw:', hookError);
+            }
+        }
+        throw error;
+    }
 };
 
 const handlerAt = (handlers: unknown, jobKey: string): unknown => {
@@ -191,20 +227,14 @@ export const createJobRunner = <Jobs_ extends Jobs>(
 
     const runDetached = (jobKey: string, input: unknown, runAt: Date | undefined): void => {
         const start = (): void => {
-            void invoke(jobKey, input).catch((error: unknown) => {
-                if (options?.onError) {
-                    options.onError(jobKey, error);
-                    return;
-                }
-                console.error(`[kizuna] Queued job "${jobKey}" failed:`, error);
-            });
+            void attemptJob(() => invoke(jobKey, input), jobKey, options?.onError).catch(() => {});
         };
-        const delay = runAt ? runAt.getTime() - Date.now() : 0;
-        if (delay <= 0) {
+        const time = runAt?.getTime();
+        if (time === undefined || time <= Date.now()) {
             start();
             return;
         }
-        setTimeout(start, delay).unref?.();
+        waitUntil(time, start);
     };
 
     /**

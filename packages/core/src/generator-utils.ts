@@ -1,5 +1,6 @@
 import type { z } from 'zod';
-import type { CachePolicy, ResponseDefinition, StreamDefinition, StreamResponseDefinition } from './types.js';
+import type { CachePolicy, ResponseDefinition, RouteDefinition, StreamDefinition, StreamResponseDefinition } from './types.js';
+import { readDef, resolveBaseType, unwrapOptionalWrappers } from './zod-internals.js';
 
 // Kept out of generator.ts so importing these doesn't pull in its node:fs dependency.
 
@@ -10,6 +11,32 @@ export const isZodSchema = (value: unknown): value is z.ZodType => typeof value 
  */
 export const isStreamResponse = (value: ResponseDefinition | undefined): value is StreamResponseDefinition =>
     value !== undefined && typeof value === 'object' && !isZodSchema(value) && 'stream' in value && value.stream !== undefined;
+
+const STRUCTURED_TYPES: ReadonlySet<string> = new Set(['object', 'array', 'record', 'tuple', 'map', 'set']);
+
+const unionOptions = (schema: z.core.$ZodType): z.core.$ZodType[] => {
+    const def = readDef(unwrapOptionalWrappers(schema).inner);
+    return def.type === 'union' ? (def.options ?? []).flatMap(unionOptions) : [schema];
+};
+
+const holdsOnlyValues = (schema: z.core.$ZodType): boolean =>
+    unionOptions(schema).every((option) => !STRUCTURED_TYPES.has(resolveBaseType(option)));
+
+/**
+ * Whether a query field travels as one JSON text. A value or a list of values
+ * is written as plain text and anything else is JSON.
+ */
+export const isJsonQueryField = (schema: z.core.$ZodType): boolean =>
+    !unionOptions(schema).every((option) => {
+        const def = readDef(unwrapOptionalWrappers(option).inner);
+        return holdsOnlyValues(def.type === 'array' && def.element !== undefined ? def.element : option);
+    });
+
+/**
+ * Whether the server validates any part of a route's request and so may answer the automatic 400.
+ */
+export const validatesRequest = (route: Pick<RouteDefinition, 'pathParams' | 'query' | 'headers' | 'body'>): boolean =>
+    route.pathParams !== undefined || route.query !== undefined || route.headers !== undefined || route.body !== undefined;
 
 /**
  * The body schema of a response, or `undefined` for a stream, which has none.
@@ -34,6 +61,21 @@ export const resolveResponseCache = (value: ResponseDefinition | undefined): Cac
 
 export const resolveResponseEtag = (value: ResponseDefinition | undefined): boolean =>
     value !== undefined && !isZodSchema(value) && !isStreamResponse(value) && value.etag === true;
+
+/**
+ * Makes a list of names unique, in order. A name an earlier one already took
+ * gets `_` in front until it is free, so `name` and `-name`, both written
+ * `name`, become `name` and `_name`. A list with no clash comes back as it was.
+ */
+export const uniqueNames = (names: readonly string[]): string[] => {
+    const taken = new Set<string>();
+    return names.map((name) => {
+        let unique = name;
+        while (taken.has(unique)) unique = `_${unique}`;
+        taken.add(unique);
+        return unique;
+    });
+};
 
 export const toPascalCase = (input: string): string => {
     if (!input) return input;

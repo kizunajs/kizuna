@@ -15,6 +15,7 @@ export interface SchemaChange {
      */
     path: string;
     summary: string;
+    detail?: string;
 }
 
 const joinPath = (parent: string, key: string): string => (parent === '' ? key : `${parent}.${key}`);
@@ -25,18 +26,55 @@ const fieldsOf = (schema: SchemaNode): Record<string, { optional: boolean; schem
 const elementOf = (schema: SchemaNode): SchemaNode | undefined =>
     schema.kind === 'array' ? (schema as Extract<SchemaNode, { kind: 'array' }>).element : undefined;
 
-const taggedOf = (schema: SchemaNode): Extract<SchemaNode, { kind: 'union' }> | undefined =>
-    schema.kind === 'union' && 'options' in schema ? (schema as Extract<SchemaNode, { kind: 'union' }>) : undefined;
+type TaggedUnion = Extract<SchemaNode, { kind: 'union'; discriminator: string }>;
+
+const taggedOf = (schema: SchemaNode): TaggedUnion | undefined =>
+    schema.kind === 'union' && 'discriminator' in schema ? (schema as TaggedUnion) : undefined;
 
 const valuesOf = (schema: SchemaNode): string[] | undefined =>
     schema.kind === 'enum' ? (schema as Extract<SchemaNode, { kind: 'enum' }>).values : undefined;
 
+const modelOf = (schema: SchemaNode): string | undefined =>
+    schema.kind === 'model' ? (schema as Extract<SchemaNode, { kind: 'model' }>).model : undefined;
+
+const isExtensible = (schema: SchemaNode): boolean => (schema as { extensible?: true }).extensible === true;
+
+const optionsOf = (schema: SchemaNode): SchemaNode[] | undefined => {
+    if (schema.kind !== 'union' || taggedOf(schema)) return undefined;
+    return (schema as Extract<SchemaNode, { kind: 'union'; options: SchemaNode[] }>).options;
+};
+
 /**
- * What a reader sees when the kinds differ, so `array` reads as `array<string>`.
+ * What a union may hold, tagged or not.
+ */
+const alternativesOf = (schema: SchemaNode): SchemaNode[] | undefined => {
+    const tagged = taggedOf(schema);
+    return tagged ? Object.values(tagged.options) : optionsOf(schema);
+};
+
+/**
+ * Whether every value `narrow` allows is one `wide` allows too. A union holds
+ * whatever one of its options holds.
+ */
+const holds = (wide: SchemaNode, narrow: SchemaNode): boolean => {
+    const narrowOptions = alternativesOf(narrow);
+    if (narrowOptions) return narrowOptions.every((option) => holds(wide, option));
+    const wideOptions = alternativesOf(wide);
+    if (wideOptions && wide.kind !== narrow.kind) return wideOptions.some((option) => holds(option, narrow));
+    if (wide.kind !== narrow.kind || modelOf(wide) !== modelOf(narrow)) return false;
+    if (narrow.nullable === true && wide.nullable !== true) return false;
+    return diffSchemas(narrow, wide, 'request').every((change) => !change.breaking);
+};
+
+/**
+ * What a reader sees when the kinds differ, so `array` reads as `array<string>` and a union as `string | number`.
  */
 const describeKind = (schema: SchemaNode): string => {
     const element = elementOf(schema);
-    return element ? `array<${describeKind(element)}>` : schema.kind;
+    if (element) return `array<${describeKind(element)}>`;
+    const options = alternativesOf(schema);
+    if (options) return options.map(describeKind).join(' | ');
+    return modelOf(schema) ?? schema.kind;
 };
 
 /**
@@ -67,12 +105,34 @@ export const diffSchemas = (
         return [{ breaking: direction === 'response', path, summary: `${path || 'the body'} is gone` }];
     }
 
-    if (before.kind !== after.kind) {
+    const kindChanged =
+        before.kind !== after.kind ||
+        modelOf(before) !== modelOf(after) ||
+        (taggedOf(before) === undefined) !== (taggedOf(after) === undefined);
+    const bothUnions = optionsOf(before) !== undefined && optionsOf(after) !== undefined;
+    if (kindChanged || bothUnions) {
+        const label = path || 'the body';
+        const widened = holds(after, before);
+        const narrowed = holds(before, after);
+        if (!kindChanged && widened && narrowed) return [];
+        // A server that takes more than it did and a client that reads less than it could keep working,
+        // and so does a client reading an extensible union, built to take members it doesn't know.
+        const extensibleWidening = direction === 'response' && widened && !kindChanged && isExtensible(after);
+        if (extensibleWidening || (direction === 'request' ? widened : narrowed)) {
+            return [
+                {
+                    breaking: false,
+                    path,
+                    summary: `${label} ${direction === 'request' ? 'widens' : 'narrows'} from ${describeKind(before)} to ${describeKind(after)}`,
+                    detail: 'the generated client type changes, the HTTP surface does not',
+                },
+            ];
+        }
         return [
             {
                 breaking: true,
                 path,
-                summary: `${path || 'the body'} is ${describeKind(after)} instead of ${describeKind(before)}`,
+                summary: `${label} is ${describeKind(after)} instead of ${describeKind(before)}`,
             },
         ];
     }
@@ -181,8 +241,9 @@ export const diffSchemas = (
         for (const [tag, option] of Object.entries(nowTagged.options)) {
             const existing = wasTagged.options[tag];
             if (existing === undefined) {
+                // An extensible union's clients are built to read members they don't know.
                 changes.push({
-                    breaking: direction === 'response',
+                    breaking: direction === 'response' && !isExtensible(after),
                     path,
                     summary:
                         direction === 'response'
@@ -217,8 +278,9 @@ export const diffSchemas = (
             changes.push({ breaking: true, path, summary: `${path || 'the body'} no longer accepts ${removed.join(', ')}` });
         }
         if (added.length > 0) {
+            // An extensible enum's clients are built to read values they don't know.
             changes.push({
-                breaking: direction === 'response',
+                breaking: direction === 'response' && !isExtensible(after),
                 path,
                 summary:
                     direction === 'response'

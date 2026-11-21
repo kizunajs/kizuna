@@ -143,3 +143,39 @@ describe('brands in a snapshot', () => {
         });
     });
 });
+
+describe('a model that holds itself', () => {
+    const EventFilterSchema = Kizuna.model({
+        title: 'EventFilter',
+        schema: z.object({
+            city: z.string().optional(),
+            get or() {
+                return z.array(EventFilterSchema).optional();
+            },
+        }),
+    });
+
+    it('is written out once, and inside itself by its title', () => {
+        expect(toSchemaNode(EventFilterSchema)).toEqual({
+            kind: 'object',
+            fields: {
+                city: {
+                    optional: true,
+                    schema: {
+                        kind: 'string',
+                    },
+                },
+                or: {
+                    optional: true,
+                    schema: {
+                        kind: 'array',
+                        element: {
+                            kind: 'model',
+                            model: 'EventFilter',
+                        },
+                    },
+                },
+            },
+        });
+    });
+});

@@ -25,6 +25,7 @@ export default defineConfig({
     routes,
     jobRunner: {
         mode: 'http',
+        transport: false,
     },
     jobs,
     clients: [

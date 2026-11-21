@@ -81,7 +81,8 @@ let config: ReturnType<typeof makeConfig>;
 const makeConfig = (db: ReturnType<typeof drizzle>) =>
     defineConfig({
         jobRunner: {
-            mode: 'in-process',
+            mode: 'long-running',
+            transport: false,
         },
         adapter: expressAdapter(),
         auth: {

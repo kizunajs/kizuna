@@ -84,7 +84,8 @@ const install = (on?: ResendEventHandlers, intercept?: ResendPluginProps['interc
         routes: [],
         jobs,
         jobRunner: {
-            mode: 'in-process',
+            mode: 'long-running',
+            transport: false,
         },
         plugins: [
             resendPlugin({

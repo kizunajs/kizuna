@@ -8,6 +8,7 @@ import {
     type JobsMeta,
     type JobWorker,
 } from './adapter.js';
+import { attemptJob } from './job-runner.js';
 
 export interface StartJobWorkerOptions {
     /**
@@ -31,9 +32,11 @@ export interface StartJobWorkerOptions {
  *
  * Returns `undefined` when the transport does not implement `start`.
  *
- * Each message goes through the same runner `queue` writes to, so its input is
- * validated against the schema it lands on rather than the one it left, and a
- * rejection propagates for the transport to retry.
+ * Each message's input is validated against the schema it lands on.
+ *
+ * A handler that throws, or returns a status of 400 or more, rejects. A
+ * returned status rejects as a `ResponseError`, so a transport can tell a `422`
+ * from a `503`. Each failed attempt also reaches the jobs' `onError`.
  *
  * @example
  * const worker = await startJobWorker(api);
@@ -74,7 +77,7 @@ export const startJobWorker = async (api: unknown, options?: StartJobWorkerOptio
         run: async (message) => {
             const jobFn = jobFnAt(runner, message.job);
             if (!jobFn) throw new Error(`No handler is bound for job "${message.job}" on this api.`);
-            await jobFn.run(message.input);
+            await attemptJob(() => jobFn.run(message.input), message.job, meta.onError, logger);
         },
     });
 };

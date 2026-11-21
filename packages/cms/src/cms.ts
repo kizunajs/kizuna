@@ -773,14 +773,13 @@ export class CmsService {
         if (!this.siteValueDefinitions.has(key)) {
             const fields = dataFields(definition.fields)
                 .filter((field) => field.perSite === true || field.sites?.includes(site) === true)
-                .map(
-                    ({ condition: _, ...field }): Field =>
-                        field.perSite === true
-                            ? {
-                                  ...field,
-                                  schema: field.schema.optional(),
-                              }
-                            : field
+                .map(({ condition: _, ...field }): Field =>
+                    field.perSite === true
+                        ? {
+                              ...field,
+                              schema: field.schema.optional(),
+                          }
+                        : field
                 );
             this.siteValueDefinitions.set(
                 key,

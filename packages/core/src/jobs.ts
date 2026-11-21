@@ -26,7 +26,7 @@ export type JobsConfig = HttpJobsConfig | InProcessJobsConfig;
 export interface HttpJobsConfig {
     /**
      * `'http'` serves `/jobs/dispatch` and `/jobs/run`, guarded by the jobs'
-     * identity. `'in-process'` is for a long-running server whose schedules
+     * identity. `'long-running'` is for a long-running server whose schedules
      * `startJobs` ticks, and serves neither.
      */
     mode: 'http';
@@ -65,7 +65,7 @@ export interface HttpJobsConfig {
  * No job endpoint is served, so the jobs need no identity.
  */
 export interface InProcessJobsConfig {
-    mode: 'in-process';
+    mode: 'long-running';
     path?: never;
     method?: never;
     windowMs?: never;
@@ -86,13 +86,15 @@ export type JobRunnerConfig = JobsConfig & JobDeliveryConfig;
  */
 export interface JobDeliveryConfig {
     /**
-     * Carries a queued job to whatever runs it. Without one, `queue` runs the
-     * job in this process and it is lost on a crash.
+     * Carries a queued job to whatever runs it. `false` runs a queued job in
+     * this process, without waiting for it, and loses it on a crash or a
+     * serverless freeze.
      */
-    transport?: JobTransport;
+    transport: JobTransport | false;
     /**
-     * Reached when a job fails after its response was sent, which is the only
-     * point where nothing else can report it.
+     * Reached by every failed run no caller awaits, from a worker,
+     * `/jobs/dispatch`, `/jobs/run`, or `queue` with `transport: false`. Called
+     * once per attempt.
      */
     onError?: JobErrorHandler;
 }
@@ -439,16 +441,22 @@ export const isCompiledJob = (value: unknown): value is CompiledJob => {
  * would be served with no identity guarding them. `contentOnly` says every job
  * is the content provider's, so the error names where its identity goes.
  */
-export const assertJobRunner = (jobs: Jobs | undefined, config: JobsConfig | undefined, contentOnly = false): void => {
+export const assertJobRunner = (jobs: Jobs | undefined, config: JobRunnerConfig | undefined, contentOnly = false): void => {
     const flattened = jobs ? flattenJobs(jobs) : [];
     if (flattened.length === 0) return;
     if (config?.mode === undefined) {
         throw new Error(
             "The jobs do not say how they run. Set `jobRunner: { mode: 'http' }` to serve `/jobs/dispatch` and `/jobs/run`, " +
-                "or `jobRunner: { mode: 'in-process' }` when `startJobs` ticks them in this process."
+                "or `jobRunner: { mode: 'long-running' }` when `startJobs` ticks them in this process."
         );
     }
-    if (config.mode === 'in-process') return;
+    if (config.transport === undefined) {
+        throw new Error(
+            'The jobs do not say where queued work goes. Set `jobRunner.transport` to a transport, such as `pgmqTransport({ pool })`, ' +
+                'or to `false` to run a queued job in this process and lose it on a crash.'
+        );
+    }
+    if (config.mode === 'long-running') return;
     const identities = [...new Set(flattened.map(({ job }) => job.identity).filter((identity) => identity !== undefined))];
     if (identities.length > 1) {
         throw new Error(
@@ -466,7 +474,7 @@ export const assertJobRunner = (jobs: Jobs | undefined, config: JobsConfig | und
     }
     throw new Error(
         `The jobs declare no identity, so \`${base}/dispatch\` and \`${base}/run\` would let anyone trigger them. ` +
-            "Pass an identity to `k.jobs`, or set `jobRunner: { mode: 'in-process' }` when the jobs run in this process with `startJobs`."
+            "Pass an identity to `k.jobs`, or set `jobRunner: { mode: 'long-running' }` when the jobs run in this process with `startJobs`."
     );
 };
 
@@ -487,7 +495,7 @@ export const withContentJobs = (jobs: Jobs | undefined, provided: Jobs | undefin
 };
 
 export const jobClaims = (jobs: Jobs | undefined, config: JobsConfig | undefined): PathClaim[] => {
-    if (!jobs || config?.mode === 'in-process' || flattenJobs(jobs).length === 0) return [];
+    if (!jobs || config?.mode === 'long-running' || flattenJobs(jobs).length === 0) return [];
     const base = config?.path ?? DEFAULT_JOBS_PATH;
     return [
         {

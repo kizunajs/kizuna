@@ -178,31 +178,27 @@ export const loadDocuments = async (connection: Connection, collections: readonl
         pages.status === 200
             ? pages.body.pages
                   .filter((page) => page.ref.startsWith('page:'))
-                  .map(
-                      (page): SearchResult => ({
-                          label: page.label ?? humanize(page.name.replace(/Page$/, '')),
-                          detail: page.path,
-                          group: 'Pages',
-                          screen: {
-                              kind: 'document',
-                              ref: page.ref,
-                          },
-                      })
-                  )
+                  .map((page): SearchResult => ({
+                      label: page.label ?? humanize(page.name.replace(/Page$/, '')),
+                      detail: page.path,
+                      group: 'Pages',
+                      screen: {
+                          kind: 'document',
+                          ref: page.ref,
+                      },
+                  }))
             : [];
     const itemResults = items.flatMap((answer, index) =>
         answer.status === 200
-            ? answer.body.items.map(
-                  (item): SearchResult => ({
-                      label: item.label,
-                      detail: item.status === undefined ? '' : statusLabelOf(item.status),
-                      group: collections[index]!.label,
-                      screen: {
-                          kind: 'document',
-                          ref: item.ref,
-                      },
-                  })
-              )
+            ? answer.body.items.map((item): SearchResult => ({
+                  label: item.label,
+                  detail: item.status === undefined ? '' : statusLabelOf(item.status),
+                  group: collections[index]!.label,
+                  screen: {
+                      kind: 'document',
+                      ref: item.ref,
+                  },
+              }))
             : []
     );
     return [...pageResults, ...itemResults];

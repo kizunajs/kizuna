@@ -107,7 +107,8 @@ const db = drizzle(pglite);
 const assemble = (dashboard: Parameters<typeof cms>[0]['dashboard']) =>
     defineConfig({
         jobRunner: {
-            mode: 'in-process',
+            mode: 'long-running',
+            transport: false,
         },
         adapter: expressAdapter(),
         auth: {

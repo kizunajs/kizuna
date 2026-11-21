@@ -175,6 +175,19 @@ const routes = k.routes({
             auth: false,
             query: z.object({
                 page: z.number().optional(),
+                filter: z
+                    .object({
+                        role: z.enum(['admin', 'member']).optional(),
+                        name: z.string().optional(),
+                    })
+                    .optional(),
+                anyOf: z
+                    .array(
+                        z.object({
+                            name: z.string(),
+                        })
+                    )
+                    .optional(),
             }),
             responses: {
                 200: z.object({

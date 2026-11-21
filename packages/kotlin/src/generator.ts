@@ -8,10 +8,14 @@ import {
     resolveResponseHeaders,
     isBinarySchema,
     isJsonMediaType,
+    isJsonQueryField,
+    validatesRequest,
     isObjectSchema,
     isDiscriminatedUnionSchema,
     readMetaId,
+    readObjectShape,
     toPascalCase,
+    uniqueNames,
     shortTypeName,
     isHintPrefix,
     localTypeName,
@@ -62,10 +66,10 @@ export interface KotlinConfig {
      */
     camelCaseProperties?: boolean;
     /**
-     * Emit each `z.enum` as a `sealed interface` with an `Unknown(wireValue)`
-     * member, so unrecognised wire values decode instead of throwing. The raw
-     * string round-trips on encode and in query params. Discriminated unions are
-     * unaffected and still throw on an unknown discriminator.
+     * Give each `z.enum` and discriminated union an `Unknown(wireValue)` member,
+     * so a value this client doesn't know decodes instead of throwing.
+     *
+     * An unknown union value can't be sent.
      *
      * @default false
      */
@@ -127,7 +131,8 @@ interface RouteMethod {
 interface StreamDescriptor {
     status: number;
     mode: 'events' | 'text' | 'binary';
-    events?: Array<{ name: string; caseName: string; type: string }>;
+    // `unknownCase` when the event's union takes variants this client doesn't know, so its shared fields may be missing.
+    events?: Array<{ name: string; caseName: string; type: string; unknownCase: boolean }>;
     messageType?: string;
 }
 
@@ -151,6 +156,8 @@ interface EmitContext {
     ownedTypeMap: Map<string, string>;
     // Header fields from the api's request context declarations; empty when none.
     requestContextFields: KotlinField[];
+    // Data classes whose fields are all optional, which get a `Builder` and a `ListBuilder`.
+    builderModelNames: ReadonlySet<string>;
 }
 
 const buildRouteMethod = (
@@ -175,7 +182,13 @@ const buildRouteMethod = (
         ? collectObjectFields(route.pathParams as z.ZodType, registry, `${baseHint}Params`)
         : [];
 
-    const queryFields: KotlinField[] = route.query ? collectObjectFields(route.query as z.ZodType, registry, `${baseHint}Query`) : [];
+    const queryShape = route.query ? (readObjectShape(route.query as z.ZodType) ?? {}) : {};
+    const queryFields: KotlinField[] = route.query
+        ? collectObjectFields(route.query as z.ZodType, registry, `${baseHint}Query`).map((field) => ({
+              ...field,
+              json: isJsonQueryField(queryShape[field.wireName]!),
+          }))
+        : [];
 
     const headerFields: KotlinField[] = route.headers
         ? collectObjectFields(route.headers as z.ZodType, registry, `${baseHint}Headers`)
@@ -255,11 +268,16 @@ const buildRouteMethod = (
                 stream = {
                     status,
                     mode,
-                    events: Object.entries(responseValue.stream).map(([name, schema]) => ({
-                        name,
-                        caseName: toPascalCase(name),
-                        type: mapType(schema, registry, `${baseHint}${toPascalCase(name)}`).expression,
-                    })),
+                    events: Object.entries(responseValue.stream).map(([name, schema]) => {
+                        const type = mapType(schema, registry, `${baseHint}${toPascalCase(name)}`).expression;
+                        const found = registry.get(type);
+                        return {
+                            name,
+                            caseName: toPascalCase(name),
+                            type,
+                            unknownCase: found?.kind === 'sealed-class' && found.unknownCase,
+                        };
+                    }),
                 };
             } else if (mode === 'events') {
                 stream = {
@@ -309,8 +327,7 @@ const buildRouteMethod = (
             });
         }
     }
-    const hasValidation = route.body || route.query;
-    if (hasValidation) {
+    if (validatesRequest(route)) {
         const has400 = errorCases.some((candidate) => candidate.status === 400);
         errorCases.push({
             caseName: has400 ? 'validationError' : statusToCamelCase(400),
@@ -577,32 +594,32 @@ const enumConstantName = (value: string): string => {
 const emitEnumClass = (writer: KotlinWriter, name: string, cases: string[], unknownCase: boolean, description?: string): void => {
     writer.blank();
     writer.docComment(description);
+    const constants = uniqueNames(cases.map(enumConstantName));
     if (!unknownCase) {
         writer.line('@Serializable');
         // `wireValue` carries the `@SerialName` for query/header serialization (see `stringifyQueryValue`).
         writer.block(`enum class ${name}(override val wireValue: String) : KizunaQueryValue`, () => {
             for (let index = 0; index < cases.length; index += 1) {
                 const caseName = cases[index]!;
-                const enumConstant = enumConstantName(caseName);
                 const separator = index < cases.length - 1 ? ',' : '';
-                writer.line(`@SerialName(${stringLiteral(caseName)}) ${enumConstant}(${stringLiteral(caseName)})${separator}`);
+                writer.line(`@SerialName(${stringLiteral(caseName)}) ${constants[index]!}(${stringLiteral(caseName)})${separator}`);
             }
         });
         return;
     }
     writer.line(`@Serializable(with = ${name}.Serializer::class)`);
     writer.block(`sealed interface ${name} : KizunaQueryValue`, () => {
-        for (const caseName of cases) {
-            writer.block(`data object ${enumConstantName(caseName)} : ${name}`, () => {
-                writer.line(`override val wireValue: String = ${stringLiteral(caseName)}`);
+        for (let index = 0; index < cases.length; index += 1) {
+            writer.block(`data object ${constants[index]!} : ${name}`, () => {
+                writer.line(`override val wireValue: String = ${stringLiteral(cases[index]!)}`);
             });
         }
         writer.line(`data class Unknown(override val wireValue: String) : ${name}`);
         writer.blank();
         writer.block('companion object', () => {
             writer.block(`fun fromWireValue(wireValue: String): ${name} = when (wireValue)`, () => {
-                for (const caseName of cases) {
-                    writer.line(`${stringLiteral(caseName)} -> ${enumConstantName(caseName)}`);
+                for (let index = 0; index < cases.length; index += 1) {
+                    writer.line(`${stringLiteral(cases[index]!)} -> ${constants[index]!}`);
                 }
                 writer.line('else -> Unknown(wireValue)');
             });
@@ -625,7 +642,9 @@ const emitDataClass = (
     type: Extract<KotlinType, { kind: 'data-class' }>,
     ownedTypeMap: Map<string, string>,
     ownedTypeLookup: Map<string, KotlinType>,
-    registryName?: string
+    registryName?: string,
+    registry?: TypeRegistry,
+    withBuilders = false
 ): void => {
     const lookupName = registryName ?? type.name;
     const baseFields = type.discriminatorWireName
@@ -690,13 +709,105 @@ const emitDataClass = (
         writer.appendToLastLine(` : ${type.sealedParent}`);
     }
 
-    if (hasOwnedTypes) {
+    const builds = withBuilders && !hasFile && isBuilderModel(type);
+    if (hasOwnedTypes || builds) {
         writer.appendToLastLine(' {');
         writer.indent(() => {
-            emitOwnedTypes(writer, lookupName, ownedTypeMap, ownedTypeLookup);
+            if (hasOwnedTypes) emitOwnedTypes(writer, lookupName, ownedTypeMap, ownedTypeLookup, registry, withBuilders);
+            if (builds) {
+                const lookup = (name: string): KotlinType | undefined => registry?.get(name) ?? ownedTypeLookup.get(name);
+                emitBuilders(writer, type.name, adjustedFields, baseFields, lookup);
+            }
         });
         writer.line('}');
     }
+};
+
+/**
+ * A data class whose fields are all optional, so it can be written one field at a time.
+ */
+const isBuilderModel = (type: KotlinType | undefined): type is Extract<KotlinType, { kind: 'data-class' }> =>
+    type?.kind === 'data-class' &&
+    type.sealedParent === undefined &&
+    type.discriminatorWireName === undefined &&
+    type.fields.length > 0 &&
+    type.fields.every((field) => field.optional && field.requiredNullable !== true && field.isFile !== true);
+
+/**
+ * What a field holds: one value or a list of them, and the type named inside.
+ */
+const fieldTarget = (fieldType: string): { list: boolean; inner: string } => {
+    const stripped = fieldType.endsWith('?') ? fieldType.slice(0, -1) : fieldType;
+    const list = stripped.startsWith('List<') && stripped.endsWith('>');
+    return {
+        list,
+        inner: list ? stripped.slice(5, -1) : stripped,
+    };
+};
+
+/**
+ * `Builder` writes one of these field by field and `ListBuilder` a list of them, one block per item:
+ * `where { or { name { contains = "ada" } } }`.
+ */
+const emitBuilders = (
+    writer: KotlinWriter,
+    className: string,
+    fields: KotlinField[],
+    rawFields: KotlinField[],
+    lookup: (name: string) => KotlinType | undefined
+): void => {
+    const targets = fields.map((field, index) => {
+        const { list, inner } = fieldTarget(field.type);
+        return {
+            name: escapeKeyword(field.name),
+            type: field.type,
+            list,
+            inner,
+            buildable: isBuilderModel(lookup(fieldTarget(rawFields[index]!.type).inner)),
+        };
+    });
+    const blockOf = (target: (typeof targets)[number]): string => `${target.inner}.${target.list ? 'ListBuilder' : 'Builder'}`;
+
+    writer.blank();
+    writer.line('@KizunaDsl');
+    writer.block('class Builder', () => {
+        for (const target of targets) {
+            writer.line(`var ${target.name}: ${optionalize(target.type, true)} = null`);
+        }
+        for (const target of targets) {
+            if (!target.buildable) continue;
+            writer.blank();
+            writer.block(`fun ${target.name}(build: ${blockOf(target)}.() -> Unit)`, () => {
+                writer.line(`${target.name} = ${blockOf(target)}().apply(build).build()`);
+            });
+        }
+        writer.blank();
+        writer.line(`fun build(): ${className} = ${className}(${targets.map((target) => `${target.name} = ${target.name}`).join(', ')})`);
+    });
+
+    writer.blank();
+    writer.line('@KizunaDsl');
+    writer.block('class ListBuilder', () => {
+        writer.line(`private val items = mutableListOf<${className}>()`);
+        writer.blank();
+        writer.block(`fun add(item: ${className})`, () => {
+            writer.line('items += item');
+        });
+        for (const target of targets) {
+            writer.blank();
+            if (target.buildable) {
+                writer.block(`fun ${target.name}(build: ${blockOf(target)}.() -> Unit)`, () => {
+                    writer.line(`items += ${className}(${target.name} = ${blockOf(target)}().apply(build).build())`);
+                });
+            } else {
+                writer.block(`fun ${target.name}(value: ${optionalize(target.type, false)})`, () => {
+                    writer.line(`items += ${className}(${target.name} = value)`);
+                });
+            }
+        }
+        writer.blank();
+        writer.line(`fun build(): List<${className}> = items.toList()`);
+    });
 };
 
 const emitOwnedTypes = (
@@ -704,14 +815,15 @@ const emitOwnedTypes = (
     ownerName: string,
     ownedTypeMap: Map<string, string>,
     ownedTypeLookup: Map<string, KotlinType>,
-    registry?: TypeRegistry
+    registry?: TypeRegistry,
+    withBuilders = false
 ): void => {
     for (const [ownedName, owningType] of ownedTypeMap) {
         if (owningType !== ownerName) continue;
         const ownedType = ownedTypeLookup.get(ownedName);
         if (!ownedType) continue;
         const shortName = shortTypeName(ownedName, ownerName);
-        emitType(writer, { ...ownedType, name: shortName }, ownedTypeMap, ownedTypeLookup, ownedName, registry);
+        emitType(writer, { ...ownedType, name: shortName }, ownedTypeMap, ownedTypeLookup, ownedName, registry, withBuilders);
     }
 };
 
@@ -743,12 +855,16 @@ const emitSealedClass = (
     ownedTypeMap: Map<string, string>,
     ownedTypeLookup: Map<string, KotlinType>
 ): void => {
-    writer.line(`@OptIn(ExperimentalSerializationApi::class)`);
-    writer.line(`@JsonClassDiscriminator(${stringLiteral(type.discriminator)})`);
-    writer.line('@Serializable');
+    if (type.unknownCase) {
+        writer.line(`@Serializable(with = ${type.name}.Serializer::class)`);
+    } else {
+        writer.line(`@OptIn(ExperimentalSerializationApi::class)`);
+        writer.line(`@JsonClassDiscriminator(${stringLiteral(type.discriminator)})`);
+        writer.line('@Serializable');
+    }
 
     const nestedVariants = type.variants.filter((variant) => variant.nested);
-    if (nestedVariants.length === 0) {
+    if (nestedVariants.length === 0 && !type.unknownCase) {
         writer.line(`sealed interface ${type.name}`);
         return;
     }
@@ -782,9 +898,12 @@ const emitSealedClass = (
               )
             : [];
 
+    // An unknown variant carries only its discriminator, so every other shared field may be missing.
+    const sharedOptional = (field: { optional: boolean; wireName: string }) =>
+        field.optional || (type.unknownCase && field.wireName !== type.discriminator);
     writer.block(`sealed interface ${type.name}`, () => {
         for (const field of sharedFields) {
-            const typeExpression = optionalize(ownedTypePath(field.type, ownedTypeMap, registry), field.optional);
+            const typeExpression = optionalize(ownedTypePath(field.type, ownedTypeMap, registry), sharedOptional(field));
             writer.line(`val ${escapeKeyword(field.name)}: ${typeExpression}`);
         }
         if (sharedFields.length > 0) writer.blank();
@@ -845,6 +964,92 @@ const emitSealedClass = (
                 );
             }
         }
+        if (type.unknownCase) {
+            emitUnknownVariant(writer, type, sharedFields, registry, ownedTypeMap);
+        }
+    });
+};
+
+/**
+ * A union's `Unknown` member and the serializer that falls back to it: it reads the discriminator, decodes the
+ * matching variant from the rest of the object, and writes the discriminator back on encode.
+ */
+const emitUnknownVariant = (
+    writer: KotlinWriter,
+    type: Extract<KotlinType, { kind: 'sealed-class' }>,
+    sharedFields: readonly { name: string; type: string; optional: boolean; wireName: string }[],
+    registry: TypeRegistry,
+    ownedTypeMap: Map<string, string>
+): void => {
+    const taken = new Set(type.variants.map((variant) => variant.caseName));
+    let unknown = 'Unknown';
+    while (taken.has(unknown)) unknown = `${unknown}Variant`;
+    const discriminator = stringLiteral(type.discriminator);
+
+    // How each variant is reached from inside the interface, and whether it wraps its payload in `value`.
+    const cases = type.variants.map((variant) => {
+        const payload = registry.all().find((candidate) => candidate.name === variant.payloadType);
+        const inline = payload !== undefined && payload.kind === 'data-class' && payload.fields.length > 0;
+        const wrapped = variant.nested && !inline;
+        return {
+            literal: stringLiteral(variant.literal),
+            className: variant.nested ? variant.caseName : ownedTypePath(variant.payloadType, ownedTypeMap, registry),
+            payloadPath: ownedTypePath(variant.payloadType, ownedTypeMap, registry),
+            wrapped,
+        };
+    });
+
+    writer.blank();
+    writer.docComment('A variant this client was generated before. It holds the discriminator, and cannot be sent back.');
+    const overrides = sharedFields.map((field) =>
+        field.wireName === type.discriminator
+            ? `override val ${escapeKeyword(field.name)}: String get() = wireValue`
+            : `override val ${escapeKeyword(field.name)}: ${optionalize(ownedTypePath(field.type, ownedTypeMap, registry), true)} get() = null`
+    );
+    if (overrides.length === 0) {
+        writer.line(`data class ${unknown}(val wireValue: String) : ${type.name}`);
+    } else {
+        writer.block(`data class ${unknown}(val wireValue: String) : ${type.name}`, () => {
+            for (const line of overrides) writer.line(line);
+        });
+    }
+
+    writer.blank();
+    writer.block(`object Serializer : KSerializer<${type.name}>`, () => {
+        writer.line(`override val descriptor: SerialDescriptor = buildClassSerialDescriptor(${stringLiteral(type.name)})`);
+        writer.blank();
+        writer.block(`override fun deserialize(decoder: Decoder): ${type.name}`, () => {
+            writer.line('val input = decoder as JsonDecoder');
+            writer.line('val element = input.decodeJsonElement().jsonObject');
+            writer.line(`val body = JsonObject(element - ${discriminator})`);
+            writer.block(`return when (val kind = element[${discriminator}]?.jsonPrimitive?.contentOrNull)`, () => {
+                for (const each of cases) {
+                    writer.line(
+                        each.wrapped
+                            ? `${each.literal} -> ${each.className}(input.json.decodeFromJsonElement(${each.payloadPath}.serializer(), body))`
+                            : `${each.literal} -> input.json.decodeFromJsonElement(${each.className}.serializer(), body)`
+                    );
+                }
+                writer.line(`else -> ${unknown}(kind ?: "")`);
+            });
+        });
+        writer.blank();
+        writer.block(`override fun serialize(encoder: Encoder, value: ${type.name})`, () => {
+            writer.line('val output = encoder as JsonEncoder');
+            writer.block('val (kind, body) = when (value)', () => {
+                for (const each of cases) {
+                    writer.line(
+                        each.wrapped
+                            ? `is ${each.className} -> ${each.literal} to output.json.encodeToJsonElement(${each.payloadPath}.serializer(), value.value)`
+                            : `is ${each.className} -> ${each.literal} to output.json.encodeToJsonElement(${each.className}.serializer(), value)`
+                    );
+                }
+                writer.line(
+                    `is ${unknown} -> throw SerializationException("This client does not know the variant \${value.wireValue}, so it cannot send it.")`
+                );
+            });
+            writer.line(`output.encodeJsonElement(JsonObject(mapOf(${discriminator} to JsonPrimitive(kind)) + body.jsonObject))`);
+        });
     });
 };
 
@@ -854,12 +1059,13 @@ const emitType = (
     ownedTypeMap: Map<string, string> = new Map(),
     ownedTypeLookup: Map<string, KotlinType> = new Map(),
     registryName?: string,
-    registry?: TypeRegistry
+    registry?: TypeRegistry,
+    withBuilders = false
 ): void => {
     writer.blank();
     writer.docComment(type.description);
     if (type.kind === 'data-class') {
-        emitDataClass(writer, type, ownedTypeMap, ownedTypeLookup, registryName);
+        emitDataClass(writer, type, ownedTypeMap, ownedTypeLookup, registryName, registry, withBuilders);
     } else if (type.kind === 'enum-class') {
         emitEnumClass(writer, type.name, type.cases, type.unknownCase, type.description);
     } else if (registry) {
@@ -883,10 +1089,11 @@ const emitTypes = (
     types: KotlinType[],
     ownedTypeMap: Map<string, string> = new Map(),
     ownedTypeLookup: Map<string, KotlinType> = new Map(),
-    registry?: TypeRegistry
+    registry?: TypeRegistry,
+    withBuilders = false
 ): void => {
     for (const type of types) {
-        emitType(writer, type, ownedTypeMap, ownedTypeLookup, undefined, registry);
+        emitType(writer, type, ownedTypeMap, ownedTypeLookup, undefined, registry, withBuilders);
     }
 };
 
@@ -899,7 +1106,8 @@ const emitNamespacedTypes = (
     entries: Array<NamespaceEntry<KotlinType>>,
     ownedTypeMap: Map<string, string>,
     ownedTypeLookup: Map<string, KotlinType>,
-    registry: TypeRegistry
+    registry: TypeRegistry,
+    withBuilders: boolean
 ): void => {
     for (const entry of entries) {
         if (entry.kind === 'type') {
@@ -912,13 +1120,14 @@ const emitNamespacedTypes = (
                 ownedTypeMap,
                 ownedTypeLookup,
                 entry.item.name,
-                registry
+                registry,
+                withBuilders
             );
             continue;
         }
         writer.blank();
         writer.block(`object ${entry.name}`, () => {
-            emitNamespacedTypes(writer, entry.entries, ownedTypeMap, ownedTypeLookup, registry);
+            emitNamespacedTypes(writer, entry.entries, ownedTypeMap, ownedTypeLookup, registry, withBuilders);
         });
     }
 };
@@ -1015,6 +1224,9 @@ const emitOperationResultTypes = (writer: KotlinWriter, method: RouteMethod, con
     if (streamEvents) {
         const eventNames = new Set(streamEvents.map((event) => event.name));
         const tracksTools = eventNames.has('tool_call') && eventNames.has('tool_result');
+        // A call from a tool this client doesn't know has no id to track it by.
+        const readId = (eventName: string) =>
+            `val id = event.data.id${streamEvents.find((event) => event.name === eventName)?.unknownCase ? ' ?: continue' : ''}`;
         if (tracksTools) {
             writer.blank();
             writer.line('/** One tool call, with its result once it answered. */');
@@ -1046,17 +1258,21 @@ const emitOperationResultTypes = (writer: KotlinWriter, method: RouteMethod, con
                     writer.indent(() => {
                         writer.line('is Event.ToolCall -> {');
                         writer.indent(() => {
+                            writer.line(readId('tool_call'));
+                            writer.line('val tracked = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(call = event.data)');
                             writer.line(
-                                'val tracked = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)'
-                            );
-                            writer.line(
-                                'calls[event.data.id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked'
+                                'calls[id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked'
                             );
                         });
                         writer.line('}');
-                        writer.line(
-                            'is Event.ToolResult -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)'
-                        );
+                        writer.line('is Event.ToolResult -> {');
+                        writer.indent(() => {
+                            writer.line(readId('tool_result'));
+                            writer.line(
+                                'calls[id] = (calls[id] ?: ToolCallRecord(id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)'
+                            );
+                        });
+                        writer.line('}');
                         if (eventNames.has('tool_error')) {
                             writer.line(
                                 'is Event.ToolError -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name.wireValue)).copy(state = ToolCallRecord.State.Failed, message = event.data.message)'
@@ -1342,9 +1558,27 @@ const emitArgsScaffolding = (writer: KotlinWriter, method: RouteMethod, context:
         }
     });
 
+    const namespacePrefix = `${context.namespaceName}.`;
+    const buildableQueryFields = (channels.find((channel) => channel.varName === 'query')?.fields ?? []).flatMap((field) => {
+        const { list, inner } = fieldTarget(field.type);
+        const name = inner.startsWith(namespacePrefix) ? inner.slice(namespacePrefix.length) : inner;
+        return context.builderModelNames.has(name)
+            ? [
+                  {
+                      field,
+                      block: `${inner}.${list ? 'ListBuilder' : 'Builder'}`,
+                      result: list ? `List<${inner}>` : inner,
+                  },
+              ]
+            : [];
+    });
+
     writer.blank();
     writer.block('object Scope', () => {
         for (const target of transitionsFrom(-1)) emitTransition(-1, target);
+        for (const { field, block, result } of buildableQueryFields) {
+            writer.line(`fun ${escapeKeyword(field.name)}(build: ${block}.() -> Unit): ${result} = ${block}().apply(build).build()`);
+        }
     });
 
     for (let stateIndex = 0; stateIndex < channels.length; stateIndex += 1) {
@@ -1465,6 +1699,12 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
         for (const field of method.query) {
             const accessor = groupMemberAccessor('query', field);
             const appendBlock = (sourceExpression: string): void => {
+                if (field.json) {
+                    writer.line(
+                        `urlBuilder.addQueryParameter(${stringLiteral(field.wireName)}, Kizuna.encodeQueryJson(json, ${sourceExpression}))`
+                    );
+                    return;
+                }
                 writer.block(`for (stringValue in Kizuna.stringifyQueryValue(${sourceExpression}))`, () => {
                     writer.line(`urlBuilder.addQueryParameter(${stringLiteral(field.wireName)}, stringValue)`);
                 });
@@ -1877,7 +2117,10 @@ const emitKizunaStreaming = (writer: KotlinWriter, clientName: string): void => 
     );
 };
 
-const emitKizunaObject = (writer: KotlinWriter, options: { streaming: boolean; clientName: string }): void => {
+const emitKizunaObject = (
+    writer: KotlinWriter,
+    options: { streaming: boolean; queryValues: boolean; jsonQuery: boolean; clientName: string }
+): void => {
     writer.blank();
     writer.block('private object Kizuna', () => {
         if (options.streaming) emitKizunaStreaming(writer, options.clientName);
@@ -1894,12 +2137,30 @@ const emitKizunaObject = (writer: KotlinWriter, options: { streaming: boolean; c
             writer.line('return java.net.URLEncoder.encode(text, "UTF-8").replace("+", "%20")');
         });
         writer.blank();
+        if (options.jsonQuery) {
+            writer.line("// One JSON text with every object's keys in order so one value always gives one URL.");
+            writer.block('inline fun <reified Value> encodeQueryJson(json: Json, value: Value): String', () => {
+                writer.line('return sortJsonKeys(json.encodeToJsonElement(value)).toString()');
+            });
+            writer.blank();
+            writer.block('fun sortJsonKeys(element: JsonElement): JsonElement', () => {
+                writer.line('return when (element) {');
+                writer.indent(() => {
+                    writer.line('is JsonObject -> JsonObject(element.toSortedMap().mapValues { sortJsonKeys(it.value) })');
+                    writer.line('is JsonArray -> JsonArray(element.map { sortJsonKeys(it) })');
+                    writer.line('else -> element');
+                });
+                writer.line('}');
+            });
+            writer.blank();
+        }
         writer.block('fun stringifyQueryValue(value: Any): List<String>', () => {
             writer.line('return when (value) {');
             writer.indent(() => {
                 writer.line('is Instant -> listOf(value.toString())');
                 writer.line('is List<*> -> value.filterNotNull().flatMap { stringifyQueryValue(it) }');
-                writer.line('is KizunaQueryValue -> listOf(value.wireValue)');
+                // Declared only when the API has an enum, so a client without one never names it.
+                if (options.queryValues) writer.line('is KizunaQueryValue -> listOf(value.wireValue)');
                 writer.line('is Enum<*> -> listOf(value.name)');
                 writer.line('else -> listOf(value.toString())');
             });
@@ -2138,13 +2399,16 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
     }
     writer.line('import kotlinx.serialization.*');
     writer.line('import kotlinx.serialization.json.*');
-    const hasTolerantEnums = registry.all().some((type) => type.kind === 'enum-class' && type.unknownCase);
+    const hasTolerantEnums = registry
+        .all()
+        .some((type) => (type.kind === 'enum-class' || type.kind === 'sealed-class') && type.unknownCase);
     if (hasTolerantEnums) {
         writer.line('import kotlinx.serialization.descriptors.*');
         writer.line('import kotlinx.serialization.encoding.*');
     }
     writer.line('import kotlinx.datetime.Instant');
     const usesStreaming = allMethods.some((method) => method.stream !== undefined);
+    const sendsJsonQuery = allMethods.some((method) => method.query.some((field) => field.json));
     if (usesStreaming) {
         writer.line('import kotlinx.coroutines.flow.*');
     }
@@ -2224,6 +2488,7 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
         requestContextFields.push(...collectObjectFields(headersSchema, registry, 'RequestContext'));
     }
 
+    const builderModelNames = new Set(sharedTypes.filter(isBuilderModel).map((type) => type.name));
     const context: EmitContext = {
         namespaceName,
         clientName,
@@ -2231,15 +2496,22 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
         fileLevelTypeNames,
         ownedTypeMap,
         requestContextFields,
+        builderModelNames,
     };
 
     writer.block(`object ${namespaceName}`, () => {
+        if (builderModelNames.size > 0) {
+            writer.line('@DslMarker');
+            writer.line('annotation class KizunaDsl');
+        }
+        // Builders sit beside `KizunaDsl`, so only the models in this object get them.
         emitNamespacedTypes(
             writer,
             groupByNamespace(topLevelSharedTypes, (type) => type.name),
             ownedTypeMap,
             ownedTypeLookup,
-            registry
+            registry,
+            builderModelNames.size > 0
         );
         for (const brand of registry.allBrands()) {
             writer.blank();
@@ -2260,6 +2532,8 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
 
     emitKizunaObject(writer, {
         streaming: usesStreaming,
+        queryValues: hasEnums,
+        jsonQuery: sendsJsonQuery,
         clientName,
     });
 

@@ -118,18 +118,16 @@ export const slashItemsOf = (blocks: ReadonlyArray<{ name: string; label: string
             kind: 'link',
         },
     },
-    ...blocks.map(
-        (block): SlashItem => ({
-            key: `block:${block.name}`,
-            label: block.label,
-            group: 'Blocks',
-            keywords: [block.name, 'block'],
-            action: {
-                kind: 'block',
-                name: block.name,
-            },
-        })
-    ),
+    ...blocks.map((block): SlashItem => ({
+        key: `block:${block.name}`,
+        label: block.label,
+        group: 'Blocks',
+        keywords: [block.name, 'block'],
+        action: {
+            kind: 'block',
+            name: block.name,
+        },
+    })),
 ];
 
 /**

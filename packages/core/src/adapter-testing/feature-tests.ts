@@ -8,12 +8,14 @@ import {
     csvBody,
     cachedInput,
     deprecatedInput,
+    failingStreamFirstChunk,
     issueInput,
     methodInput,
     ownerToken,
     responseShapeInput,
     securedInput,
     sessionAuthorization,
+    sharedSegmentInput,
     signedBodyText,
     subUserInput,
     userInput,
@@ -50,6 +52,13 @@ interface MountOptions {
      */
     input: unknown;
     responseValidation?: boolean;
+}
+
+/**
+ * An api as `defineConfig` assembles it, which answers requests in process.
+ */
+interface InProcessApi {
+    fetch: (input: string, init?: RequestInit) => Promise<Response>;
 }
 
 export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void => {
@@ -229,6 +238,83 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             expect(response.status).toBe(404);
         },
 
+        'routing.sharedSegmentParams': async () => {
+            const cases = {
+                '/range/a-b-c': {
+                    from: 'a-b',
+                    to: 'c',
+                },
+                '/range/2024-01-2024-02': {
+                    from: '2024-01-2024',
+                    to: '02',
+                },
+                '/range/a%2Db-c': {
+                    from: 'a-b',
+                    to: 'c',
+                },
+                '/files/archive.tar.gz': {
+                    name: 'archive.tar',
+                    ext: 'gz',
+                },
+                '/span/a-to-b-to-c': {
+                    start: 'a-to-b',
+                    end: 'c',
+                },
+            };
+            await using(
+                {
+                    input: sharedSegmentInput,
+                },
+                async (shared) => {
+                    for (const [path, params] of Object.entries(cases)) {
+                        const response = await shared.request({
+                            method: 'GET',
+                            path,
+                        });
+                        expect(response.status, path).toBe(200);
+                        expect(response.body, path).toEqual(params);
+                    }
+                }
+            );
+        },
+
+        'routing.sharedSegmentMismatch': async () => {
+            await using(
+                {
+                    input: sharedSegmentInput,
+                },
+                async (shared) => {
+                    for (const path of ['/range/a-b-', '/range/-a', '/files/archive.']) {
+                        const response = await shared.request({
+                            method: 'GET',
+                            path,
+                        });
+                        expect(response.status, path).toBe(404);
+                    }
+                }
+            );
+        },
+
+        'routing.malformedEscape': async () => {
+            const plain = await api.request({
+                method: 'GET',
+                path: '/users/%E0',
+            });
+            expect(plain.status).toBe(400);
+            await using(
+                {
+                    input: sharedSegmentInput,
+                },
+                async (shared) => {
+                    const response = await shared.request({
+                        method: 'GET',
+                        path: '/range/%E0-b',
+                    });
+                    expect(response.status).toBe(400);
+                }
+            );
+        },
+
         'routing.subRouterComposition': async () => {
             await using(
                 {
@@ -396,6 +482,81 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 ],
                 total: 1,
             });
+        },
+
+        'query.methodOverride': async () => {
+            await createAda();
+            await api.request({
+                method: 'POST',
+                path: '/users',
+                body: {
+                    name: 'Grace',
+                    email: 'grace@example.com',
+                },
+            });
+            const overridden = await api.request({
+                method: 'POST',
+                path: '/users',
+                body: 'ids=1&ids=2&limit=1',
+                headers: {
+                    'content-type': 'application/x-www-form-urlencoded',
+                    'x-http-method-override': 'GET',
+                },
+            });
+            expect(overridden.status).toBe(200);
+            expect(overridden.body).toEqual({
+                users: [
+                    {
+                        id: '1',
+                        name: 'Ada',
+                    },
+                ],
+                total: 2,
+            });
+            const created = await api.request({
+                method: 'POST',
+                path: '/users',
+                body: {
+                    name: 'Linus',
+                    email: 'linus@example.com',
+                },
+            });
+            expect(created.status).toBe(201);
+        },
+        'query.jsonObject': async () => {
+            await createAda();
+            await api.request({
+                method: 'POST',
+                path: '/users',
+                body: {
+                    name: 'Grace',
+                    email: 'grace@example.com',
+                },
+            });
+            const filter = encodeURIComponent(
+                JSON.stringify({
+                    name: 'Grace',
+                })
+            );
+            const response = await api.request({
+                method: 'GET',
+                path: `/users?filter=${filter}`,
+            });
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({
+                users: [
+                    {
+                        id: '2',
+                        name: 'Grace',
+                    },
+                ],
+                total: 1,
+            });
+            const invalid = await api.request({
+                method: 'GET',
+                path: '/users?filter=Grace',
+            });
+            expect(invalid.status).toBe(400);
         },
 
         'query.repeatedKeys': async () => {
@@ -1017,6 +1178,23 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 expect(response.headers.getSetCookie()).toEqual(['session=abc; Path=/; HttpOnly', 'theme=dark; Path=/']);
             });
         },
+        'plugins.rawResponseStreamError': async () => {
+            await usingPlugins(async (mounted) => {
+                const response = await mounted.stream({
+                    method: 'GET',
+                    path: '/probe/failing-stream',
+                });
+                expect(response.status).toBe(200);
+                const { text, error } = await withTimeout(collectStreamText(response.body), 2000, 'the cut-short read');
+                expect(text).toBe(failingStreamFirstChunk);
+                expect(error).toBeDefined();
+                const next = await mounted.request({
+                    method: 'GET',
+                    path: '/probe/ping',
+                });
+                expect(next.status).toBe(200);
+            });
+        },
         'streams.sseFraming': async () => {
             await usingStreams(async (streams) => {
                 const response = await streams.request({
@@ -1181,6 +1359,88 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 expect(text).not.toContain('42');
                 expect(error).toBeDefined();
             }, true);
+        },
+
+        'inProcess.answers': async () => {
+            const inProcess = adapter.createApi(userInput as never) as InProcessApi;
+            const created = await inProcess.fetch('/users', {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: 'Ada',
+                    email: 'ada@example.com',
+                }),
+            });
+            expect(created.status).toBe(201);
+            expect(await created.json()).toMatchObject({
+                name: 'Ada',
+                email: 'ada@example.com',
+            });
+            const invalid = await inProcess.fetch('/users', {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: '',
+                    email: 'not-an-email',
+                }),
+            });
+            expect(invalid.status).toBe(400);
+            expect((await inProcess.fetch('/nowhere')).status).toBe(404);
+        },
+
+        'inProcess.guards': async () => {
+            const inProcess = adapter.createApi(securedInput as never) as InProcessApi;
+            expect((await inProcess.fetch('/who-am-i')).status).toBe(401);
+            const allowed = await inProcess.fetch('/who-am-i', {
+                headers: {
+                    authorization: sessionAuthorization,
+                },
+            });
+            expect(allowed.status).toBe(200);
+            expect(await allowed.json()).toEqual({
+                userId: '1',
+            });
+        },
+
+        'inProcess.besideTransport': async () => {
+            const inProcess = adapter.createApi(userInput as never) as InProcessApi;
+            expect((await inProcess.fetch('/nowhere')).status).toBe(404);
+            await using(
+                {
+                    input: userInput,
+                },
+                async (mounted) => {
+                    for (let index = 0; index < 3; index++) {
+                        const response = await mounted.request({
+                            method: 'GET',
+                            path: '/users',
+                        });
+                        expect(response.status).toBe(200);
+                    }
+                }
+            );
+        },
+
+        'inProcess.streams': async () => {
+            const inProcess = adapter.createApi(streamInput as never) as InProcessApi;
+            streamGate.hold();
+            const response = await inProcess.fetch('/events');
+            expect(response.status).toBe(200);
+            const reader = response.body!.getReader();
+            const first = await withTimeout(
+                readStreamUntil(reader, (text) => text.includes(': keep-alive')),
+                2000,
+                'the first message'
+            );
+            expect(first).toContain('event: delta');
+            expect(first).not.toContain('event: done');
+            streamGate.release();
+            const rest = await readStreamUntil(reader, (text) => text.includes('event: done'));
+            expect(first + rest).toBe(streamedEventsText);
         },
     };
 

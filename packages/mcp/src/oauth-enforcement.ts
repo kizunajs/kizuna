@@ -3,7 +3,7 @@ import { problemDetails, problemFromBody, type RequiredPermissions, type Securit
 import {
     bearerChallenge,
     extractCredential,
-    guardDenyFor,
+    callGuard,
     insufficientScope,
     requiresDenial,
     withPermissions,
@@ -65,17 +65,16 @@ export const enforceOAuth = async (
     const credential = extractCredential(args.schemeDefinition, credentialRequest);
     const presented = Object.values(credential).some((value) => value !== null);
 
-    const guardResult = await args.guard({
+    const guardResult = await callGuard(args.guard, args.schemeDefinition, {
         ...args.handlerContext,
         ...credential,
         params: args.params,
-        deny: guardDenyFor(args.schemeDefinition),
         ...(args.requestContext && Object.keys(args.requestContext).length > 0
             ? {
                   requestContext: args.requestContext,
               }
             : {}),
-    } as Parameters<GuardRun>[0]);
+    });
 
     if (isGuardDenial(guardResult)) {
         const challenge =

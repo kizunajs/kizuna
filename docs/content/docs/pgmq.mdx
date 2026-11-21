@@ -1,0 +1,131 @@
+---
+title: pgmq
+description: Queue jobs in your own Postgres database with pgmq.
+---
+
+<AlphaNotice>
+
+The pgmq transport is new and still settling. Its options may change while v2 is in beta, so pin your version if you depend on them.
+
+</AlphaNotice>
+
+`@kizunajs/pgmq` keeps the jobs you `queue` in [pgmq](https://github.com/pgmq/pgmq) queues inside your Postgres database, and a worker runs them. Supabase Queues runs on pgmq, so it works there too.
+
+<InstallTabs packageName="@kizunajs/pgmq pg" />
+
+<Steps>
+
+<Step>
+
+## Enable pgmq
+
+Install the extension and run:
+
+```sql
+create extension pgmq;
+```
+
+There is nothing else to set up. The transport creates each job's queue the first time it is used.
+
+</Step>
+
+<Step>
+
+## Name the transport on your config
+
+```ts title="kizuna.config.ts"
+import pg from 'pg';
+import { pgmqTransport } from '@kizunajs/pgmq';
+
+const pool = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+});
+
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    jobs,
+    jobRunner: {
+        mode: 'long-running',
+        transport: pgmqTransport({
+            pool,
+        }),
+    },
+});
+```
+
+</Step>
+
+<Step>
+
+## Run the worker
+
+```ts title="src/index.ts"
+import { startJobs, startJobWorker } from 'kizunajs/jobs';
+import kizuna from '../kizuna.config';
+
+kizuna.api.mount(app);
+startJobs(kizuna.api);
+
+const worker = await startJobWorker(kizuna.api);
+process.on('SIGTERM', () => void worker?.stop());
+```
+
+`startJobs` queues each scheduled occurrence, and `startJobWorker` runs what is queued. On shutdown, `stop` waits for the jobs that are running.
+
+</Step>
+
+</Steps>
+
+## Queues
+
+Each job has its own queue, named after its key: `billing.reconcileInvoices` reads from `kizuna_billing_reconcile_invoices`.
+
+pgmq allows queue names up to 47 characters. A key that would make a longer one throws when the worker starts, as do two keys that would share a name.
+
+## Retries
+
+A job declares its attempts with `retry`. A failed attempt is tried again after 10 seconds, then 20, 40 and so on, up to 10 minutes between attempts.
+
+A `422`, or input the job's schema no longer accepts, is not retried. Neither is a job that has used every attempt. Those messages move to the queue's archive table, `pgmq.a_kizuna_billing_reconcile_invoices`, so the archive is where you look for jobs that failed for good. A job that succeeds is deleted.
+
+A worker reads a message and hides it from other workers for the visibility timeout, 60 seconds by default. A job still running after that is read again by another worker, so raise `visibilityTimeoutMs` above your slowest job.
+
+## Reading the queues
+
+The queues are pgmq's own tables, so anything that can query your database reads them with SQL. How many jobs wait in each queue, and how long the oldest has waited:
+
+```sql
+select queue_name, queue_length, oldest_msg_age_sec
+from pgmq.metrics_all()
+where queue_name like 'kizuna_%';
+```
+
+The jobs that failed for good, newest first:
+
+```sql
+select msg_id, read_ct, archived_at, message->'input' as input
+from pgmq.a_kizuna_users_index_user
+order by archived_at desc;
+```
+
+To retry one, have a route queue its `input` again with `jobs.users.indexUser.queue(...)`. The archive keeps what the job was given but not why it failed, which reaches [`onError`](/docs/jobs#hearing-about-failures).
+
+## One scheduler, any number of workers
+
+pgmq has no deduplication, so a `dedupeKey` is not honoured. Every instance running `startJobs` queues each occurrence, and two instances run the 05:00 job twice. Call `startJobs` on one instance and `startJobWorker` on as many as you like.
+
+The transport writes nothing to your database besides pgmq's own queues.
+
+## Options
+
+| Option                | Default   | Description                                               |
+| --------------------- | --------- | --------------------------------------------------------- |
+| `pool`                | required  | Anything with `query(text, values)`, like a `pg.Pool`     |
+| `prefix`              | `kizuna_` | Put before every queue name                               |
+| `visibilityTimeoutMs` | `60000`   | How long a read message stays hidden from other workers   |
+| `pollIntervalMs`      | `1000`    | How long the worker waits after a read that found nothing |
+| `batchSize`           | `10`      | The most messages one read takes from each queue          |
+| `logger`              | `console` | Where a failed read is reported. The worker keeps polling |
+
+The worker needs a process that keeps running. On a serverless platform, run it on a separate long-running host, since a function can be frozen the moment it answers.

@@ -22,6 +22,17 @@ interface ClientRoute {
     streams: boolean;
 }
 
+/**
+ * The response headers browsers hide from scripts. On the server the fetch
+ * client returns them, and dehydrated query data is written into the page.
+ */
+const forbiddenResponseHeaders = new Set(['set-cookie', 'set-cookie2']);
+
+const withoutForbiddenHeaders = (result: ClientResult): ClientResult => ({
+    ...result,
+    headers: Object.fromEntries(Object.entries(result.headers).filter(([name]) => !forbiddenResponseHeaders.has(name.toLowerCase()))),
+});
+
 const routeOf = (value: unknown): ClientRoute | undefined =>
     typeof value === 'function' ? (value as { '~route'?: ClientRoute })['~route'] : undefined;
 
@@ -51,7 +62,7 @@ const runRoute = async (
     args: unknown,
     signal: AbortSignal | undefined
 ): Promise<unknown> => {
-    const result = (await clientFn(withSignal(args, signal))) as ClientResult;
+    const result = withoutForbiddenHeaders((await clientFn(withSignal(args, signal))) as ClientResult);
 
     if (!declaresStatus(route, result.status)) {
         throw new UndeclaredResponseError(routeKey, result.status, result.body, result.headers);

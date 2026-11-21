@@ -43,7 +43,15 @@ import { encodeStreamBody, EVENT_STREAM_MEDIA_TYPE, streamContentType, type Enco
 import { streamToolsOf } from './tool-events.js';
 import { createStreamTools, type StreamTools } from './tool-runner.js';
 import { DEFAULT_JOBS_PATH, flattenJobs, type Jobs, type JobsConfig } from './jobs.js';
-import { createJobRunner, jobFnAt, JobInputError, type JobRunner, type JobRunnerOptions, type JobErrorHandler } from './job-runner.js';
+import {
+    attemptJob,
+    createJobRunner,
+    jobFnAt,
+    JobInputError,
+    type JobRunner,
+    type JobRunnerOptions,
+    type JobErrorHandler,
+} from './job-runner.js';
 import {
     DispatchFailedSchema,
     DispatchResultSchema,
@@ -59,6 +67,7 @@ import type { JobTransport } from './job-transport.js';
 export type { ResponseHeaders, RouteDefinition, RoutePath, Routes, Method } from './types.js';
 export { rawResponse, isRawResponse, type RawResponse } from './raw-response.js';
 export { encodeStreamBody, type EncodeStreamOptions, type StreamContext } from './stream.js';
+export { injectedRequestOf, responseOfInjected, type InjectedRequest, type InjectedResponse } from './injected.js';
 export { isStreamResponse } from './generator-utils.js';
 export {
     definePlugin,
@@ -215,6 +224,29 @@ export const guardDenyFor = (scheme: SecurityScheme | undefined): GuardDeny<Guar
 export const isGuardDenial = (value: unknown): value is GuardDenial => typeof value === 'object' && value !== null && GUARD_DENY in value;
 
 /**
+ * Run a guard with the `deny` for its scheme. A guard that calls `deny` is
+ * denied whether or not it returns the denial, and a returned denial wins over
+ * one it only called.
+ */
+export const callGuard = async <HandlerContext>(
+    guard: GuardRun<HandlerContext>,
+    scheme: SecurityScheme | undefined,
+    args: Record<string, unknown>
+): Promise<Record<string, unknown> | GuardDenial | void> => {
+    const buildDenial = guardDenyFor(scheme);
+    let calledDenial: GuardDenial | undefined;
+    const result = await guard({
+        ...args,
+        deny: (denial) => {
+            const built = buildDenial(denial);
+            calledDenial ??= built;
+            return built;
+        },
+    } as Parameters<GuardRun<HandlerContext>>[0]);
+    return isGuardDenial(result) ? result : (calledDenial ?? result);
+};
+
+/**
  * The runtime behavior of a guard. It receives one object: the adapter's handler
  * context (e.g. `req`/`res`) plus the credential the identity's method extracted
  * from the request (or `null` if absent), a `deny` helper, and the request
@@ -357,10 +389,10 @@ export const assembleApi = <const R extends Routes>(
 
 /**
  * The endpoints jobs are served on, in the {@link Routes} shape the request
- * pipeline takes. None when the jobs run in process.
+ * pipeline takes. None in `'long-running'` mode.
  */
 export const jobRoutes = (meta: JobsMeta): Routes =>
-    meta.config?.mode === 'in-process'
+    meta.config?.mode === 'long-running'
         ? {}
         : {
               [DISPATCH_ROUTE_KEY]: dispatchRoute(meta),
@@ -412,6 +444,10 @@ export interface Adapter<HandlerContext = unknown, MountArgs extends readonly un
      * and not-found answer. Without it, content reads go uncached.
      */
     readonly content?: ContentRuntime;
+    /**
+     * Answer one request in this process with the routes `mount` serves, using the options the adapter was made with.
+     */
+    readonly fetch?: (api: ApiWithRouter, request: Request) => Promise<Response>;
     readonly [ADAPTER_CONTEXT]?: HandlerContext;
 }
 
@@ -463,8 +499,8 @@ export const warnUnsupportedJobOptions = (
     const named = retrying.map((jobKey) => `"${jobKey}"`).join(', ');
     if (!transport) {
         logger.warn(
-            `[kizuna] ${named} declare \`retry\`, but no transport is configured, so a failed run is not retried. ` +
-                'Pass one as `jobRunner.transport` in `kizuna.config.ts` to make retrying real.'
+            `[kizuna] ${named} declare \`retry\`, but \`jobRunner.transport\` is \`false\`, so a failed run is not retried. ` +
+                'Pass a transport in `kizuna.config.ts` to make retrying real.'
         );
         return;
     }
@@ -515,7 +551,7 @@ export const dispatchHandler = <HandlerContext>(meta: JobsMeta): RouteHandler<Ro
     for (const { jobKey } of flattenJobs(meta.jobs)) {
         const jobFn = jobFnAt(runner, jobKey);
         if (!jobFn) continue;
-        thunks[jobKey] = () => jobFn.run();
+        thunks[jobKey] = () => attemptJob(() => jobFn.run(), jobKey, meta.onError);
     }
     return (async () => {
         const result = await dispatchDueJobs({ jobs: meta.jobs } as unknown as ApiDefinition, thunks, {
@@ -585,8 +621,15 @@ export const runHandler = <HandlerContext>(meta: JobsMeta): RouteHandler<RouteDe
             };
         }
         try {
-            return await jobFn.run(input);
+            return await attemptJob(() => jobFn.run(input), job, meta.onError);
         } catch (error) {
+            if (error instanceof ResponseError) {
+                return {
+                    status: error.status,
+                    body: error.body,
+                    headers: error.headers,
+                };
+            }
             if (error instanceof JobInputError) {
                 return {
                     status: 422,
@@ -659,8 +702,8 @@ export { groupRoutes } from './routes.js';
 export { isGroupSet } from './groups.js';
 export { ResponseError } from './response-error.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
-export type { MatchResult, RouteMatch } from './route-matcher.js';
-export { matchRoute } from './route-matcher.js';
+export type { MatchResult, PathParamsResult, RouteMatch, SharedSegmentRoute } from './route-matcher.js';
+export { isMalformedPath, matchRoute, sharedSegmentRoute } from './route-matcher.js';
 export { type ApiRouter } from './server-surface.js';
 
 export type RouteMatcher = (method: string, path: string, routes: Routes, basePath?: string) => MatchResult;
@@ -671,11 +714,15 @@ export interface AdapterRequest<NativeRequest> {
     /**
      * - `core-match`: core matches the path against the routes (Next-style catch-all routing).
      * - `pre-resolved`: adapter has already routed the request and tells core which route was matched (Express-style per-route registration).
+     * - `malformed-path`: adapter has routed the request, but its params hold a percent-encoding that does not decode.
      */
     resolution:
         | {
               kind: 'core-match';
               path: string;
+          }
+        | {
+              kind: 'malformed-path';
           }
         | {
               kind: 'pre-resolved';
@@ -702,6 +749,9 @@ export interface AdapterRequest<NativeRequest> {
 export type AdapterResult =
     | {
           kind: 'not-found';
+      }
+    | {
+          kind: 'malformed-path';
       }
     | {
           kind: 'method-not-allowed';
@@ -1009,7 +1059,18 @@ const resolveRoute = (
             },
         };
     }
-    const matched = matcher(request.method, request.resolution.path, routes, basePath);
+    const matched =
+        request.resolution.kind === 'malformed-path'
+            ? request.resolution
+            : matcher(request.method, request.resolution.path, routes, basePath);
+    if (matched.kind === 'malformed-path') {
+        return {
+            ok: false,
+            result: {
+                kind: 'malformed-path',
+            },
+        };
+    }
     if (matched.kind === 'not-found') {
         return {
             ok: false,
@@ -1082,6 +1143,7 @@ const withDeprecationHeaders = (result: AdapterResult, route: RouteDefinition): 
     switch (result.kind) {
         case 'raw-response':
         case 'not-found':
+        case 'malformed-path':
         case 'method-not-allowed':
             return result;
         default: {
@@ -1108,6 +1170,7 @@ const statusOf = (result: AdapterResult): number | undefined => {
         // A route that did not match carries no declaration to read a policy from.
         case 'raw-response':
         case 'not-found':
+        case 'malformed-path':
         case 'method-not-allowed':
             return undefined;
         case 'success':
@@ -1135,7 +1198,14 @@ const statusOf = (result: AdapterResult): number | undefined => {
  * headers alone.
  */
 const withCacheHeaders = (result: AdapterResult, route: RouteDefinition): AdapterResult => {
-    if (result.kind === 'raw-response' || result.kind === 'not-found' || result.kind === 'method-not-allowed') return result;
+    if (
+        result.kind === 'raw-response' ||
+        result.kind === 'not-found' ||
+        result.kind === 'malformed-path' ||
+        result.kind === 'method-not-allowed'
+    ) {
+        return result;
+    }
     const status = statusOf(result);
     if (status === undefined) return result;
     const policy = cacheHeaders(resolveResponseCache(route.responses[status]));
@@ -1471,13 +1541,12 @@ const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
             }
             const schemeDefinition = schemes?.[scheme];
             const credential = schemeDefinition ? extractCredential(schemeDefinition, request as AdapterRequest<unknown>) : {};
-            const guardResult = await guard({
+            const guardResult = await callGuard(guard, schemeDefinition, {
                 ...(handlerContext as Record<string, unknown>),
                 ...credential,
                 params,
-                deny: guardDenyFor(schemeDefinition),
                 ...(hasRequestContext ? { requestContext } : {}),
-            } as Parameters<typeof guard>[0]);
+            });
             if (isGuardDenial(guardResult)) {
                 if (responseValidation) assertDeclaredBody(route, routeKey, guardResult.status, guardResult.body);
                 return {
@@ -1845,6 +1914,8 @@ const renderResult = (
                     allow: result.allowed.join(', '),
                 }
             );
+        case 'malformed-path':
+            return renderError(400, 'The path holds a percent-encoding that does not decode.');
         case 'invalid-body':
             return renderError(400, result.detail, undefined, result.headers);
         case 'validation-failed':
@@ -1877,6 +1948,24 @@ const renderResult = (
             return renderError(500, 'Internal Server Error', undefined, result.headers);
     }
 };
+
+/**
+ * The header a POST carries to be read as a GET, for a query too long for a URL.
+ */
+export const METHOD_OVERRIDE_HEADER = 'x-http-method-override';
+
+/**
+ * Whether a request is a POST standing in for a GET: `X-HTTP-Method-Override:
+ * GET`, with the query as an `application/x-www-form-urlencoded` body. Only
+ * `GET` is honored, so a form on another site can never turn a POST into a
+ * write.
+ */
+export const isMethodOverride = (method: string, override: unknown, contentType: unknown): boolean =>
+    method.toUpperCase() === 'POST' &&
+    typeof override === 'string' &&
+    override.trim().toUpperCase() === 'GET' &&
+    typeof contentType === 'string' &&
+    contentType.split(';', 1)[0]!.trim().toLowerCase() === 'application/x-www-form-urlencoded';
 
 /**
  * A query string or form as an object. A repeated key collects every value into a list.

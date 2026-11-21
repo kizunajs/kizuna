@@ -18,53 +18,43 @@ const documentsOf = (options: CmsPluginOptions): ContentDocument[] => [
     ...Object.entries(sitesOf(options)).flatMap(([site, declared]) =>
         Object.entries(declared.pages)
             .filter(([, entry]) => !servesCollection(entry.page))
-            .map(
-                ([name, entry]): ContentDocument => ({
-                    ref: site === DEFAULT_SITE ? `page:${name}` : `page:${site}:${name}`,
-                    kind: 'page',
-                    name,
-                    schema: entry.page.schema,
-                    migration: latestMigration(entry.page),
-                })
-            )
+            .map(([name, entry]): ContentDocument => ({
+                ref: site === DEFAULT_SITE ? `page:${name}` : `page:${site}:${name}`,
+                kind: 'page',
+                name,
+                schema: entry.page.schema,
+                migration: latestMigration(entry.page),
+            }))
     ),
-    ...(options.globals ?? []).map(
-        (definition): ContentDocument => ({
-            ref: `global:${definition.name}`,
+    ...(options.globals ?? []).map((definition): ContentDocument => ({
+        ref: `global:${definition.name}`,
+        kind: 'global',
+        name: definition.name,
+        schema: definition.schema,
+        migration: latestMigration(definition),
+    })),
+    ...(options.collections ?? []).map((definition): ContentDocument => ({
+        ref: `collection:${definition.name}`,
+        kind: 'collection',
+        name: definition.name,
+        schema: definition.schema,
+        migration: latestMigration(definition),
+    })),
+    ...Object.entries(options.sites?.entries ?? {}).flatMap(([site, entry]) => [
+        ...(entry.globals ?? []).map((definition): ContentDocument => ({
+            ref: `global:${site}:${definition.name}`,
             kind: 'global',
             name: definition.name,
             schema: definition.schema,
             migration: latestMigration(definition),
-        })
-    ),
-    ...(options.collections ?? []).map(
-        (definition): ContentDocument => ({
-            ref: `collection:${definition.name}`,
+        })),
+        ...(entry.collections ?? []).map((definition): ContentDocument => ({
+            ref: `collection:${site}:${definition.name}`,
             kind: 'collection',
             name: definition.name,
             schema: definition.schema,
             migration: latestMigration(definition),
-        })
-    ),
-    ...Object.entries(options.sites?.entries ?? {}).flatMap(([site, entry]) => [
-        ...(entry.globals ?? []).map(
-            (definition): ContentDocument => ({
-                ref: `global:${site}:${definition.name}`,
-                kind: 'global',
-                name: definition.name,
-                schema: definition.schema,
-                migration: latestMigration(definition),
-            })
-        ),
-        ...(entry.collections ?? []).map(
-            (definition): ContentDocument => ({
-                ref: `collection:${site}:${definition.name}`,
-                kind: 'collection',
-                name: definition.name,
-                schema: definition.schema,
-                migration: latestMigration(definition),
-            })
-        ),
+        })),
     ]),
 ];
 

@@ -3,16 +3,20 @@ import { ROUTES_GROUP, type Routes, type RouteDefinition, type ResponseDefinitio
 import { isRouteDefinition } from './handler-pipeline.js';
 import {
     findCoercedSchemaPath,
+    findSelfReferenceIssue,
     isBinarySchema,
     isFileSchema,
+    isVoidSchema,
     readDef,
+    readDefType,
     readObjectShape,
     resolveBaseType,
     unwrapOptionalWrappers,
+    type SelfReferenceIssue,
 } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
 import { parsePath, type PathParamsCheck } from './path-params.js';
-import { isStreamResponse, isZodSchema } from './generator-utils.js';
+import { isJsonQueryField, isStreamResponse, isZodSchema } from './generator-utils.js';
 import { assertValidStreams, streamSchemas } from './stream.js';
 import { expandStreamTools } from './tool-events.js';
 
@@ -29,10 +33,9 @@ const responseSchemas = (response: ResponseDefinition): z.core.$ZodType[] => {
 };
 
 /**
- * Throws if any of a route's schemas use `z.coerce`. Built-in query/path/header
- * coercion makes it redundant.
+ * Every schema a route declares, each with where it sits.
  */
-const assertNoCoercion = (route: RouteDefinition, routeKey: string): void => {
+const schemasOf = (route: RouteDefinition): Array<[string, z.core.$ZodType]> => {
     const targets: Array<[string, z.core.$ZodType | undefined]> = [
         ['body', route.body],
         ['query', route.query],
@@ -44,8 +47,15 @@ const assertNoCoercion = (route: RouteDefinition, routeKey: string): void => {
             targets.push([`responses.${status}`, schema]);
         }
     }
-    for (const [field, schema] of targets) {
-        if (!schema) continue;
+    return targets.filter((target): target is [string, z.core.$ZodType] => target[1] !== undefined);
+};
+
+/**
+ * Throws if any of a route's schemas use `z.coerce`. Built-in query/path/header
+ * coercion makes it redundant.
+ */
+const assertNoCoercion = (route: RouteDefinition, routeKey: string): void => {
+    for (const [field, schema] of schemasOf(route)) {
         const coercedPath = findCoercedSchemaPath(schema);
         if (coercedPath === undefined) continue;
         const location = coercedPath ? `${field}.${coercedPath}` : field;
@@ -54,6 +64,39 @@ const assertNoCoercion = (route: RouteDefinition, routeKey: string): void => {
                 `kizuna automatically coerces query, path, and header params to their declared types for you, ` +
                 `so use z.number(), z.date(), or z.bigint() instead.`
         );
+    }
+};
+
+const selfReferenceMessage = (routeKey: string, location: string, kind: SelfReferenceIssue['kind']): string => {
+    if (kind === 'lazy') {
+        return (
+            `Route "${routeKey}" uses z.lazy at "${location}", which has no type a client can name.\n` +
+            'Make the schema a Kizuna.model and refer to it with a getter:\n' +
+            '    get replies() {\n' +
+            '        return z.array(CommentSchema);\n' +
+            '    },'
+        );
+    }
+    if (kind === 'unnamed') {
+        return (
+            `Route "${routeKey}" holds a schema inside itself at "${location}". A client can only refer to a schema by its name, ` +
+            "so wrap it in Kizuna.model({ title: 'Comment', schema: ... })."
+        );
+    }
+    return (
+        `Route "${routeKey}" holds a model directly inside itself at "${location}". A Swift struct cannot contain itself, ` +
+        'so hold it in a list, or hold its id.'
+    );
+};
+
+/**
+ * Throws when a schema holds itself in a way no client can write.
+ */
+const assertSelfReferencesNamed = (route: RouteDefinition, routeKey: string): void => {
+    for (const [field, schema] of schemasOf(route)) {
+        const issue = findSelfReferenceIssue(schema);
+        if (issue === undefined) continue;
+        throw new Error(selfReferenceMessage(routeKey, issue.path ? `${field}.${issue.path}` : field, issue.kind));
     }
 };
 
@@ -80,6 +123,15 @@ const assertPathParamsMatchPath = (route: RouteDefinition, routeKey: string): vo
 const STRUCTURED_TYPES: ReadonlySet<string> = new Set(['object', 'array', 'record', 'tuple', 'map', 'set']);
 
 /**
+ * The options of a union, nested ones included, or the field alone. A query,
+ * path, header or form field is sent as text, so each option has to be.
+ */
+const optionsOf = (schema: z.core.$ZodType): z.core.$ZodType[] => {
+    const def = readDef(unwrapOptionalWrappers(schema).inner);
+    return def.type === 'union' ? (def.options ?? []).flatMap(optionsOf) : [schema];
+};
+
+/**
  * Throws when a path parameter is declared as a structured type. A path segment
  * arrives as one string, so these are not supported.
  */
@@ -87,10 +139,9 @@ const assertPathParamsAreScalar = (route: RouteDefinition, routeKey: string): vo
     const shape = route.pathParams ? readObjectShape(route.pathParams) : undefined;
     if (!shape) return;
     for (const [name, fieldSchema] of Object.entries(shape)) {
-        const baseType = resolveBaseType(fieldSchema);
-        if (!STRUCTURED_TYPES.has(baseType)) continue;
+        if (optionsOf(fieldSchema).every((option) => !STRUCTURED_TYPES.has(resolveBaseType(option)))) continue;
         throw new Error(
-            `Route "${routeKey}" declares path parameter "${name}" as ${baseType}. ` +
+            `Route "${routeKey}" declares path parameter "${name}" as ${describeField(fieldSchema)}. ` +
                 `A path parameter arrives as a single string, so this is not supported.\n` +
                 `Use a scalar schema (z.string(), z.int(), z.uuid(), z.enum([...])), move the value to query, ` +
                 `or parse it yourself with z.string().transform(...).`
@@ -116,26 +167,35 @@ const listElement = (schema: z.core.$ZodType): z.core.$ZodType | undefined => {
 const isValue = (kind: string): boolean => !STRUCTURED_TYPES.has(kind) && kind !== 'file' && kind !== 'BinarySchema';
 
 /**
- * Names a field the way an error shows it: its kind, or what a list holds.
+ * Names a field the way an error shows it: its kind, what a list holds, or the
+ * option of a union that cannot be sent.
  */
 const describeField = (schema: z.core.$ZodType): string => {
+    const options = optionsOf(schema);
+    if (options.length > 1) {
+        const unsendable = options.find((option) => !isValue(fieldKind(option))) ?? options[0]!;
+        return `a union holding ${describeField(unsendable)}`;
+    }
     const element = listElement(schema);
-    return element === undefined ? fieldKind(schema) : `array of ${fieldKind(element)}`;
+    return element === undefined ? fieldKind(schema) : `array of ${describeField(element)}`;
 };
 
 const fieldsOf = (schema: z.ZodType | undefined): [string, z.core.$ZodType][] => Object.entries((schema && readObjectShape(schema)) ?? {});
 
 /**
- * A query string carries values and lists of values, the way OpenAPI's default `form` style sends them.
+ * A query string carries values and lists of values in OpenAPI's default `form` style. Anything else travels
+ * as one JSON text. Only a file cannot be sent.
  */
 const assertQuerySendable = (route: RouteDefinition, routeKey: string): void => {
     for (const [name, field] of fieldsOf(route.query)) {
-        const element = listElement(field);
-        if (element === undefined ? isValue(fieldKind(field)) : isValue(fieldKind(element))) continue;
+        if (isJsonQueryField(field)) continue;
+        const sendable = optionsOf(field).every((option) =>
+            optionsOf(listElement(option) ?? option).every((value) => isValue(fieldKind(value)))
+        );
+        if (sendable) continue;
         throw new Error(
             `Route "${routeKey}" declares query field "${name}" as ${describeField(field)}. ` +
-                'A query string carries values and lists of values, so this cannot be sent.\n' +
-                'Split it into fields of their own, or move it to a body.'
+                'A query string carries text and JSON. A file needs a multipart form body.'
         );
     }
 };
@@ -145,11 +205,29 @@ const assertQuerySendable = (route: RouteDefinition, routeKey: string): void => 
  */
 const assertHeadersSendable = (route: RouteDefinition, routeKey: string): void => {
     for (const [name, field] of fieldsOf(route.headers)) {
-        if (listElement(field) === undefined && isValue(fieldKind(field))) continue;
+        if (optionsOf(field).every((option) => listElement(option) === undefined && isValue(fieldKind(option)))) continue;
         throw new Error(
             `Route "${routeKey}" declares header "${name}" as ${describeField(field)}. ` +
                 'A header carries one value, so this cannot be sent.\n' +
                 'Use a scalar schema (z.string(), z.int(), z.enum([...])), or split it into headers of their own.'
+        );
+    }
+};
+
+/**
+ * A form sends a file part as a File, and only a multipart form carries one.
+ */
+const assertFormFileKind = (kind: string, name: string, multipart: boolean, routeKey: string): void => {
+    if (kind === 'BinarySchema') {
+        throw new Error(
+            `Route "${routeKey}" declares form field "${name}" as BinarySchema, but a form sends a file part as a File. ` +
+                'Declare it with FileSchema.'
+        );
+    }
+    if (kind === 'file' && !multipart) {
+        throw new Error(
+            `Route "${routeKey}" declares form field "${name}" as a file, which a urlencoded body cannot carry. ` +
+                "Send it as contentType: 'multipart/form-data'."
         );
     }
 };
@@ -161,20 +239,9 @@ const assertFormFieldsSendable = (route: RouteDefinition, routeKey: string): voi
     if (route.contentType !== 'multipart/form-data' && route.contentType !== 'application/x-www-form-urlencoded') return;
     const multipart = route.contentType === 'multipart/form-data';
     for (const [name, field] of fieldsOf(route.body)) {
-        const kind = fieldKind(listElement(field) ?? field);
-        if (kind === 'BinarySchema') {
-            throw new Error(
-                `Route "${routeKey}" declares form field "${name}" as BinarySchema, but a form sends a file part as a File. ` +
-                    'Declare it with FileSchema.'
-            );
-        }
-        if (kind === 'file' && !multipart) {
-            throw new Error(
-                `Route "${routeKey}" declares form field "${name}" as a file, which a urlencoded body cannot carry. ` +
-                    "Send it as contentType: 'multipart/form-data'."
-            );
-        }
-        if (kind === 'file' || isValue(kind)) continue;
+        const kinds = optionsOf(field).flatMap((option) => optionsOf(listElement(option) ?? option).map(fieldKind));
+        for (const kind of kinds) assertFormFileKind(kind, name, multipart, routeKey);
+        if (kinds.every((kind) => kind === 'file' || isValue(kind))) continue;
         throw new Error(
             `Route "${routeKey}" declares form field "${name}" as ${describeField(field)}. ` +
                 'A form carries values, lists of values and files, so this cannot be sent.\n' +
@@ -197,6 +264,34 @@ const assertToolDescribed = (route: RouteDefinition, routeKey: string): void => 
     );
 };
 
+/**
+ * The statuses RFC 9110 gives no content: 204 (section 15.3.5), 205 (15.3.6)
+ * and 304 (15.4.5).
+ */
+const NO_CONTENT_STATUSES: ReadonlySet<number> = new Set([204, 205, 304]);
+
+/**
+ * A response with no content is declared `z.void()`. `z.undefined()` reads the
+ * same in a handler, but the OpenAPI document and the generated clients take
+ * it as a JSON body and try to decode one.
+ */
+export const assertNoContentResponses = (route: RouteDefinition, routeKey: string): void => {
+    for (const [status, response] of Object.entries(route.responses)) {
+        for (const schema of responseSchemas(response)) {
+            if (readDefType(schema) !== 'undefined') continue;
+            throw new Error(
+                `Route '${routeKey}' declares its ${status} response as \`z.undefined()\`, which the generated clients read as a JSON body. ` +
+                    'Declare `z.void()` for a response with no content.'
+            );
+        }
+        if (!NO_CONTENT_STATUSES.has(Number(status))) continue;
+        if (!isStreamResponse(response) && isVoidSchema(isZodSchema(response) ? response : response.body)) continue;
+        throw new Error(
+            `Route '${routeKey}' declares a body on its ${status} response. A ${status} carries no content, so declare it \`z.void()\`.`
+        );
+    }
+};
+
 const validateRoutes = (routes: Routes, prefix?: string): void => {
     for (const [key, value] of Object.entries(routes)) {
         const fullKey = prefix ? `${prefix}.${key}` : key;
@@ -211,6 +306,7 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
             assertHeadersSendable(value, fullKey);
             assertFormFieldsSendable(value, fullKey);
             assertNoCoercion(value, fullKey);
+            assertSelfReferencesNamed(value, fullKey);
             assertValidStreams(value, fullKey);
             assertToolDescribed(value, fullKey);
             resolveCoercionPlans(value);

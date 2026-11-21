@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createJiti } from 'jiti';
-import { apiEntries, type ApiDefinition, type DiffSettings, type GeneratedFile } from 'kizunajs';
+import { apiEntries, type ApiDefinition, type ConfigExtension, type DiffSettings, type GeneratedFile } from 'kizunajs';
 
 /**
  * One api a config declares, with everything generated from it. A config that
@@ -19,6 +19,10 @@ export interface LoadedApi {
      * Where `kizuna generate` writes the `Config`, when the config says.
      */
     typesOutput: string | undefined;
+    /**
+     * What `typescript.extend` adds to the `Config`.
+     */
+    typesExtensions: readonly ConfigExtension[];
     /**
      * What else `kizuna diff` treats as breaking.
      */
@@ -48,6 +52,7 @@ export const loadConfig = async (configPath: string): Promise<LoadedApi[]> => {
         clients: entry.clients ?? [],
         generators: entry.generators ?? [],
         typesOutput: entry.typescript?.outputFile,
+        typesExtensions: entry.typescript?.extend ?? [],
         diff: entry.diff ?? {},
     }));
 };

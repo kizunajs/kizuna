@@ -351,7 +351,8 @@ const db = drizzle(pglite);
 const app = express();
 defineConfig({
     jobRunner: {
-        mode: 'in-process',
+        mode: 'long-running',
+        transport: false,
     },
     adapter: expressAdapter(),
     auth: {

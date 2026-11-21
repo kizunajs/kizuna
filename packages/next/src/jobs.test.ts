@@ -101,6 +101,7 @@ const contract = defineConfig({
     routes: [routes],
     jobRunner: {
         mode: 'http',
+        transport: false,
     },
     jobs,
 }).api;
@@ -167,7 +168,7 @@ describe('the dispatch endpoint', () => {
     });
 });
 
-describe('jobs that run in process', () => {
+describe('jobs on a long-running server', () => {
     const closed = defineConfig({
         ...config,
         adapter: nextAdapter(),
@@ -180,7 +181,8 @@ describe('jobs that run in process', () => {
                 .handler(() => {}),
         }),
         jobRunner: {
-            mode: 'in-process',
+            mode: 'long-running',
+            transport: false,
         },
     }).api.mount({
         basePath: '/api',

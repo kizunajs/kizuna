@@ -108,7 +108,7 @@ const runGenerate = async (values: { check?: boolean; config?: string; types?: s
     // Settled first: the generated imports are written relative to it.
     let types: string;
     try {
-        types = generateConfigTypes(readFileSync(configPath, 'utf8'), configPath, typesPath);
+        types = generateConfigTypes(readFileSync(configPath, 'utf8'), configPath, typesPath, config.typesExtensions);
     } catch (error) {
         if (error instanceof ConfigSyntaxError) die(`${displayPath(configPath)}: ${error.message}`);
         throw error;

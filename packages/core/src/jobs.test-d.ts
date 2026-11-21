@@ -119,6 +119,7 @@ const contract = defineConfig({
     ],
     jobRunner: {
         mode: 'http',
+        transport: false,
     },
     jobs,
 }).api;
@@ -194,6 +195,7 @@ test('a nested job tree keeps its shape', () => {
         routes: [k.routes({})],
         jobRunner: {
             mode: 'http',
+            transport: false,
         },
         jobs: nested,
     }).api;
@@ -230,7 +232,8 @@ test('jobs declared without an identity still get a runner', () => {
         routes: [bare.routes({})],
         jobs: publicJobs,
         jobRunner: {
-            mode: 'in-process',
+            mode: 'long-running',
+            transport: false,
         },
     }).api;
     type BareHandlers = JobHandlers<NonNullable<(typeof bareContract)['jobs']>>;
@@ -239,7 +242,7 @@ test('jobs declared without an identity still get a runner', () => {
     expectTypeOf<Args>().toHaveProperty('jobs');
 });
 
-test('jobs that run in process take none of the endpoint options', () => {
+test('jobs on a long-running server take none of the endpoint options', () => {
     defineConfig({
         ...config,
         routes: [k.routes({})],
@@ -249,7 +252,8 @@ test('jobs that run in process take none of the endpoint options', () => {
             }),
         }),
         jobRunner: {
-            mode: 'in-process',
+            mode: 'long-running',
+            transport: false,
             // @ts-expect-error `path` shapes the endpoints, which in process are not served
             path: '/jobs',
         },

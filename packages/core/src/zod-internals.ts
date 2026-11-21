@@ -27,6 +27,8 @@ export interface ZodDef {
     format?: string;
     defaultValue?: unknown;
     valueType?: z.core.$ZodType;
+    left?: z.core.$ZodType;
+    right?: z.core.$ZodType;
 }
 
 /**
@@ -153,6 +155,71 @@ export const findCoercedSchemaPath = (schema: z.core.$ZodType, path = '', seen: 
         }
     }
     return undefined;
+};
+
+/**
+ * Why a schema that holds itself has no type a client can name. `lazy` is
+ * `z.lazy`, `unnamed` goes round through a schema that is not a `Kizuna.model`,
+ * and `direct` holds its model in a field rather than in a list or a record.
+ */
+export interface SelfReferenceIssue {
+    kind: 'lazy' | 'unnamed' | 'direct';
+    /**
+     * Dotted path to where it happens, `''` for the root.
+     */
+    path: string;
+}
+
+/**
+ * The kinds that hold their values one step removed, so a model inside one can
+ * hold itself.
+ */
+const CONTAINER_TYPES: ReadonlySet<string> = new Set(['array', 'record', 'tuple']);
+
+/**
+ * The first reason a schema that holds itself has no type a client can name,
+ * or `undefined`. A `Kizuna.model` that holds itself in a list or a record is
+ * fine: each generator writes it once and refers to it by its title.
+ */
+export const findSelfReferenceIssue = (schema: z.core.$ZodType): SelfReferenceIssue | undefined => {
+    const inside: Array<{ schema: z.core.$ZodType; container: boolean }> = [];
+    const checked = new WeakSet<z.core.$ZodType>();
+
+    const visit = (current: z.core.$ZodType, path: string): SelfReferenceIssue | undefined => {
+        // A model copied by `.describe()` or `.meta()` is still the model.
+        const identity = readModelSchema(current) ?? current;
+        const index = inside.findIndex((entry) => entry.schema === identity);
+        if (index !== -1) {
+            if (readModelSchema(current) === undefined) return { kind: 'unnamed', path };
+            const throughContainer = inside.slice(index + 1).some((entry) => entry.container);
+            return throughContainer ? undefined : { kind: 'direct', path };
+        }
+        if (checked.has(identity)) return undefined;
+
+        const def = readDef(current);
+        if (def.type === 'lazy') return { kind: 'lazy', path };
+
+        inside.push({
+            schema: identity,
+            container: CONTAINER_TYPES.has(def.type ?? ''),
+        });
+        const children: Array<[z.core.$ZodType, string]> = [];
+        for (const [key, field] of Object.entries(def.shape ?? {})) children.push([field, path ? `${path}.${key}` : key]);
+        for (const child of [def.innerType, def.element, def.in, def.out, def.valueType, def.rest, def.left, def.right]) {
+            if (child) children.push([child, path]);
+        }
+        for (const option of [...(def.options ?? []), ...(def.items ?? [])]) children.push([option, path]);
+
+        for (const [child, childPath] of children) {
+            const issue = visit(child, childPath);
+            if (issue) return issue;
+        }
+        inside.pop();
+        checked.add(identity);
+        return undefined;
+    };
+
+    return visit(schema, '');
 };
 
 export interface DiscriminatedUnion {
@@ -323,6 +390,15 @@ export const readMetaDescription = (schema: z.core.$ZodType): string | undefined
 /**
  * Returns a schema's `brand` metadata, set by `Kizuna.brand`, or undefined.
  */
+/**
+ * Whether an enum or union is extensible, so clients take members they don't know. Set by
+ * `Kizuna.model({ extensible: true })`, or on the schema itself with `.meta({ extensible: true })`.
+ */
+export const readMetaExtensible = (schema: z.core.$ZodType): boolean => {
+    const model = readModelSchema(schema);
+    return readMeta(schema)?.extensible === true || (model !== undefined && readMeta(model)?.extensible === true);
+};
+
 export const readMetaBrand = (schema: z.core.$ZodType): string | undefined => {
     const brand = readMeta(schema)?.brand;
     return typeof brand === 'string' ? brand : undefined;

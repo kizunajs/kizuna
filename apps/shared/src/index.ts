@@ -13,3 +13,4 @@ export { roles } from './roles';
 export { jobs } from './jobs';
 export { assistantTools } from './routes/assistant-tools';
 export { replyWords, countWords, forecastFor, signupsOverDays, noteCallFor, replyFor } from './assistant';
+export { UserWhereSchema, type UserWhere } from './user-where';

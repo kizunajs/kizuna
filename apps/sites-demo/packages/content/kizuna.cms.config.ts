@@ -45,7 +45,8 @@ export default defineConfig({
     },
     jobs,
     jobRunner: {
-        mode: 'in-process',
+        mode: 'long-running',
+        transport: false,
     },
     content: cms({
         name: 'Hagen',

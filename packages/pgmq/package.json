@@ -1,0 +1,72 @@
+{
+  "name": "@kizunajs/pgmq",
+  "version": "2.0.0-beta.36",
+  "description": "pgmq job transport for Kizuna.js: queue jobs in Postgres with the pgmq extension",
+  "keywords": [
+    "kizunajs",
+    "typescript",
+    "zod",
+    "openapi",
+    "spec-driven",
+    "type-safe",
+    "rest",
+    "api",
+    "pgmq",
+    "postgres",
+    "queue",
+    "jobs"
+  ],
+  "license": "MIT",
+  "homepage": "https://kizunajs.com/docs/pgmq",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kizunajs/kizuna.git",
+    "directory": "packages/pgmq"
+  },
+  "bugs": "https://github.com/kizunajs/kizuna/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "kizuna": {
+    "entries": {
+      ".": "server"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external kizunajs",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "kizunajs": "workspace:*"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
+    "kizunajs": "workspace:*",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
+  }
+}

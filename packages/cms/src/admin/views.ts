@@ -179,31 +179,27 @@ export const viewColumnsOf = (view: ViewSummary): ListColumn[] => {
     const serves = servesPages(view);
     const sorts = view.sorts ?? [];
     return [
-        ...columnsOf(view).map(
-            (column, index): ListColumn => ({
-                key: column,
-                label: columnLabel(view, column),
-                kind: index === 0 ? 'title' : 'text',
-                ...formatOf(view, column),
-                shown: true,
-                fixed: index === 0,
-                ...(serves
-                    ? {
-                          sortable: sorts.includes(column),
-                      }
-                    : {}),
-            })
-        ),
-        ...hiddenSortsOf(view).map(
-            (column): ListColumn => ({
-                key: column,
-                label: columnLabel(view, column),
-                kind: 'text',
-                ...formatOf(view, column),
-                shown: false,
-                sortable: true,
-            })
-        ),
+        ...columnsOf(view).map((column, index): ListColumn => ({
+            key: column,
+            label: columnLabel(view, column),
+            kind: index === 0 ? 'title' : 'text',
+            ...formatOf(view, column),
+            shown: true,
+            fixed: index === 0,
+            ...(serves
+                ? {
+                      sortable: sorts.includes(column),
+                  }
+                : {}),
+        })),
+        ...hiddenSortsOf(view).map((column): ListColumn => ({
+            key: column,
+            label: columnLabel(view, column),
+            kind: 'text',
+            ...formatOf(view, column),
+            shown: false,
+            sortable: true,
+        })),
     ];
 };
 

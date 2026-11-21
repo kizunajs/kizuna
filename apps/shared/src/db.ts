@@ -48,9 +48,20 @@ const notes = new Map<string, Note[]>([['2', [{ id: 'note_1', text: 'Review the 
  */
 export const db = {
     users: {
-        findMany: async ({ skip = 0, take = 20 }: { skip?: number; take?: number } = {}): Promise<User[]> =>
-            Array.from(users.values()).slice(skip, skip + take),
-        count: async (): Promise<number> => users.size,
+        findMany: async ({
+            skip = 0,
+            take = 20,
+            matching = () => true,
+        }: {
+            skip?: number;
+            take?: number;
+            matching?: (user: User) => boolean;
+        } = {}): Promise<User[]> =>
+            Array.from(users.values())
+                .filter(matching)
+                .slice(skip, skip + take),
+        count: async (matching: (user: User) => boolean = () => true): Promise<number> =>
+            Array.from(users.values()).filter(matching).length,
         findById: async (id: string): Promise<User | null> => users.get(id) ?? null,
         findByEmail: async (email: string): Promise<User | null> => Array.from(users.values()).find((user) => user.email === email) ?? null,
         search: async (

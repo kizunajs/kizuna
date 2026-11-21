@@ -19,6 +19,7 @@ import {
     listedRoutes,
     assertFreeNamespaces,
     groupByNamespace,
+    validatesRequest,
 } from 'kizunajs/generator';
 import { runtimeSource } from './runtime.js';
 import { TypeCollector, docComment, sampleObject, sampleValue, typeOf, type NamedType } from './zod-to-typescript.js';
@@ -200,7 +201,7 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
     args.push('fetchOptions?: RequestInit');
 
     // The route tree never carries the automatic 400, so the union adds it here.
-    const validates = route.body !== undefined || route.query !== undefined;
+    const validates = validatesRequest(route);
     const declaredBadRequest = Object.keys(route.responses).includes('400');
     const validationBody = validates ? typeOf(ValidationErrorSchema, collector, 'ValidationError') : undefined;
 

@@ -8,11 +8,13 @@ import type { Kizuna, K } from './kizuna.js';
  */
 export const AUTHORING_NAMES = {
     model: 'model',
+    route: 'route',
     routes: 'routes',
     defineConfig: 'defineConfig',
     router: 'router',
 } as const satisfies {
     model: keyof typeof Kizuna;
+    route: keyof K;
     routes: keyof K;
     defineConfig: typeof defineConfig extends unknown ? 'defineConfig' : never;
     router: string;

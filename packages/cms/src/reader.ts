@@ -191,11 +191,13 @@ type OwnOf<Entry, Key extends 'globals' | 'collections'> = Entry extends { reado
  */
 type PagesOf<Entry, Key extends string> = Entry extends { readonly pages?: infer Pages extends PageMap }
     ? {
-          [Name in keyof Pages as Pages[Name]['page'] extends { readonly sites: readonly (infer Named)[] }
-              ? Key extends Named
-                  ? Name
-                  : never
-              : Name]: Pages[Name];
+          [
+              Name in keyof Pages as Pages[Name]['page'] extends { readonly sites: readonly (infer Named)[] }
+                  ? Key extends Named
+                      ? Name
+                      : never
+                  : Name
+          ]: Pages[Name];
       }
     : {};
 
@@ -471,19 +473,15 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
 
     const globals: Record<string, unknown> = {};
     const globalRefs: DocumentRef[] = [
-        ...Object.keys(service.globals).map(
-            (name): DocumentRef => ({
-                type: 'global',
-                name,
-            })
-        ),
-        ...Object.keys(service.siteGlobals[site] ?? {}).map(
-            (name): DocumentRef => ({
-                type: 'global',
-                name,
-                site,
-            })
-        ),
+        ...Object.keys(service.globals).map((name): DocumentRef => ({
+            type: 'global',
+            name,
+        })),
+        ...Object.keys(service.siteGlobals[site] ?? {}).map((name): DocumentRef => ({
+            type: 'global',
+            name,
+            site,
+        })),
     ];
     for (const ref of globalRefs) {
         if (ref.type !== 'global') continue;

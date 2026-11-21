@@ -1,5 +1,7 @@
 import type { z } from 'zod';
-import { markModelSchema } from './zod-internals.js';
+import { markModelSchema, readDefType, readDiscriminatedUnion } from './zod-internals.js';
+
+const isEnumOrUnion = (schema: z.ZodType): boolean => readDefType(schema) === 'enum' || readDiscriminatedUnion(schema) !== undefined;
 
 export interface ModelOptions<T extends z.ZodType> {
     /**
@@ -18,6 +20,11 @@ export interface ModelOptions<T extends z.ZodType> {
      * The Zod schema that defines the shape and validation of this model.
      */
     schema: T;
+    /**
+     * An enum or discriminated union that will gain members. The Swift and
+     * Kotlin clients decode a member they don't know as `unknown`.
+     */
+    extensible?: boolean;
 }
 
 /**
@@ -38,9 +45,17 @@ export const createModel = <T extends z.ZodType>(options: ModelOptions<T>): T =>
     if (options.title.split('.').some((segment) => segment === '')) {
         throw new Error(`Kizuna.model: ${JSON.stringify(options.title)} needs a name on both sides of every dot, like "Billing.Invoice".`);
     }
+    if (options.extensible === true && !isEnumOrUnion(options.schema)) {
+        throw new Error(`Model '${options.title}' is \`extensible\`, which only an enum or a discriminated union can be.`);
+    }
     const model = options.schema.meta({
         id: options.title,
         description: options.description,
+        ...(options.extensible === true
+            ? {
+                  extensible: true,
+              }
+            : {}),
     }) as T;
     markModelSchema(model);
     return model;

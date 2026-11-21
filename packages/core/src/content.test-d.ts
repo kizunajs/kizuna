@@ -43,7 +43,8 @@ test('a provider declaring jobs requires jobRunner', () => {
     defineConfig({
         content: refreshingContent,
         jobRunner: {
-            mode: 'in-process',
+            mode: 'long-running',
+            transport: false,
         },
     });
 });

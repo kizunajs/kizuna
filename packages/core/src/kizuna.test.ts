@@ -742,6 +742,152 @@ describe('rawBody', () => {
     });
 });
 
+describe('responses with no content', () => {
+    const plainK = new Kizuna();
+
+    it('refuses z.undefined() on a 204', () => {
+        expect(() =>
+            defineConfig({
+                routes: [
+                    {
+                        deleteUser: plainK.route({
+                            method: 'DELETE',
+                            path: '/users/:id',
+                            responses: {
+                                // eslint-disable-next-line @kizunajs/no-unsupported-schema -- intentional, asserts defineConfig throws on z.undefined()
+                                204: z.undefined(),
+                            },
+                        }),
+                    },
+                ],
+            })
+        ).toThrow(
+            "Route 'deleteUser' declares its 204 response as `z.undefined()`, which the generated clients read as a JSON body. Declare `z.void()` for a response with no content."
+        );
+    });
+
+    it('refuses z.undefined() on any status', () => {
+        expect(() =>
+            defineConfig({
+                routes: [
+                    {
+                        getUser: plainK.route({
+                            method: 'GET',
+                            path: '/users/:id',
+                            responses: {
+                                200: {
+                                    // eslint-disable-next-line @kizunajs/no-unsupported-schema -- intentional, asserts defineConfig throws on z.undefined()
+                                    body: z.undefined(),
+                                },
+                            },
+                        }),
+                    },
+                ],
+            })
+        ).toThrow("Route 'getUser' declares its 200 response as `z.undefined()`");
+    });
+
+    it.each([204, 205, 304])('refuses a body on a %i', (status) => {
+        expect(() =>
+            defineConfig({
+                routes: [
+                    {
+                        updateUser: plainK.route({
+                            method: 'PUT',
+                            path: '/users/:id',
+                            responses: {
+                                [status]: z.object({
+                                    name: z.string(),
+                                }),
+                            },
+                        }),
+                    },
+                ],
+            })
+        ).toThrow(
+            `Route 'updateUser' declares a body on its ${status} response. A ${status} carries no content, so declare it \`z.void()\`.`
+        );
+    });
+
+    it('refuses a stream on a 204', () => {
+        expect(() =>
+            defineConfig({
+                routes: [
+                    {
+                        listEvents: plainK.route({
+                            method: 'GET',
+                            path: '/events',
+                            responses: {
+                                204: {
+                                    stream: {
+                                        delta: z.object({
+                                            text: z.string(),
+                                        }),
+                                    },
+                                },
+                            },
+                        }),
+                    },
+                ],
+            })
+        ).toThrow("Route 'listEvents' declares a body on its 204 response.");
+    });
+
+    it('accepts z.void() with headers on a 204', () => {
+        expect(() =>
+            defineConfig({
+                routes: [
+                    {
+                        deleteUser: plainK.route({
+                            method: 'DELETE',
+                            path: '/users/:id',
+                            responses: {
+                                204: {
+                                    body: z.void(),
+                                    headers: z.object({
+                                        'x-request-id': z.string(),
+                                    }),
+                                },
+                            },
+                        }),
+                    },
+                ],
+            })
+        ).not.toThrow();
+    });
+
+    it("refuses a body on a plugin route's 204", () => {
+        const auditPlugin = definePlugin({
+            slug: 'audit',
+            options: z.object({}),
+            setup: () => ({
+                routes: {
+                    clear: route({
+                        method: 'DELETE',
+                        path: '/audit',
+                        responses: {
+                            204: z.object({
+                                cleared: z.number(),
+                            }),
+                        },
+                    }).handler(() => ({
+                        status: 204,
+                        body: {
+                            cleared: 0,
+                        },
+                    })),
+                },
+            }),
+        });
+
+        expect(() =>
+            defineConfig({
+                plugins: [auditPlugin()],
+            })
+        ).toThrow("Route 'audit.clear' declares a body on its 204 response.");
+    });
+});
+
 describe('hidden routes', () => {
     const hiddenGroups = k.groups({
         api: 'API',

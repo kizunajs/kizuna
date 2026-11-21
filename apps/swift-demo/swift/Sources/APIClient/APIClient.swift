@@ -7,9 +7,65 @@ import FoundationNetworking
 
 public enum API {
 
+    public struct UserWhere: Codable, Sendable, Equatable {
+        public let name: TextFilter?
+        public let email: TextFilter?
+        public let and: [UserWhere]?
+        public let or: [UserWhere]?
+
+        public init(
+            name: TextFilter? = nil,
+            email: TextFilter? = nil,
+            and: [UserWhere]? = nil,
+            or: [UserWhere]? = nil
+        ) {
+            self.name = name
+            self.email = email
+            self.and = and
+            self.or = or
+        }
+
+        public static func name(_ name: TextFilter) -> Self {
+            .init(name: name)
+        }
+
+        public static func email(_ email: TextFilter) -> Self {
+            .init(email: email)
+        }
+
+        public static func and(_ and: [UserWhere]) -> Self {
+            .init(and: and)
+        }
+
+        public static func or(_ or: [UserWhere]) -> Self {
+            .init(or: or)
+        }
+    }
+
+    public struct TextFilter: Codable, Sendable, Equatable {
+        public let equals: String?
+        public let contains: String?
+
+        public init(
+            equals: String? = nil,
+            contains: String? = nil
+        ) {
+            self.equals = equals
+            self.contains = contains
+        }
+
+        public static func equals(_ equals: String) -> Self {
+            .init(equals: equals)
+        }
+
+        public static func contains(_ contains: String) -> Self {
+            .init(contains: contains)
+        }
+    }
+
     /// A user in the system
-    public struct User: Codable, Sendable, Equatable {
-        public struct Avatar: Codable, Sendable, Equatable {
+    public struct User: Codable, Sendable, Equatable, Identifiable {
+        public struct Avatar: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let url: String
 
@@ -21,7 +77,7 @@ public enum API {
                 self.url = url
             }
         }
-        public struct AvatarsItem: Codable, Sendable, Equatable {
+        public struct AvatarsItem: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let url: String
 
@@ -364,7 +420,7 @@ public enum API {
         case signup = "signup"
     }
 
-    public struct EventRecord: Codable, Sendable, Equatable {
+    public struct EventRecord: Codable, Sendable, Equatable, Identifiable {
         public let id: String
         public let kind: EventKind
         public let occurredAt: Date
@@ -644,20 +700,24 @@ public final class APIClient: Sendable {
         public struct Query: Sendable {
             public let page: Int?
             public let limit: Int?
+            public let `where`: API.UserWhere?
 
             public init(
                 page: Int? = nil,
-                limit: Int? = nil
+                limit: Int? = nil,
+                `where`: API.UserWhere? = nil
             ) {
                 self.page = page
                 self.limit = limit
+                self.`where` = `where`
             }
 
             public static func query(
                 page: Int? = nil,
-                limit: Int? = nil
+                limit: Int? = nil,
+                `where`: API.UserWhere? = nil
             ) -> Self {
-                .init(page: page, limit: limit)
+                .init(page: page, limit: limit, where: `where`)
             }
         }
 
@@ -740,6 +800,7 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+            case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -778,6 +839,7 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+            case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -908,6 +970,7 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+            case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -970,6 +1033,7 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+            case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1008,6 +1072,7 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+            case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1153,6 +1218,7 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+            case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1221,6 +1287,7 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1411,6 +1478,7 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+            case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1902,7 +1970,7 @@ public final class APIClient: Sendable {
 
     public enum WorkspaceGetWorkspace {
 
-        public struct Response: Codable, Sendable, Equatable {
+        public struct Response: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
 
@@ -2387,7 +2455,7 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolCallGetForecast: Codable, Sendable, Equatable {
+        public struct ToolCallGetForecast: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let needsApproval: Bool?
@@ -2433,6 +2501,10 @@ public final class APIClient: Sendable {
             public init(unit: ToolCallGetForecastInputQueryUnit? = nil) {
                 self.unit = unit
             }
+
+            public static func unit(_ unit: ToolCallGetForecastInputQueryUnit) -> Self {
+                .init(unit: unit)
+            }
         }
 
         public enum ToolCallGetForecastInputQueryUnit: String, Codable, Sendable {
@@ -2440,7 +2512,7 @@ public final class APIClient: Sendable {
             case fahrenheit = "fahrenheit"
         }
 
-        public struct ToolCallPlotSignups: Codable, Sendable, Equatable {
+        public struct ToolCallPlotSignups: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let needsApproval: Bool?
@@ -2475,7 +2547,7 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolCallCountWords: Codable, Sendable, Equatable {
+        public struct ToolCallCountWords: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let needsApproval: Bool?
@@ -2573,7 +2645,7 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolResultGetForecast: Codable, Sendable, Equatable {
+        public struct ToolResultGetForecast: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let output: ToolResultGetForecastOutput
@@ -2610,7 +2682,7 @@ public final class APIClient: Sendable {
             case fahrenheit = "fahrenheit"
         }
 
-        public struct ToolResultPlotSignups: Codable, Sendable, Equatable {
+        public struct ToolResultPlotSignups: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let output: ToolResultPlotSignupsOutput
@@ -2647,7 +2719,7 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolResultCountWords: Codable, Sendable, Equatable {
+        public struct ToolResultCountWords: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let output: ToolResultCountWordsOutput
@@ -2671,7 +2743,7 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolError: Codable, Sendable, Equatable {
+        public struct ToolError: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: ToolErrorName
             public let message: String
@@ -2748,17 +2820,19 @@ public final class APIClient: Sendable {
             for event in events {
                 switch event {
                 case .tool_call(let payload):
-                    var tracked = at(payload.id, payload.name)
+                    let id = payload.id
+                    var tracked = at(id, payload.name)
                     tracked.call = payload
                     if payload.needsApproval == true, tracked.state == .running {
                         tracked.state = .needsApproval
                     }
-                    calls[payload.id] = tracked
+                    calls[id] = tracked
                 case .tool_result(let payload):
-                    var tracked = at(payload.id, payload.name)
+                    let id = payload.id
+                    var tracked = at(id, payload.name)
                     tracked.state = .done
                     tracked.result = payload
-                    calls[payload.id] = tracked
+                    calls[id] = tracked
                 case .tool_error(let payload):
                     var tracked = at(payload.id, payload.name.rawValue)
                     tracked.state = .failed
@@ -2825,7 +2899,7 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct InputAnswerCall: Codable, Sendable, Equatable {
+        public struct InputAnswerCall: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let input: APIClient.JSONValue?
@@ -2909,7 +2983,7 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolCallNotesList: Codable, Sendable, Equatable {
+        public struct ToolCallNotesList: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let needsApproval: Bool?
@@ -2925,7 +2999,7 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolCallNotesAdd: Codable, Sendable, Equatable {
+        public struct ToolCallNotesAdd: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let needsApproval: Bool?
@@ -3013,7 +3087,7 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolResultNotesList: Codable, Sendable, Equatable {
+        public struct ToolResultNotesList: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let output: ToolResultNotesListOutput
@@ -3037,7 +3111,7 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolResultNotesListOutputNotesItem: Codable, Sendable, Equatable {
+        public struct ToolResultNotesListOutputNotesItem: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let text: String
 
@@ -3050,7 +3124,7 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolResultNotesAdd: Codable, Sendable, Equatable {
+        public struct ToolResultNotesAdd: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let output: ToolResultNotesAddOutput
@@ -3066,7 +3140,7 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolResultNotesAddOutput: Codable, Sendable, Equatable {
+        public struct ToolResultNotesAddOutput: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let text: String
 
@@ -3079,7 +3153,7 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolError: Codable, Sendable, Equatable {
+        public struct ToolError: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: ToolErrorName
             public let message: String
@@ -3157,17 +3231,19 @@ public final class APIClient: Sendable {
             for event in events {
                 switch event {
                 case .tool_call(let payload):
-                    var tracked = at(payload.id, payload.name)
+                    let id = payload.id
+                    var tracked = at(id, payload.name)
                     tracked.call = payload
                     if payload.needsApproval == true, tracked.state == .running {
                         tracked.state = .needsApproval
                     }
-                    calls[payload.id] = tracked
+                    calls[id] = tracked
                 case .tool_result(let payload):
-                    var tracked = at(payload.id, payload.name)
+                    let id = payload.id
+                    var tracked = at(id, payload.name)
                     tracked.state = .done
                     tracked.result = payload
-                    calls[payload.id] = tracked
+                    calls[id] = tracked
                 case .tool_error(let payload):
                     var tracked = at(payload.id, payload.name.rawValue)
                     tracked.state = .failed
@@ -3407,7 +3483,7 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ResponseNotesItem: Codable, Sendable, Equatable {
+        public struct ResponseNotesItem: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let text: String
 
@@ -3455,7 +3531,7 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct Response201: Codable, Sendable, Equatable {
+        public struct Response201: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let text: String
 
@@ -3658,6 +3734,7 @@ public struct APIUsersClient: Sendable {
         var queryItems: [URLQueryItem] = []
         queryItems += Kizuna.queryItems(name: "page", value: query.page)
         queryItems += Kizuna.queryItems(name: "limit", value: query.limit)
+        queryItems += try Kizuna.jsonQueryItems(name: "where", value: query.`where`, failure: APIClient.UsersListUsers.Failure.self)
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: queryItems, failure: APIClient.UsersListUsers.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
@@ -3708,6 +3785,9 @@ public struct APIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUserBadge.Failure.self)
             throw APIClient.UsersUserBadge.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUserBadge.Failure.self)
+            throw APIClient.UsersUserBadge.Failure.badRequest(payload)
         default:
             throw APIClient.UsersUserBadge.Failure.unexpectedStatus(statusCode, data)
         }
@@ -3729,6 +3809,9 @@ public struct APIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersLastSessionEvent.Failure.self)
             throw APIClient.UsersLastSessionEvent.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersLastSessionEvent.Failure.self)
+            throw APIClient.UsersLastSessionEvent.Failure.badRequest(payload)
         default:
             throw APIClient.UsersLastSessionEvent.Failure.unexpectedStatus(statusCode, data)
         }
@@ -3776,6 +3859,9 @@ public struct APIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersGetUser.Failure.self)
             throw APIClient.UsersGetUser.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersGetUser.Failure.self)
+            throw APIClient.UsersGetUser.Failure.badRequest(payload)
         default:
             throw APIClient.UsersGetUser.Failure.unexpectedStatus(statusCode, data)
         }
@@ -3798,6 +3884,9 @@ public struct APIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUserActivity.Failure.self)
             throw APIClient.UsersUserActivity.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUserActivity.Failure.self)
+            throw APIClient.UsersUserActivity.Failure.badRequest(payload)
         default:
             throw APIClient.UsersUserActivity.Failure.unexpectedStatus(statusCode, data)
         }
@@ -3819,6 +3908,9 @@ public struct APIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUserProfile.Failure.self)
             throw APIClient.UsersUserProfile.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUserProfile.Failure.self)
+            throw APIClient.UsersUserProfile.Failure.badRequest(payload)
         default:
             throw APIClient.UsersUserProfile.Failure.unexpectedStatus(statusCode, data)
         }
@@ -3888,6 +3980,9 @@ public struct APIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersDeleteUser.Failure.self)
             throw APIClient.UsersDeleteUser.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersDeleteUser.Failure.self)
+            throw APIClient.UsersDeleteUser.Failure.badRequest(payload)
         default:
             throw APIClient.UsersDeleteUser.Failure.unexpectedStatus(statusCode, data)
         }
@@ -3909,6 +4004,9 @@ public struct APIUsersClient: Sendable {
         case 201:
             let payload = try Kizuna.decode(APIClient.UsersArchiveUser.Response201.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersArchiveUser.Failure.self)
             return APIClient.UsersArchiveUser.Result(body: .status201(payload))
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersArchiveUser.Failure.self)
+            throw APIClient.UsersArchiveUser.Failure.badRequest(payload)
         default:
             throw APIClient.UsersArchiveUser.Failure.unexpectedStatus(statusCode, data)
         }
@@ -3993,6 +4091,9 @@ public struct APIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersCheckUser.Failure.self)
             throw APIClient.UsersCheckUser.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersCheckUser.Failure.self)
+            throw APIClient.UsersCheckUser.Failure.badRequest(payload)
         default:
             throw APIClient.UsersCheckUser.Failure.unexpectedStatus(statusCode, data)
         }
@@ -4815,6 +4916,14 @@ private enum Kizuna {
     static func queryItems<Value>(name: String, value: Value?) -> [URLQueryItem] {
         guard let value else { return [] }
         return stringifyQueryValue(value).map { URLQueryItem(name: name, value: $0) }
+    }
+
+    static func jsonQueryItems<Value: Encodable, Failure: KizunaFailure>(name: String, value: Value?, failure: Failure.Type) throws(Failure) -> [URLQueryItem] {
+        guard let value else { return [] }
+        let encoder = makeJSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        do { return [URLQueryItem(name: name, value: String(decoding: try encoder.encode(value), as: UTF8.self))] }
+        catch { throw Failure.requestFailed(error) }
     }
 
     static func setHeader<Value>(_ request: inout URLRequest, name: String, value: Value?) {

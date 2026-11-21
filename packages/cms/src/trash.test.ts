@@ -94,7 +94,8 @@ const storage = memoryMediaStorage();
 
 const config = defineConfig({
     jobRunner: {
-        mode: 'in-process',
+        mode: 'long-running',
+        transport: false,
     },
     adapter: expressAdapter(),
     auth: {

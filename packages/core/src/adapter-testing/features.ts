@@ -15,6 +15,15 @@ export const ADAPTER_FEATURES = {
     'routing.notFound': {
         summary: 'An undeclared path is refused.',
     },
+    'routing.sharedSegmentParams': {
+        summary: 'Several params in one segment split at the last separator, so the last param takes what follows it.',
+    },
+    'routing.sharedSegmentMismatch': {
+        summary: 'A path that leaves a param of a shared segment empty is refused.',
+    },
+    'routing.malformedEscape': {
+        summary: 'A param with a percent-encoding that does not decode answers 400.',
+    },
     'routing.subRouterComposition': {
         summary: 'Routes composed from a sub-router mount at their declared path.',
     },
@@ -44,6 +53,13 @@ export const ADAPTER_FEATURES = {
     },
     'query.repeatedKeys': {
         summary: 'A repeated query key arrives as a list of every value.',
+    },
+    'query.methodOverride': {
+        summary:
+            'A POST with `X-HTTP-Method-Override: GET` and a form body is answered as the GET on that path, the body read as its query. A POST without the header still reaches the POST route.',
+    },
+    'query.jsonObject': {
+        summary: 'An object query param arrives parsed from its JSON text, and text that is not JSON answers 400.',
     },
     'body.json': {
         summary: 'A JSON body validates and reaches the handler typed.',
@@ -159,6 +175,9 @@ export const ADAPTER_FEATURES = {
     'plugins.rawResponseCookies': {
         summary: 'A raw response keeps every `Set-Cookie`.',
     },
+    'plugins.rawResponseStreamError': {
+        summary: 'A `rawResponse` body that fails partway ends that response, and the server goes on serving.',
+    },
     'streams.sseFraming': {
         summary: 'A streamed status writes each yield as a server-sent event under `text/event-stream` with `Cache-Control: no-store`.',
     },
@@ -191,6 +210,18 @@ export const ADAPTER_FEATURES = {
     },
     'streams.itemValidation': {
         summary: 'With `responseValidation` on, a message failing its schema ends the stream.',
+    },
+    'inProcess.answers': {
+        summary: '`api.fetch` answers a request with a JSON body, refuses an invalid one and misses an undeclared path, with no server.',
+    },
+    'inProcess.guards': {
+        summary: '`api.fetch` runs the guard: no token answers 401 and a valid one reaches the handler.',
+    },
+    'inProcess.streams': {
+        summary: '`api.fetch` hands each message of a stream on as it is written.',
+    },
+    'inProcess.besideTransport': {
+        summary: 'A request over the transport after `api.fetch` in the same process answers as it would alone.',
     },
 } as const satisfies Record<string, AdapterFeatureMeta>;
 

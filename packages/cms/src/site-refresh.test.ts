@@ -112,7 +112,7 @@ const db = drizzle(pglite);
 const config = defineConfig({
     adapter: expressAdapter(),
     jobRunner: {
-        mode: 'in-process',
+        mode: 'long-running',
         transport: defineJobTransport({
             name: 'captured',
             supports: {
@@ -510,7 +510,8 @@ describe('a CMS with one site', () => {
     it('declares the scheduling job alone, so it names a jobRunner too', () => {
         const single = defineConfig({
             jobRunner: {
-                mode: 'in-process',
+                mode: 'long-running',
+                transport: false,
             },
             auth: {
                 identities: {
@@ -570,6 +571,7 @@ describe("the refresh job's identity", () => {
         const served = defineConfig({
             jobRunner: {
                 mode: 'http',
+                transport: false,
             },
             auth: {
                 identities: {
@@ -595,6 +597,7 @@ describe("the refresh job's identity", () => {
         const served = defineConfig({
             jobRunner: {
                 mode: 'http',
+                transport: false,
             },
             auth: {
                 identities: {
@@ -622,6 +625,7 @@ describe("the refresh job's identity", () => {
             defineConfig({
                 jobRunner: {
                     mode: 'http',
+                    transport: false,
                 },
                 auth: {
                     identities: {
@@ -644,6 +648,7 @@ describe("the refresh job's identity", () => {
             defineConfig({
                 jobRunner: {
                     mode: 'http',
+                    transport: false,
                 },
                 auth: {
                     identities: {

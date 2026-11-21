@@ -118,7 +118,8 @@ const signOut = (request: SignOutRequest): Response => {
 const pglite = new PGlite();
 const config = defineConfig({
     jobRunner: {
-        mode: 'in-process',
+        mode: 'long-running',
+        transport: false,
     },
     adapter: {
         ...expressAdapter(),
@@ -336,7 +337,8 @@ describe('the sign-in screen of a deployment with several sites', () => {
     const withSites = defineConfig({
         adapter: expressAdapter(),
         jobRunner: {
-            mode: 'in-process',
+            mode: 'long-running',
+            transport: false,
         },
         auth: {
             identities: {
@@ -381,7 +383,8 @@ describe('the sign-in options', () => {
     const configWith = (options: { signInPath?: string; signOutPath?: string }) => () =>
         defineConfig({
             jobRunner: {
-                mode: 'in-process',
+                mode: 'long-running',
+                transport: false,
             },
             adapter: expressAdapter(),
             auth: {

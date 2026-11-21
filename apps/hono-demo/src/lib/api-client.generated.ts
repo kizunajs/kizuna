@@ -92,6 +92,11 @@ export namespace API {
         text: string;
     };
 
+    export type TextFilter = {
+        equals?: string;
+        contains?: string;
+    };
+
     /**
      * A user in the system
      */
@@ -177,6 +182,13 @@ export namespace API {
         reason: "signed_out" | "session_expired";
     };
 
+    export type UserWhere = {
+        name?: TextFilter;
+        email?: TextFilter;
+        and?: Array<UserWhere>;
+        or?: Array<UserWhere>;
+    };
+
     /**
      * RFC 9457 Problem Details error response for validation failures.
      */
@@ -208,6 +220,7 @@ export namespace API {
              * 10
              */
             limit?: number;
+            where?: UserWhere;
         };
 
         export type Result =
@@ -230,7 +243,8 @@ export namespace API {
 
         export type Result =
             | { status: 200; body: Uint8Array; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersLastSessionEvent {
@@ -240,7 +254,8 @@ export namespace API {
 
         export type Result =
             | { status: 200; body: UserSessionEvent; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersSearchUsers {
@@ -271,7 +286,8 @@ export namespace API {
             | { status: 200; body: User; headers: {
                 "x-request-id"?: string;
             } }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersUserActivity {
@@ -286,7 +302,8 @@ export namespace API {
                 year: number;
                 events: number;
             }; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersUserProfile {
@@ -296,7 +313,8 @@ export namespace API {
 
         export type Result =
             | { status: 200; body: User; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersCreateUser {
@@ -328,7 +346,8 @@ export namespace API {
             | { status: 200; body: {
                 success: boolean;
             }; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersArchiveUser {
@@ -344,7 +363,8 @@ export namespace API {
             | { status: 201; body: {
                 archivedAt: string;
                 userId: UserId;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersUploadAvatar {
@@ -389,7 +409,8 @@ export namespace API {
             | { status: 200; body: {
                 exists: boolean;
             }; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersDescribeUsers {
@@ -1458,6 +1479,7 @@ const routes: GeneratedRoutes = {
             responses: {
                 200: { read: 'bytes' },
                 404: {},
+                400: {},
             },
         },
         lastSessionEvent: {
@@ -1466,6 +1488,7 @@ const routes: GeneratedRoutes = {
             responses: {
                 200: {},
                 404: {},
+                400: {},
             },
         },
         searchUsers: {
@@ -1482,6 +1505,7 @@ const routes: GeneratedRoutes = {
             responses: {
                 200: {},
                 404: {},
+                400: {},
             },
         },
         userActivity: {
@@ -1490,6 +1514,7 @@ const routes: GeneratedRoutes = {
             responses: {
                 200: {},
                 404: {},
+                400: {},
             },
         },
         userProfile: {
@@ -1498,6 +1523,7 @@ const routes: GeneratedRoutes = {
             responses: {
                 200: {},
                 404: {},
+                400: {},
             },
         },
         createUser: {
@@ -1522,6 +1548,7 @@ const routes: GeneratedRoutes = {
             responses: {
                 200: {},
                 404: {},
+                400: {},
             },
         },
         archiveUser: {
@@ -1530,6 +1557,7 @@ const routes: GeneratedRoutes = {
             responses: {
                 200: {},
                 201: {},
+                400: {},
             },
         },
         uploadAvatar: {
@@ -1563,6 +1591,7 @@ const routes: GeneratedRoutes = {
             responses: {
                 200: {},
                 404: {},
+                400: {},
             },
         },
         describeUsers: {
@@ -1968,13 +1997,32 @@ const buildPath = (path: string, params: Record<string, unknown> = {}): string =
         return encodeURIComponent(serializeValue(value));
     });
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date);
+
 /**
- * An array repeats its key, and an undefined or null field is left out.
+ * JSON with every object's keys in order so one value always gives one URL.
+ */
+const sortedJson = (value: unknown): string =>
+    JSON.stringify(value, (_, inner: unknown) => {
+        if (!isPlainObject(inner)) return inner;
+        const keys = Object.keys(inner).sort();
+        return Object.fromEntries(keys.map((key) => [key, inner[key]]));
+    });
+
+const isText = (value: unknown): boolean => !isPlainObject(value) && !Array.isArray(value);
+
+/**
+ * A list of values repeats its key and anything else travels as one JSON text. An undefined or null field is left out.
  */
 const buildSearchParams = (fields: Record<string, unknown>): URLSearchParams => {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(fields)) {
         if (value === undefined || value === null) continue;
+        if (Array.isArray(value) ? !value.every(isText) : !isText(value)) {
+            params.append(key, sortedJson(value));
+            continue;
+        }
         for (const item of Array.isArray(value) ? value : [value]) params.append(key, serializeValue(item));
     }
     return params;

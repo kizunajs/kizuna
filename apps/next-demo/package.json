@@ -28,7 +28,7 @@
     "@kizunajs/mcp": "workspace:*",
     "@kizunajs/next": "workspace:*",
     "@kizunajs/openapi": "workspace:*",
-    "@scalar/nextjs-api-reference": "^0.10.11",
+    "@scalar/nextjs-api-reference": "^0.10.20",
     "better-auth": "^1.7.6",
     "drizzle-orm": "^0.45.3",
     "kizunajs": "workspace:*",

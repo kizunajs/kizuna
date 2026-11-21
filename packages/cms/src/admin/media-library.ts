@@ -214,7 +214,7 @@ export const foldersAt = (folders: readonly MediaFolderItem[], parent: string | 
  */
 export const folderTrail = (folders: readonly MediaFolderItem[], id: string | undefined): MediaFolderItem[] => {
     const trail: MediaFolderItem[] = [];
-    for (let step = folders.find((folder) => folder.id === id); step !== undefined && !trail.includes(step); ) {
+    for (let step = folders.find((folder) => folder.id === id); step !== undefined && !trail.includes(step);) {
         trail.unshift(step);
         const parent: string | undefined = step.parent;
         step = folders.find((folder) => folder.id === parent);

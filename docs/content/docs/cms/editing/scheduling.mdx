@@ -53,7 +53,8 @@ The CMS keeps its schedules in its own tables, `cms_schedules` and `cms_releases
 
 ```ts title="kizuna.config.ts"
 jobRunner: {
-    mode: 'in-process',
+    mode: 'long-running',
+    transport: false,
 },
 ```
 
@@ -83,6 +84,7 @@ Platform cron calls `/jobs/dispatch`, and the job runs on each call. It runs as 
 ```ts title="kizuna.config.ts"
 jobRunner: {
     mode: 'http',
+    transport: false,
 },
 content: cms({
     jobs: {

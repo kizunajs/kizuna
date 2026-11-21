@@ -363,13 +363,7 @@ export type DashboardWidgetBody =
  * A widget drawn as a panel, two to a row.
  */
 export type PanelWidgetBody =
-    | ChartWidgetBody
-    | ListWidgetBody
-    | FunnelWidgetBody
-    | ReviewsWidgetBody
-    | RefreshesWidgetBody
-    | ReachWidgetBody
-    | EditorsWidgetBody;
+    ChartWidgetBody | ListWidgetBody | FunnelWidgetBody | ReviewsWidgetBody | RefreshesWidgetBody | ReachWidgetBody | EditorsWidgetBody;
 
 /**
  * Widgets that sit together on the dashboard: stats in a row of tiles,

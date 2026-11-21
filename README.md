@@ -4,7 +4,7 @@
 
 A spec-driven framework for building fully typed REST APIs in TypeScript, where your route declarations produce the validation, the documentation, the clients, and the AI tools.
 
-[![npm](https://img.shields.io/npm/v/kizunajs/beta?color=blue&label=npm)](https://www.npmjs.com/package/kizunajs/v/2.0.0-beta.27)
+[![npm](https://img.shields.io/npm/v/kizunajs/beta?color=blue&label=npm)](https://www.npmjs.com/package/kizunajs/v/2.0.0-beta.36)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
 [Documentation](https://kizunajs.com)
@@ -64,6 +64,7 @@ Follow the [quickstart](https://kizunajs.com/docs/quickstart), which goes from a
 | `@kizunajs/kotlin`         | Kotlin client generation                                |
 | `@kizunajs/mcp`            | MCP endpoint for AI assistants                          |
 | `@kizunajs/resend`         | Email, newsletters and webhooks through Resend          |
+| `@kizunajs/pgmq`           | pgmq job transport                                      |
 | `@kizunajs/cms`            | Content for Next.js sites, edited in your chat over MCP |
 | `@kizunajs/eslint-plugin`  | ESLint rules                                            |
 | `@kizunajs/cli`            | Command line tooling                                    |

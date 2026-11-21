@@ -57,6 +57,7 @@ const contract = defineConfig({
     ],
     jobRunner: {
         mode: 'http',
+        transport: false,
     },
     jobs,
 }).api;
@@ -236,6 +237,7 @@ describe('createJobRunner', () => {
             routes: [k.routes({})],
             jobRunner: {
                 mode: 'http',
+                transport: false,
             },
             jobs: nested,
         }).api;
@@ -304,6 +306,24 @@ describe('createJobRunner', () => {
             });
             await expect(runner.indexPost.queue({ input: {} as never })).rejects.toThrow(JobInputError);
             expect(indexPost).not.toHaveBeenCalled();
+        });
+
+        it('waits for a runAt further away than one timer can hold', async () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2026-08-05T00:00:00Z'));
+            const cleanup = vi.fn(noop);
+            const runner = createJobRunner(contract, {
+                indexPost: indexed,
+                cleanup,
+            });
+            await runner.cleanup.queue({
+                runAt: new Date('2026-09-14T00:00:00Z'),
+            });
+            await vi.advanceTimersByTimeAsync(39 * 24 * 60 * 60 * 1000);
+            expect(cleanup).not.toHaveBeenCalled();
+            await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+            expect(cleanup).toHaveBeenCalledOnce();
+            vi.useRealTimers();
         });
     });
 

@@ -60,7 +60,8 @@ const pglite = new PGlite();
 const configWith = (adminPath?: `/${string}`, adminCss?: string) =>
     defineConfig({
         jobRunner: {
-            mode: 'in-process',
+            mode: 'long-running',
+            transport: false,
         },
         adapter: expressAdapter(),
         auth: {
@@ -220,7 +221,8 @@ describe('Edit in your chat', () => {
         const connected = express();
         defineConfig({
             jobRunner: {
-                mode: 'in-process',
+                mode: 'long-running',
+                transport: false,
             },
             adapter: expressAdapter(),
             auth: {
@@ -329,7 +331,8 @@ const countryPages = definePages({
 const withSites = defineConfig({
     adapter: expressAdapter(),
     jobRunner: {
-        mode: 'in-process',
+        mode: 'long-running',
+        transport: false,
     },
     auth: {
         identities: {

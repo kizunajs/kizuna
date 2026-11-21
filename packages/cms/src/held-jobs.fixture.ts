@@ -6,7 +6,7 @@ import { defineJobTransport, type JobTransport } from 'kizunajs/adapter';
  * never delivered, so publishing calls no site.
  */
 export const heldJobs: InProcessJobsConfig & { transport: JobTransport } = {
-    mode: 'in-process',
+    mode: 'long-running',
     transport: defineJobTransport({
         name: 'held',
         dispatch: () => undefined,

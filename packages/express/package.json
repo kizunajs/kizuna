@@ -1,6 +1,6 @@
 {
   "name": "@kizunajs/express",
-  "version": "2.0.0-beta.27",
+  "version": "2.0.0-beta.36",
   "description": "Express adapter for Kizuna.js",
   "keywords": [
     "kizunajs",
@@ -59,16 +59,19 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "kizunajs": "workspace:*",
     "express": "^5.0.0",
+    "kizunajs": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "kizunajs": "workspace:*",
     "@types/express": "catalog:",
     "express": "catalog:",
+    "kizunajs": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "zod": "catalog:"
+  },
+  "dependencies": {
+    "light-my-request": "6.8.0"
   }
 }

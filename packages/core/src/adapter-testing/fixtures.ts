@@ -124,6 +124,11 @@ export const userRoutes = k.routes({
                 page: z.number().int().min(1).default(1),
                 limit: z.number().int().min(1).default(10),
                 ids: z.array(z.string()).optional(),
+                filter: z
+                    .object({
+                        name: z.string(),
+                    })
+                    .optional(),
             }),
             responses: {
                 200: z.object({
@@ -138,7 +143,9 @@ export const userRoutes = k.routes({
             },
         })
         .handler(({ query }) => {
-            const all = Array.from(users.values()).filter((user) => !query.ids || query.ids.includes(user.id));
+            const all = Array.from(users.values()).filter(
+                (user) => (!query.ids || query.ids.includes(user.id)) && (!query.filter || query.filter.name === user.name)
+            );
             const start = (query.page - 1) * query.limit;
             return {
                 status: 200,
@@ -1026,6 +1033,73 @@ export const methodInput = {
 
 export const methodContract = defineConfig(methodInput).api;
 
+/**
+ * Routes with several params in one segment.
+ */
+export const sharedSegmentRoutes = k.routes({
+    getRange: k
+        .route({
+            method: 'GET',
+            path: '/range/:from-:to',
+            responses: {
+                200: z.object({
+                    from: z.string(),
+                    to: z.string(),
+                }),
+            },
+        })
+        .handler(({ params }) => ({
+            status: 200,
+            body: {
+                from: params.from,
+                to: params.to,
+            },
+        })),
+    getFile: k
+        .route({
+            method: 'GET',
+            path: '/files/:name.:ext',
+            responses: {
+                200: z.object({
+                    name: z.string(),
+                    ext: z.string(),
+                }),
+            },
+        })
+        .handler(({ params }) => ({
+            status: 200,
+            body: {
+                name: params.name,
+                ext: params.ext,
+            },
+        })),
+    getSpan: k
+        .route({
+            method: 'GET',
+            path: '/span/:start-to-:end',
+            responses: {
+                200: z.object({
+                    start: z.string(),
+                    end: z.string(),
+                }),
+            },
+        })
+        .handler(({ params }) => ({
+            status: 200,
+            body: {
+                start: params.start,
+                end: params.end,
+            },
+        })),
+});
+
+export const sharedSegmentInput = {
+    ...config,
+    routes: [sharedSegmentRoutes],
+};
+
+export const failingStreamFirstChunk = 'id,name\n1,Ada\n';
+
 const probePlugin = definePlugin({
     slug: 'probe',
     options: z.object({
@@ -1112,6 +1186,39 @@ const probePlugin = definePlugin({
                             ['Set-Cookie', 'theme=dark; Path=/'],
                         ],
                     })
+                )
+            ),
+            failingStream: route({
+                method: 'GET',
+                path: '/probe/failing-stream',
+                responses: {
+                    200: z.object({
+                        never: z.boolean(),
+                    }),
+                },
+            }).handler(() =>
+                rawResponse(
+                    new Response(
+                        new ReadableStream<Uint8Array>({
+                            start(controller) {
+                                controller.enqueue(new TextEncoder().encode(failingStreamFirstChunk));
+                            },
+                            pull(controller) {
+                                return new Promise((resolve) => {
+                                    setTimeout(() => {
+                                        controller.error(new Error('The upstream dropped the connection.'));
+                                        resolve();
+                                    }, 20);
+                                });
+                            },
+                        }),
+                        {
+                            status: 200,
+                            headers: {
+                                'Content-Type': 'text/csv',
+                            },
+                        }
+                    )
                 )
             ),
         },

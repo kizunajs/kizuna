@@ -1,6 +1,7 @@
+import Fastify from 'fastify';
 import type { FastifyInstance, FastifyRequest, FastifyReply, FastifyPluginAsync } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
-import { Readable, pipeline } from 'node:stream';
+import { Readable, Transform, pipeline } from 'node:stream';
 import type { ServerResponse } from 'node:http';
 import {
     type AdapterRequest,
@@ -27,7 +28,14 @@ import {
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
+    sharedSegmentRoute,
+    type PathParamsResult,
     type Adapter,
+    entriesToObject,
+    isMethodOverride,
+    METHOD_OVERRIDE_HEADER,
+    injectedRequestOf,
+    responseOfInjected,
 } from 'kizunajs/adapter';
 import type { SecurityScheme } from 'kizunajs';
 
@@ -56,6 +64,10 @@ export interface FastifyHandlerContext {
 declare module 'fastify' {
     interface FastifyRequest {
         kizunaRoute?: RouteDefinition;
+        /**
+         * The params of a route with several params in one segment, read by kizuna's matcher.
+         */
+        kizunaParams?: PathParamsResult;
         /**
          * The body as it was sent, kept for routes with `rawBody: true`.
          */
@@ -87,22 +99,40 @@ interface FastifyResponseContext {
     responseValidation?: boolean;
 }
 
+type CountedStream = NodeJS.ReadableStream & {
+    /**
+     * The bytes read off the wire so far, which Fastify checks against
+     * `bodyLimit` and `Content-Length` when a `preParsing` hook replaces the
+     * request stream.
+     */
+    receivedEncodedLength?: number;
+};
+
 /**
- * Read a `rawBody` route's body once, keep the text, and hand Fastify a fresh
- * stream to parse, so the route gets both the text and the parsed body.
+ * Keep a `rawBody` route's body as it was sent. The bytes pass through to
+ * Fastify's parser as it reads them, so its `bodyLimit` and `Content-Length`
+ * checks stop the read as they would on any route, and the text is kept once
+ * the whole body has passed.
  */
-const keepRawBody = async (
-    request: FastifyRequest,
-    _reply: FastifyReply,
-    payload: NodeJS.ReadableStream
-): Promise<NodeJS.ReadableStream> => {
+const keepRawBody = async (request: FastifyRequest, _reply: FastifyReply, payload: CountedStream): Promise<CountedStream> => {
     const chunks: Buffer[] = [];
-    for await (const chunk of payload) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
-    const buffer = Buffer.concat(chunks);
-    request.kizunaRawBody = buffer.toString('utf8');
-    const replay = Readable.from([buffer]) as Readable & { receivedEncodedLength?: number };
-    replay.receivedEncodedLength = buffer.length;
-    return replay;
+    let received = 0;
+    const recorder: Transform & CountedStream = new Transform({
+        transform(chunk: Buffer, _encoding, callback) {
+            received += chunk.length;
+            // A hook ahead of this one, like a decompressor, counts what came off the wire itself.
+            recorder.receivedEncodedLength = payload.receivedEncodedLength ?? received;
+            // Past the limit Fastify answers 413, so the rest is not kept.
+            if (recorder.receivedEncodedLength <= request.routeOptions.bodyLimit) chunks.push(chunk);
+            callback(null, chunk);
+        },
+        flush(callback) {
+            request.kizunaRawBody = Buffer.concat(chunks).toString('utf8');
+            callback();
+        },
+    });
+    pipeline(payload, recorder, () => undefined);
+    return recorder;
 };
 
 const writeStream = (open: NonNullable<RenderedResult['stream']>, res: ServerResponse, validate: boolean | undefined): void => {
@@ -136,7 +166,7 @@ const writeWebResponse = async (response: unknown, reply: FastifyReply): Promise
         reply.raw.end();
         return;
     }
-    Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]).pipe(reply.raw);
+    pipeline(Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]), reply.raw, () => undefined);
 };
 
 const adapter = defineAdapter<FastifyRequest, void, FastifyHandlerContext, FastifyResponseContext>({
@@ -184,6 +214,33 @@ export interface KizunaPluginOptions extends FastifyOptions {
     api: FastifyApi;
 }
 
+const METHOD_OVERRIDE_CONSTRAINT = 'kizunaMethodOverride';
+
+type ConstraintStrategy = Parameters<FastifyInstance['addConstraintStrategy']>[0];
+type ConstraintStore = NonNullable<ReturnType<ReturnType<ConstraintStrategy['storage']>['get']>>;
+
+/**
+ * Picks the route a method-override POST stands in for: `GET` when the request
+ * is one, and nothing otherwise, so every other request matches as usual.
+ */
+const methodOverrideStrategy: ConstraintStrategy = {
+    name: METHOD_OVERRIDE_CONSTRAINT,
+    storage: () => {
+        const stores = new Map<string, ConstraintStore>();
+        return {
+            get: (value: string) => stores.get(value) ?? null,
+            set: (value: string, store: ConstraintStore) => {
+                stores.set(value, store);
+            },
+        };
+    },
+    deriveConstraint: (request) =>
+        isMethodOverride(request.method ?? '', request.headers[METHOD_OVERRIDE_HEADER], request.headers['content-type'])
+            ? 'GET'
+            : undefined,
+    mustMatchWhenDerived: false,
+};
+
 /**
  * Fastify plugin that mounts a Kizuna API.
  *
@@ -206,11 +263,34 @@ export const fastifyKizuna = fastifyPlugin(
             route: RouteDefinition,
             lane: Routes,
             resolvedRouter: CoreRouter<Routes, FastifyHandlerContext>,
-            method: Method = route.method
+            method: Method = route.method,
+            override = false
         ): void => {
+            const shared = sharedSegmentRoute(route.path);
             app.route({
-                method,
+                method: override ? 'POST' : method,
                 url: route.path,
+                ...(override
+                    ? {
+                          constraints: {
+                              [METHOD_OVERRIDE_CONSTRAINT]: 'GET',
+                          },
+                      }
+                    : {}),
+                ...(shared
+                    ? {
+                          onRequest: [
+                              async (request: FastifyRequest, reply: FastifyReply) => {
+                                  const params = shared.readParams(request.url.split('?', 1)[0]!);
+                                  if (params.kind === 'not-found') {
+                                      reply.callNotFound();
+                                      return reply;
+                                  }
+                                  request.kizunaParams = params;
+                              },
+                          ],
+                      }
+                    : {}),
                 preHandler: [
                     async (request: FastifyRequest) => {
                         request.kizunaRoute = route;
@@ -224,17 +304,23 @@ export const fastifyKizuna = fastifyPlugin(
                 handler: async (request: FastifyRequest, reply: FastifyReply) => {
                     const adapterRequest: AdapterRequest<FastifyRequest> = {
                         request,
-                        method: request.method,
-                        resolution: {
-                            kind: 'pre-resolved',
-                            routeKey,
-                            route,
-                            params: (request.params ?? {}) as Record<string, string>,
-                        },
-                        query: (request.query ?? {}) as Record<string, string>,
+                        method: override ? 'GET' : request.method,
+                        resolution:
+                            request.kizunaParams?.kind === 'malformed-path'
+                                ? request.kizunaParams
+                                : {
+                                      kind: 'pre-resolved',
+                                      routeKey,
+                                      route,
+                                      params:
+                                          request.kizunaParams?.kind === 'matched'
+                                              ? request.kizunaParams.params
+                                              : ((request.params ?? {}) as Record<string, string>),
+                                  },
+                        query: ((override ? request.body : request.query) ?? {}) as Record<string, string>,
                         headers: request.headers,
-                        readBody: () => request.body,
-                        readRawBody: () => request.kizunaRawBody ?? '',
+                        readBody: () => (override ? undefined : request.body),
+                        readRawBody: () => (override ? '' : (request.kizunaRawBody ?? '')),
                     };
 
                     await adapter.handle({
@@ -276,6 +362,24 @@ export const fastifyKizuna = fastifyPlugin(
             }
         };
 
+        if (!app.hasConstraintStrategy(METHOD_OVERRIDE_CONSTRAINT)) app.addConstraintStrategy(methodOverrideStrategy);
+        if (!app.hasContentTypeParser('application/x-www-form-urlencoded')) {
+            app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_request, body, done) => {
+                done(null, entriesToObject(new URLSearchParams(body as string)));
+            });
+        }
+        // A POST standing in for a GET is its own route, which Fastify picks only when the override header asks for GET.
+        for (const [lane, resolvedRouter] of [
+            [api.routes, api[ROUTER_META]],
+            [pluginRoutesOf(api), pluginRouterOf(api)],
+        ] as const) {
+            for (const { routeKey, route } of adapter.eachRoute(lane, resolvedRouter as CoreRouter<Routes, FastifyHandlerContext>)) {
+                if (route.method === 'GET') {
+                    mountRoute(routeKey, route, lane, resolvedRouter as CoreRouter<Routes, FastifyHandlerContext>, 'POST', true);
+                }
+            }
+        }
+
         mountLane(api.routes, api[ROUTER_META] as CoreRouter<Routes, FastifyHandlerContext>);
         mountLane(pluginRoutesOf(api), pluginRouterOf(api) as CoreRouter<Routes, FastifyHandlerContext>);
 
@@ -307,13 +411,48 @@ export const fastifyKizuna = fastifyPlugin(
  */
 export const fastifyAdapter = (
     defaults?: FastifyOptions
-): Adapter<FastifyHandlerContext, [app: FastifyInstance, options?: FastifyOptions], Promise<void>> => ({
-    name: 'fastify',
-    mount: async (api, app, options) => {
+): Adapter<FastifyHandlerContext, [app: FastifyInstance, options?: FastifyOptions], Promise<void>> => {
+    const inProcess = new WeakMap<object, Promise<FastifyInstance>>();
+    const start = async (api: object): Promise<FastifyInstance> => {
+        const app = Fastify();
         await app.register(fastifyKizuna, {
             ...defaults,
-            ...options,
             api: api as FastifyApi,
         });
-    },
-});
+        await app.ready();
+        return app;
+    };
+    const appFor = (api: object): Promise<FastifyInstance> => {
+        const existing = inProcess.get(api);
+        if (existing !== undefined) return existing;
+        const ready = start(api);
+        inProcess.set(api, ready);
+        return ready;
+    };
+    return {
+        name: 'fastify',
+        mount: async (api, app, options) => {
+            await app.register(fastifyKizuna, {
+                ...defaults,
+                ...options,
+                api: api as FastifyApi,
+            });
+        },
+        fetch: async (api, request) => {
+            const app = await appFor(api);
+            const injected = await injectedRequestOf(request);
+            const response = await app.inject({
+                method: injected.method as never,
+                url: injected.url,
+                headers: injected.headers,
+                ...(injected.body === undefined
+                    ? {}
+                    : {
+                          body: Buffer.from(injected.body),
+                      }),
+                payloadAsStream: true,
+            });
+            return responseOfInjected(response);
+        },
+    };
+};

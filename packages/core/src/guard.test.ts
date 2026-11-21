@@ -226,6 +226,49 @@ describe('guard pipeline', () => {
         });
     });
 
+    it('denies when the guard calls deny and still returns a context', async () => {
+        const contract = makeContract();
+        const { adapter, results } = makeAdapter();
+        await adapter.handle({
+            routes: contract.routes,
+            router: {
+                items: {
+                    listItems: okHandler,
+                    getSecret: okHandler,
+                    ownerOnly: okHandler,
+                    adminOnly: okHandler,
+                },
+            },
+            request: makeRequest('/secret'),
+            responseContext: {},
+            guards: {
+                user: ({ deny }) => {
+                    deny({
+                        status: 401,
+                        body: {
+                            detail: 'Unauthorized',
+                        },
+                    });
+                    return {
+                        userId: '1',
+                    };
+                },
+            } as GuardMap<Record<string, never>>,
+            schemes: contract.securitySchemes,
+        });
+        expect(results[0]).toEqual({
+            kind: 'guard-denied',
+            status: 401,
+            body: {
+                detail: 'Unauthorized',
+            },
+            headers: {
+                'cache-control': 'no-store',
+                'www-authenticate': 'Bearer',
+            },
+        });
+    });
+
     it('carries the headers a denial passes and lets them replace the default challenge', async () => {
         const contract = makeContract();
         const { adapter, results } = makeAdapter();

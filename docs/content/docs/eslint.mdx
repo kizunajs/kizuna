@@ -83,6 +83,22 @@ body: z.object({
 });
 ```
 
+### `z.undefined()`
+
+JSON has no `undefined`, so the generated clients read it as a value and try to decode one. A response with no content is `z.void()`, and a field that may be left out is `.optional()`:
+
+```ts
+// flagged
+responses: {
+    204: z.undefined(),
+}
+
+// good
+responses: {
+    204: z.void(),
+}
+```
+
 ### A union of objects with no discriminator
 
 Two object branches with overlapping fields cannot be told apart from the JSON, so a decoder picks whichever matches first, and which one that is depends on the order you declared them. [`z.discriminatedUnion`](/docs/zod) puts the answer on the wire:
@@ -145,19 +161,19 @@ JSON bodies and responses can carry `null`, so `.nullable()` there is untouched.
 
 ### A field its part of the request cannot carry
 
-A path parameter and a header carry one value, a query carries values and lists of values, and a form carries those plus files. An object anywhere in those, a list in a header, or `BinarySchema` in a form can't be sent:
+A path parameter and a header carry one value. A form carries values, lists of values and files. A query carries anything but a file, since what isn't plain text travels as JSON. The rule flags an object in a path, a header or a form, a list in a header, a file in a query and `BinarySchema` in a form:
 
 ```ts
 // flagged
-query: z.object({
-    filter: z.object({
-        status: z.string(),
+headers: z.object({
+    'x-workspace': z.object({
+        id: z.string(),
     }),
 });
 
-// good, a field of its own
-query: z.object({
-    status: z.string(),
+// good, one value
+headers: z.object({
+    'x-workspace': z.string(),
 });
 ```
 

@@ -63,6 +63,10 @@ export namespace API {
              */
             description?: string;
             /**
+             * The icon editors see beside its label, like quote or image.
+             */
+            icon?: string;
+            /**
              * The block's fields, in the order editors see them, named as the item holds them.
              */
             fields: Array<{
@@ -150,6 +154,62 @@ export namespace API {
                     label: string;
                 } | null;
             }>;
+        };
+
+        export type Comment = {
+            id: string;
+            /**
+             * The field it is about, as a change to it is keyed.
+             */
+            path: string;
+            text: string;
+            /**
+             * Who wrote it.
+             */
+            by: CMS.Person;
+            /**
+             * The agent that wrote it for `by`, like Claude, or null when they wrote it themselves.
+             */
+            via: string | null;
+            createdAt: string;
+            /**
+             * Who resolved it, or null while it is open.
+             */
+            resolvedBy: CMS.Person | null;
+            resolvedAt: string | null;
+            /**
+             * The comment that starts the thread this one answers, or null when it starts one.
+             */
+            replyTo: string | null;
+            /**
+             * The review it was left in, or null for a comment on the draft.
+             */
+            review: string | null;
+            /**
+             * The phrase of the field it is about, or null for the whole field.
+             */
+            anchor: {
+                text: string;
+                /**
+                 * Whether the field no longer holds the phrase. The comment stays on the field.
+                 */
+                changed: boolean;
+            } | null;
+            /**
+             * The people it mentions, who find it under Waiting until it is resolved.
+             */
+            mentions: Array<CMS.Person>;
+            /**
+             * The person who deals with it, who finds it under Waiting until it is resolved.
+             */
+            assignee: CMS.Person | null;
+        };
+
+        export type CommentList = {
+            /**
+             * Oldest first. A thread is the comment it starts and the answers whose `replyTo` names it.
+             */
+            comments: Array<CMS.Comment>;
         };
 
         export type CreateMediaFolder = {
@@ -267,6 +327,37 @@ export namespace API {
              * The tabs, rows and collapsibles that arrange the fields, in the order they are shown. Empty when the fields are listed plainly.
              */
             layout: Array<CMS.Layout>;
+            /**
+             * Markdown on what the document is for and how its fields are filled, from its content's own `instructions`. Null when there are none.
+             */
+            instructions: string | null;
+            /**
+             * The site's voice, which wins over `instructions` on tone and words. Null when cms() has no voice or it says nothing.
+             */
+            voice: {
+                /**
+                 * How the site writes in the document's language, with the glossary terms its draft or source holds.
+                 */
+                text: string;
+                /**
+                 * The glossary terms its draft or source holds.
+                 */
+                glossary: Array<{
+                    forms: Array<string>;
+                    rule: "keep" | "translate" | "avoid";
+                    language?: string;
+                    use?: string;
+                    note?: string;
+                    /**
+                     * Whether the group's voice on Shared or the site's own holds it.
+                     */
+                    from: "group" | "site";
+                }>;
+            } | null;
+            /**
+             * Words in the draft the site's glossary flags, by field. Fix them before asking for a review.
+             */
+            glossary: Array<CMS.GlossaryIssue>;
             draft: Record<string, unknown> | null;
             /**
              * For an item, the buttons its collection's actions show the caller.
@@ -344,6 +435,10 @@ export namespace API {
             missing: Array<string>;
             updatedAt: string | null;
             updatedBy: string | null;
+            /**
+             * The agent that made the last change for `updatedBy`, like `Claude`. Null when the person made it.
+             */
+            updatedVia: string | null;
             /**
              * Who edits the document now. One person edits a document at a time: a write from anyone else answers 409 until they stop, or two minutes after their last save. Null when nobody does.
              */
@@ -431,6 +526,27 @@ export namespace API {
              * Who edits the document now. One person edits a document at a time: a write from anyone else answers 409 until they stop, or two minutes after their last save. Null when nobody does.
              */
             heldBy: string | null;
+            /**
+             * Content links whose page or item is not published or is gone. They read as plain text, and publishing goes ahead.
+             */
+            brokenLinks: Array<{
+                /**
+                 * Where the link sits, like body.2.markDefs.0.
+                 */
+                path: string;
+                /**
+                 * The ref it points at, like page:uk:plantCarePage.
+                 */
+                target: string;
+                /**
+                 * Deleted or never written, saved but not published, or in the trash.
+                 */
+                reason: "missing" | "unpublished" | "trashed";
+            }>;
+            /**
+             * Words the site's glossary flags, in the draft and its translations, with `locale` naming the translation or null for the document itself. Publishing goes ahead.
+             */
+            glossary: Array<CMS.GlossaryIssue>;
             /**
              * One entry per field the draft changes, in the order the fields are shown.
              */
@@ -651,6 +767,30 @@ export namespace API {
             }>;
         };
 
+        export type GlossaryIssue = {
+            /**
+             * The field, by path.
+             */
+            path: string;
+            /**
+             * The language the field is in, or null without languages.
+             */
+            locale: string | null;
+            /**
+             * The word the field says, or for a translation, the word its source says.
+             */
+            form: string;
+            rule: "keep" | "translate" | "avoid";
+            /**
+             * What the glossary writes instead, when it names it.
+             */
+            use: string | null;
+            /**
+             * What to change, like "The summary says billig. Hagen Norge writes rimelig."
+             */
+            detail: string;
+        };
+
         export type Layout = {
             /**
              * What the fields inside it name in their layout.
@@ -665,6 +805,67 @@ export namespace API {
              * Where the editor shows a collapsible, when beside the main column.
              */
             position?: "sidebar";
+        };
+
+        export type LinkedFrom = {
+            documents: Array<{
+                ref: string;
+                label: string;
+                /**
+                 * The site it belongs to, or default for shared content.
+                 */
+                site: string;
+                /**
+                 * What editors call its site, Shared for shared content, or null without sites.
+                 */
+                siteLabel: string | null;
+                /**
+                 * Its site's icon as a full URL, or null for shared content.
+                 */
+                siteIcon: string | null;
+                /**
+                 * Where it is served, when it is a page or an item a page shows.
+                 */
+                path: string | null;
+                /**
+                 * The fields holding the link.
+                 */
+                fieldPaths: Array<string>;
+            }>;
+        };
+
+        export type LinkTargets = {
+            targets: Array<{
+                /**
+                 * What a content link stores under ref.
+                 */
+                ref: string;
+                label: string;
+                /**
+                 * The site it belongs to, or default for shared content.
+                 */
+                site: string;
+                /**
+                 * What editors call its site, Shared for shared content, or null without sites.
+                 */
+                siteLabel: string | null;
+                /**
+                 * Its site's icon as a full URL, or null for shared content.
+                 */
+                siteIcon: string | null;
+                /**
+                 * Its address on its site, in the site's first language.
+                 */
+                path: string | null;
+                /**
+                 * Published, saved but not published, in the trash, or deleted and never written.
+                 */
+                status: "published" | "unpublished" | "trashed" | "missing";
+                /**
+                 * A thumbnail, for an item with an image.
+                 */
+                image?: string;
+            }>;
         };
 
         export type ListWidget = {
@@ -903,6 +1104,91 @@ export namespace API {
             folder?: string;
         };
 
+        export type NewComment = {
+            /**
+             * The document, like page:frontPage or item:articles:k3j9x2.
+             */
+            ref: string;
+            /**
+             * The field to comment on, as a change to it is keyed, like hero.heading. An answer takes its thread's.
+             */
+            path?: string;
+            text: string;
+            /**
+             * A phrase of the field's text the comment is about, quoted exactly as the draft has it.
+             */
+            anchor?: string;
+            /**
+             * People to mention, by their id from the people list.
+             */
+            mentions?: Array<string>;
+            /**
+             * The person to deal with it, by their id from the people list.
+             */
+            assignee?: string | null;
+            /**
+             * The comment to answer. The answer joins its thread.
+             */
+            replyTo?: string;
+        };
+
+        export type PageMap = {
+            nodes: Array<{
+                /**
+                 * Unique on the map. Links name documents by `ref`, and an item shown on several sites has a node on each.
+                 */
+                id: string;
+                /**
+                 * The document, or null for a route that shows a collection, like /shops/[slug].
+                 */
+                ref: string | null;
+                /**
+                 * A page, an item a page shows at its address, the route that shows those items, or another document that holds or receives a link, like the footer.
+                 */
+                kind: "page" | "item" | "collection" | "document";
+                /**
+                 * The site it belongs to, or null for the shared content.
+                 */
+                site: string | null;
+                title: string;
+                path: string | null;
+                /**
+                 * `trashed` for a link target in the trash, `missing` for one that is gone.
+                 */
+                status: "empty" | "draft" | "published" | "changed" | "trashed" | "missing";
+                /**
+                 * For an item, the `id` of the route that shows it.
+                 */
+                collection?: string;
+                /**
+                 * For a route that shows a collection, how many items it shows.
+                 */
+                count?: number;
+            }>;
+            links: Array<{
+                /**
+                 * The ref of the document holding the link.
+                 */
+                from: string;
+                /**
+                 * The ref of the document it links to.
+                 */
+                to: string;
+                /**
+                 * Where in the holder the link sits, like `body.2.markDefs.0`.
+                 */
+                fieldPaths: Array<string>;
+                /**
+                 * Whether the holder's published content holds the link, not only its draft.
+                 */
+                published: boolean;
+                /**
+                 * Whether the target is not live: never published, in the trash, or gone.
+                 */
+                broken: boolean;
+            }>;
+        };
+
         export type PageSummary = {
             name: string;
             /**
@@ -989,6 +1275,42 @@ export namespace API {
             image?: string;
         };
 
+        export type PublishCheck = {
+            /**
+             * Whether it would publish now: no issue blocks.
+             */
+            ready: boolean;
+            documents: Array<{
+                ref: string;
+                title: string;
+                issues: Array<CMS.PublishIssue>;
+            }>;
+        };
+
+        export type PublishIssue = {
+            /**
+             * A `block` refuses the publish. A `warning` lets it through.
+             */
+            level: "block" | "warning";
+            /**
+             * Nothing to publish, a publish you may not make, a required field missing, a translation with empty fields, a link to a page that is gone or unpublished, a word the site's glossary flags, someone editing it, a review it waits for, or a schedule publishing ends.
+             */
+            kind: "nothing" | "permission" | "missing" | "language" | "brokenLink" | "glossary" | "held" | "review" | "schedule";
+            detail: string;
+            /**
+             * The field it is about, by path, when it is about one.
+             */
+            path: string | null;
+            /**
+             * The site the document belongs to, or null for shared content.
+             */
+            site: string | null;
+            /**
+             * The language it is about, or null for the source.
+             */
+            locale: string | null;
+        };
+
         export type ReachWidget = {
             type: "reach";
             /**
@@ -1014,6 +1336,67 @@ export namespace API {
                  * Whether it has changes not yet published.
                  */
                 changed: boolean;
+            }>;
+        };
+
+        export type Redirect = {
+            id: string;
+            from: string;
+            /**
+             * Where visitors go.
+             */
+            to: {
+                type: "document";
+                ref: string;
+                label: string;
+                /**
+                 * Where it is served now, or null while it is unpublished or in the trash, when the redirect answers nothing.
+                 */
+                path: string | null;
+            } | {
+                type: "path";
+                path: string;
+            } | {
+                type: "url";
+                url: string;
+            };
+            status: 307 | 308;
+            /**
+             * `rename`: made when its document published at a new address, which can be deleted but not changed. `manual`: made by an editor. `import`: made by `kizuna cms import-redirects`.
+             */
+            origin: "rename" | "manual" | "import";
+            /**
+             * Who made it, or published the rename that made it. Null for an import.
+             */
+            by: CMS.Person | null;
+            createdAt: string;
+        };
+
+        export type RedirectList = {
+            /**
+             * Each redirect of the site, by its from.
+             */
+            redirects: Array<CMS.Redirect>;
+        };
+
+        export type RedirectTable = {
+            /**
+             * Moves on with every change to the site's redirects, and is the response's ETag.
+             */
+            version: number;
+            redirects: Array<{
+                /**
+                 * The path a visitor asks for, language prefix included, with a query when the old address had one.
+                 */
+                from: string;
+                /**
+                 * A path on the site, or an absolute URL.
+                 */
+                to: string;
+                /**
+                 * 308 for an address that moved for good, 307 for one that moved for now.
+                 */
+                status: 307 | 308;
             }>;
         };
 
@@ -1060,6 +1443,10 @@ export namespace API {
              */
             mayPublish: boolean;
             createdBy: CMS.Person;
+            /**
+             * The agent that made it for `createdBy`, like `Claude`, or null.
+             */
+            createdVia: string | null;
             createdAt: string;
             scheduledBy: CMS.Person | null;
             publishedAt: string | null;
@@ -1081,27 +1468,45 @@ export namespace API {
             note?: string;
         };
 
+        export type ResolvedLinkTarget = {
+            target: {
+                /**
+                 * What a content link stores under ref.
+                 */
+                ref: string;
+                label: string;
+                /**
+                 * The site it belongs to, or default for shared content.
+                 */
+                site: string;
+                /**
+                 * What editors call its site, Shared for shared content, or null without sites.
+                 */
+                siteLabel: string | null;
+                /**
+                 * Its site's icon as a full URL, or null for shared content.
+                 */
+                siteIcon: string | null;
+                /**
+                 * Its address on its site, in the site's first language.
+                 */
+                path: string | null;
+                /**
+                 * Published, saved but not published, in the trash, or deleted and never written.
+                 */
+                status: "published" | "unpublished" | "trashed" | "missing";
+                /**
+                 * A thumbnail, for an item with an image.
+                 */
+                image?: string;
+            };
+        };
+
         export type Revert = {
             /**
              * The fields to set back to what is published, from the changes list.
              */
             paths: Array<string>;
-        };
-
-        export type ReviewComment = {
-            id: string;
-            /**
-             * The field it is about, as a change to it is keyed.
-             */
-            path: string;
-            text: string;
-            by: CMS.Person;
-            createdAt: string;
-            /**
-             * Who resolved it, or null while it is open.
-             */
-            resolvedBy: CMS.Person | null;
-            resolvedAt: string | null;
         };
 
         export type ReviewIds = {
@@ -1127,6 +1532,10 @@ export namespace API {
             version: number;
             reviewers: Array<CMS.Person>;
             requestedBy: CMS.Person;
+            /**
+             * The agent that asked for `requestedBy`, like `Claude`, or null.
+             */
+            requestedVia: string | null;
             note: string | null;
             createdAt: string;
             decidedBy: CMS.Person | null;
@@ -1135,7 +1544,7 @@ export namespace API {
             /**
              * Comments on single fields, on this review and the earlier ones since the document was last published, oldest first.
              */
-            comments: Array<CMS.ReviewComment>;
+            comments: Array<CMS.Comment>;
         };
 
         export type ReviewsWidget = {
@@ -1155,6 +1564,10 @@ export namespace API {
                 version: number;
                 reviewers: Array<CMS.Person>;
                 requestedBy: CMS.Person;
+                /**
+                 * The agent that asked for `requestedBy`, like `Claude`, or null.
+                 */
+                requestedVia: string | null;
                 note: string | null;
                 createdAt: string;
                 decidedBy: CMS.Person | null;
@@ -1163,7 +1576,7 @@ export namespace API {
                 /**
                  * Comments on single fields, on this review and the earlier ones since the document was last published, oldest first.
                  */
-                comments: Array<CMS.ReviewComment>;
+                comments: Array<CMS.Comment>;
                 ref: string;
                 label: string;
                 path: string | null;
@@ -1219,6 +1632,10 @@ export namespace API {
             waitingFor: string | null;
             scheduledBy: CMS.Person;
             createdAt: string;
+            /**
+             * Its latest review since it was last published.
+             */
+            review: CMS.ReviewState | null;
         };
 
         export type Scheduled = {
@@ -1348,6 +1765,99 @@ export namespace API {
             content: Record<string, unknown>;
         };
 
+        export type Trash = {
+            /**
+             * How many days a delete waits in the trash before it is deleted for good.
+             */
+            days: number;
+            /**
+             * Each item deleted, newest first.
+             */
+            items: Array<{
+                ref: string;
+                collection: string;
+                id: string;
+                label: string;
+                deletedAt: string;
+                deletedBy: CMS.Person;
+                /**
+                 * When it is deleted for good.
+                 */
+                erasedAt: string;
+                /**
+                 * How many items under it in a tree went to the trash with it, and come back with it.
+                 */
+                under: number;
+                /**
+                 * Whether it was published, and so comes back published.
+                 */
+                published: boolean;
+            }>;
+        };
+
+        export type UpdatedDraft = {
+            /**
+             * The document: page:<name>, page:<site>:<name>, global:<name> or item:<collection>:<id>.
+             */
+            ref: string;
+            name: string;
+            /**
+             * Where it is served: a page's path, or an item's address on the page that shows it. Null otherwise.
+             */
+            path: string | null;
+            status: "empty" | "draft" | "published" | "changed";
+            version: number;
+            publishedVersion: number | null;
+            content: Record<string, unknown> | null;
+            /**
+             * Whether the draft passes the page schema and may be rendered.
+             */
+            complete: boolean;
+            /**
+             * The fields the draft is missing or fails.
+             */
+            missing: Array<string>;
+            updatedAt: string | null;
+            updatedBy: string | null;
+            /**
+             * The agent that made the last change for `updatedBy`, like `Claude`. Null when the person made it.
+             */
+            updatedVia: string | null;
+            /**
+             * Who edits the document now. One person edits a document at a time: a write from anyone else answers 409 until they stop, or two minutes after their last save. Null when nobody does.
+             */
+            heldBy: string | null;
+            /**
+             * When the document publishes or unpublishes without anyone pressing Publish. Null when nothing is scheduled.
+             */
+            schedule: {
+                action: "publish" | "unpublish";
+                /**
+                 * When it runs, in UTC. Null in a release that has no time yet.
+                 */
+                at: string | null;
+                /**
+                 * The release it publishes with, or null when it is scheduled on its own.
+                 */
+                release: {
+                    id: string;
+                    name: string;
+                } | null;
+                /**
+                 * Who set the time, by their id.
+                 */
+                by: string;
+            } | null;
+            /**
+             * An item's place, in an orderable collection, once it has one.
+             */
+            place?: string;
+            /**
+             * Words the site's glossary flags in the fields this change wrote. Fix them before anyone looks.
+             */
+            glossary: Array<CMS.GlossaryIssue>;
+        };
+
         export type UpdateDraft = {
             /**
              * New values keyed by field path, like "hero.heading". Only fields the caller may write. null empties an optional field.
@@ -1407,6 +1917,10 @@ export namespace API {
             createdAt: string;
             createdBy: string;
             /**
+             * The agent that saved it for `createdBy`, like `Claude`, or null.
+             */
+            via: string | null;
+            /**
              * Whether this is the version readers see.
              */
             published: boolean;
@@ -1426,6 +1940,10 @@ export namespace API {
             summary: string | null;
             createdAt: string;
             createdBy: string;
+            /**
+             * The agent that saved it for `createdBy`, like `Claude`, or null.
+             */
+            via: string | null;
             /**
              * The content as that version saved it, migrated to the current schema.
              */
@@ -1530,6 +2048,60 @@ export namespace API {
             values: Record<string, unknown>;
         };
 
+        export type WaitingComments = {
+            comments: Array<{
+                id: string;
+                /**
+                 * The field it is about, as a change to it is keyed.
+                 */
+                path: string;
+                text: string;
+                /**
+                 * Who wrote it.
+                 */
+                by: CMS.Person;
+                /**
+                 * The agent that wrote it for `by`, like Claude, or null when they wrote it themselves.
+                 */
+                via: string | null;
+                createdAt: string;
+                /**
+                 * Who resolved it, or null while it is open.
+                 */
+                resolvedBy: CMS.Person | null;
+                resolvedAt: string | null;
+                /**
+                 * The comment that starts the thread this one answers, or null when it starts one.
+                 */
+                replyTo: string | null;
+                /**
+                 * The review it was left in, or null for a comment on the draft.
+                 */
+                review: string | null;
+                /**
+                 * The phrase of the field it is about, or null for the whole field.
+                 */
+                anchor: {
+                    text: string;
+                    /**
+                     * Whether the field no longer holds the phrase. The comment stays on the field.
+                     */
+                    changed: boolean;
+                } | null;
+                /**
+                 * The people it mentions, who find it under Waiting until it is resolved.
+                 */
+                mentions: Array<CMS.Person>;
+                /**
+                 * The person who deals with it, who finds it under Waiting until it is resolved.
+                 */
+                assignee: CMS.Person | null;
+                reason: "mentioned" | "assigned";
+                ref: string;
+                label: string;
+            }>;
+        };
+
         export type WaitingReviews = {
             reviews: Array<{
                 id: string;
@@ -1543,6 +2115,10 @@ export namespace API {
                 version: number;
                 reviewers: Array<CMS.Person>;
                 requestedBy: CMS.Person;
+                /**
+                 * The agent that asked for `requestedBy`, like `Claude`, or null.
+                 */
+                requestedVia: string | null;
                 note: string | null;
                 createdAt: string;
                 decidedBy: CMS.Person | null;
@@ -1551,7 +2127,7 @@ export namespace API {
                 /**
                  * Comments on single fields, on this review and the earlier ones since the document was last published, oldest first.
                  */
-                comments: Array<CMS.ReviewComment>;
+                comments: Array<CMS.Comment>;
                 ref: string;
                 label: string;
                 path: string | null;
@@ -1771,7 +2347,7 @@ export namespace API {
                                     _type: "link";
                                     _key: string;
                                     /**
-                                     * An https or http URL, mailto:, tel:, a path on this site like /blog, or an #anchor.
+                                     * The link's address for the site and language being read.
                                      */
                                     href: string;
                                 }>;
@@ -2092,7 +2668,8 @@ export namespace API {
                 order: number;
                 id: EmployeeId;
             }; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace ContentCollectionsArticlesList {
@@ -2130,7 +2707,7 @@ export namespace API {
                             _type: "link";
                             _key: string;
                             /**
-                             * An https or http URL, mailto:, tel:, a path on this site like /blog, or an #anchor.
+                             * The link's address for the site and language being read.
                              */
                             href: string;
                         }>;
@@ -2209,7 +2786,7 @@ export namespace API {
                         _type: "link";
                         _key: string;
                         /**
-                         * An https or http URL, mailto:, tel:, a path on this site like /blog, or an #anchor.
+                         * The link's address for the site and language being read.
                          */
                         href: string;
                     }>;
@@ -2258,7 +2835,23 @@ export namespace API {
                 related: Array<ArticleId>;
                 id: ArticleId;
             }; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace ContentRedirects {
+        export type Headers = {
+            "if-none-match"?: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.RedirectTable; headers: {
+                etag: string;
+            } }
+            | { status: 304; body: undefined; headers: {
+                etag: string;
+            } }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace ContentMediaImage {
@@ -2329,12 +2922,44 @@ export namespace API {
             | { status: 403; body: ProblemDetails; headers: Record<string, string> };
     }
 
+    export namespace EditingCheck {
+        export type Query = {
+            /**
+             * A document, as `describe` names it under `ref`.
+             */
+            ref?: string;
+            /**
+             * A release, like rel_8f2k3j9x2a1b.
+             */
+            release?: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.PublishCheck; headers: Record<string, string> }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> };
+    }
+
     export namespace EditingPagesList {
         export type Result =
             | { status: 200; body: {
                 pages: Array<CMS.PageSummary>;
                 collectionPages: Array<CMS.CollectionPage>;
             }; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingPagesMap {
+        export type Result =
+            | { status: 200; body: CMS.PageMap; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -2354,7 +2979,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingPagesUpdateDraft {
@@ -2372,7 +2998,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CMS.Draft; headers: {
+            | { status: 200; body: CMS.UpdatedDraft; headers: {
                 etag: string;
             } }
             | { status: 401; body: ProblemDetails; headers: {
@@ -2421,7 +3047,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingPagesGetPublished {
@@ -2435,7 +3062,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingPagesHistory {
@@ -2449,7 +3077,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingPagesGetVersion {
@@ -2464,7 +3093,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingPagesChanges {
@@ -2478,7 +3108,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingPagesRevert {
@@ -2581,7 +3212,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingPagesSetOwner {
@@ -2652,7 +3284,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingGlobalsUpdateDraft {
@@ -2670,7 +3303,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CMS.Draft; headers: {
+            | { status: 200; body: CMS.UpdatedDraft; headers: {
                 etag: string;
             } }
             | { status: 401; body: ProblemDetails; headers: {
@@ -2719,7 +3352,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingGlobalsGetPublished {
@@ -2733,7 +3367,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingGlobalsHistory {
@@ -2747,7 +3382,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingGlobalsGetVersion {
@@ -2762,7 +3398,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingGlobalsChanges {
@@ -2776,7 +3413,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingGlobalsRevert {
@@ -2879,7 +3517,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingGlobalsSetOwner {
@@ -3022,7 +3661,60 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingCollectionsListTrash {
+        export type Result =
+            | { status: 200; body: CMS.Trash; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingCollectionsRestoreItem {
+        export type Params = {
+            name: string;
+            id: string;
+        };
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingCollectionsEraseItem {
+        export type Params = {
+            name: string;
+            id: string;
+        };
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingCollectionsEmptyTrash {
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> };
     }
 
     export namespace EditingCollectionsPlaceItem {
@@ -3077,7 +3769,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingCollectionsUpdateDraft {
@@ -3096,7 +3789,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CMS.Draft; headers: {
+            | { status: 200; body: CMS.UpdatedDraft; headers: {
                 etag: string;
             } }
             | { status: 401; body: ProblemDetails; headers: {
@@ -3147,7 +3840,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingCollectionsGetPublished {
@@ -3162,7 +3856,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingCollectionsHistory {
@@ -3177,7 +3872,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingCollectionsGetVersion {
@@ -3193,7 +3889,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingCollectionsChanges {
@@ -3208,7 +3905,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingCollectionsRevert {
@@ -3316,7 +4014,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingCollectionsSetOwner {
@@ -3379,7 +4078,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingMediaUses {
@@ -3393,7 +4093,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingMediaGetFile {
@@ -3407,7 +4108,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingMediaUpdate {
@@ -3439,7 +4141,8 @@ export namespace API {
             } }
             | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 409; body: CMS.MediaHeld; headers: Record<string, string> };
+            | { status: 409; body: CMS.MediaHeld; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingMediaCreateUpload {
@@ -3537,7 +4240,8 @@ export namespace API {
             } }
             | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 409; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingActionsArticlesAnnounce {
@@ -3552,7 +4256,8 @@ export namespace API {
             } }
             | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 409; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingListViews {
@@ -3620,7 +4325,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingViewsAppUsersSave {
@@ -3661,7 +4367,8 @@ export namespace API {
             } }
             | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 409; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingDashboard {
@@ -3696,7 +4403,8 @@ export namespace API {
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
-            | { status: 403; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingSearchItems {
@@ -3740,6 +4448,62 @@ export namespace API {
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
             | { status: 502; body: ProblemDetails; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingLinkTargets {
+        export type Query = {
+            /**
+             * Words in the label or the path.
+             */
+            q?: string;
+            /**
+             * Name these refs instead of searching, gone ones included.
+             */
+            refs?: Array<string>;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.LinkTargets; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingResolveLinkTarget {
+        export type Query = {
+            /**
+             * A full URL, like https://hagen.example.co.uk/plant-care.
+             */
+            url: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.ResolvedLinkTarget; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingLinkedFrom {
+        export type Query = {
+            /**
+             * The page or item linked to, like page:uk:plantCarePage or item:offices:k3j9x2.
+             */
+            ref: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.LinkedFrom; headers: Record<string, string> }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> };
     }
 
     export namespace EditingCreatePreview {
@@ -3851,7 +4615,8 @@ export namespace API {
             } }
             | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 409; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingReviewsWithdraw {
@@ -3909,7 +4674,65 @@ export namespace API {
             } }
             | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 409; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingCommentsList {
+        export type Query = {
+            /**
+             * The document, as `describe` names it under `ref`.
+             */
+            ref: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.CommentList; headers: Record<string, string> }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingCommentsAdd {
+        export type Body = CMS.NewComment;
+
+        export type Result =
+            | { status: 201; body: CMS.Comment; headers: Record<string, string> }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingCommentsResolve {
+        export type Params = {
+            id: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Comment; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingCommentsWaiting {
+        export type Result =
+            | { status: 200; body: CMS.WaitingComments; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> };
     }
 
     export namespace EditingSchedulesList {
@@ -3962,7 +4785,8 @@ export namespace API {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingReleasesCreate {
@@ -4105,7 +4929,8 @@ export namespace API {
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 409; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingReleasesPublish {
@@ -4134,6 +4959,32 @@ export namespace API {
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
+    export namespace EditingReleasesSendBack {
+        export type Params = {
+            /**
+             * The release, like rel_8f2k3j9x2a1b.
+             */
+            id: string;
+        };
+
+        export type Body = {
+            /**
+             * What to change, for whoever made the release.
+             */
+            note: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Release; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
     export namespace EditingReleasesDelete {
         export type Params = {
             /**
@@ -4149,7 +5000,131 @@ export namespace API {
             } }
             | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 409; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingRedirectsList {
+        export type Query = {
+            /**
+             * Only the redirects to this page or item, by ref, like item:articles:k3j9x2.
+             */
+            to?: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.RedirectList; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingRedirectsCreate {
+        export type Body = {
+            /**
+             * The address visitors ask for, with its language prefix and any query, like /en/shops/oslo or /produkt.php?id=12. It never ends in /, and no page may be live there.
+             */
+            from: string;
+            /**
+             * Where visitors go: a page or an item, a path on the site, or a URL.
+             */
+            to: {
+                type: "document";
+                /**
+                 * A page or an item, like item:articles:k3j9x2, or one translation of it, like item:articles:k3j9x2@en. Visitors go wherever it is served when they arrive, so the redirect follows it through renames.
+                 */
+                ref: string;
+            } | {
+                type: "path";
+                /**
+                 * A path on the same site, like /butikker.
+                 */
+                path: string;
+            } | {
+                type: "url";
+                /**
+                 * An address elsewhere, starting with https://.
+                 */
+                url: string;
+            };
+            status?: 307 | 308;
+        };
+
+        export type Result =
+            | { status: 201; body: CMS.Redirect; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingRedirectsUpdate {
+        export type Params = {
+            /**
+             * The redirect, by the id the list answers.
+             */
+            id: string;
+        };
+
+        export type Body = {
+            from?: string;
+            to?: {
+                type: "document";
+                /**
+                 * A page or an item, like item:articles:k3j9x2, or one translation of it, like item:articles:k3j9x2@en. Visitors go wherever it is served when they arrive, so the redirect follows it through renames.
+                 */
+                ref: string;
+            } | {
+                type: "path";
+                /**
+                 * A path on the same site, like /butikker.
+                 */
+                path: string;
+            } | {
+                type: "url";
+                /**
+                 * An address elsewhere, starting with https://.
+                 */
+                url: string;
+            };
+            status?: 307 | 308;
+        };
+
+        export type Result =
+            | { status: 200; body: CMS.Redirect; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingRedirectsDelete {
+        export type Params = {
+            /**
+             * The redirect, by the id the list answers.
+             */
+            id: string;
+        };
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace Invalidate {
@@ -4309,6 +5284,18 @@ export interface Client {
                 }, API.ContentCollectionsArticlesGet.Result>;
             };
         };
+        /**
+         * List the site's redirects
+         *
+         * Each old address and where it goes now, for a proxy to answer with a real 307 or 308 before the site renders anything. Send the ETag back as If-None-Match to get 304 until something changes.
+         *
+         * @example
+         * const result = await client.content.redirects();
+         */
+        redirects: ClientMethod<'GET', false, {
+            headers?: API.ContentRedirects.Headers;
+            fetchOptions?: RequestInit;
+        }, API.ContentRedirects.Result>;
         media: {
             /**
              * The image as a page shows it, cropped and sized by sharp
@@ -4332,7 +5319,7 @@ export interface Client {
         /**
          * Describe what is shown at a URL, or any document by its ref: its fields, what the caller may write, and the draft
          *
-         * Start here when working from the page someone is looking at, or from a ref a source path or another tool gave you. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it. `usedOn` says where else shared content appears; say so before changing it. A document in several languages lists them under `locale`: to translate it, describe `<ref>@<code>` and write each field from its `sourceValue` with that `locale`. A field whose `sourceChanged` is true is updated, or kept as it is.
+         * Start here when working from the page someone is looking at, or from a ref a source path or another tool gave you. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it. `instructions` says what the document is for and how its fields are filled, and `voice` how its site writes and which words it uses: follow both, the glossary over everything. `glossary` lists words in the draft the glossary flags. `usedOn` says where else shared content appears; say so before changing it. A document in several languages lists them under `locale`: to translate it, describe `<ref>@<code>` and write each field from its `sourceValue` with that `locale`. A field whose `sourceChanged` is true is updated, or kept as it is.
          *
          * @example
          * const result = await client.editing.describe();
@@ -4359,6 +5346,19 @@ export interface Client {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }, API.EditingReleaseHold.Result>;
+        /**
+         * Check what would stop a document or a release from publishing, saving nothing
+         *
+         * Pass a document by `ref` or a release by `release`. Each document lists its issues: a `block` refuses the publish, like a required field missing, someone editing it or a review it waits for, and a `warning` lets it through, like a link to an unpublished page, a translation with empty fields, a word the site's glossary flags or a schedule the publish ends. Check before asking someone to review or publish your work.
+         *
+         * @example
+         * const result = await client.editing.check();
+         */
+        check: ClientMethod<'GET', false, {
+            query?: API.EditingCheck.Query;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.EditingCheck.Result>;
         pages: {
             /**
              * List every page with its status
@@ -4372,6 +5372,18 @@ export interface Client {
                 headers?: Record<string, string>;
                 fetchOptions?: RequestInit;
             }, API.EditingPagesList.Result>;
+            /**
+             * Map every page and the content links between them
+             *
+             * Every page of the sites you may open and the shared content, with each route that shows a collection, its items, and every content link between documents, across sites. A page's parent is the page whose path its own extends. `broken` marks a link to a target that is not live.
+             *
+             * @example
+             * const result = await client.editing.pages.map();
+             */
+            map: ClientMethod<'GET', false, {
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingPagesMap.Result>;
             /**
              * Read the draft of a page
              *
@@ -4390,7 +5402,7 @@ export interface Client {
             /**
              * Change fields on the draft of a page
              *
-             * Changes are keyed by field path and merged into the draft, which is then checked against the whole schema. Describe the document first to learn the paths, the schemas and which fields you may write. Nothing goes live until it is published.
+             * Changes are keyed by field path and merged into the draft, which is then checked against the whole schema. Describe the document first to learn the paths, the schemas, which fields you may write, its `instructions` and its site's `voice`. The answer's `glossary` lists words the site's glossary flags in the fields you wrote: fix them. Nothing goes live until it is published.
              *
              * @example
              * const result = await client.editing.pages.updateDraft({
@@ -4682,7 +5694,7 @@ export interface Client {
             /**
              * Change fields on the draft of a global, which every page may show
              *
-             * Changes are keyed by field path and merged into the draft, which is then checked against the whole schema. Describe the document first to learn the paths, the schemas and which fields you may write. Nothing goes live until it is published.
+             * Changes are keyed by field path and merged into the draft, which is then checked against the whole schema. Describe the document first to learn the paths, the schemas, which fields you may write, its `instructions` and its site's `voice`. The answer's `glossary` lists words the site's glossary flags in the fields you wrote: fix them. Nothing goes live until it is published.
              *
              * @example
              * const result = await client.editing.globals.updateDraft({
@@ -4992,9 +6004,9 @@ export interface Client {
                 fetchOptions?: RequestInit;
             }, API.EditingCollectionsCreateItem.Result>;
             /**
-             * Delete an item of a collection, with its history
+             * Move an item of a collection to the trash
              *
-             * Its address stops answering, and pages that reference it stop showing it. In a collection with a tree, every item under it goes too. The person confirms before this runs.
+             * Its address stops answering, and pages that reference it stop showing it. In a collection with a tree, every item under it goes too. It keeps its versions, translations and each site's values for 30 days, and restoring it brings it back as it was. The person confirms before this runs.
              *
              * @example
              * const result = await client.editing.collections.deleteItem({
@@ -5009,6 +6021,66 @@ export interface Client {
                 headers?: Record<string, string>;
                 fetchOptions?: RequestInit;
             }, API.EditingCollectionsDeleteItem.Result>;
+            /**
+             * List the items of shared collections in the trash
+             *
+             * Each item deleted, newest first, with who deleted it and how many items under it went with it. Each is deleted for good 30 days after it was deleted.
+             *
+             * @example
+             * const result = await client.editing.collections.listTrash();
+             */
+            listTrash: ClientMethod<'GET', false, {
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCollectionsListTrash.Result>;
+            /**
+             * Restore an item of a collection from the trash
+             *
+             * Brings it back as it was, with the items that went to the trash with it: published if it was published, and a draft otherwise. Refused with 409 while the item above it in a tree is in the trash, or when another item now has its address. The person confirms before this runs.
+             *
+             * @example
+             * const result = await client.editing.collections.restoreItem({
+             *     params: {
+             *         name: 'string',
+             *         id: '1',
+             *     },
+             * });
+             */
+            restoreItem: ClientMethod<'POST', false, {
+                params: API.EditingCollectionsRestoreItem.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCollectionsRestoreItem.Result>;
+            /**
+             * Delete an item in the trash for good
+             *
+             * Deletes it now with its history, translations and each site's values, and the items that went to the trash with it. It cannot be restored. The person confirms before this runs.
+             *
+             * @example
+             * const result = await client.editing.collections.eraseItem({
+             *     params: {
+             *         name: 'string',
+             *         id: '1',
+             *     },
+             * });
+             */
+            eraseItem: ClientMethod<'DELETE', false, {
+                params: API.EditingCollectionsEraseItem.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCollectionsEraseItem.Result>;
+            /**
+             * Delete everything in the shared trash for good
+             *
+             * None of it can be restored. The person confirms before this runs.
+             *
+             * @example
+             * const result = await client.editing.collections.emptyTrash();
+             */
+            emptyTrash: ClientMethod<'DELETE', false, {
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCollectionsEmptyTrash.Result>;
             /**
              * Move an item of a collection with an order or a tree, saving the move to its draft
              *
@@ -5047,7 +6119,7 @@ export interface Client {
             /**
              * Change fields on the draft of an item of a collection
              *
-             * Changes are keyed by field path and merged into the draft, which is then checked against the whole schema. Describe the document first to learn the paths, the schemas and which fields you may write. Nothing goes live until it is published.
+             * Changes are keyed by field path and merged into the draft, which is then checked against the whole schema. Describe the document first to learn the paths, the schemas, which fields you may write, its `instructions` and its site's `voice`. The answer's `glossary` lists words the site's glossary flags in the fields you wrote: fix them. Nothing goes live until it is published.
              *
              * @example
              * const result = await client.editing.collections.updateDraft({
@@ -5401,7 +6473,7 @@ export interface Client {
             /**
              * Delete an image and its stored file
              *
-             * Refused with 409 while a page, global or item holds the image, published or in a draft, listing them under `uses`. The person confirms before this runs.
+             * Refused with 409 while a page, global or item holds the image, published or in a draft, listing them under `uses`. An image only items in the trash hold goes to the trash with its file, comes back when one of them is restored, and is deleted with the last of them. The person confirms before this runs.
              *
              * @example
              * const result = await client.editing.media.delete({
@@ -5666,6 +6738,53 @@ export interface Client {
             fetchOptions?: RequestInit;
         }, API.EditingSearchItems.Result>;
         /**
+         * Find the pages and items a content link may point at, on any site, or name the ones given by ref
+         *
+         * Each target has the ref a link stores under `ref`, in rich text or a link field, with its label, site (default for shared content), path and whether it is published. The reader turns the ref into the address for the site and language being read, so a link to another site goes to that site.
+         *
+         * @example
+         * const result = await client.editing.linkTargets();
+         */
+        linkTargets: ClientMethod<'GET', false, {
+            query?: API.EditingLinkTargets.Query;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.EditingLinkTargets.Result>;
+        /**
+         * Find the page or item a URL on one of the sites shows, for a content link to it by ref
+         *
+         * The URL matches a site's `url` and an address on it, in any language the site serves, like https://hagen.example.no/en/butikker. Paths match exactly, so a trailing slash is another address. The target has the ref to store under `ref`, with its label, site, path and whether it is published.
+         *
+         * @example
+         * const result = await client.editing.resolveLinkTarget({
+         *     query: {
+         *         url: 'string',
+         *     },
+         * });
+         */
+        resolveLinkTarget: ClientMethod<'GET', false, {
+            query: API.EditingResolveLinkTarget.Query;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.EditingResolveLinkTarget.Result>;
+        /**
+         * List every document, on any site, holding a content link to a page or an item
+         *
+         * What links here, read from the refs index: each document by ref, with its label, site and path, and the fields holding the link. Moving or unpublishing the target changes what these show.
+         *
+         * @example
+         * const result = await client.editing.linkedFrom({
+         *     query: {
+         *         ref: 'string',
+         *     },
+         * });
+         */
+        linkedFrom: ClientMethod<'GET', false, {
+            query: API.EditingLinkedFrom.Query;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.EditingLinkedFrom.Result>;
+        /**
          * Open the site's draft
          *
          * A link into draft mode that holds for ten minutes, for the editor to frame the site or open it in a tab.
@@ -5743,7 +6862,7 @@ export interface Client {
             /**
              * Approve reviews, or send them back with changes to make
              *
-             * An approval is the person's own judgement of what goes live, so they confirm first: in a host that cannot ask, such as Claude, they answer in the editor instead. An approval can be undone until the draft is published, with the reopen route.
+             * An approval is the person's own judgement of what goes live, so only their own button in the editor calls this, never a model. An approval can be undone until the draft is published, with the reopen route.
              *
              * @example
              * const result = await client.editing.reviews.decide({
@@ -5763,7 +6882,7 @@ export interface Client {
             /**
              * Approve a review and publish its draft in one step
              *
-             * The approval and the publish happen together, or neither does. It is refused when the person may not publish the document, when the review was already answered, and when the draft changed since they looked. The person confirms first: in a host that cannot ask, such as Claude, they answer in the editor instead.
+             * The approval and the publish happen together, or neither does. It is refused when the person may not publish the document, when the review was already answered, and when the draft changed since they looked. Only their own button in the editor calls this, never a model.
              *
              * @example
              * const result = await client.editing.reviews.approveAndPublish({
@@ -5852,6 +6971,72 @@ export interface Client {
                 fetchOptions?: RequestInit;
             }, API.EditingReviewsResolveComment.Result>;
         };
+        comments: {
+            /**
+             * List the comments on a document's draft, with who wrote each
+             *
+             * Each comment is on one field, and may quote a phrase of its text under `anchor`. A thread is the comment that starts it and the answers whose `replyTo` names it. `by` says who wrote it, and `via` the agent that wrote it for them. Comments left in a review since the last publish are listed too.
+             *
+             * @example
+             * const result = await client.editing.comments.list({
+             *     query: {
+             *         ref: 'string',
+             *     },
+             * });
+             */
+            list: ClientMethod<'GET', false, {
+                query: API.EditingCommentsList.Query;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCommentsList.Result>;
+            /**
+             * Comment on a field of a document's draft, or on a phrase of its text
+             *
+             * Quote the phrase under `anchor` exactly as the draft has it, and the editor marks it in the field. Mention people, or name one as the assignee, by their id from the people list: they find the comment under Waiting until it is resolved. Only people who open the document can be named. Pass `replyTo` to answer a thread. Answers with the comment.
+             *
+             * @example
+             * const result = await client.editing.comments.add({
+             *     body: {
+             *         ref: 'string',
+             *         text: 'string',
+             *     },
+             * });
+             */
+            add: ClientMethod<'POST', false, {
+                body: API.EditingCommentsAdd.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCommentsAdd.Result>;
+            /**
+             * Resolve a comment thread once it is dealt with
+             *
+             * Resolving any comment of a thread resolves the whole thread, which folds away under its field and leaves Waiting. Anyone who opens the document may resolve it. Answers with the comment that starts the thread.
+             *
+             * @example
+             * const result = await client.editing.comments.resolve({
+             *     params: {
+             *         id: '1',
+             *     },
+             * });
+             */
+            resolve: ClientMethod<'POST', false, {
+                params: API.EditingCommentsResolve.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCommentsResolve.Result>;
+            /**
+             * List the open comments that mention you or name you as the assignee
+             *
+             * One entry per open thread, with the document it is on: the comment that names you as the assignee, or the latest that mentions you. It leaves the list once the thread is resolved.
+             *
+             * @example
+             * const result = await client.editing.comments.waiting();
+             */
+            waiting: ClientMethod<'GET', false, {
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCommentsWaiting.Result>;
+        };
         schedules: {
             /**
              * List what is set to publish or unpublish, and the releases
@@ -5901,7 +7086,7 @@ export interface Client {
             /**
              * Make a release: a named set of drafts that publish together
              *
-             * Name it after what it is for, like "Trondheim opening", and pass the documents by ref. Nothing publishes until someone schedules or publishes the release.
+             * Name it after what it is for, like "Trondheim opening", and pass the documents by ref. Nothing publishes until someone schedules or publishes the release. An agent changing several documents for someone names it after the task, like "Agent: winter care refresh", puts each document it changes in it, checks it with `editing_check`, then asks that person to review the documents with `editing_reviews_request`. They publish it, schedule it or send it back.
              *
              * @example
              * const result = await client.editing.releases.create({
@@ -6038,6 +7223,27 @@ export interface Client {
                 fetchOptions?: RequestInit;
             }, API.EditingReleasesPublish.Result>;
             /**
+             * Send a release back with changes to make
+             *
+             * Asks for changes on each document in it that waits for your review, with one note for them all. Whoever made it, like an agent, reads the note on each review and saves new drafts into the same release. Sending back is up to the reviewer, so only their own button in the editor calls this, never a model.
+             *
+             * @example
+             * const result = await client.editing.releases.sendBack({
+             *     params: {
+             *         id: '1',
+             *     },
+             *     body: {
+             *         note: 'string',
+             *     },
+             * });
+             */
+            sendBack: ClientMethod<'POST', false, {
+                params: API.EditingReleasesSendBack.Params;
+                body: API.EditingReleasesSendBack.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReleasesSendBack.Result>;
+            /**
              * Delete a release, keeping every draft in it
              *
              * @example
@@ -6052,6 +7258,77 @@ export interface Client {
                 headers?: Record<string, string>;
                 fetchOptions?: RequestInit;
             }, API.EditingReleasesDelete.Result>;
+        };
+        redirects: {
+            /**
+             * List the redirects
+             *
+             * Each address that sends visitors elsewhere, by its from, with who made it: a rename on publish, an editor, or an import. With `to`, only the old addresses of one page or item, in every language.
+             *
+             * @example
+             * const result = await client.editing.redirects.list();
+             */
+            list: ClientMethod<'GET', false, {
+                query?: API.EditingRedirectsList.Query;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingRedirectsList.Result>;
+            /**
+             * Redirect an address
+             *
+             * Sends visitors who ask for `from` to a page or an item, a path on the site, or a URL, from the moment it is made. Prefer a page or an item to its path, since the redirect then follows it through renames. A path that redirects already is stored as where that redirect goes, and the redirects that led to `from` go where it goes. Refused with 409 when a page is published at `from`, when `from` redirects already, or when the redirect would lead back to `from`.
+             *
+             * @example
+             * const result = await client.editing.redirects.create({
+             *     body: {
+             *         from: 'string',
+             *         to: {
+             *             type: 'document',
+             *             ref: 'string',
+             *         },
+             *     },
+             * });
+             */
+            create: ClientMethod<'POST', false, {
+                body: API.EditingRedirectsCreate.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingRedirectsCreate.Result>;
+            /**
+             * Change a redirect
+             *
+             * Changes its from, where it goes, or its status, taking effect at once. A redirect a rename made can be deleted but not changed. Refused with 409 as making one is.
+             *
+             * @example
+             * const result = await client.editing.redirects.update({
+             *     params: {
+             *         id: '1',
+             *     },
+             * });
+             */
+            update: ClientMethod<'PATCH', false, {
+                params: API.EditingRedirectsUpdate.Params;
+                body: API.EditingRedirectsUpdate.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingRedirectsUpdate.Result>;
+            /**
+             * Delete a redirect
+             *
+             * Visitors who ask for its from get what the site answers there, which is a page not found until a page takes the address. The person confirms before this runs.
+             *
+             * @example
+             * const result = await client.editing.redirects.delete({
+             *     params: {
+             *         id: '1',
+             *     },
+             * });
+             */
+            delete: ClientMethod<'DELETE', false, {
+                params: API.EditingRedirectsDelete.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingRedirectsDelete.Result>;
         };
     };
     /**
@@ -6144,6 +7421,7 @@ const routes: GeneratedRoutes = {
                     responses: {
                         200: {},
                         404: {},
+                        400: {},
                     },
                 },
             },
@@ -6162,8 +7440,18 @@ const routes: GeneratedRoutes = {
                     responses: {
                         200: {},
                         404: {},
+                        400: {},
                     },
                 },
+            },
+        },
+        redirects: {
+            method: 'GET',
+            path: '/content/redirects',
+            responses: {
+                200: {},
+                304: {},
+                400: {},
             },
         },
         media: {
@@ -6201,10 +7489,31 @@ const routes: GeneratedRoutes = {
                 403: {},
             },
         },
+        check: {
+            method: 'GET',
+            path: '/editing/check',
+            responses: {
+                200: {},
+                400: {},
+                401: {},
+                403: {},
+                404: {},
+                409: {},
+            },
+        },
         pages: {
             list: {
                 method: 'GET',
                 path: '/editing/pages',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                },
+            },
+            map: {
+                method: 'GET',
+                path: '/editing/map',
                 responses: {
                     200: {},
                     401: {},
@@ -6219,6 +7528,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             updateDraft: {
@@ -6254,6 +7564,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             getPublished: {
@@ -6264,6 +7575,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             history: {
@@ -6274,6 +7586,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             getVersion: {
@@ -6284,6 +7597,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             changes: {
@@ -6294,6 +7608,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             revert: {
@@ -6353,6 +7668,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             setOwner: {
@@ -6399,6 +7715,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             updateDraft: {
@@ -6434,6 +7751,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             getPublished: {
@@ -6444,6 +7762,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             history: {
@@ -6454,6 +7773,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             getVersion: {
@@ -6464,6 +7784,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             changes: {
@@ -6474,6 +7795,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             revert: {
@@ -6533,6 +7855,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             setOwner: {
@@ -6603,6 +7926,49 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
+                },
+            },
+            listTrash: {
+                method: 'GET',
+                path: '/editing/trash',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                },
+            },
+            restoreItem: {
+                method: 'POST',
+                path: '/editing/trash/:name/:id/restore',
+                responses: {
+                    204: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    400: {},
+                },
+            },
+            eraseItem: {
+                method: 'DELETE',
+                path: '/editing/trash/:name/:id',
+                responses: {
+                    204: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    400: {},
+                },
+            },
+            emptyTrash: {
+                method: 'DELETE',
+                path: '/editing/trash',
+                responses: {
+                    204: {},
+                    401: {},
+                    403: {},
                 },
             },
             placeItem: {
@@ -6625,6 +7991,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             updateDraft: {
@@ -6660,6 +8027,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             getPublished: {
@@ -6670,6 +8038,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             history: {
@@ -6680,6 +8049,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             getVersion: {
@@ -6690,6 +8060,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             changes: {
@@ -6700,6 +8071,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             revert: {
@@ -6759,6 +8131,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             setOwner: {
@@ -6806,6 +8179,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             uses: {
@@ -6816,6 +8190,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             getFile: {
@@ -6826,6 +8201,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             update: {
@@ -6848,6 +8224,7 @@ const routes: GeneratedRoutes = {
                     403: {},
                     404: {},
                     409: {},
+                    400: {},
                 },
             },
             createUpload: {
@@ -6919,6 +8296,7 @@ const routes: GeneratedRoutes = {
                     403: {},
                     404: {},
                     409: {},
+                    400: {},
                 },
             },
         },
@@ -6933,6 +8311,7 @@ const routes: GeneratedRoutes = {
                         403: {},
                         404: {},
                         409: {},
+                        400: {},
                     },
                 },
             },
@@ -6966,6 +8345,7 @@ const routes: GeneratedRoutes = {
                         401: {},
                         403: {},
                         404: {},
+                        400: {},
                     },
                 },
                 save: {
@@ -6993,6 +8373,7 @@ const routes: GeneratedRoutes = {
                             403: {},
                             404: {},
                             409: {},
+                            400: {},
                         },
                     },
                 },
@@ -7015,6 +8396,7 @@ const routes: GeneratedRoutes = {
                 200: {},
                 401: {},
                 403: {},
+                400: {},
             },
         },
         searchItems: {
@@ -7027,6 +8409,37 @@ const routes: GeneratedRoutes = {
                 404: {},
                 502: {},
                 400: {},
+            },
+        },
+        linkTargets: {
+            method: 'GET',
+            path: '/editing/link-targets',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                400: {},
+            },
+        },
+        resolveLinkTarget: {
+            method: 'GET',
+            path: '/editing/link-targets/resolve',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                404: {},
+                400: {},
+            },
+        },
+        linkedFrom: {
+            method: 'GET',
+            path: '/editing/linked-from',
+            responses: {
+                200: {},
+                400: {},
+                401: {},
+                403: {},
             },
         },
         createPreview: {
@@ -7107,6 +8520,7 @@ const routes: GeneratedRoutes = {
                     403: {},
                     404: {},
                     409: {},
+                    400: {},
                 },
             },
             withdraw: {
@@ -7155,6 +8569,53 @@ const routes: GeneratedRoutes = {
                     403: {},
                     404: {},
                     409: {},
+                    400: {},
+                },
+            },
+        },
+        comments: {
+            list: {
+                method: 'GET',
+                path: '/editing/comments',
+                responses: {
+                    200: {},
+                    400: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                },
+            },
+            add: {
+                method: 'POST',
+                path: '/editing/comments',
+                responses: {
+                    201: {},
+                    400: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    422: {},
+                },
+            },
+            resolve: {
+                method: 'POST',
+                path: '/editing/comments/:id/resolve',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    400: {},
+                },
+            },
+            waiting: {
+                method: 'GET',
+                path: '/editing/comments/waiting',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
                 },
             },
         },
@@ -7191,6 +8652,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    400: {},
                 },
             },
             create: {
@@ -7265,11 +8727,24 @@ const routes: GeneratedRoutes = {
                     403: {},
                     404: {},
                     409: {},
+                    400: {},
                 },
             },
             publish: {
                 method: 'POST',
                 path: '/editing/releases/:id/publish',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    400: {},
+                },
+            },
+            sendBack: {
+                method: 'POST',
+                path: '/editing/releases/:id/send-back',
                 responses: {
                     200: {},
                     401: {},
@@ -7288,6 +8763,57 @@ const routes: GeneratedRoutes = {
                     403: {},
                     404: {},
                     409: {},
+                    400: {},
+                },
+            },
+        },
+        redirects: {
+            list: {
+                method: 'GET',
+                path: '/editing/redirects',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    400: {},
+                },
+            },
+            create: {
+                method: 'POST',
+                path: '/editing/redirects',
+                responses: {
+                    201: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    422: {},
+                    400: {},
+                },
+            },
+            update: {
+                method: 'PATCH',
+                path: '/editing/redirects/:id',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    422: {},
+                    400: {},
+                },
+            },
+            delete: {
+                method: 'DELETE',
+                path: '/editing/redirects/:id',
+                responses: {
+                    204: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    400: {},
                 },
             },
         },
@@ -7473,13 +8999,32 @@ const buildPath = (path: string, params: Record<string, unknown> = {}): string =
         return encodeURIComponent(serializeValue(value));
     });
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date);
+
 /**
- * An array repeats its key, and an undefined or null field is left out.
+ * JSON with every object's keys in order so one value always gives one URL.
+ */
+const sortedJson = (value: unknown): string =>
+    JSON.stringify(value, (_, inner: unknown) => {
+        if (!isPlainObject(inner)) return inner;
+        const keys = Object.keys(inner).sort();
+        return Object.fromEntries(keys.map((key) => [key, inner[key]]));
+    });
+
+const isText = (value: unknown): boolean => !isPlainObject(value) && !Array.isArray(value);
+
+/**
+ * A list of values repeats its key and anything else travels as one JSON text. An undefined or null field is left out.
  */
 const buildSearchParams = (fields: Record<string, unknown>): URLSearchParams => {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(fields)) {
         if (value === undefined || value === null) continue;
+        if (Array.isArray(value) ? !value.every(isText) : !isText(value)) {
+            params.append(key, sortedJson(value));
+            continue;
+        }
         for (const item of Array.isArray(value) ? value : [value]) params.append(key, serializeValue(item));
     }
     return params;

@@ -117,6 +117,7 @@ const createSourceResolver = (): SchemaResolver => {
 const MESSAGE_IDS = {
     coerce: ['coerce', 'coerceReference'],
     collection: ['collection', 'collectionReference'],
+    undefined: ['undefined', 'undefinedReference'],
     union: ['union', 'unionReference'],
     transform: ['transform', 'transformReference'],
     nullable: ['nullable', 'nullableReference'],
@@ -127,6 +128,24 @@ const calleeName = (node: TSESTree.CallExpression): string | undefined => {
     if (callee.type === 'Identifier') return callee.name;
     if (callee.type === 'MemberExpression' && callee.property.type === 'Identifier') return callee.property.name;
     return undefined;
+};
+
+/**
+ * Whether a call declares routes: `k.route(...)`, `k.routes(...)`, or a group like
+ * `k.routes.users(...)` or `k.routes.workspaces.members(...)`.
+ */
+const declaresRoutes = (call: TSESTree.CallExpression): boolean => {
+    let callee: TSESTree.Node = call.callee;
+    while (callee.type === 'MemberExpression') {
+        if (
+            callee.property.type === 'Identifier' &&
+            (callee.property.name === AUTHORING_NAMES.route || callee.property.name === AUTHORING_NAMES.routes)
+        ) {
+            return true;
+        }
+        callee = callee.object;
+    }
+    return false;
 };
 
 interface SchemaSite {
@@ -157,7 +176,7 @@ const schemaNodesOf = (call: TSESTree.CallExpression): SchemaSite[] => {
             : [];
     }
 
-    if (name !== AUTHORING_NAMES.routes && name !== AUTHORING_NAMES.defineConfig) return [];
+    if (name !== AUTHORING_NAMES.defineConfig && !declaresRoutes(call)) return [];
 
     const nodes: SchemaSite[] = [];
     const visit = (node: TSESTree.Node): void => {
@@ -209,6 +228,10 @@ export const noUnsupportedSchema = ESLintUtils.RuleCreator.withoutDocs({
                 'z.set and z.map are not supported in a Kizuna schema. JSON has neither, so the value arrives as an empty object. Use z.array() for a set and z.record() for a map.',
             collectionReference:
                 'This schema uses z.set or z.map, which JSON cannot carry. Use z.array() for a set and z.record() for a map.',
+            undefined:
+                'z.undefined() has no JSON form, so the generated clients read it as a value. Use z.void() for a response with no content, or .optional() for a field that may be left out.',
+            undefinedReference:
+                'This schema uses z.undefined(), which has no JSON form. Use z.void() for a response with no content, or .optional() for a field that may be left out.',
             union: 'A union of objects needs a discriminator, or nothing on the wire says which branch arrived. Use z.discriminatedUnion() instead.',
             unionReference:
                 'This schema unions objects with no discriminator, so nothing on the wire says which branch arrived. Use z.discriminatedUnion() instead.',
@@ -222,8 +245,7 @@ export const noUnsupportedSchema = ESLintUtils.RuleCreator.withoutDocs({
                 'This schema has a .nullable() field, which a query, path, header or form field cannot carry, since none of them has a null. Use .optional() instead.',
             unsendablePath:
                 'A path parameter arrives as a single string, so a list or an object here cannot be sent. Use a scalar schema, or move the value to query.',
-            unsendableQuery:
-                'A query string carries values and lists of values, so an object, record, tuple or nested list here cannot be sent. Split it into fields of their own, or move it to a body.',
+            unsendableQuery: 'A query string carries text and JSON. A file needs a multipart form body.',
             unsendableHeader:
                 'A header carries one value, so a list or an object here cannot be sent. Use a scalar schema, or split it into headers of their own.',
             unsendableForm:

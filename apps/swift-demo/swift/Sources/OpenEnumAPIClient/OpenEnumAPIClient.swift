@@ -7,9 +7,65 @@ import FoundationNetworking
 
 public enum OpenEnumAPI {
 
+    public struct UserWhere: Codable, Sendable, Equatable {
+        public let name: TextFilter?
+        public let email: TextFilter?
+        public let and: [UserWhere]?
+        public let or: [UserWhere]?
+
+        public init(
+            name: TextFilter? = nil,
+            email: TextFilter? = nil,
+            and: [UserWhere]? = nil,
+            or: [UserWhere]? = nil
+        ) {
+            self.name = name
+            self.email = email
+            self.and = and
+            self.or = or
+        }
+
+        public static func name(_ name: TextFilter) -> Self {
+            .init(name: name)
+        }
+
+        public static func email(_ email: TextFilter) -> Self {
+            .init(email: email)
+        }
+
+        public static func and(_ and: [UserWhere]) -> Self {
+            .init(and: and)
+        }
+
+        public static func or(_ or: [UserWhere]) -> Self {
+            .init(or: or)
+        }
+    }
+
+    public struct TextFilter: Codable, Sendable, Equatable {
+        public let equals: String?
+        public let contains: String?
+
+        public init(
+            equals: String? = nil,
+            contains: String? = nil
+        ) {
+            self.equals = equals
+            self.contains = contains
+        }
+
+        public static func equals(_ equals: String) -> Self {
+            .init(equals: equals)
+        }
+
+        public static func contains(_ contains: String) -> Self {
+            .init(contains: contains)
+        }
+    }
+
     /// A user in the system
-    public struct User: Codable, Sendable, Equatable {
-        public struct Avatar: Codable, Sendable, Equatable {
+    public struct User: Codable, Sendable, Equatable, Identifiable {
+        public struct Avatar: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let url: String
 
@@ -21,7 +77,7 @@ public enum OpenEnumAPI {
                 self.url = url
             }
         }
-        public struct AvatarsItem: Codable, Sendable, Equatable {
+        public struct AvatarsItem: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let url: String
 
@@ -176,6 +232,8 @@ public enum OpenEnumAPI {
         }
         case login(Login)
         case logout(Logout)
+        /// A variant this client was generated before. It holds the discriminator, and cannot be sent back.
+        case unknown(String)
         public static func login(at: Date, ipAddress: String, userAgent: String) -> UserSessionEvent {
             .login(Login(kind: "login", at: at, ipAddress: ipAddress, userAgent: userAgent))
         }
@@ -187,13 +245,15 @@ public enum OpenEnumAPI {
             switch self {
             case .login(let payload): return payload.kind
             case .logout(let payload): return payload.kind
+            case .unknown(let value): return value
             }
         }
 
-        public var at: Date {
+        public var at: Date? {
             switch self {
             case .login(let payload): return payload.at
             case .logout(let payload): return payload.at
+            case .unknown: return nil
             }
         }
 
@@ -211,7 +271,7 @@ public enum OpenEnumAPI {
             case "logout":
                 self = .logout(try single.decode(Logout.self))
             default:
-                throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+                self = .unknown(kind)
             }
         }
 
@@ -222,6 +282,8 @@ public enum OpenEnumAPI {
                 try single.encode(payload)
             case .logout(let payload):
                 try single.encode(payload)
+            case .unknown(let kind):
+                throw EncodingError.invalidValue(self, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "This client does not know the variant \(kind), so it cannot send it."))
             }
         }
     }
@@ -310,6 +372,8 @@ public enum OpenEnumAPI {
     public enum NotificationEvent: Codable, Sendable, Equatable {
         case email(EmailEvent)
         case sms(SmsEvent)
+        /// A variant this client was generated before. It holds the discriminator, and cannot be sent back.
+        case unknown(String)
         public static func email(to: String, subject: String) -> NotificationEvent {
             .email(EmailEvent(channel: "email", to: to, subject: subject))
         }
@@ -321,6 +385,7 @@ public enum OpenEnumAPI {
             switch self {
             case .email(let payload): return payload.channel
             case .sms(let payload): return payload.channel
+            case .unknown(let value): return value
             }
         }
 
@@ -338,7 +403,7 @@ public enum OpenEnumAPI {
             case "sms":
                 self = .sms(try single.decode(SmsEvent.self))
             default:
-                throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+                self = .unknown(kind)
             }
         }
 
@@ -349,6 +414,8 @@ public enum OpenEnumAPI {
                 try single.encode(payload)
             case .sms(let payload):
                 try single.encode(payload)
+            case .unknown(let kind):
+                throw EncodingError.invalidValue(self, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "This client does not know the variant \(kind), so it cannot send it."))
             }
         }
     }
@@ -420,7 +487,7 @@ public enum OpenEnumAPI {
         }
     }
 
-    public struct EventRecord: Codable, Sendable, Equatable {
+    public struct EventRecord: Codable, Sendable, Equatable, Identifiable {
         public let id: String
         public let kind: EventKind
         public let occurredAt: Date
@@ -731,20 +798,24 @@ public final class OpenEnumAPIClient: Sendable {
         public struct Query: Sendable {
             public let page: Int?
             public let limit: Int?
+            public let `where`: OpenEnumAPI.UserWhere?
 
             public init(
                 page: Int? = nil,
-                limit: Int? = nil
+                limit: Int? = nil,
+                `where`: OpenEnumAPI.UserWhere? = nil
             ) {
                 self.page = page
                 self.limit = limit
+                self.`where` = `where`
             }
 
             public static func query(
                 page: Int? = nil,
-                limit: Int? = nil
+                limit: Int? = nil,
+                `where`: OpenEnumAPI.UserWhere? = nil
             ) -> Self {
-                .init(page: page, limit: limit)
+                .init(page: page, limit: limit, where: `where`)
             }
         }
 
@@ -827,6 +898,7 @@ public final class OpenEnumAPIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(OpenEnumAPI.ProblemDetails)
+            case badRequest(OpenEnumAPIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -865,6 +937,7 @@ public final class OpenEnumAPIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(OpenEnumAPI.ProblemDetails)
+            case badRequest(OpenEnumAPIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -995,6 +1068,7 @@ public final class OpenEnumAPIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(OpenEnumAPI.ProblemDetails)
+            case badRequest(OpenEnumAPIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1057,6 +1131,7 @@ public final class OpenEnumAPIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(OpenEnumAPI.ProblemDetails)
+            case badRequest(OpenEnumAPIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1095,6 +1170,7 @@ public final class OpenEnumAPIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(OpenEnumAPI.ProblemDetails)
+            case badRequest(OpenEnumAPIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1240,6 +1316,7 @@ public final class OpenEnumAPIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(OpenEnumAPI.ProblemDetails)
+            case badRequest(OpenEnumAPIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1308,6 +1385,7 @@ public final class OpenEnumAPIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(OpenEnumAPIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1529,6 +1607,7 @@ public final class OpenEnumAPIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(OpenEnumAPI.ProblemDetails)
+            case badRequest(OpenEnumAPIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -2020,7 +2099,7 @@ public final class OpenEnumAPIClient: Sendable {
 
     public enum WorkspaceGetWorkspace {
 
-        public struct Response: Codable, Sendable, Equatable {
+        public struct Response: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
 
@@ -2438,6 +2517,8 @@ public final class OpenEnumAPIClient: Sendable {
             case getForecast(ToolCallGetForecast)
             case plotSignups(ToolCallPlotSignups)
             case countWords(ToolCallCountWords)
+            /// A variant this client was generated before. It holds the discriminator, and cannot be sent back.
+            case unknown(String)
             public static func getForecast(id: String, needsApproval: Bool? = nil, input: OpenEnumAPIClient.AssistantReply.ToolCallGetForecastInput) -> ToolCall {
                 .getForecast(ToolCallGetForecast(id: id, name: "getForecast", needsApproval: needsApproval, input: input))
             }
@@ -2448,11 +2529,12 @@ public final class OpenEnumAPIClient: Sendable {
                 .countWords(ToolCallCountWords(id: id, name: "countWords", needsApproval: needsApproval, input: input))
             }
 
-            public var id: String {
+            public var id: String? {
                 switch self {
                 case .getForecast(let payload): return payload.id
                 case .plotSignups(let payload): return payload.id
                 case .countWords(let payload): return payload.id
+                case .unknown: return nil
                 }
             }
 
@@ -2461,6 +2543,7 @@ public final class OpenEnumAPIClient: Sendable {
                 case .getForecast(let payload): return payload.name
                 case .plotSignups(let payload): return payload.name
                 case .countWords(let payload): return payload.name
+                case .unknown(let value): return value
                 }
             }
 
@@ -2469,6 +2552,7 @@ public final class OpenEnumAPIClient: Sendable {
                 case .getForecast(let payload): return payload.needsApproval
                 case .plotSignups(let payload): return payload.needsApproval
                 case .countWords(let payload): return payload.needsApproval
+                case .unknown: return nil
                 }
             }
 
@@ -2488,7 +2572,7 @@ public final class OpenEnumAPIClient: Sendable {
                 case "countWords":
                     self = .countWords(try single.decode(ToolCallCountWords.self))
                 default:
-                    throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+                    self = .unknown(kind)
                 }
             }
 
@@ -2501,11 +2585,13 @@ public final class OpenEnumAPIClient: Sendable {
                     try single.encode(payload)
                 case .countWords(let payload):
                     try single.encode(payload)
+                case .unknown(let kind):
+                    throw EncodingError.invalidValue(self, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "This client does not know the variant \(kind), so it cannot send it."))
                 }
             }
         }
 
-        public struct ToolCallGetForecast: Codable, Sendable, Equatable {
+        public struct ToolCallGetForecast: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let needsApproval: Bool?
@@ -2551,6 +2637,10 @@ public final class OpenEnumAPIClient: Sendable {
             public init(unit: ToolCallGetForecastInputQueryUnit? = nil) {
                 self.unit = unit
             }
+
+            public static func unit(_ unit: ToolCallGetForecastInputQueryUnit) -> Self {
+                .init(unit: unit)
+            }
         }
 
         public enum ToolCallGetForecastInputQueryUnit: RawRepresentable, Codable, Sendable, Hashable {
@@ -2585,7 +2675,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolCallPlotSignups: Codable, Sendable, Equatable {
+        public struct ToolCallPlotSignups: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let needsApproval: Bool?
@@ -2620,7 +2710,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolCallCountWords: Codable, Sendable, Equatable {
+        public struct ToolCallCountWords: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let needsApproval: Bool?
@@ -2659,6 +2749,8 @@ public final class OpenEnumAPIClient: Sendable {
             case getForecast(ToolResultGetForecast)
             case plotSignups(ToolResultPlotSignups)
             case countWords(ToolResultCountWords)
+            /// A variant this client was generated before. It holds the discriminator, and cannot be sent back.
+            case unknown(String)
             public static func getForecast(id: String, output: OpenEnumAPIClient.AssistantReply.ToolResultGetForecastOutput) -> ToolResult {
                 .getForecast(ToolResultGetForecast(id: id, name: "getForecast", output: output))
             }
@@ -2669,11 +2761,12 @@ public final class OpenEnumAPIClient: Sendable {
                 .countWords(ToolResultCountWords(id: id, name: "countWords", output: output))
             }
 
-            public var id: String {
+            public var id: String? {
                 switch self {
                 case .getForecast(let payload): return payload.id
                 case .plotSignups(let payload): return payload.id
                 case .countWords(let payload): return payload.id
+                case .unknown: return nil
                 }
             }
 
@@ -2682,6 +2775,7 @@ public final class OpenEnumAPIClient: Sendable {
                 case .getForecast(let payload): return payload.name
                 case .plotSignups(let payload): return payload.name
                 case .countWords(let payload): return payload.name
+                case .unknown(let value): return value
                 }
             }
 
@@ -2701,7 +2795,7 @@ public final class OpenEnumAPIClient: Sendable {
                 case "countWords":
                     self = .countWords(try single.decode(ToolResultCountWords.self))
                 default:
-                    throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+                    self = .unknown(kind)
                 }
             }
 
@@ -2714,11 +2808,13 @@ public final class OpenEnumAPIClient: Sendable {
                     try single.encode(payload)
                 case .countWords(let payload):
                     try single.encode(payload)
+                case .unknown(let kind):
+                    throw EncodingError.invalidValue(self, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "This client does not know the variant \(kind), so it cannot send it."))
                 }
             }
         }
 
-        public struct ToolResultGetForecast: Codable, Sendable, Equatable {
+        public struct ToolResultGetForecast: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let output: ToolResultGetForecastOutput
@@ -2782,7 +2878,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolResultPlotSignups: Codable, Sendable, Equatable {
+        public struct ToolResultPlotSignups: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let output: ToolResultPlotSignupsOutput
@@ -2819,7 +2915,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolResultCountWords: Codable, Sendable, Equatable {
+        public struct ToolResultCountWords: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let output: ToolResultCountWordsOutput
@@ -2843,7 +2939,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolError: Codable, Sendable, Equatable {
+        public struct ToolError: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: ToolErrorName
             public let message: String
@@ -2949,17 +3045,19 @@ public final class OpenEnumAPIClient: Sendable {
             for event in events {
                 switch event {
                 case .tool_call(let payload):
-                    var tracked = at(payload.id, payload.name)
+                    guard let id = payload.id else { continue }
+                    var tracked = at(id, payload.name)
                     tracked.call = payload
                     if payload.needsApproval == true, tracked.state == .running {
                         tracked.state = .needsApproval
                     }
-                    calls[payload.id] = tracked
+                    calls[id] = tracked
                 case .tool_result(let payload):
-                    var tracked = at(payload.id, payload.name)
+                    guard let id = payload.id else { continue }
+                    var tracked = at(id, payload.name)
                     tracked.state = .done
                     tracked.result = payload
-                    calls[payload.id] = tracked
+                    calls[id] = tracked
                 case .tool_error(let payload):
                     var tracked = at(payload.id, payload.name.rawValue)
                     tracked.state = .failed
@@ -3026,7 +3124,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct InputAnswerCall: Codable, Sendable, Equatable {
+        public struct InputAnswerCall: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let input: OpenEnumAPIClient.JSONValue?
@@ -3053,6 +3151,8 @@ public final class OpenEnumAPIClient: Sendable {
         public enum ToolCall: Codable, Sendable, Equatable {
             case notes_list(ToolCallNotesList)
             case notes_add(ToolCallNotesAdd)
+            /// A variant this client was generated before. It holds the discriminator, and cannot be sent back.
+            case unknown(String)
             public static func notes_list(id: String, needsApproval: Bool? = nil) -> ToolCall {
                 .notes_list(ToolCallNotesList(id: id, name: "notes.list", needsApproval: needsApproval))
             }
@@ -3060,10 +3160,11 @@ public final class OpenEnumAPIClient: Sendable {
                 .notes_add(ToolCallNotesAdd(id: id, name: "notes.add", needsApproval: needsApproval, input: input))
             }
 
-            public var id: String {
+            public var id: String? {
                 switch self {
                 case .notes_list(let payload): return payload.id
                 case .notes_add(let payload): return payload.id
+                case .unknown: return nil
                 }
             }
 
@@ -3071,6 +3172,7 @@ public final class OpenEnumAPIClient: Sendable {
                 switch self {
                 case .notes_list(let payload): return payload.name
                 case .notes_add(let payload): return payload.name
+                case .unknown(let value): return value
                 }
             }
 
@@ -3078,6 +3180,7 @@ public final class OpenEnumAPIClient: Sendable {
                 switch self {
                 case .notes_list(let payload): return payload.needsApproval
                 case .notes_add(let payload): return payload.needsApproval
+                case .unknown: return nil
                 }
             }
 
@@ -3095,7 +3198,7 @@ public final class OpenEnumAPIClient: Sendable {
                 case "notes.add":
                     self = .notes_add(try single.decode(ToolCallNotesAdd.self))
                 default:
-                    throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+                    self = .unknown(kind)
                 }
             }
 
@@ -3106,11 +3209,13 @@ public final class OpenEnumAPIClient: Sendable {
                     try single.encode(payload)
                 case .notes_add(let payload):
                     try single.encode(payload)
+                case .unknown(let kind):
+                    throw EncodingError.invalidValue(self, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "This client does not know the variant \(kind), so it cannot send it."))
                 }
             }
         }
 
-        public struct ToolCallNotesList: Codable, Sendable, Equatable {
+        public struct ToolCallNotesList: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let needsApproval: Bool?
@@ -3126,7 +3231,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolCallNotesAdd: Codable, Sendable, Equatable {
+        public struct ToolCallNotesAdd: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let needsApproval: Bool?
@@ -3164,6 +3269,8 @@ public final class OpenEnumAPIClient: Sendable {
         public enum ToolResult: Codable, Sendable, Equatable {
             case notes_list(ToolResultNotesList)
             case notes_add(ToolResultNotesAdd)
+            /// A variant this client was generated before. It holds the discriminator, and cannot be sent back.
+            case unknown(String)
             public static func notes_list(id: String, output: OpenEnumAPIClient.AssistantChat.ToolResultNotesListOutput) -> ToolResult {
                 .notes_list(ToolResultNotesList(id: id, name: "notes.list", output: output))
             }
@@ -3171,10 +3278,11 @@ public final class OpenEnumAPIClient: Sendable {
                 .notes_add(ToolResultNotesAdd(id: id, name: "notes.add", output: output))
             }
 
-            public var id: String {
+            public var id: String? {
                 switch self {
                 case .notes_list(let payload): return payload.id
                 case .notes_add(let payload): return payload.id
+                case .unknown: return nil
                 }
             }
 
@@ -3182,6 +3290,7 @@ public final class OpenEnumAPIClient: Sendable {
                 switch self {
                 case .notes_list(let payload): return payload.name
                 case .notes_add(let payload): return payload.name
+                case .unknown(let value): return value
                 }
             }
 
@@ -3199,7 +3308,7 @@ public final class OpenEnumAPIClient: Sendable {
                 case "notes.add":
                     self = .notes_add(try single.decode(ToolResultNotesAdd.self))
                 default:
-                    throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+                    self = .unknown(kind)
                 }
             }
 
@@ -3210,11 +3319,13 @@ public final class OpenEnumAPIClient: Sendable {
                     try single.encode(payload)
                 case .notes_add(let payload):
                     try single.encode(payload)
+                case .unknown(let kind):
+                    throw EncodingError.invalidValue(self, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "This client does not know the variant \(kind), so it cannot send it."))
                 }
             }
         }
 
-        public struct ToolResultNotesList: Codable, Sendable, Equatable {
+        public struct ToolResultNotesList: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let output: ToolResultNotesListOutput
@@ -3238,7 +3349,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolResultNotesListOutputNotesItem: Codable, Sendable, Equatable {
+        public struct ToolResultNotesListOutputNotesItem: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let text: String
 
@@ -3251,7 +3362,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolResultNotesAdd: Codable, Sendable, Equatable {
+        public struct ToolResultNotesAdd: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: String
             public let output: ToolResultNotesAddOutput
@@ -3267,7 +3378,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolResultNotesAddOutput: Codable, Sendable, Equatable {
+        public struct ToolResultNotesAddOutput: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let text: String
 
@@ -3280,7 +3391,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolError: Codable, Sendable, Equatable {
+        public struct ToolError: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let name: ToolErrorName
             public let message: String
@@ -3385,17 +3496,19 @@ public final class OpenEnumAPIClient: Sendable {
             for event in events {
                 switch event {
                 case .tool_call(let payload):
-                    var tracked = at(payload.id, payload.name)
+                    guard let id = payload.id else { continue }
+                    var tracked = at(id, payload.name)
                     tracked.call = payload
                     if payload.needsApproval == true, tracked.state == .running {
                         tracked.state = .needsApproval
                     }
-                    calls[payload.id] = tracked
+                    calls[id] = tracked
                 case .tool_result(let payload):
-                    var tracked = at(payload.id, payload.name)
+                    guard let id = payload.id else { continue }
+                    var tracked = at(id, payload.name)
                     tracked.state = .done
                     tracked.result = payload
-                    calls[payload.id] = tracked
+                    calls[id] = tracked
                 case .tool_error(let payload):
                     var tracked = at(payload.id, payload.name.rawValue)
                     tracked.state = .failed
@@ -3689,7 +3802,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ResponseNotesItem: Codable, Sendable, Equatable {
+        public struct ResponseNotesItem: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let text: String
 
@@ -3737,7 +3850,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct Response201: Codable, Sendable, Equatable {
+        public struct Response201: Codable, Sendable, Equatable, Identifiable {
             public let id: String
             public let text: String
 
@@ -3940,6 +4053,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         var queryItems: [URLQueryItem] = []
         queryItems += Kizuna.queryItems(name: "page", value: query.page)
         queryItems += Kizuna.queryItems(name: "limit", value: query.limit)
+        queryItems += try Kizuna.jsonQueryItems(name: "where", value: query.`where`, failure: OpenEnumAPIClient.UsersListUsers.Failure.self)
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: queryItems, failure: OpenEnumAPIClient.UsersListUsers.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
@@ -3990,6 +4104,9 @@ public struct OpenEnumAPIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersUserBadge.Failure.self)
             throw OpenEnumAPIClient.UsersUserBadge.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersUserBadge.Failure.self)
+            throw OpenEnumAPIClient.UsersUserBadge.Failure.badRequest(payload)
         default:
             throw OpenEnumAPIClient.UsersUserBadge.Failure.unexpectedStatus(statusCode, data)
         }
@@ -4011,6 +4128,9 @@ public struct OpenEnumAPIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersLastSessionEvent.Failure.self)
             throw OpenEnumAPIClient.UsersLastSessionEvent.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersLastSessionEvent.Failure.self)
+            throw OpenEnumAPIClient.UsersLastSessionEvent.Failure.badRequest(payload)
         default:
             throw OpenEnumAPIClient.UsersLastSessionEvent.Failure.unexpectedStatus(statusCode, data)
         }
@@ -4058,6 +4178,9 @@ public struct OpenEnumAPIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersGetUser.Failure.self)
             throw OpenEnumAPIClient.UsersGetUser.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersGetUser.Failure.self)
+            throw OpenEnumAPIClient.UsersGetUser.Failure.badRequest(payload)
         default:
             throw OpenEnumAPIClient.UsersGetUser.Failure.unexpectedStatus(statusCode, data)
         }
@@ -4080,6 +4203,9 @@ public struct OpenEnumAPIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersUserActivity.Failure.self)
             throw OpenEnumAPIClient.UsersUserActivity.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersUserActivity.Failure.self)
+            throw OpenEnumAPIClient.UsersUserActivity.Failure.badRequest(payload)
         default:
             throw OpenEnumAPIClient.UsersUserActivity.Failure.unexpectedStatus(statusCode, data)
         }
@@ -4101,6 +4227,9 @@ public struct OpenEnumAPIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersUserProfile.Failure.self)
             throw OpenEnumAPIClient.UsersUserProfile.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersUserProfile.Failure.self)
+            throw OpenEnumAPIClient.UsersUserProfile.Failure.badRequest(payload)
         default:
             throw OpenEnumAPIClient.UsersUserProfile.Failure.unexpectedStatus(statusCode, data)
         }
@@ -4170,6 +4299,9 @@ public struct OpenEnumAPIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersDeleteUser.Failure.self)
             throw OpenEnumAPIClient.UsersDeleteUser.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersDeleteUser.Failure.self)
+            throw OpenEnumAPIClient.UsersDeleteUser.Failure.badRequest(payload)
         default:
             throw OpenEnumAPIClient.UsersDeleteUser.Failure.unexpectedStatus(statusCode, data)
         }
@@ -4191,6 +4323,9 @@ public struct OpenEnumAPIUsersClient: Sendable {
         case 201:
             let payload = try Kizuna.decode(OpenEnumAPIClient.UsersArchiveUser.Response201.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersArchiveUser.Failure.self)
             return OpenEnumAPIClient.UsersArchiveUser.Result(body: .status201(payload))
+        case 400:
+            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersArchiveUser.Failure.self)
+            throw OpenEnumAPIClient.UsersArchiveUser.Failure.badRequest(payload)
         default:
             throw OpenEnumAPIClient.UsersArchiveUser.Failure.unexpectedStatus(statusCode, data)
         }
@@ -4275,6 +4410,9 @@ public struct OpenEnumAPIUsersClient: Sendable {
         case 404:
             let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersCheckUser.Failure.self)
             throw OpenEnumAPIClient.UsersCheckUser.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersCheckUser.Failure.self)
+            throw OpenEnumAPIClient.UsersCheckUser.Failure.badRequest(payload)
         default:
             throw OpenEnumAPIClient.UsersCheckUser.Failure.unexpectedStatus(statusCode, data)
         }
@@ -5097,6 +5235,14 @@ private enum Kizuna {
     static func queryItems<Value>(name: String, value: Value?) -> [URLQueryItem] {
         guard let value else { return [] }
         return stringifyQueryValue(value).map { URLQueryItem(name: name, value: $0) }
+    }
+
+    static func jsonQueryItems<Value: Encodable, Failure: KizunaFailure>(name: String, value: Value?, failure: Failure.Type) throws(Failure) -> [URLQueryItem] {
+        guard let value else { return [] }
+        let encoder = makeJSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        do { return [URLQueryItem(name: name, value: String(decoding: try encoder.encode(value), as: UTF8.self))] }
+        catch { throw Failure.requestFailed(error) }
     }
 
     static func setHeader<Value>(_ request: inout URLRequest, name: String, value: Value?) {

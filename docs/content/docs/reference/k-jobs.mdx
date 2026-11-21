@@ -36,7 +36,7 @@ export const jobs = k.jobs('scheduler', {
 
 Jobs nest to any depth. Because a job carries its own identity, it declares no `auth` of its own.
 
-Omit the identity argument only for jobs that run in process, with `jobRunner: { mode: 'in-process' }`. Otherwise `/jobs/run` would let anyone trigger them, so `defineConfig` throws.
+Omit the identity argument only for jobs on a long-running server, with `jobRunner: { mode: 'long-running' }`. Otherwise `/jobs/run` would let anyone trigger them, so `defineConfig` throws.
 
 ```ts title="jobs.ts"
 export const jobs = k.jobs({
@@ -104,7 +104,7 @@ await jobs.indexUser.queue({
 });
 ```
 
-Input is validated against the job's `input` schema either way. Where a queued job goes is the [transport's](/docs/extend/create-job-transport) business; with none configured it runs in this process.
+Input is validated against the job's `input` schema either way. Where a queued job goes is the [transport's](/docs/extend/create-job-transport) business; with `transport: false` it runs in this process.
 
 ## Validation
 

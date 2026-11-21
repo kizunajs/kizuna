@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { Kizuna, type ApiDefinition } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import { definePlugin, route } from 'kizunajs/plugin';
+import { FileSchema } from 'kizunajs/schemas';
 import { generateSwiftClient } from './generator.js';
 import { swiftClient } from './client-target.js';
 
@@ -1497,7 +1498,7 @@ describe('Swift generator: automatic validation error', () => {
         expect(output).toContain('struct ValidationIssue');
     });
 
-    it('does not add validation case for route without body or query', () => {
+    it('does not add validation case for a route that validates nothing', () => {
         const contractRoutes = k.routes({
             getUser: k.route({
                 method: 'GET',
@@ -2128,6 +2129,94 @@ describe('Swift generator: unknownEnumCase', () => {
         expect(output).toContain('case _unknown(String)');
         expect(output).toContain('default: self = ._unknown(rawValue)');
     });
+
+    const activityContract = (): ApiDefinition => {
+        const Activity = Kizuna.model({
+            title: 'Activity',
+            schema: z.discriminatedUnion('kind', [
+                z.object({
+                    kind: z.literal('taskCreated'),
+                    id: z.string(),
+                    title: z.string(),
+                }),
+                z.object({
+                    kind: z.literal('commentAdded'),
+                    id: z.string(),
+                    body: z.string(),
+                }),
+            ]),
+        });
+        const contractRoutes = k.routes({
+            listActivity: k.route({
+                method: 'GET',
+                path: '/activity',
+                responses: {
+                    200: z.array(Activity),
+                },
+            }),
+        });
+        return defineConfig({
+            ...config,
+            routes: [contractRoutes],
+        }).api;
+    };
+
+    it('throws on an unknown union variant by default', () => {
+        const output = generateSwiftClient(activityContract(), baseConfig);
+        expect(output).not.toMatch(/case unknown\(String\)/);
+        expect(output).toContain('Unknown discriminator');
+        expect(output).toContain('public var id: String {');
+    });
+
+    it('decodes an unknown union variant as unknown(String) when enabled, and refuses to encode it', () => {
+        const output = generateSwiftClient(activityContract(), tolerantConfig);
+        expect(output).toContain('case unknown(String)');
+        expect(output).toContain('    self = .unknown(kind)');
+        expect(output).not.toContain('Unknown discriminator');
+        expect(output).toContain('case .unknown(let kind):');
+        expect(output).toContain('throw EncodingError.invalidValue');
+    });
+
+    it('reads the discriminator of an unknown variant, and other shared fields as optional', () => {
+        const output = generateSwiftClient(activityContract(), tolerantConfig);
+        expect(output).toContain('public var kind: String {');
+        expect(output).toContain('case .unknown(let value): return value');
+        expect(output).toContain('public var id: String? {');
+        expect(output).toContain('case .unknown: return nil');
+    });
+
+    it('gives an extensible model the unknown case without the flag, and leaves the rest strict', () => {
+        const OrderStatus = Kizuna.model({
+            title: 'OrderStatus',
+            schema: z.enum(['open', 'shipped']),
+            extensible: true,
+        });
+        const Priority = Kizuna.model({
+            title: 'Priority',
+            schema: z.enum(['low', 'high']),
+        });
+        const contractRoutes = k.routes({
+            getOrder: k.route({
+                method: 'GET',
+                path: '/orders/:id',
+                responses: {
+                    200: z.object({
+                        status: OrderStatus,
+                        priority: Priority,
+                    }),
+                },
+            }),
+        });
+        const output = generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: [contractRoutes],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('public enum OrderStatus: RawRepresentable, Codable, Sendable, Hashable');
+        expect(output).toContain('public enum Priority: String, Codable, Sendable');
+    });
 });
 
 describe('Swift generator: union variants nest under their union', () => {
@@ -2485,7 +2574,7 @@ describe('Swift generator: hidden routes and plugin routes', () => {
         const output = generateSwiftClient(hiddenFixtureContract(), baseConfig);
         expect(output).toContain('listUsers');
         expect(output).not.toContain('healthCheck');
-        expect(output).not.toContain('ping');
+        expect(output).not.toMatch(/\bping\b/);
         expect(output).not.toContain('internalProbe');
     });
 });
@@ -2642,7 +2731,7 @@ describe('Swift generator: dotted model names', () => {
 
     it('nests a dotted model in a caseless enum per segment', () => {
         expect(output).toContain(
-            'public enum TestAPI {\n\n    public enum Shipping {\n\n        public struct Parcel: Codable, Sendable, Equatable {'
+            'public enum TestAPI {\n\n    public enum Shipping {\n\n        public struct Parcel: Codable, Sendable, Equatable, Identifiable {'
         );
         expect(output).toContain('        public enum ParcelStatus: String, Codable, Sendable {');
         expect(output).toContain('        public enum Tracking {\n\n            public struct Checkpoint: Codable, Sendable, Equatable {');
@@ -2805,5 +2894,330 @@ describe('Swift generator: fractional keys', () => {
 
     it('emits none for an API without one', () => {
         expect(generateSwiftClient(contractWith(z.string()), baseConfig)).not.toContain('FractionalKey');
+    });
+});
+
+describe('Swift generator: a model that holds itself', () => {
+    const EventFilterSchema = Kizuna.model({
+        title: 'EventFilter',
+        schema: z.object({
+            city: z.string().optional(),
+            get or() {
+                return z.array(EventFilterSchema).optional();
+            },
+        }),
+    });
+
+    const output = generateSwiftClient(
+        defineConfig({
+            ...config,
+            routes: [
+                k.routes({
+                    searchEvents: k.route({
+                        method: 'POST',
+                        path: '/events/search',
+                        summary: 'Search events',
+                        tool: true,
+                        body: EventFilterSchema,
+                        responses: {
+                            200: z.array(EventFilterSchema),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+
+    it('writes a struct that holds a list of itself', () => {
+        expect(output).toContain('public struct EventFilter: Codable, Sendable, Equatable');
+        expect(output).toContain('public let or: [EventFilter]?');
+    });
+});
+
+describe('Swift generator: enum values that differ only in punctuation', () => {
+    const contractFor = (values: [string, ...string[]]) =>
+        defineConfig({
+            ...config,
+            routes: [
+                k.routes({
+                    listTasks: k.route({
+                        method: 'GET',
+                        path: '/tasks',
+                        query: z.object({
+                            sort: z.array(z.enum(values)).optional(),
+                        }),
+                        responses: {
+                            200: z.array(z.string()),
+                        },
+                    }),
+                }),
+            ],
+        }).api;
+
+    it('puts `_` in front of a value whose name is already taken', () => {
+        const output = generateSwiftClient(contractFor(['name', '-name', 'createdAt', '-createdAt']), baseConfig);
+        expect(output).toContain('case name = "name"');
+        expect(output).toContain('case _name = "-name"');
+        expect(output).toContain('case createdAt = "createdAt"');
+        expect(output).toContain('case _createdAt = "-createdAt"');
+    });
+
+    it('does the same for an enum with an unknown case', () => {
+        const output = generateSwiftClient(contractFor(['name', '-name']), {
+            ...baseConfig,
+            unknownEnumCase: true,
+        });
+        expect(output).toContain('case "-name": self = ._name');
+        expect(output).toContain('case ._name: return "-name"');
+    });
+
+    it('keeps the usual name for a value that clashes with nothing', () => {
+        const output = generateSwiftClient(contractFor(['-name', 'createdAt']), baseConfig);
+        expect(output).toContain('case name = "-name"');
+    });
+});
+
+describe('Swift generator: an object in a query', () => {
+    const output = generateSwiftClient(
+        defineConfig({
+            ...config,
+            routes: [
+                k.routes({
+                    listEvents: k.route({
+                        method: 'GET',
+                        path: '/events',
+                        query: z.object({
+                            limit: z.int().optional(),
+                            filter: z
+                                .object({
+                                    city: z.string().optional(),
+                                })
+                                .optional(),
+                        }),
+                        responses: {
+                            200: z.array(z.string()),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+
+    it('sends the object as one JSON text, and a value as before', () => {
+        expect(output).toContain(
+            'queryItems += try Kizuna.jsonQueryItems(name: "filter", value: query.filter, failure: TestAPIClient.ListEvents.Failure.self)'
+        );
+        expect(output).toContain('queryItems += Kizuna.queryItems(name: "limit", value: query.limit)');
+    });
+
+    it('encodes it with its keys sorted', () => {
+        expect(output).toContain('encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]');
+    });
+});
+
+describe('Swift generator: a model whose fields are all optional', () => {
+    const TextFilterSchema = Kizuna.model({
+        title: 'TextFilter',
+        schema: z.object({
+            equals: z.string().optional(),
+            contains: z.string().optional(),
+        }),
+    });
+    const EventWhereSchema = Kizuna.model({
+        title: 'EventWhere',
+        schema: z.object({
+            city: TextFilterSchema.optional(),
+            get or() {
+                return z.array(EventWhereSchema).optional();
+            },
+        }),
+    });
+    const EventSchema = Kizuna.model({
+        title: 'Event',
+        schema: z.object({
+            id: z.string(),
+            city: z.string().optional(),
+        }),
+    });
+    const output = generateSwiftClient(
+        defineConfig({
+            ...config,
+            routes: [
+                k.routes({
+                    listEvents: k.route({
+                        method: 'GET',
+                        path: '/events',
+                        query: z.object({
+                            where: EventWhereSchema.optional(),
+                        }),
+                        responses: {
+                            200: z.array(EventSchema),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+
+    it('gets one factory per field so a leading dot reaches it', () => {
+        expect(output).toContain('public static func city(_ city: TextFilter) -> Self');
+        expect(output).toContain('.init(city: city)');
+        expect(output).toContain('public static func or(_ or: [EventWhere]) -> Self');
+        expect(output).toContain('public static func contains(_ contains: String) -> Self');
+    });
+
+    it('leaves a model with a required field to its init', () => {
+        expect(output).not.toContain('public static func id(');
+    });
+});
+
+describe('Swift generator: the automatic 400 for each validated part', () => {
+    const outputFor = (definition: Record<string, unknown>) =>
+        generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: [
+                    k.routes({
+                        getForecast: k.route({
+                            method: 'GET',
+                            path: '/weather/:station',
+                            responses: {
+                                200: z.object({
+                                    summary: z.string(),
+                                }),
+                            },
+                            ...definition,
+                        } as never),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+
+    it('lists it for a route that validates only its path parameters', () => {
+        const output = outputFor({
+            pathParams: z.object({
+                station: z.enum(['bergen', 'oslo']),
+            }),
+        });
+        expect(output).toContain('case badRequest(TestAPIClient.ValidationError)');
+    });
+
+    it('lists it for a route that validates only its headers', () => {
+        const output = outputFor({
+            headers: z.object({
+                'x-request-id': z.string(),
+            }),
+        });
+        expect(output).toContain('case badRequest(TestAPIClient.ValidationError)');
+    });
+});
+
+describe('Swift generator: a model with an id is Identifiable', () => {
+    const UserId = Kizuna.brand('UserId', z.string());
+    const outputFor = (fields: Record<string, z.ZodType>) =>
+        generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: [
+                    k.routes({
+                        getTask: k.route({
+                            method: 'GET',
+                            path: '/task',
+                            responses: {
+                                200: Kizuna.model({
+                                    title: 'Task',
+                                    schema: z.object({
+                                        title: z.string(),
+                                        ...fields,
+                                    }),
+                                }),
+                            },
+                        }),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+
+    it('conforms when the id is a string', () => {
+        const output = outputFor({
+            id: z.string(),
+        });
+        expect(output).toContain('public struct Task: Codable, Sendable, Equatable, Identifiable');
+    });
+
+    it('conforms when the id is an integer or a brand', () => {
+        expect(
+            outputFor({
+                id: z.int(),
+            })
+        ).toContain('public struct Task: Codable, Sendable, Equatable, Identifiable');
+        const branded = outputFor({
+            id: UserId,
+        });
+        expect(branded).toContain('public struct Task: Codable, Sendable, Equatable, Identifiable');
+        expect(branded).toContain('public let id: UserId');
+    });
+
+    it('leaves an optional or nullable id alone, since Identifiable needs one every time', () => {
+        expect(
+            outputFor({
+                id: z.string().optional(),
+            })
+        ).toContain('public struct Task: Codable, Sendable, Equatable {');
+        expect(
+            outputFor({
+                id: z.string().nullable(),
+            })
+        ).toContain('public struct Task: Codable, Sendable, Equatable {');
+    });
+
+    it('leaves a model without an id unchanged', () => {
+        expect(outputFor({})).toContain('public struct Task: Codable, Sendable, Equatable {');
+    });
+
+    it('conforms through the computed property of a deprecated id', () => {
+        const output = outputFor({
+            id: z.string().meta({
+                deprecated: true,
+            }),
+        });
+        expect(output).toContain('public struct Task: Codable, Sendable, Equatable, Identifiable');
+        expect(output).toContain('public var id: String {');
+    });
+});
+
+describe('Swift generator: a model with an id and a file', () => {
+    it('conforms to Identifiable beside Sendable and Equatable', () => {
+        const output = generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: [
+                    k.routes({
+                        uploadAttachment: k.route({
+                            method: 'POST',
+                            path: '/attachments',
+                            contentType: 'multipart/form-data',
+                            body: Kizuna.model({
+                                title: 'Attachment',
+                                schema: z.object({
+                                    id: z.string(),
+                                    file: FileSchema,
+                                }),
+                            }),
+                            responses: {
+                                204: z.void(),
+                            },
+                        }),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('public struct Attachment: Sendable, Equatable, Identifiable');
     });
 });

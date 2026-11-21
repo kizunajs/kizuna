@@ -11,9 +11,10 @@ import { flattenRoutes, type RoutesWithHandlerContext } from './handler-pipeline
 import { assertJobRunner, flattenJobs, jobClaims, withContentJobs, type Jobs, type JobsArg, type JobRunnerConfig } from './jobs.js';
 import type { GroupOptions, GroupSet } from './groups.js';
 import type { AssembledRoutes } from './group-routes.js';
-import { assembleRoutes } from './routes.js';
+import { assembleRoutes, assertNoContentResponses } from './routes.js';
 import { problemDetails, type GuardBody, type GuardOutput, type GuardSchemaCheck } from './problem-details.js';
 import { readObjectShape } from './zod-internals.js';
+import { streamToolsOf } from './tool-events.js';
 import type { Routes, RouteDefinition, RouteAuth, SecurityRequirement, RequiredPermissions } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
@@ -22,7 +23,8 @@ import { permissionNames } from './permissions.js';
 import { GUARD } from './identity-builder.js';
 import { RESOLVER } from './request-context-builder.js';
 import { buildApi, type Api } from './api.js';
-import type { DiffSettings, GeneratedFile } from './config.js';
+import type { ConfigTypes, DiffSettings, GeneratedFile } from './config.js';
+import { assertConfigExtensions } from './config-extension.js';
 import {
     CONTENT_JOBS_KEY,
     CONTENT_META_KEY,
@@ -272,16 +274,14 @@ export type KizunaConfigInput<
         issueCodes?: readonly Codes[];
     };
     /**
-     * What `kizuna generate` writes the `Config` to.
+     * Where `kizuna generate` writes the `Config` and what else it holds.
      *
      * @example
      * typescript: {
      *     outputFile: './kizuna.types.ts',
      * },
      */
-    typescript?: {
-        outputFile?: string;
-    };
+    typescript?: ConfigTypes;
     /**
      * What `kizuna generate` writes from this API: one entry per generated
      * client.
@@ -319,9 +319,9 @@ type JobRunnerInput<J extends Jobs, ProviderJobs extends Jobs> = [DeclaresJobs<J
       }
     : {
           /**
-           * How this deployment runs the jobs it declares: over HTTP or in
-           * process, what carries queued work out of the process, and where a
-           * failure is reported. The jobs themselves are declared with
+           * How this deployment runs the jobs it declares: over HTTP or from a
+           * long-running server, what carries queued work out of the process,
+           * and where a failure is reported. The jobs themselves are declared with
            * `k.jobs` and go under `jobs`.
            */
           jobRunner: JobRunnerConfig;
@@ -400,11 +400,12 @@ export const defineConfig = <
     content: ContentReaderOf<ContentValue>;
     clients: readonly GeneratedFile[];
     generators: readonly GeneratedFile[];
-    typescript: { outputFile?: string } | undefined;
+    typescript: ConfigTypes | undefined;
     diff: DiffSettings | undefined;
 } => {
     const guardSchema = options.auth?.guardSchema;
     if (guardSchema) assertFillableGuardSchema(guardSchema);
+    assertConfigExtensions(options.typescript?.extend);
 
     const content = options.content;
     if (content !== undefined && !isContentProvider(content)) {
@@ -445,6 +446,7 @@ export const defineConfig = <
                 `Route '${routeKey}' is \`hidden\` and declares \`tool\`. A hidden route never publishes, so remove one of them.`
             );
         }
+        assertNoContentResponses(route, routeKey);
         if (route.rawBody === true && route.contentType === 'multipart/form-data') {
             throw new Error(
                 `Route '${routeKey}' declares \`rawBody\` on a \`multipart/form-data\` body. A multipart body is read as a stream of parts, so kizuna cannot keep it as text. Remove \`rawBody\`, or take the body as JSON.`
@@ -472,6 +474,18 @@ export const defineConfig = <
             continue;
         }
         resolveRouteAuth(route, route.auth, identities, routeKey);
+    }
+    // A tool's guard is the one its own `auth` resolves to, which only happens for a route `routes` lists.
+    const listed = new Set(flattenRoutes(routes).map(({ route }) => route));
+    for (const { route, routeKey } of [...flattenRoutes(routes), ...flattenRoutes(pluginRoutes)]) {
+        for (const response of Object.values(route.responses)) {
+            for (const { route: tool, routeKey: toolKey } of flattenRoutes(streamToolsOf(response) ?? {})) {
+                if (listed.has(tool)) continue;
+                throw new Error(
+                    `Route '${routeKey}' streams the tool '${toolKey}', which \`routes\` does not list. A tool is a route, so add its routes to \`routes\`.`
+                );
+            }
+        }
     }
     // After every route's `auth` resolves, so both of these can read `security`.
     injectGuardResponses(routes, identities, guardSchema);
@@ -505,7 +519,7 @@ export const defineConfig = <
         {
             guards,
             requestContext: handlersOf(options.requestContext as Record<string, unknown> | undefined, RESOLVER),
-            jobTransport: options.jobRunner?.transport,
+            jobTransport: options.jobRunner?.transport || undefined,
             onJobError: options.jobRunner?.onError,
         },
         options.adapter

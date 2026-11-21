@@ -113,6 +113,14 @@ const user = k.identity
                     detail: 'Invalid or expired token',
                 },
             });
+        if (session.revoked) {
+            deny({
+                status: 401,
+                body: {
+                    detail: 'Token revoked',
+                },
+            });
+        }
         const tokenScopes = session.scope.split(' ');
         return {
             userId: session.userId,
@@ -273,7 +281,7 @@ const contract = defineConfig({
     ],
 }).api;
 
-const TOKENS: Record<string, { userId: string; role: 'employee' | 'admin'; scope: string }> = {
+const TOKENS: Record<string, { userId: string; role: 'employee' | 'admin'; scope: string; revoked?: boolean }> = {
     reader: {
         userId: 'u-reader',
         role: 'employee',
@@ -288,6 +296,12 @@ const TOKENS: Record<string, { userId: string; role: 'employee' | 'admin'; scope
         userId: 'u-admin',
         role: 'admin',
         scope: 'openid users:read users:write report:read',
+    },
+    revoked: {
+        userId: 'u-revoked',
+        role: 'admin',
+        scope: 'openid users:read users:write report:read',
+        revoked: true,
     },
 };
 
@@ -397,6 +411,21 @@ describe('mcpPlugin: oauth', () => {
         expect(response.headers.get('www-authenticate')).toContain('error="invalid_token"');
     });
 
+    it('answers a token whose guard calls deny and still returns a context with 401', async () => {
+        const port = await start();
+        const response = await jsonRpc(
+            port,
+            'revoked',
+            toolCall('api_get_user', {
+                params: {
+                    id: '42',
+                },
+            })
+        );
+        expect(response.status).toBe(401);
+        expect(response.headers.get('www-authenticate')).toContain('error="invalid_token"');
+    });
+
     it('runs tools with a valid token, guard once per request, context in the handler', async () => {
         let guardRuns = 0;
         const port = await start(() => {
@@ -466,6 +495,36 @@ describe('mcpPlugin: oauth', () => {
         expect(challenge).toContain('error="insufficient_scope"');
         expect(challenge).toContain('scope="users:write"');
         expect(challenge).toContain('resource_metadata="https://api.example.com/.well-known/oauth-protected-resource/mcp"');
+    });
+
+    it('answers a scope shortfall inside a batch with 403', async () => {
+        const port = await start();
+        const response = await jsonRpc(port, 'reader', [
+            toolCall('api_create_user', {
+                body: {
+                    name: 'Ada',
+                },
+            }),
+        ]);
+        expect(response.status).toBe(403);
+        expect(response.headers.get('www-authenticate')).toContain('error="insufficient_scope"');
+    });
+
+    it('refuses a batch with more than one tool call with 400', async () => {
+        const port = await start();
+        const response = await jsonRpc(port, 'admin', [
+            toolCall('api_get_user', {
+                params: {
+                    id: '1',
+                },
+            }),
+            toolCall('api_get_user', {
+                params: {
+                    id: '2',
+                },
+            }),
+        ]);
+        expect(response.status).toBe(400);
     });
 
     it('runs a tool the token has the scopes for', async () => {

@@ -102,18 +102,14 @@ export const termsFor = (
     return [
         ...group
             .filter((term) => holdsIn(term, language) && !term.forms.some((form) => replaced.has(lower(form))))
-            .map(
-                (term): VoiceTerm => ({
-                    ...term,
-                    from: 'group',
-                })
-            ),
-        ...own.map(
-            (term): VoiceTerm => ({
+            .map((term): VoiceTerm => ({
                 ...term,
-                from: 'site',
-            })
-        ),
+                from: 'group',
+            })),
+        ...own.map((term): VoiceTerm => ({
+            ...term,
+            from: 'site',
+        })),
     ];
 };
 

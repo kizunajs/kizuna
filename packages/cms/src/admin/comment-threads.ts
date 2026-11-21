@@ -15,12 +15,10 @@ export interface Thread {
 export const threadsOf = (comments: readonly CommentView[]): Thread[] => {
     const threads = comments
         .filter((comment) => comment.replyTo === null && comment.review === null)
-        .map(
-            (root): Thread => ({
-                root,
-                answers: [],
-            })
-        );
+        .map((root): Thread => ({
+            root,
+            answers: [],
+        }));
     for (const comment of comments) {
         if (comment.replyTo === null) continue;
         threads.find((thread) => thread.root.id === comment.replyTo)?.answers.push(comment);

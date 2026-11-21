@@ -115,12 +115,10 @@ const triggers: ContentTrigger[] = [
         job: jobs.syncPrice,
         when: (event) => event.changed.includes('price'),
     },
-    ...recorded.map(
-        (event): ContentTrigger => ({
-            event,
-            job: jobs.record,
-        })
-    ),
+    ...recorded.map((event): ContentTrigger => ({
+        event,
+        job: jobs.record,
+    })),
 ];
 
 const pglite = new PGlite();
@@ -130,7 +128,7 @@ const configWith = (on: readonly ContentTrigger[]) =>
     defineConfig({
         jobs,
         jobRunner: {
-            mode: 'in-process',
+            mode: 'long-running',
             transport,
         },
         adapter: expressAdapter(),

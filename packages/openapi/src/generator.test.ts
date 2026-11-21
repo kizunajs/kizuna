@@ -3,7 +3,7 @@ import { z } from 'zod';
 import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
 import { Kizuna, type ApiDefinition } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
-import { ProblemDetailsSchema } from 'kizunajs/schemas';
+import { ProblemDetailsSchema, ValidationErrorSchema } from 'kizunajs/schemas';
 import { definePlugin, route } from 'kizunajs/plugin';
 import { renderOpenApi } from './generator.js';
 import { openApiPlugin } from './plugin.js';
@@ -304,9 +304,10 @@ describe('Zod meta() in OpenAPI output', () => {
         );
         expect(spec.components?.schemas?.RawTagged).toBeUndefined();
         const responseSchema = spec.paths['/raw']?.get?.responses['200']?.content?.['application/json']?.schema;
-        expect(responseSchema).not.toEqual({
-            $ref: '#/components/schemas/RawTagged',
+        expect(responseSchema).toMatchObject({
+            type: 'object',
         });
+        expect(responseSchema).not.toHaveProperty('$ref');
     });
 
     it('keeps a described model field as a $ref with its own description', () => {
@@ -335,8 +336,7 @@ describe('Zod meta() in OpenAPI output', () => {
         );
         const operation = spec.paths['/articles/{id}']?.patch;
         const bodySchema = operation?.requestBody?.content?.['application/json']?.schema as
-            | { properties: Record<string, unknown> }
-            | undefined;
+            { properties: Record<string, unknown> } | undefined;
         expect(bodySchema?.properties['status']).toEqual({
             description: 'Set by the editor',
             $ref: '#/components/schemas/ArticleStatus',
@@ -821,8 +821,7 @@ describe('transform field handling', () => {
         }).api;
         const spec = generateJson(contract, baseConfig);
         const properties = spec.paths['/users']?.post?.requestBody?.content?.['application/json']?.schema?.properties as
-            | Record<string, unknown>
-            | undefined;
+            Record<string, unknown> | undefined;
         expect(properties?.['name']).toEqual({
             type: 'string',
         });
@@ -859,8 +858,7 @@ describe('transform field handling', () => {
         }).api;
         const spec = generateJson(contract, baseConfig);
         const schema = spec.paths['/items']?.get?.parameters?.find((parameter) => parameter.name === 'ids')?.schema as
-            | Record<string, unknown>
-            | undefined;
+            Record<string, unknown> | undefined;
         const branches = schema?.anyOf as Array<Record<string, unknown>> | undefined;
         expect(branches?.[1]).toMatchObject({
             type: 'string',
@@ -960,7 +958,7 @@ describe('complex transform edge cases', () => {
         const bodyProps = createBody?.properties as Record<string, unknown>;
 
         expect(bodyProps?.['username']).toEqual({ type: 'string' });
-        expect((bodyProps?.['bio'] as Record<string, unknown>)?.['anyOf']).toMatchObject([{ type: 'string' }, { type: 'null' }]);
+        expect(bodyProps?.['bio']).toEqual({ type: ['string', 'null'] });
         expect(bodyProps?.['tags']).toMatchObject({ type: 'array', items: { type: 'string' } });
         expect((bodyProps?.['metadata'] as Record<string, unknown>)?.['additionalProperties']).toEqual({ type: 'string' });
         expect((bodyProps?.['coords'] as Record<string, unknown>)?.['prefixItems']).toMatchObject([
@@ -973,9 +971,8 @@ describe('complex transform edge cases', () => {
         expect(addressProps?.['street']).toEqual({ type: 'string' });
         expect(addressProps?.['zip']).toEqual({ type: 'string' });
 
-        const extraAllOf = (bodyProps?.['extra'] as Record<string, unknown>)?.['allOf'] as Array<Record<string, unknown>>;
-        const extraSecondProps = extraAllOf?.[1]?.['properties'] as Record<string, unknown>;
-        expect(extraSecondProps?.['label']).toEqual({ type: 'string' });
+        const extraProps = (bodyProps?.['extra'] as Record<string, unknown>)?.['properties'] as Record<string, unknown>;
+        expect(extraProps?.['label']).toEqual({ type: 'string' });
     });
 });
 
@@ -1331,10 +1328,16 @@ describe('automatic validation error response', () => {
         const response = spec.paths['/users']?.post?.responses?.['400'];
         expect(response).toBeDefined();
         expect(response?.description).toBe('Bad Request');
-        const schema = response?.content?.['application/problem+json']?.schema as Record<string, unknown> | undefined;
-        expect(schema?.required).toContain('detail');
-        expect(schema?.required).toContain('errors');
-        const properties = schema?.properties as Record<string, Record<string, unknown>> | undefined;
+        expect(response?.content?.['application/problem+json']?.schema).toEqual({
+            $ref: '#/components/schemas/ValidationError',
+        });
+    });
+
+    it('writes the validation error once, as a component every route refers to', () => {
+        const component = spec.components?.schemas?.ValidationError as Record<string, unknown> | undefined;
+        expect(component?.required).toContain('detail');
+        expect(component?.required).toContain('errors');
+        const properties = component?.properties as Record<string, Record<string, unknown>> | undefined;
         expect(properties?.errors?.type).toBe('array');
     });
 
@@ -1344,9 +1347,48 @@ describe('automatic validation error response', () => {
         expect(response?.description).toBe('Bad Request');
     });
 
-    it('does not add 400 to routes without body or query', () => {
+    it('does not add 400 to a route that validates nothing', () => {
         const response = spec.paths['/users/{id}']?.get?.responses?.['400'];
         expect(response).toBeUndefined();
+    });
+
+    it('adds 400 to a route that validates only its path parameters or headers', () => {
+        const forecast = generateJson(
+            defineConfig({
+                ...config,
+                routes: [
+                    k.routes({
+                        getForecast: k.route({
+                            method: 'GET',
+                            path: '/weather/:station',
+                            pathParams: z.object({
+                                station: z.enum(['bergen', 'oslo']),
+                            }),
+                            responses: {
+                                200: z.object({
+                                    summary: z.string(),
+                                }),
+                            },
+                        }),
+                        getStatus: k.route({
+                            method: 'GET',
+                            path: '/status',
+                            headers: z.object({
+                                'x-request-id': z.string(),
+                            }),
+                            responses: {
+                                200: z.object({
+                                    ok: z.boolean(),
+                                }),
+                            },
+                        }),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(forecast.paths['/weather/{station}']?.get?.responses?.['400']).toBeDefined();
+        expect(forecast.paths['/status']?.get?.responses?.['400']).toBeDefined();
     });
 
     it('merges with a user-declared 400 using oneOf', () => {
@@ -1371,7 +1413,38 @@ describe('automatic validation error response', () => {
         const schema = response?.content?.['application/problem+json']?.schema as Record<string, unknown> | undefined;
         const oneOf = schema?.oneOf as Array<Record<string, unknown>> | undefined;
         expect(oneOf).toHaveLength(2);
-        expect(oneOf?.[1]?.required).toContain('errors');
+        expect(oneOf?.[1]).toEqual({
+            $ref: '#/components/schemas/ValidationError',
+        });
+    });
+
+    it('refers to the validation error once when the route declares it itself', () => {
+        const spec = generateJson(
+            defineConfig({
+                ...config,
+                routes: [
+                    k.routes({
+                        createItem: k.route({
+                            method: 'POST',
+                            path: '/items',
+                            body: z.object({
+                                name: z.string(),
+                            }),
+                            responses: {
+                                201: z.object({
+                                    id: z.string(),
+                                }),
+                                400: ValidationErrorSchema,
+                            },
+                        }),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(spec.paths['/items']?.post?.responses?.['400']?.content?.['application/problem+json']?.schema).toEqual({
+            $ref: '#/components/schemas/ValidationError',
+        });
     });
 });
 
@@ -1446,8 +1519,7 @@ describe('deprecation from metadata', () => {
 
     it('marks a deprecated inline response field and leaves its siblings unmarked', () => {
         const responseSchema = spec.paths['/inline']?.get?.responses['200']?.content?.['application/json']?.schema as
-            | Record<string, Record<string, Record<string, unknown>>>
-            | undefined;
+            Record<string, Record<string, Record<string, unknown>>> | undefined;
         expect(responseSchema?.properties?.['name']?.deprecated).toBe(true);
         expect(responseSchema?.properties?.['fullName']?.deprecated).toBeUndefined();
     });
@@ -1510,8 +1582,7 @@ describe('examples from metadata', () => {
 
     it('emits an example array as multiple JSON Schema examples', () => {
         const bodySchema = spec.paths['/events']?.post?.requestBody?.content?.['application/json']?.schema as
-            | Record<string, Record<string, Record<string, unknown>>>
-            | undefined;
+            Record<string, Record<string, Record<string, unknown>>> | undefined;
         expect(bodySchema?.properties?.['name']?.examples).toEqual(['Launch party', 'Board meeting']);
     });
 
@@ -1552,10 +1623,37 @@ describe('brands from metadata', () => {
         expect(parameter.schema?.['brand']).toBeUndefined();
     });
 
+    it('marks an extensible model with an x-kizuna-extensible extension', () => {
+        const extensibleRoutes = k.routes({
+            getOrder: k.route({
+                method: 'GET',
+                path: '/orders/:id',
+                responses: {
+                    200: z.object({
+                        status: Kizuna.model({
+                            title: 'OrderStatus',
+                            schema: z.enum(['open', 'shipped']),
+                            extensible: true,
+                        }),
+                    }),
+                },
+            }),
+        });
+        const extensibleSpec = generateJson(
+            defineConfig({
+                ...config,
+                routes: [extensibleRoutes],
+            }).api,
+            baseConfig
+        );
+        const status = extensibleSpec.components?.schemas?.['OrderStatus'] as Record<string, unknown> | undefined;
+        expect(status?.['x-kizuna-extensible']).toBe(true);
+        expect(status?.['extensible']).toBeUndefined();
+    });
+
     it('emits the brand on a response field', () => {
         const body = operation?.responses?.['200']?.content?.['application/json']?.schema as
-            | Record<string, Record<string, Record<string, unknown>>>
-            | undefined;
+            Record<string, Record<string, Record<string, unknown>>> | undefined;
         expect(body?.properties?.['id']?.['x-kizuna-brand']).toBe('CenterId');
     });
 
@@ -1867,8 +1965,7 @@ describe('error response media type (RFC 9457)', () => {
             baseConfig
         );
         const errorSchema = deprecatedSpec.paths['/users/{id}']?.get?.responses?.['404']?.content?.['application/problem+json']?.schema as
-            | Record<string, Record<string, Record<string, unknown>>>
-            | undefined;
+            Record<string, Record<string, Record<string, unknown>>> | undefined;
         expect(errorSchema?.properties?.['detail']?.deprecated).toBe(true);
     });
 });
@@ -1937,8 +2034,7 @@ describe('binary response bodies', () => {
 
     it('emits type: string, format: binary under the declared media type', () => {
         const schema = spec.paths['/badge']?.get?.responses?.['200']?.content?.['application/pdf']?.schema as
-            | Record<string, unknown>
-            | undefined;
+            Record<string, unknown> | undefined;
         expect(schema).toEqual({ type: 'string', format: 'binary' });
     });
 });
@@ -2975,5 +3071,110 @@ describe('renderOpenApi: groups', () => {
                 groups: ['contents'],
             })
         ).toThrow("No route's key starts with 'contents'.");
+    });
+});
+
+describe('a model that holds itself', () => {
+    const EventFilterSchema = Kizuna.model({
+        title: 'EventFilter',
+        schema: z.object({
+            city: z.string().optional(),
+            get or() {
+                return z.array(EventFilterSchema).optional();
+            },
+        }),
+    });
+
+    const spec = generateJson(
+        defineConfig({
+            ...config,
+            routes: [
+                k.routes({
+                    searchEvents: k.route({
+                        method: 'POST',
+                        path: '/events/search',
+                        summary: 'Search events',
+                        tool: true,
+                        body: EventFilterSchema,
+                        responses: {
+                            200: z.array(EventFilterSchema),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+
+    it('is a valid OpenAPI 3.1 document', async () => {
+        await expect(spec).toBeAValidOpenAPIDefinition();
+    });
+
+    it('refers to itself with $ref', () => {
+        const properties = (spec.components?.schemas?.EventFilter as { properties: Record<string, unknown> }).properties;
+        expect(properties['or']).toEqual({
+            type: 'array',
+            items: {
+                $ref: '#/components/schemas/EventFilter',
+            },
+        });
+    });
+});
+
+describe('an object in a query', () => {
+    const spec = generateJson(
+        defineConfig({
+            ...config,
+            routes: [
+                k.routes({
+                    listEvents: k.route({
+                        method: 'GET',
+                        path: '/events',
+                        query: z.object({
+                            limit: z.int().optional(),
+                            filter: z
+                                .object({
+                                    city: z.string().optional(),
+                                })
+                                .optional(),
+                        }),
+                        responses: {
+                            200: z.array(z.string()),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+    const parameters = spec.paths['/events']?.get?.parameters ?? [];
+
+    it('is a valid OpenAPI 3.1 document', async () => {
+        await expect(spec).toBeAValidOpenAPIDefinition();
+    });
+
+    it('writes the object as JSON text that carries its schema', () => {
+        const filter = parameters.find((parameter) => parameter.name === 'filter');
+        expect(filter?.schema).toMatchObject({
+            type: 'string',
+            contentMediaType: 'application/json',
+            contentSchema: {
+                type: 'object',
+                properties: {
+                    city: {
+                        type: 'string',
+                    },
+                },
+            },
+        });
+    });
+
+    it('writes a value as before', () => {
+        const limit = parameters.find((parameter) => parameter.name === 'limit');
+        expect(limit?.schema).toEqual({
+            type: 'integer',
+            minimum: -9007199254740991,
+            maximum: 9007199254740991,
+        });
     });
 });

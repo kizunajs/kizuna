@@ -150,6 +150,24 @@ pathParams: z.object({
 }),
 ```
 
+### Several parameters in one segment
+
+A segment can hold more than one parameter, with fixed text between them, as OpenAPI 3.2 allows:
+
+```ts
+path: '/files/:name.:ext',
+```
+
+The last parameter takes what follows the last separator, and the one before it takes the rest. Every adapter splits the same way:
+
+| Path                 | Request                 | `params`                           |
+| -------------------- | ----------------------- | ---------------------------------- |
+| `/files/:name.:ext`  | `/files/archive.tar.gz` | `name: 'archive.tar'`, `ext: 'gz'` |
+| `/flights/:from-:to` | `/flights/OSL-BGO`      | `from: 'OSL'`, `to: 'BGO'`         |
+| `/flights/:from-:to` | `/flights/OSL-`         | no match, `404`                    |
+
+A parameter is never empty, so a request that leaves one empty matches nothing.
+
 ### What each part can carry
 
 A route can only declare what its part of the request can send, and `k.routes` throws on anything else when the config loads:
@@ -157,13 +175,125 @@ A route can only declare what its part of the request can send, and `k.routes` t
 | Part                                        | Carries                                                       |
 | ------------------------------------------- | ------------------------------------------------------------- |
 | `pathParams`                                | a value: a string, number, boolean, enum, date or bigint      |
-| `query`                                     | a value, or a list of values                                  |
+| `query`                                     | values and lists of values, and anything else as JSON         |
 | `headers`                                   | a value                                                       |
 | a `multipart/form-data` body                | values, lists of values, and files declared with `FileSchema` |
 | an `application/x-www-form-urlencoded` body | values and lists of values                                    |
 | a JSON body                                 | anything JSON can hold                                        |
 
-An object in a query or a form can't be sent. Split it into fields of their own, or move it to a JSON body.
+An object in a form can't be sent. Split it into fields of its own or move it to a JSON body. A union counts as each of its options. `z.union([z.string(), z.number()])` is a value and a union holding an object is refused.
+
+### An object in a query
+
+A filter with more than one condition is an object in a query field. It travels as one JSON text:
+
+```ts
+export const listEvents = k
+    .route({
+        method: 'GET',
+        path: '/events',
+        query: z.object({
+            where: z
+                .object({
+                    city: z.string().optional(),
+                    after: z.iso.datetime().optional(),
+                })
+                .optional(),
+            limit: z.int().default(20),
+        }),
+        responses: {
+            200: z.array(EventSchema),
+        },
+    })
+    .handler(async ({ query }) => ({
+        status: 200,
+        body: await db.events.list(query.where, query.limit),
+    }));
+```
+
+The clients sort its keys. One filter then always gives one URL and one cache entry:
+
+```
+GET /events?where=%7B%22after%22%3A%222026-12-01T00%3A00%3A00Z%22%2C%22city%22%3A%22Bergen%22%7D&limit=20
+```
+
+A filter can nest as deep as it needs. A model that refers to itself takes `and` and `or`, and each field takes the operators the route supports:
+
+```ts
+const TextFilterSchema = Kizuna.model({
+    title: 'TextFilter',
+    schema: z.object({
+        equals: z.string().optional(),
+        contains: z.string().optional(),
+    }),
+});
+
+const EventWhereSchema = Kizuna.model({
+    title: 'EventWhere',
+    schema: z.object({
+        city: TextFilterSchema.optional(),
+        venue: TextFilterSchema.optional(),
+        get and() {
+            return z.array(EventWhereSchema).optional();
+        },
+        get or() {
+            return z.array(EventWhereSchema).optional();
+        },
+    }),
+});
+```
+
+```ts
+await client.events.listEvents({
+    query: {
+        where: {
+            or: [
+                {
+                    city: {
+                        equals: 'Bergen',
+                    },
+                },
+                {
+                    and: [
+                        {
+                            venue: {
+                                contains: 'Grieg',
+                            },
+                        },
+                        {
+                            city: {
+                                equals: 'Oslo',
+                            },
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+});
+```
+
+Give each field one shape. The Swift and Kotlin clients type a field that is a string or an object as an untyped JSON value.
+
+The server parses the JSON before validation. Inside it the rules of a JSON body apply and a value keeps its JSON type. Declare a date in it with `z.iso.datetime()`. Text that isn't JSON answers 400.
+
+The same goes for a list of objects, a record or a union holding an object. Any query field that isn't a value or a list of values travels as JSON.
+
+### A query too long for a URL
+
+Servers and proxies only promise to accept a URL of about 8,000 characters (RFC 9110). A longer query can travel as a POST to the same path, carrying `X-HTTP-Method-Override: GET` and the query string as a form body:
+
+```http
+POST /users
+X-HTTP-Method-Override: GET
+Content-Type: application/x-www-form-urlencoded
+
+ids=1&ids=2&limit=20
+```
+
+Kizuna answers it as the GET on that path, with the body read as its query, so the route's `query` schema checks it the same way. Only `GET` is honored, so a form on another site can never turn a POST into a write. A POST without the header still reaches the POST route on that path.
+
+A browser on another origin sends the header only after a CORS preflight, so add `X-HTTP-Method-Override` to the headers your CORS setup allows.
 
 ## Handler arguments
 
@@ -330,7 +460,7 @@ TypeScript enforces the status and body the same way it does for a return value.
 
 ## Validation errors
 
-When a request body or query fails schema validation, Kizuna returns a `400` before the handler runs:
+When the path parameters, the query, the headers or the body fail schema validation, Kizuna returns a `400` before the handler runs:
 
 ```json
 {
@@ -369,7 +499,7 @@ User-defined checks (`.refine()`) report as `custom` by default. To emit a **typ
 
 The `message` and `path` fields come from your Zod schemas, custom messages (`z.string().min(1, 'Name is required')`) included.
 
-This `400` is reflected in the [fetch client](/docs/clients/fetch#validation-errors) return type and the [OpenAPI spec](/docs/openapi) for any route that declares a `body` or `query` schema.
+This `400` is reflected in the [fetch client](/docs/clients/fetch#validation-errors) return type and the [OpenAPI spec](/docs/openapi) for any route that declares a `pathParams`, `query`, `headers` or `body` schema.
 
 If you declare your own `400` response, the client sees a union of both your type and Kizuna's `ValidationError`. Use [`isValidationError`](/docs/clients/fetch#isvalidationerror) on the client to distinguish them.
 
@@ -415,6 +545,8 @@ return {
     status: 204,
 };
 ```
+
+A `204`, `205` or `304` carries no content (RFC 9110), so `defineConfig` throws when one declares anything else.
 
 To type response headers, give the status a `{ body, headers }` object:
 

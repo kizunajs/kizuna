@@ -1201,7 +1201,23 @@ describe('MCP server: guards', () => {
         routes: [{ api: securedRoutes }],
     }).api;
 
-    const makeSecuredApi = () => {
+    type UserGuard = (args: { bearer: { token: string } | null; deny: GuardDeny }) => unknown;
+
+    const tokenGuard: UserGuard = ({ bearer, deny }) => {
+        if (bearer?.token !== 'tok_ada')
+            return deny({
+                status: 401,
+                body: {
+                    detail: 'Unauthorized',
+                },
+            });
+        return {
+            userId: '1',
+            role: 'member',
+        };
+    };
+
+    const makeSecuredApi = (userGuard: UserGuard = tokenGuard) => {
         return assembleApi(securedContract, {
             router: {
                 api: {
@@ -1226,19 +1242,7 @@ describe('MCP server: guards', () => {
                 },
             },
             guards: {
-                user: ({ bearer, deny }: { bearer: { token: string } | null; deny: GuardDeny }) => {
-                    if (bearer?.token !== 'tok_ada')
-                        return deny({
-                            status: 401,
-                            body: {
-                                detail: 'Unauthorized',
-                            },
-                        });
-                    return {
-                        userId: '1',
-                        role: 'member',
-                    };
-                },
+                user: userGuard,
             },
         }) as Parameters<typeof createMcpServer>[0];
     };
@@ -1280,6 +1284,37 @@ describe('MCP server: guards', () => {
         expect(result.isError).toBe(true);
         expect(parsed.status).toBe(401);
         expect(parsed.body.detail).toBe('Unauthorized');
+        await close();
+    });
+
+    it('denies a tool call whose guard calls deny and still returns a context', async () => {
+        const { client, close } = await connectMcpClient(
+            makeSecuredApi(({ deny }) => {
+                deny({
+                    status: 401,
+                    body: {
+                        detail: 'Unauthorized',
+                    },
+                });
+                return {
+                    userId: '1',
+                    role: 'member',
+                };
+            }),
+            {
+                credentialHeaders: {
+                    authorization: 'Bearer tok_ada',
+                },
+            }
+        );
+        const result = await client.callTool({
+            name: 'api_who_am_i',
+            arguments: {},
+        });
+        const content = result.content as Array<{ type: string; text: string }>;
+        const parsed = JSON.parse(content[0]!.text);
+        expect(result.isError).toBe(true);
+        expect(parsed.status).toBe(401);
         await close();
     });
 
@@ -2013,6 +2048,102 @@ describe('the client behind a tool call', () => {
                 }),
             },
         ]);
+        await close();
+    });
+});
+
+describe('a tool whose input holds itself', () => {
+    const EventFilterSchema = Kizuna.model({
+        title: 'EventFilter',
+        schema: z.object({
+            city: z.string().optional(),
+            get or() {
+                return z.array(EventFilterSchema).optional();
+            },
+        }),
+    });
+
+    it('lists the input with a $ref to itself', async () => {
+        const { client, close } = await connectMcpClient(
+            defineConfig({
+                routes: [
+                    k.routes({
+                        searchEvents: k.route({
+                            method: 'POST',
+                            path: '/events/search',
+                            summary: 'Search events',
+                            tool: true,
+                            body: EventFilterSchema,
+                            responses: {
+                                200: z.array(EventFilterSchema),
+                            },
+                        }),
+                    }),
+                ],
+            }).api
+        );
+
+        const { tools } = await client.listTools();
+        const searchEvents = tools.find((tool) => tool.name === 'search_events')!;
+
+        expect(JSON.stringify(searchEvents.inputSchema)).toContain('"$ref":"#/$defs/EventFilter"');
+
+        await close();
+    });
+});
+
+describe('a tool whose query holds an object', () => {
+    it('hands the object to the handler as the model sent it', async () => {
+        const { client, close } = await connectMcpClient(
+            defineConfig({
+                routes: [
+                    k.routes({
+                        listEvents: k
+                            .route({
+                                method: 'GET',
+                                path: '/events',
+                                summary: 'List events',
+                                tool: true,
+                                query: z.object({
+                                    filter: z.object({
+                                        city: z.string(),
+                                    }),
+                                }),
+                                responses: {
+                                    200: z.object({
+                                        city: z.string(),
+                                    }),
+                                },
+                            })
+                            .handler(({ query }) => ({
+                                status: 200,
+                                body: {
+                                    city: query.filter.city,
+                                },
+                            })),
+                    }),
+                ],
+            }).api
+        );
+
+        const result = await client.callTool({
+            name: 'list_events',
+            arguments: {
+                query: {
+                    filter: {
+                        city: 'Bergen',
+                    },
+                },
+            },
+        });
+
+        expect(result.structuredContent).toEqual({
+            status: 200,
+            body: {
+                city: 'Bergen',
+            },
+        });
+
         await close();
     });
 });

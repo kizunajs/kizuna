@@ -60,26 +60,22 @@ export const refreshTargets = (cms: CmsService, ref: DocumentRef, sites?: readon
     const shared = site === DEFAULT_SITE;
     const reached = shared ? names.filter((name) => sites === undefined || sites.includes(name)) : [site];
     return [
-        ...reached.map(
-            (key): RefreshTarget => ({
-                key,
-                kind: 'site',
-                label: String(cms.siteInfo(key)['label']),
-            })
-        ),
+        ...reached.map((key): RefreshTarget => ({
+            key,
+            kind: 'site',
+            label: String(cms.siteInfo(key)['label']),
+        })),
         ...Object.entries(cms.options.partners ?? {})
             .filter(
                 ([, partner]) =>
                     ((shared && sites === undefined) || partner.reads.some((read) => reached.includes(read))) &&
                     partnerReads(partner, partnerReadOf(ref))
             )
-            .map(
-                ([key, partner]): RefreshTarget => ({
-                    key,
-                    kind: 'partner',
-                    label: partner.label,
-                })
-            ),
+            .map(([key, partner]): RefreshTarget => ({
+                key,
+                kind: 'partner',
+                label: partner.label,
+            })),
     ];
 };
 
@@ -119,13 +115,11 @@ export const queueRefreshes = async (cms: CmsService, ref: DocumentRef, sites?: 
     const shown = refreshTargets(cms, ref, sites);
     const linking = (await linkingSites(cms, ref))
         .filter((site) => !shown.some((target) => target.kind === 'site' && target.key === site))
-        .map(
-            (key): RefreshTarget => ({
-                key,
-                kind: 'site',
-                label: String(cms.siteInfo(key)['label']),
-            })
-        );
+        .map((key): RefreshTarget => ({
+            key,
+            kind: 'site',
+            label: String(cms.siteInfo(key)['label']),
+        }));
     const targets = [...shown, ...linking];
     const job = cms.refreshJob();
     if (targets.length === 0 || job === undefined) return;

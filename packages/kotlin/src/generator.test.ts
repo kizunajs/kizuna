@@ -1028,7 +1028,7 @@ describe('Kotlin generator: automatic validation error', () => {
         expect(output).toContain('data class ValidationIssue(');
     });
 
-    it('does not add validation case for route without body or query', () => {
+    it('does not add validation case for a route that validates nothing', () => {
         const contract = defineConfig({
             routes: [
                 {
@@ -2136,6 +2136,92 @@ describe('Kotlin generator: unknownEnumCase', () => {
         const output = generateKotlinClient(enumContract(['encoding', 'encoded', 'failed']), baseConfig);
         expect(output).not.toContain('import kotlinx.serialization.descriptors.*');
     });
+
+    const activityContract = (extensible: boolean): ApiDefinition =>
+        defineConfig({
+            routes: [
+                {
+                    listActivity: {
+                        method: 'GET',
+                        path: '/activity',
+                        responses: {
+                            200: z.array(
+                                Kizuna.model({
+                                    title: 'Activity',
+                                    schema: z.discriminatedUnion('kind', [
+                                        z.object({
+                                            kind: z.literal('taskCreated'),
+                                            id: z.string(),
+                                            title: z.string(),
+                                        }),
+                                        z.object({
+                                            kind: z.literal('commentAdded'),
+                                            id: z.string(),
+                                            body: z.string(),
+                                        }),
+                                    ]),
+                                    extensible,
+                                })
+                            ),
+                        },
+                    },
+                },
+            ],
+        }).api;
+
+    it('keeps a union strict by default', () => {
+        const output = generateKotlinClient(activityContract(false), baseConfig);
+        expect(output).toContain('@JsonClassDiscriminator("kind")');
+        expect(output).not.toContain('data class Unknown(val wireValue: String) : Activity');
+    });
+
+    it('gives a union an Unknown member and a serializer that falls back to it when enabled', () => {
+        const output = generateKotlinClient(activityContract(false), tolerantConfig);
+        expect(output).toContain('@Serializable(with = Activity.Serializer::class)');
+        expect(output).toContain('data class Unknown(val wireValue: String) : Activity');
+        expect(output).toContain('"taskCreated" -> input.json.decodeFromJsonElement(TaskCreated.serializer(), body)');
+        expect(output).toContain('else -> Unknown(kind ?: "")');
+        expect(output).toContain('output.encodeJsonElement(JsonObject(mapOf("kind" to JsonPrimitive(kind)) + body.jsonObject))');
+        expect(output).toContain('is Unknown -> throw SerializationException');
+        expect(output).toContain('import kotlinx.serialization.descriptors.*');
+    });
+
+    it('gives an extensible union the Unknown member without the flag', () => {
+        const output = generateKotlinClient(activityContract(true), baseConfig);
+        expect(output).toContain('data class Unknown(val wireValue: String) : Activity');
+        expect(output).not.toContain('@JsonClassDiscriminator("kind")');
+    });
+
+    it('gives an extensible enum the Unknown member without the flag, and leaves other enums strict', () => {
+        const output = generateKotlinClient(
+            defineConfig({
+                routes: [
+                    {
+                        getOrder: {
+                            method: 'GET',
+                            path: '/orders/:id',
+                            responses: {
+                                200: z.object({
+                                    status: Kizuna.model({
+                                        title: 'OrderStatus',
+                                        schema: z.enum(['open', 'shipped']),
+                                        extensible: true,
+                                    }),
+                                    priority: Kizuna.model({
+                                        title: 'Priority',
+                                        schema: z.enum(['low', 'high']),
+                                    }),
+                                }),
+                            },
+                        },
+                    },
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('data class Unknown(override val wireValue: String) : OrderStatus');
+        expect(output).toContain('enum class Priority(override val wireValue: String) : KizunaQueryValue');
+    });
 });
 
 describe('Kotlin generator: union variants owned by a name-prefix class', () => {
@@ -2792,5 +2878,269 @@ describe('Kotlin generator: fractional keys', () => {
 
     it('emits none for an API without one', () => {
         expect(generateKotlinClient(contractWith(z.string()), baseConfig)).not.toContain('FractionalKey');
+    });
+});
+
+describe('Kotlin generator: a model that holds itself', () => {
+    const EventFilterSchema = Kizuna.model({
+        title: 'EventFilter',
+        schema: z.object({
+            city: z.string().optional(),
+            get or() {
+                return z.array(EventFilterSchema).optional();
+            },
+        }),
+    });
+
+    const output = generateKotlinClient(
+        defineConfig({
+            routes: [
+                k.routes({
+                    searchEvents: k.route({
+                        method: 'POST',
+                        path: '/events/search',
+                        summary: 'Search events',
+                        tool: true,
+                        body: EventFilterSchema,
+                        responses: {
+                            200: z.array(EventFilterSchema),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+
+    it('writes a data class that holds a list of itself', () => {
+        expect(output).toContain('data class EventFilter(');
+        expect(output).toContain('val or: List<EventFilter>? = null');
+    });
+});
+
+describe('Kotlin generator: an API with no enums', () => {
+    const output = generateKotlinClient(
+        defineConfig({
+            routes: [
+                k.routes({
+                    listEvents: k.route({
+                        method: 'GET',
+                        path: '/events',
+                        query: z.object({
+                            city: z.string().optional(),
+                        }),
+                        responses: {
+                            200: z.array(z.string()),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+
+    it('never names KizunaQueryValue, which only an enum declares', () => {
+        expect(output).not.toContain('KizunaQueryValue');
+    });
+});
+
+describe('Kotlin generator: enum values that write the same constant', () => {
+    const contractFor = (values: [string, ...string[]]) =>
+        defineConfig({
+            routes: [
+                k.routes({
+                    listTasks: k.route({
+                        method: 'GET',
+                        path: '/tasks',
+                        query: z.object({
+                            sort: z.array(z.enum(values)).optional(),
+                        }),
+                        responses: {
+                            200: z.array(z.string()),
+                        },
+                    }),
+                }),
+            ],
+        }).api;
+
+    it('puts `_` in front of a value whose constant is already taken', () => {
+        const output = generateKotlinClient(contractFor(['a.b', 'a-b', 'name', 'Name']), baseConfig);
+        expect(output).toContain('@SerialName("a.b") A_B("a.b")');
+        expect(output).toContain('@SerialName("a-b") _A_B("a-b")');
+        expect(output).toContain('@SerialName("name") NAME("name")');
+        expect(output).toContain('@SerialName("Name") _NAME("Name")');
+    });
+
+    it('does the same for an enum with an unknown case', () => {
+        const output = generateKotlinClient(contractFor(['a.b', 'a-b']), {
+            ...baseConfig,
+            unknownEnumCase: true,
+        });
+        expect(output).toContain('data object _A_B : ');
+        expect(output).toContain('"a-b" -> _A_B');
+    });
+});
+
+describe('Kotlin generator: an object in a query', () => {
+    const output = generateKotlinClient(
+        defineConfig({
+            routes: [
+                k.routes({
+                    listEvents: k.route({
+                        method: 'GET',
+                        path: '/events',
+                        query: z.object({
+                            limit: z.int().optional(),
+                            filter: z
+                                .object({
+                                    city: z.string().optional(),
+                                })
+                                .optional(),
+                        }),
+                        responses: {
+                            200: z.array(z.string()),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+
+    it('sends the object as one JSON text, and a value as before', () => {
+        expect(output).toContain('urlBuilder.addQueryParameter("filter", Kizuna.encodeQueryJson(json, query.filter))');
+        expect(output).toContain('for (stringValue in Kizuna.stringifyQueryValue(query.limit))');
+    });
+
+    it('encodes it with its keys sorted', () => {
+        expect(output).toContain('fun sortJsonKeys(element: JsonElement): JsonElement');
+    });
+
+    it('leaves the JSON helper out of a client that never sends one', () => {
+        const plain = generateKotlinClient(
+            defineConfig({
+                routes: [
+                    k.routes({
+                        listEvents: k.route({
+                            method: 'GET',
+                            path: '/events',
+                            responses: {
+                                200: z.array(z.string()),
+                            },
+                        }),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(plain).not.toContain('encodeQueryJson');
+    });
+});
+
+describe('Kotlin generator: a model whose fields are all optional', () => {
+    const TextFilterSchema = Kizuna.model({
+        title: 'TextFilter',
+        schema: z.object({
+            equals: z.string().optional(),
+            contains: z.string().optional(),
+        }),
+    });
+    const EventWhereSchema = Kizuna.model({
+        title: 'EventWhere',
+        schema: z.object({
+            city: TextFilterSchema.optional(),
+            get or() {
+                return z.array(EventWhereSchema).optional();
+            },
+        }),
+    });
+    const EventSchema = Kizuna.model({
+        title: 'Event',
+        schema: z.object({
+            id: z.string(),
+            city: z.string().optional(),
+        }),
+    });
+    const output = generateKotlinClient(
+        defineConfig({
+            routes: [
+                k.routes({
+                    listEvents: k.route({
+                        method: 'GET',
+                        path: '/events',
+                        query: z.object({
+                            where: EventWhereSchema.optional(),
+                        }),
+                        responses: {
+                            200: z.array(EventSchema),
+                        },
+                    }),
+                }),
+            ],
+        }).api,
+        baseConfig
+    );
+
+    it('gets a builder that sets one field per block', () => {
+        expect(output).toContain('annotation class KizunaDsl');
+        expect(output).toContain('fun city(build: TextFilter.Builder.() -> Unit)');
+        expect(output).toContain('fun or(build: EventWhere.ListBuilder.() -> Unit)');
+        expect(output).toContain('fun build(): EventWhere = EventWhere(city = city, or = or)');
+    });
+
+    it('gets a list builder that adds one filter per block', () => {
+        expect(output).toContain('items += EventWhere(city = TextFilter.Builder().apply(build).build())');
+        expect(output).toContain('fun build(): List<EventWhere> = items.toList()');
+    });
+
+    it('is reached from the query scope without naming the type', () => {
+        expect(output).toContain(
+            'fun where(build: TestAPI.EventWhere.Builder.() -> Unit): TestAPI.EventWhere = TestAPI.EventWhere.Builder().apply(build).build()'
+        );
+    });
+
+    it('leaves a model with a required field to its constructor', () => {
+        expect(output).not.toContain('fun id(');
+    });
+});
+
+describe('Kotlin generator: the automatic 400 for each validated part', () => {
+    const outputFor = (definition: Record<string, unknown>) =>
+        generateKotlinClient(
+            defineConfig({
+                routes: [
+                    k.routes({
+                        getForecast: k.route({
+                            method: 'GET',
+                            path: '/weather/:station',
+                            responses: {
+                                200: z.object({
+                                    summary: z.string(),
+                                }),
+                            },
+                            ...definition,
+                        } as never),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+
+    it('lists it for a route that validates only its path parameters', () => {
+        const output = outputFor({
+            pathParams: z.object({
+                station: z.enum(['bergen', 'oslo']),
+            }),
+        });
+        expect(output).toContain('data class BadRequest(val body: TestAPIClient.ValidationError) : Failure()');
+    });
+
+    it('lists it for a route that validates only its headers', () => {
+        const output = outputFor({
+            headers: z.object({
+                'x-request-id': z.string(),
+            }),
+        });
+        expect(output).toContain('data class BadRequest(val body: TestAPIClient.ValidationError) : Failure()');
     });
 });

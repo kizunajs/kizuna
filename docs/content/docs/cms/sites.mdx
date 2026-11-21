@@ -305,7 +305,7 @@ Each publish records one row per site and partner, with its status and attempts:
 
 ### Running the refreshes
 
-A config with sites gets the CMS's refresh job, `content.refreshSite`, beside your [jobs](/docs/jobs) and the [scheduling](/docs/cms/editing/scheduling#how-it-runs) job every CMS has. With `mode: 'in-process'`, the job runs on its own. With `mode: 'http'`, the job endpoints need an identity. The job runs as the one your own jobs name, and with no jobs of your own, `jobs: { identity: 'scheduler' }` on `cms()` names it. A [transport](/docs/jobs#transports) retries a site or partner that does not answer, up to five attempts. Without one, a refresh that fails is not tried again.
+A config with sites gets the CMS's refresh job, `content.refreshSite`, beside your [jobs](/docs/jobs) and the [scheduling](/docs/cms/editing/scheduling#how-it-runs) job every CMS has. With `mode: 'long-running'`, the job runs on its own. With `mode: 'http'`, the job endpoints need an identity. The job runs as the one your own jobs name, and with no jobs of your own, `jobs: { identity: 'scheduler' }` on `cms()` names it. A [transport](/docs/jobs#transports) retries a site or partner that does not answer, up to five attempts. With `transport: false`, a refresh that fails is not tried again.
 
 ## Partners
 
