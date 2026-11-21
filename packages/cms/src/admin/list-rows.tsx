@@ -10,7 +10,8 @@ import {
 import { Checkbox } from '@base-ui/react/checkbox';
 import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, ChevronsUpDown, GripVertical, Minus } from 'lucide-react';
 import { ICON } from '../view/context.js';
-import { columnText, dateTimeOf, nextSort, type ListColumn, type ListRow, type Sort } from './list-columns.js';
+import { columnText, dateTimeOf, nextSort, scoreOf, type ListColumn, type ListRow, type Sort } from './list-columns.js';
+import { ListScore } from './seo-panel.js';
 import { heightIn, levelsAt, linesWithout, parentAt, placeAmongSiblings, placeAtSlot, placeOnto, type PlaceBody } from './list-order.js';
 import { treeLinesOf, type TreePlace } from './list-tree.js';
 
@@ -215,6 +216,7 @@ function Cell({ row, column, options, lead }: { row: TreeRow; column: ListColumn
             </td>
         );
     }
+    const score = column.kind === 'score' ? scoreOf(row, column.key) : undefined;
     const content =
         column.kind === 'status' ? (
             row.count !== undefined ? (
@@ -227,6 +229,10 @@ function Cell({ row, column, options, lead }: { row: TreeRow; column: ListColumn
         ) : column.kind === 'person' ? (
             row.updatedBy === undefined ? null : (
                 options.nameOf(row.updatedBy)
+            )
+        ) : column.kind === 'score' ? (
+            score === undefined ? null : (
+                <ListScore score={score} />
             )
         ) : (
             columnText(row.values?.[column.key], column.format)

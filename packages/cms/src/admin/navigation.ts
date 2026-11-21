@@ -93,6 +93,25 @@ export type Screen = (
       }
     | {
           /**
+           * How a site does in search and in AI answers, and what to fix
+           * first.
+           */
+          kind: 'seo';
+      }
+    | {
+          /**
+           * The links into, between and out of a site's pages.
+           */
+          kind: 'link-map';
+      }
+    | {
+          /**
+           * The site's pages that compete for the same searches.
+           */
+          kind: 'too-similar';
+      }
+    | {
+          /**
            * An address under the admin's that names no screen.
            */
           kind: 'missing';
@@ -260,6 +279,9 @@ export const hrefIn = (site: string | undefined, screen: Screen): string => {
     if (screen.kind === 'people') return at('people');
     if (screen.kind === 'trash') return at('trash');
     if (screen.kind === 'redirects') return at('redirects');
+    if (screen.kind === 'seo') return at('seo');
+    if (screen.kind === 'link-map') return at('seo', 'link-map');
+    if (screen.kind === 'too-similar') return at('seo', 'too-similar');
     if (screen.kind === 'map') return at('map');
     if (screen.kind === 'media') return screen.id === undefined ? at('media') : at('media', screen.id);
     if (screen.kind === 'collection') return at('collections', screen.name);
@@ -413,6 +435,19 @@ const screenAt = (segments: readonly string[], site: AdminSite | undefined): Scr
             kind: 'redirects',
         };
     }
+    // SEO reads a site's addresses, like its redirects.
+    if (section === 'seo' && id === undefined && (site !== undefined || sites.length === 0)) {
+        if (name === undefined) {
+            return {
+                kind: 'seo',
+            };
+        }
+        if (name === 'link-map' || name === 'too-similar') {
+            return {
+                kind: name,
+            };
+        }
+    }
     if (section === 'releases' && name !== undefined && id === undefined) {
         return {
             kind: 'release',
@@ -499,14 +534,14 @@ export const screenInSite = (screen: Screen, key: string | undefined): Screen =>
             kind: screen.kind,
         });
     }
-    if (screen.kind === 'redirects') {
+    if (screen.kind === 'redirects' || screen.kind === 'seo' || screen.kind === 'link-map' || screen.kind === 'too-similar') {
         return placed(
             site === undefined
                 ? {
                       kind: 'dashboard',
                   }
                 : {
-                      kind: 'redirects',
+                      kind: screen.kind,
                   }
         );
     }
@@ -764,6 +799,12 @@ export const navigationOf = (options: {
                     },
                 },
                 {
+                    label: 'SEO',
+                    screen: {
+                        kind: 'seo',
+                    },
+                },
+                {
                     label: 'Trash',
                     screen: {
                         kind: 'trash',
@@ -981,6 +1022,13 @@ const siteNavigationOf = (options: Parameters<typeof navigationOf>[0], declared:
                         site: shown.key,
                     },
                 },
+                {
+                    label: 'SEO',
+                    screen: {
+                        kind: 'seo',
+                        site: shown.key,
+                    },
+                },
                 trash(shown.key),
             ],
         },
@@ -1056,7 +1104,10 @@ export const screenInPlace = (screen: Screen, place: Place): Screen => {
             screen.kind === 'scheduled' ||
             screen.kind === 'map' ||
             screen.kind === 'trash' ||
-            screen.kind === 'redirects'
+            screen.kind === 'redirects' ||
+            screen.kind === 'seo' ||
+            screen.kind === 'link-map' ||
+            screen.kind === 'too-similar'
         ) {
             return {
                 kind: screen.kind,
@@ -1194,6 +1245,9 @@ export const isCurrent = (entry: Screen, shown: Screen): boolean => {
     if (entry.kind === 'map') return shown.kind === 'map' && shown.site === entry.site;
     if (entry.kind === 'trash') return shown.kind === 'trash' && shown.site === entry.site;
     if (entry.kind === 'redirects') return shown.kind === 'redirects' && shown.site === entry.site;
+    if (entry.kind === 'seo') {
+        return (shown.kind === 'seo' || shown.kind === 'link-map' || shown.kind === 'too-similar') && shown.site === entry.site;
+    }
     if (entry.kind === 'scheduled') return (shown.kind === 'scheduled' || shown.kind === 'release') && shown.site === entry.site;
     if (entry.kind === 'sites' || entry.kind === 'people') return shown.kind === entry.kind;
     if (entry.kind === 'pages') {

@@ -66,6 +66,18 @@ describe('the admin navigation', () => {
             ],
             [
                 {
+                    kind: 'seo',
+                },
+                '/admin/seo',
+            ],
+            [
+                {
+                    kind: 'link-map',
+                },
+                '/admin/seo/link-map',
+            ],
+            [
+                {
                     kind: 'document',
                     ref: 'page:frontPage',
                 },
@@ -162,7 +174,7 @@ describe('the admin navigation', () => {
             },
         });
         expect(sections.map((section) => [section.label, section.entries.map((entry) => entry.label)])).toEqual([
-            ['Content', ['Pages', 'Scheduled', 'Media', 'Redirects', 'Trash', 'Site', 'Articles']],
+            ['Content', ['Pages', 'Scheduled', 'Media', 'Redirects', 'SEO', 'Trash', 'Site', 'Articles']],
             ['People', ['Employees']],
         ]);
     });
@@ -489,6 +501,7 @@ describe('the admin navigation with several sites', () => {
             ['Scheduled', '/admin/uk/scheduled'],
             ['Media', '/admin/uk/media'],
             ['Redirects', '/admin/uk/redirects'],
+            ['SEO', '/admin/uk/seo'],
             ['Trash', '/admin/uk/trash'],
         ]);
     });
@@ -790,6 +803,34 @@ describe('the admin navigation with several sites', () => {
         });
         expect(isCurrent(screen, screenOf('/admin/uk/redirects'))).toBe(true);
         expect(isCurrent(screen, screenOf('/admin/norway/redirects'))).toBe(false);
+    });
+
+    it("gives each site's SEO, Link map and Too similar an address, and none to Overview", () => {
+        const screen: Screen = {
+            kind: 'seo',
+            site: 'uk',
+        };
+        expect(hrefOf(screen)).toBe('/admin/uk/seo');
+        expect(screenOf('/admin/uk/seo')).toEqual(screen);
+        expect(screenOf('/admin/uk/seo/link-map')).toEqual({
+            kind: 'link-map',
+            site: 'uk',
+        });
+        expect(screenOf('/admin/uk/seo/too-similar')).toEqual({
+            kind: 'too-similar',
+            site: 'uk',
+        });
+        expect(screenOf('/admin/uk/seo/elsewhere').kind).toBe('missing');
+        expect(screenOf('/admin/seo').kind).toBe('missing');
+        expect(screenInPlace(screenOf('/admin/uk/seo/link-map'), sitePlace('norway'))).toEqual({
+            kind: 'link-map',
+            site: 'norway',
+        });
+        expect(screenInSite(screenOf('/admin/uk/seo'), undefined)).toEqual({
+            kind: 'dashboard',
+        });
+        expect(isCurrent(screen, screenOf('/admin/uk/seo/link-map'))).toBe(true);
+        expect(isCurrent(screen, screenOf('/admin/norway/seo'))).toBe(false);
     });
 
     it('keeps Waiting when the switcher moves between Overview and a site', () => {

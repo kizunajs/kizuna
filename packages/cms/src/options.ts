@@ -5,6 +5,7 @@ import { isPage, type Page } from './page.js';
 import { isCollection, isGlobal, type Collection, type Global } from './definitions.js';
 import type { CmsDatabase } from './storage/store.js';
 import type { MediaStorage } from './media/storage.js';
+import { isSeoData, type SeoData } from './seo-data.js';
 import { isRelationship, type CmsRelationship } from './relationships.js';
 import { isView, type View } from './view-definition.js';
 import { DashboardWidgetSchema, OverviewWidgetSchema, type DashboardWidget, type OverviewWidget } from './dashboard.js';
@@ -652,6 +653,16 @@ export interface CmsPluginOptions<
     overview?: readonly OverviewWidget<NoInfer<Sites>>[];
     media?: MediaOptions;
     /**
+     * Where the SEO overview's scores, keywords, AI answers and links from
+     * other sites come from, such as `fakeSeoData()` for a demo. Without it
+     * the overview shows what the CMS checks itself: search titles and
+     * descriptions, broken links, and pages nothing links to.
+     *
+     * @example
+     * seoData: fakeSeoData(),
+     */
+    seoData?: SeoData;
+    /**
      * Who may approve a review, and how reviewers hear of one.
      */
     reviews?: ReviewOptions;
@@ -936,6 +947,11 @@ export const CmsPluginOptionsSchema = z
                 publicPath: z.string().optional(),
                 maxBytes: z.int().min(1).optional(),
                 storage: z.custom<MediaStorage>((value) => typeof value === 'object' && value !== null).optional(),
+            })
+            .optional(),
+        seoData: z
+            .custom<SeoData>(isSeoData, {
+                error: 'takes a `label`, and `page` and `site` functions, like fakeSeoData() gives',
             })
             .optional(),
         reviews: z

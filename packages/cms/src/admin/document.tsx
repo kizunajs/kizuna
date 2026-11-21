@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { Popover } from '@base-ui/react/popover';
 import { Tabs } from '@base-ui/react/tabs';
 import { Toast } from '@base-ui/react/toast';
-import { Check, CircleAlert, ExternalLink, Eye, Info, Languages, PanelRight, RotateCcw, Undo2 } from 'lucide-react';
+import { ChartLine, Check, CircleAlert, ExternalLink, Eye, Info, Languages, PanelRight, RotateCcw, Undo2 } from 'lucide-react';
 import { toolsFor, type Connection, type ToolAnswer } from '../view/connection.js';
 import { EditorContext, ICON, type EditorContextValue } from '../view/context.js';
 import { FieldForm, fieldDomId, type FieldFormHandle, type SaveFailure, type SaveState } from '../view/form.js';
@@ -10,6 +10,7 @@ import { Avatar, OwnerControl, type People } from '../view/people.js';
 import { PublishReview, changeViewsOf, type AskedReview, type Changes, type PublishReviewHandle } from '../view/review.js';
 import {
     documentTitle,
+    fieldHolding,
     languageNameOf,
     valueAt,
     type Description,
@@ -63,6 +64,7 @@ import { relativeTimeOf } from './time.js';
 import { CommentMarks, FieldThreads, SelectionComment, peopleWhoOpen, useComments } from './comments.js';
 import { openThreadsOn, threadsOf } from './comment-threads.js';
 import { AdminPreview, type AdminPreviewHandle } from './preview-pane.js';
+import { SeoPanel } from './seo-panel.js';
 import { AskForReview } from './review-ask.js';
 import { ChangesScreen, SendBack, SentBackNotes, type ViewedChange } from './review-changes.js';
 import { PeopleFact } from './review-screen.js';
@@ -304,6 +306,8 @@ export function DocumentScreen({
     const [previewOn, setPreviewOn] = useState(false);
     // The preview stays loaded once opened, so turning it back on shows the page where it was.
     const [previewOpened, setPreviewOpened] = useState(false);
+    // The SEO panel takes Live Preview's place, so only one of them shows.
+    const [seoOn, setSeoOn] = useState(false);
     const [versions, setVersions] = useState<VersionSummary[] | undefined>();
     const [updatedBy, setUpdatedBy] = useState<string | null>(null);
     const [updatedVia, setUpdatedVia] = useState<string | null>(null);
@@ -1302,8 +1306,10 @@ export function DocumentScreen({
     // The reviewer who sent it back already knows what Publish waits for.
     const gateNote = document.review?.decidedBy?.id === me ? undefined : gateNoteOf(document.requireReview, document.review);
     const previewPath = siteUrl === null ? null : document.previewPath;
+    // A page or an item with an address shows its SEO in the preview's place.
+    const seoShown = seoOn && document.path !== null && shownView === 'edit';
     // A document that stops showing on a page, after a change or a reload, loses the preview.
-    const previewShown = previewOn && previewPath !== null && shownView === 'edit';
+    const previewShown = previewOn && !seoShown && previewPath !== null && shownView === 'edit';
     const unsaved = saveState === 'pending' || saveState === 'saving';
     const blocker = document.complete ? undefined : blockerOf(document.missing, document.fields);
     const askable = people !== undefined && people.people.some((person) => person.id !== people.me);
@@ -1677,7 +1683,7 @@ export function DocumentScreen({
                     if (key !== 'versions') setCompared(undefined);
                 }}
                 className="k-document"
-                data-preview={previewShown}
+                data-preview={previewShown || seoShown}
                 data-language-view={languageView === 'edit' ? undefined : languageView}>
                 <PageHeader
                     crumbs={crumbs}
@@ -1801,11 +1807,26 @@ export function DocumentScreen({
                                         onClick={() => {
                                             setPreviewOn(!previewShown);
                                             setPreviewOpened(true);
+                                            setSeoOn(false);
                                             setView('edit');
                                         }}>
                                         <PanelRight {...ICON} />
                                         <span className="k-document__long">Live Preview</span>
                                         <span className="k-document__short">Preview</span>
+                                    </button>
+                                )}
+                                {document.path === null ? null : (
+                                    <button
+                                        type="button"
+                                        className="k-tab k-document__seo-toggle"
+                                        aria-pressed={seoShown}
+                                        onClick={() => {
+                                            setSeoOn(!seoShown);
+                                            if (!seoShown) setPreviewOn(false);
+                                            setView('edit');
+                                        }}>
+                                        <ChartLine {...ICON} />
+                                        SEO
                                     </button>
                                 )}
                                 {info}
@@ -2129,6 +2150,26 @@ export function DocumentScreen({
                                 path={previewPath}
                                 onPoint={pointAt}
                                 onOpen={() => void openOnSite(previewPath)}
+                            />
+                        </div>
+                    ) : null}
+                    {seoShown ? (
+                        <div className="k-document__preview k-document__seo">
+                            <SeoPanel
+                                connection={connection}
+                                documentRef={document.ref}
+                                savedAt={updatedAt}
+                                now={now}
+                                fieldOf={(path) => {
+                                    const field = fieldHolding(document.fields, path);
+                                    return field === undefined
+                                        ? undefined
+                                        : {
+                                              path: field.path,
+                                              label: fieldLabelOf(field.path),
+                                          };
+                                }}
+                                onShowField={setPointed}
                             />
                         </div>
                     ) : null}

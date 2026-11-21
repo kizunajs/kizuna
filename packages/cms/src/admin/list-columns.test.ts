@@ -16,6 +16,7 @@ import {
     pagesAround,
     shownColumnsOf,
     sortRows,
+    withScoreColumns,
     type ListRow,
 } from './list-columns.js';
 
@@ -259,5 +260,64 @@ describe('the columns of a list', () => {
         ).toEqual({
             showsOn: 'Hagen UK',
         });
+    });
+});
+
+describe('the score columns', () => {
+    const scored = (title: string, search: number | undefined): ListRow => ({
+        ...row(title, 'published', '2026-11-01T10:00:00Z'),
+        scores:
+            search === undefined
+                ? undefined
+                : {
+                      search,
+                      answers: 100 - search,
+                  },
+    });
+
+    it('come after the status', () => {
+        expect(withScoreColumns(DOCUMENT_COLUMNS).map((column) => column.key)).toEqual([
+            'title',
+            'status',
+            'score:search',
+            'score:answers',
+            'updatedBy',
+            'updated',
+        ]);
+    });
+
+    it('sort by the score, with a row without one lowest', () => {
+        const columns = withScoreColumns(DOCUMENT_COLUMNS);
+        const rows = [scored('Delivery', 64), scored('Events', undefined), scored('Visit the shop', 91)];
+        expect(
+            sortRows(
+                rows,
+                {
+                    column: 'score:search',
+                    direction: 'descending',
+                },
+                columns
+            ).map((each) => each.title)
+        ).toEqual(['Visit the shop', 'Delivery', 'Events']);
+        expect(
+            sortRows(
+                rows,
+                {
+                    column: 'score:answers',
+                    direction: 'ascending',
+                },
+                columns
+            ).map((each) => each.title)
+        ).toEqual(['Events', 'Visit the shop', 'Delivery']);
+    });
+
+    it('keep their sort in the address, and send none to the list route', () => {
+        const sort = {
+            column: 'score:search',
+            direction: 'descending' as const,
+        };
+        expect(sortParamOf(sort)).toBe('-score:search');
+        expect(sortOfParam('-score:search')).toEqual(sort);
+        expect(orderOf(sort)).toEqual({});
     });
 });

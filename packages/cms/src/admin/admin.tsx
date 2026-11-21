@@ -3,6 +3,7 @@ import { Dialog } from '@base-ui/react/dialog';
 import { Toast } from '@base-ui/react/toast';
 import {
     CalendarClock,
+    ChartLine,
     File,
     FileText,
     Globe,
@@ -35,6 +36,8 @@ import { MapScreen } from './map-screen.js';
 import { MediaLibrary } from './media.js';
 import { TrashScreen } from './trash-screen.js';
 import { RedirectsScreen } from './redirects-screen.js';
+import { LinkMapScreen } from './link-map-screen.js';
+import { SeoScreen, seoHrefOf, TooSimilarScreen } from './seo-screen.js';
 import {
     ALL_PLACE,
     CONTENT_GROUP,
@@ -141,6 +144,7 @@ const entryIconOf = (screen: Screen): LucideIcon | undefined => {
     if (screen.kind === 'people') return Users;
     if (screen.kind === 'trash') return Trash2;
     if (screen.kind === 'redirects') return Signpost;
+    if (screen.kind === 'seo' || screen.kind === 'link-map' || screen.kind === 'too-similar') return ChartLine;
     if (screen.kind === 'map') return Network;
     return undefined;
 };
@@ -304,6 +308,24 @@ export function Admin({ config }: { config: AdminConfig }) {
             return [
                 {
                     label: 'Redirects',
+                },
+            ];
+        }
+        if (screen.kind === 'seo') {
+            return [
+                {
+                    label: 'SEO',
+                },
+            ];
+        }
+        if (screen.kind === 'link-map' || screen.kind === 'too-similar') {
+            return [
+                {
+                    label: 'SEO',
+                    href: seoHrefOf('seo', screen.site),
+                },
+                {
+                    label: screen.kind === 'link-map' ? 'Link map' : 'Too similar',
                 },
             ];
         }
@@ -525,6 +547,11 @@ export function Admin({ config }: { config: AdminConfig }) {
             );
         }
         if (screen.kind === 'redirects') return <RedirectsScreen key={screen.site ?? ''} connection={connection} site={screen.site} />;
+        if (screen.kind === 'seo') return <SeoScreen key={screen.site ?? ''} connection={connection} site={screen.site} />;
+        if (screen.kind === 'link-map') {
+            return <LinkMapScreen key={screen.site ?? ''} connection={connection} sites={sites} site={screen.site} />;
+        }
+        if (screen.kind === 'too-similar') return <TooSimilarScreen site={screen.site} />;
         if (screen.kind === 'map') return <MapScreen connection={connection} sites={sites} site={screen.site} />;
         if (screen.kind === 'scheduled') return <ScheduledScreen connection={connection} site={screen.site} sites={sites} />;
         if (screen.kind === 'release') return <ReleaseScreen connection={connection} id={screen.id} site={screen.site} sites={sites} />;

@@ -76,7 +76,7 @@ const kindOf = (ref: string, collections: readonly CollectionSummary[]): string 
  * A number with its label, how far it moved since the period before, and a
  * line of detail under it.
  */
-function ChangeBadge({ change }: { change: number | undefined }) {
+export function ChangeBadge({ change }: { change: number | undefined }) {
     if (change === undefined) return null;
     const shown = changeOf(change);
     return (
@@ -254,7 +254,7 @@ const hostOf = (url: string): string => {
 /**
  * A number cell: right-aligned, with the change before the value.
  */
-function NumberCell({ value, change }: { value: ReactNode; change?: number | undefined }) {
+export function NumberCell({ value, change }: { value: ReactNode; change?: number | undefined }) {
     return (
         <td data-kind="number">
             <span className="k-dashboard-table__number">
@@ -359,7 +359,7 @@ function SitesCard({ widget }: { widget: SitesWidgetBody }) {
  * A panel on its card: the title, what its numbers count beside it, and the
  * rows under them.
  */
-function PanelCard({
+export function PanelCard({
     label,
     description,
     className,
@@ -388,7 +388,7 @@ function PanelCard({
  * Rows on the collection list's table, with column headings when there are
  * any.
  */
-function PanelTable({
+export function PanelTable({
     label,
     headings,
     empty,
@@ -423,7 +423,7 @@ function PanelTable({
 /**
  * The primary cell of a row: its name in the ink, and a muted line under it.
  */
-function NameCell({ label, detail, href }: { label: string; detail?: string | undefined; href?: string }) {
+export function NameCell({ label, detail, href }: { label: string; detail?: string | undefined; href?: string }) {
     return (
         <td className="k-dashboard-table__name">
             <span className="k-table__name">

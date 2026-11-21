@@ -22,6 +22,7 @@ import {
     collectionColumnsOf,
     choiceLabelsOf,
     fieldValuesOf,
+    isScoreColumn,
     orderOf,
     readChosenColumns,
     saveChosenColumns,
@@ -29,7 +30,9 @@ import {
     sortOfParam,
     sortParamOf,
     sortRows,
+    withScoreColumns,
     type ListColumn,
+    type PageScores,
     type Sort,
 } from './list-columns.js';
 import {
@@ -47,7 +50,8 @@ import { ColumnsPanel, ListToolbar, SortMenu, type ListPanel } from './list-tool
 import { placeAfterMove, selectionMoves, type PlaceBody, type SelectionMove } from './list-order.js';
 import { descendantsIn, pageTreeOf } from './page-tree.js';
 import { branchQuestionOf } from './branch.js';
-import { hrefOf, replaceQuery, useAddress, type CollectionSummary } from './navigation.js';
+import { addressSite, hrefOf, replaceQuery, useAddress, type CollectionSummary } from './navigation.js';
+import { usePageScores } from './seo-panel.js';
 import { PageHeader, type MetaPair } from './page-header.js';
 import { Loading, problemOf } from './parts.js';
 
@@ -389,7 +393,8 @@ export function ListScreen({
         return (rows ?? []).filter((row) => row.title.toLowerCase().includes(term) || (row.detail ?? '').toLowerCase().includes(term));
     }, [rows, query, search]);
     const sorted = useMemo(
-        () => (server === undefined ? sortRows(searched, sort, columns, nameOf) : [...searched]),
+        // The list route holds no scores, so the list sorts the page it shows by one itself.
+        () => (server === undefined || isScoreColumn(sort?.column) ? sortRows(searched, sort, columns, nameOf) : [...searched]),
         [searched, sort, columns, nameOf, server]
     );
     const nested = tree !== undefined && query.trim() === '' && !filtering && sort === undefined ? tree : undefined;
@@ -741,6 +746,36 @@ const siteFactsOf = (siteFact: ReactNode): MetaPair[] =>
               },
           ];
 
+/**
+ * The site whose scores a row's page has: its own, or the one the list is
+ * shown in.
+ */
+const scoreSiteOf = (ref: string): string => parseRef(ref)?.site ?? addressSite() ?? 'default';
+
+/**
+ * The rows with their pages' scores, and the columns with the score columns
+ * once any row has a score.
+ */
+const withScores = <Row extends TreeRow>(
+    rows: readonly Row[] | undefined,
+    columns: readonly ListColumn[],
+    scores: Readonly<Record<string, PageScores>> | undefined
+): { rows: Row[] | undefined; columns: readonly ListColumn[] } => {
+    if (rows === undefined || scores === undefined || !rows.some((row) => scores[row.ref] !== undefined)) {
+        return {
+            rows: rows === undefined ? undefined : [...rows],
+            columns,
+        };
+    }
+    return {
+        rows: rows.map((row) => ({
+            ...row,
+            scores: scores[row.ref],
+        })),
+        columns: withScoreColumns(columns),
+    };
+};
+
 export function PagesList({
     connection,
     routes,
@@ -841,16 +876,22 @@ export function PagesList({
                       })),
         [everySite, rows, filters, sites]
     );
+    const scoreSites = useMemo(() => (rows ?? []).filter((row) => row.segment !== true).map((row) => scoreSiteOf(row.ref)), [rows]);
+    const scores = usePageScores(connection, scoreSites);
+    const scored = useMemo(
+        () => withScores(shownRows, everySite ? SITE_COLUMNS : DOCUMENT_COLUMNS, scores),
+        [shownRows, everySite, scores]
+    );
     return (
         <ListScreen
             list="pages"
             title="Pages"
             noun="pages"
-            rows={shownRows}
+            rows={scored.rows}
             total={rows?.filter((row) => row.tree === undefined || (row.segment !== true && row.count === undefined)).length}
             facts={siteFactsOf(siteFact)}
             problem={problem}
-            columns={everySite ? SITE_COLUMNS : DOCUMENT_COLUMNS}
+            columns={scored.columns}
             filters={
                 !everySite
                     ? undefined
@@ -1185,18 +1226,22 @@ export function CollectionList({
 
     const actions = offeredActions(routes);
     const noun = collection.label.toLowerCase();
+    // Only an item with an address has scores.
+    const scoreSites = useMemo(() => (rows ?? []).filter((row) => row.detail !== undefined).map((row) => scoreSiteOf(row.ref)), [rows]);
+    const scores = usePageScores(connection, scoreSites);
+    const scored = useMemo(() => withScores(rows, columns, scores), [rows, columns, scores]);
 
     return (
         <ListScreen
             list={`collections:${name}`}
             title={collection.label}
             noun={noun}
-            rows={rows}
+            rows={scored.rows}
             facts={siteFactsOf(siteFact)}
             total={counts?.total ?? items?.total}
             drafts={counts?.drafts ?? 0}
             problem={problem}
-            columns={columns}
+            columns={scored.columns}
             defaultSort={defaultSort}
             defaultSortLabel={orderable ? 'Order' : 'Tree order'}
             nameOf={nameOf}

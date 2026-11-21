@@ -173,6 +173,7 @@ export {
 } from './options.js';
 export { CmsService, CmsHttpError, pageCacheTag, documentCacheTag, collectionCacheTag, brandOf, type ContentProblem } from './cms.js';
 export { memoryMediaStorage, type MediaStorage } from './media/storage.js';
+export { fakeSeoData, type PageSeoData, type SeoBacklink, type SeoCheck, type SeoCitation, type SeoData, type SeoKeyword, type SeoScores, type SiteSeoData } from './seo-data.js';
 export { s3MediaStorage, type S3Options } from './media/s3.js';
 export { type MediaRecord } from './media/media.js';
 export { inspectImage, stripMetadata, renderImage, type InspectedImage, type RenderOptions } from './media/inspect.js';

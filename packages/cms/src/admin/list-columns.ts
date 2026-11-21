@@ -4,9 +4,10 @@ import { cellText } from './views.js';
 
 /**
  * What a column shows: the row's title with its path under it, its status,
- * when it last changed, who changed it, or one of its values as text.
+ * when it last changed, who changed it, one of its values as text, or one of
+ * its page's scores.
  */
-export type ColumnKind = 'title' | 'status' | 'date' | 'person' | 'text';
+export type ColumnKind = 'title' | 'status' | 'date' | 'person' | 'text' | 'score';
 
 /**
  * The JSON Schema `format` of a text column holding a date, or a date and
@@ -58,6 +59,19 @@ export interface ListRow {
      * The row's values by column, for a view.
      */
     values?: Readonly<Record<string, unknown>> | undefined;
+    /**
+     * Its page's scores, from 0 to 100, for a row with an address once they
+     * load.
+     */
+    scores?: PageScores | undefined;
+}
+
+/**
+ * How a page does in search and in AI answers, each from 0 to 100.
+ */
+export interface PageScores {
+    search: number;
+    answers: number;
 }
 
 /**
@@ -90,6 +104,47 @@ export const DOCUMENT_COLUMNS: readonly ListColumn[] = [
         shown: true,
     },
 ];
+
+/**
+ * The columns of a page's scores, which a list adds once it has scores for
+ * any of its rows.
+ */
+export const SCORE_COLUMNS: readonly ListColumn[] = [
+    {
+        key: 'score:search',
+        label: 'SEO score',
+        kind: 'score',
+        shown: true,
+    },
+    {
+        key: 'score:answers',
+        label: 'AI score',
+        kind: 'score',
+        shown: true,
+    },
+];
+
+/**
+ * Whether a column holds a score, which the list sorts itself since the list
+ * route holds none.
+ */
+export const isScoreColumn = (key: string | undefined): boolean => SCORE_COLUMNS.some((column) => column.key === key);
+
+/**
+ * The columns with the scores after the status, or where the status would
+ * be.
+ */
+export const withScoreColumns = (columns: readonly ListColumn[]): ListColumn[] => {
+    const status = columns.findIndex((column) => column.kind === 'status');
+    const at = status === -1 ? Math.min(1, columns.length) : status + 1;
+    return [...columns.slice(0, at), ...SCORE_COLUMNS, ...columns.slice(at)];
+};
+
+/**
+ * A row's score in a score column, or `undefined` while it has none.
+ */
+export const scoreOf = (row: ListRow, key: string): number | undefined =>
+    key === 'score:search' ? row.scores?.search : key === 'score:answers' ? row.scores?.answers : undefined;
 
 /**
  * What a field's column key starts with, so a field named `title` or
@@ -203,6 +258,7 @@ export const orderOf = (sort: Sort | undefined): { orderBy?: string; direction?:
  * after a `-` when it runs descending, as in `-updatedAt`.
  */
 export const sortParamOf = (sort: Sort | undefined): string | undefined => {
+    if (sort !== undefined && isScoreColumn(sort.column)) return sort.direction === 'descending' ? `-${sort.column}` : sort.column;
     const { orderBy, direction } = orderOf(sort);
     if (orderBy === undefined) return undefined;
     return direction === 'desc' ? `-${orderBy}` : orderBy;
@@ -215,7 +271,12 @@ export const sortOfParam = (value: string): Sort => {
     const descending = value.startsWith('-');
     const orderBy = descending ? value.slice(1) : value;
     return {
-        column: orderBy === 'title' || orderBy === 'status' ? orderBy : orderBy === 'updatedAt' ? 'updated' : `${FIELD_COLUMN}${orderBy}`,
+        column:
+            orderBy === 'title' || orderBy === 'status' || isScoreColumn(orderBy)
+                ? orderBy
+                : orderBy === 'updatedAt'
+                  ? 'updated'
+                  : `${FIELD_COLUMN}${orderBy}`,
         direction: descending ? 'descending' : 'ascending',
     };
 };
@@ -231,6 +292,8 @@ export const sortValueOf = (row: ListRow, column: ListColumn, names: (id: string
     if (column.kind === 'status') return STATUS_ORDER.indexOf(row.status ?? '');
     if (column.kind === 'date') return row.updatedAt ?? '';
     if (column.kind === 'person') return row.updatedBy === undefined ? '' : names(row.updatedBy).toLowerCase();
+    // A row without a score counts as lower than any score.
+    if (column.kind === 'score') return scoreOf(row, column.key) ?? -1;
     return cellText(row.values?.[column.key]).toLowerCase();
 };
 
