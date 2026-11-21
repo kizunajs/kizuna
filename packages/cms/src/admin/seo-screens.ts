@@ -214,3 +214,77 @@ export const competeAdviceOf = (competing: SiteSeoCompeting, nameOf: (url: strin
  * two is worth a look.
  */
 export const competeBandOf = (pages: number): SeoBand => (pages >= 3 ? 'poor' : pages === 2 ? 'fair' : 'good');
+
+/**
+ * A page or item in a group that competes for one search.
+ */
+export interface SimilarPage {
+    ref: string;
+    title: string;
+    path: string;
+    position?: number;
+}
+
+/**
+ * One search several of the site's pages compete for: the page that ranks
+ * best, the others with how much of it they repeat, and the fix.
+ */
+export interface SimilarSearch {
+    keyword: string;
+    volume: number;
+    winner: SimilarPage;
+    others: Array<
+        SimilarPage & {
+            /**
+             * How much of the winner it says, from 0 to 1.
+             */
+            similarity: number;
+        }
+    >;
+    fix: 'merge' | 'link';
+    why: string;
+}
+
+/**
+ * What `editing_similar_pages` answers, largest search first.
+ */
+export interface SimilarPagesAnswer {
+    checkedAt: string;
+    label: string | null;
+    searches: SimilarSearch[];
+}
+
+/**
+ * How loud a group reads in the list: red when its pages should merge,
+ * yellow when they should link.
+ */
+export const similarBandOf = (search: SimilarSearch): SeoBand => (search.fix === 'merge' ? 'poor' : 'fair');
+
+/**
+ * The fix for a group of competing pages: its title, what happens, and the
+ * button's words.
+ */
+export const similarFixOf = (search: SimilarSearch): { title: string; sentence: string; action: string } => {
+    const winner = search.winner.title;
+    const [only] = search.others;
+    const pages =
+        search.others.length === 1 && only !== undefined
+            ? only.title
+            : search.others.length === 2
+              ? 'both pages'
+              : `the ${search.others.length} pages`;
+    if (search.fix === 'merge') {
+        const one = search.others.length === 1;
+        return {
+            title: `Merge ${pages} into ${winner}`,
+            sentence: `${one ? 'Its' : 'Their'} own text goes into a draft of ${winner} and ${one ? 'its address redirects' : 'their addresses redirect'} to it. Nothing changes on the site until you publish the draft.`,
+            action: `Merge into a draft of ${winner}`,
+        };
+    }
+    return {
+        title: `Link ${pages} to ${winner}`,
+        sentence:
+            search.others.length === 1 ? `It gets a link to ${winner} in a draft.` : `Each page gets a link to ${winner} in a draft.`,
+        action: `Add links to ${winner}`,
+    };
+};

@@ -6345,4 +6345,339 @@
             text-align: left;
         }
     }
+
+    /* SEO screens */
+
+    /* A score's band, green from 80, yellow from 50 and red under it, in tokens an app can set. */
+    :root,
+    :root[data-theme='dark'] {
+        --k-good: oklch(70% 0.15 152);
+        --k-fair: oklch(82% 0.15 88);
+        --k-poor: oklch(66% 0.19 25);
+        --k-good-text: oklch(82% 0.11 155);
+        --k-fair-text: oklch(86% 0.12 90);
+        --k-poor-text: oklch(78% 0.11 20);
+        --k-good-surface: oklch(72% 0.13 155 / 0.14);
+        --k-fair-surface: oklch(82% 0.14 90 / 0.16);
+        --k-poor-surface: oklch(68% 0.14 20 / 0.15);
+    }
+
+    :root[data-theme='light'] {
+        --k-good: oklch(66% 0.15 152);
+        --k-fair: oklch(80% 0.15 88);
+        --k-poor: oklch(61% 0.2 25);
+        --k-good-text: oklch(46% 0.12 152);
+        --k-fair-text: oklch(52% 0.11 75);
+        --k-poor-text: oklch(50% 0.18 25);
+        --k-good-surface: oklch(66% 0.15 152 / 0.13);
+        --k-fair-surface: oklch(84% 0.15 92 / 0.3);
+        --k-poor-surface: oklch(61% 0.2 25 / 0.11);
+    }
+
+    /* A count tinted by its band, the only colour on these screens. */
+    .k-band-pill {
+        display: inline-flex;
+        flex-shrink: 0;
+        align-items: center;
+        height: 22px;
+        padding: 0 8px;
+        border: 0;
+        border-radius: 999px;
+        background: var(--k-control);
+        font: inherit;
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        color: var(--k-muted);
+    }
+
+    .k-band-pill[data-band='good'] {
+        background: var(--k-good-surface);
+        color: var(--k-good-text);
+    }
+
+    .k-band-pill[data-band='fair'] {
+        background: var(--k-fair-surface);
+        color: var(--k-fair-text);
+    }
+
+    .k-band-pill[data-band='poor'] {
+        background: var(--k-poor-surface);
+        color: var(--k-poor-text);
+    }
+
+    /* SEO: the dashboard's tiles and panels, with when the numbers were checked beside the header's buttons. */
+    .k-seo__checked {
+        font-size: 13px;
+        white-space: nowrap;
+        color: var(--k-muted);
+    }
+
+    .k-dashboard-table td.k-seo__engines {
+        white-space: nowrap;
+    }
+
+    .k-seo__credit {
+        margin: 4px 0 0;
+        font-size: 12.5px;
+        color: var(--k-muted);
+    }
+
+    /* Link map: the Map's canvas and cards, each page with its links in as a pill, and only the links worth seeing drawn. */
+    .k-link-map__filters {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .k-link-map__filter {
+        cursor: pointer;
+    }
+
+    .k-link-map__filter[aria-pressed='true'][data-band='poor'] {
+        background: var(--k-poor);
+        color: oklch(99% 0 0);
+    }
+
+    .k-link-map__filter[aria-pressed='true'][data-band='fair'] {
+        background: var(--k-fair);
+        color: oklch(28% 0.05 85);
+    }
+
+    .k-link-map__head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        height: 44px;
+    }
+
+    .k-link-map__head-name {
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        color: var(--k-ink);
+    }
+
+    .k-link-map__tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        height: 20px;
+        padding: 0 7px;
+        border-radius: 999px;
+        background: var(--k-control);
+        font-size: 11.5px;
+        font-weight: 500;
+        color: var(--k-muted);
+    }
+
+    .k-link-map__card {
+        gap: 10px;
+        transition: opacity 120ms ease;
+    }
+
+    .k-link-map__card[data-dimmed] {
+        opacity: 0.25;
+    }
+
+    .k-link-map__card[data-found] {
+        box-shadow: inset 0 0 0 1.5px var(--k-ink);
+    }
+
+    .k-link-map__card[data-selected],
+    .k-link-map__card[data-selected]:hover {
+        box-shadow: inset 0 0 0 2px var(--k-ink);
+    }
+
+    .k-link-map__card[data-kind='broken'] {
+        box-shadow: inset 0 0 0 1px var(--k-poor);
+        cursor: default;
+    }
+
+    .k-link-map__card[data-kind='broken'] .k-map__card-path {
+        color: var(--k-poor-text);
+    }
+
+    .k-link-map__out {
+        flex-shrink: 0;
+        color: var(--k-muted);
+    }
+
+    /* Another site's mark: its icon, or its first letter on a grey tile. */
+    .k-domain-tile {
+        display: grid;
+        flex-shrink: 0;
+        place-items: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 5px;
+        background: var(--k-control);
+        font-size: 11px;
+        font-weight: 600;
+        object-fit: cover;
+        color: var(--k-ink);
+    }
+
+    .k-domain-tile--broken {
+        background: var(--k-poor-surface);
+        color: var(--k-poor-text);
+    }
+
+    /* Links between pages are solid, to other sites dotted grey, and to a target that is gone dashed red. */
+    .k-link-map .k-link-map__line {
+        fill: none;
+        stroke: var(--k-ink);
+        stroke-width: 1.5;
+    }
+
+    .k-link-map .k-link-map__line[data-external] {
+        stroke: var(--k-muted);
+        stroke-dasharray: 1 4;
+        stroke-linecap: round;
+        stroke-width: 2;
+    }
+
+    .k-link-map .k-link-map__line[data-broken] {
+        stroke: var(--k-poor);
+        stroke-dasharray: 4 4;
+        stroke-linecap: butt;
+        stroke-width: 1.5;
+    }
+
+    /* The chosen page's card floats over the canvas on the right. */
+    .k-link-map__inspector {
+        position: absolute;
+        z-index: 5;
+        top: 16px;
+        right: 16px;
+        bottom: 16px;
+        display: flex;
+        flex-direction: column;
+        width: 340px;
+        max-width: calc(100% - 32px);
+        overflow: hidden;
+        border-radius: var(--k-radius-card);
+        background: var(--k-popup);
+        box-shadow: var(--k-popup-shadow);
+    }
+
+    .k-link-map__inspector-head {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 16px 12px 14px 16px;
+        box-shadow: inset 0 -1px 0 var(--k-line);
+    }
+
+    .k-link-map__inspector-text {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .k-link-map__inspector-title {
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+
+    .k-link-map__inspector-title:hover,
+    .k-link-map__row-title a:hover {
+        text-decoration: underline;
+    }
+
+    .k-link-map__inspector-path {
+        font-size: 13px;
+        color: var(--k-muted);
+    }
+
+    .k-link-map__sections {
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    .k-link-map__section {
+        padding: 14px 16px 8px;
+    }
+
+    .k-link-map__section + .k-link-map__section {
+        box-shadow: inset 0 1px 0 var(--k-line);
+    }
+
+    .k-link-map__section-title {
+        display: flex;
+        gap: 6px;
+        margin: 0 0 4px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .k-link-map__count {
+        font-weight: 400;
+        color: var(--k-muted);
+    }
+
+    .k-link-map__rows {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .k-link-map__row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        padding: 6px 0;
+        font-size: 13px;
+    }
+
+    .k-link-map__row .k-site-icon {
+        flex-shrink: 0;
+        width: 20px;
+        height: 20px;
+        border-radius: 5px;
+    }
+
+    .k-link-map__row-text {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .k-link-map__row-title {
+        font-weight: 500;
+    }
+
+    .k-link-map__row-detail {
+        font-size: 12px;
+        color: var(--k-muted);
+    }
+
+    .k-link-map__row .k-button,
+    .k-link-map__visit {
+        flex-shrink: 0;
+    }
+
+    .k-link-map__visit {
+        color: var(--k-muted);
+    }
+
+    @media (max-width: 640px) {
+        .k-link-map__inspector {
+            top: auto;
+            left: 8px;
+            right: 8px;
+            bottom: 8px;
+            width: auto;
+            max-width: none;
+            max-height: 60%;
+        }
+    }
 }

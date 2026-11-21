@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { bandOf, competeAdviceOf, competeBandOf, pageNamerOf, siteStatsOf, type SiteSeoAnswer } from './seo-screens.js';
+import {
+    bandOf,
+    competeAdviceOf,
+    competeBandOf,
+    pageNamerOf,
+    similarBandOf,
+    similarFixOf,
+    siteStatsOf,
+    type SimilarSearch,
+    type SiteSeoAnswer,
+} from './seo-screens.js';
 
 const ANSWER: SiteSeoAnswer = {
     checkedAt: '2026-11-21T08:00:00.000Z',
@@ -165,5 +175,58 @@ describe('competeAdviceOf', () => {
     it('reads three pages or more as poor and two as fair', () => {
         expect(competeBandOf(3)).toBe('poor');
         expect(competeBandOf(2)).toBe('fair');
+    });
+});
+
+describe('similarFixOf', () => {
+    const search = (fix: 'merge' | 'link', others: number): SimilarSearch => ({
+        keyword: 'task list',
+        volume: 1800,
+        winner: {
+            ref: 'page:uk:tasksPage',
+            title: 'Tasks',
+            path: '/tasks',
+            position: 12,
+        },
+        others: Array.from(
+            {
+                length: others,
+            },
+            (_, index) => ({
+                ref: `item:guides:${index}`,
+                title: `Guide ${index + 1}`,
+                path: `/guides/${index + 1}`,
+                similarity: 0.9,
+            })
+        ),
+        fix,
+        why: 'Search splits the searches between the pages.',
+    });
+
+    it('merges both pages into the winner, in a draft', () => {
+        expect(similarFixOf(search('merge', 2))).toEqual({
+            title: 'Merge both pages into Tasks',
+            sentence:
+                'Their own text goes into a draft of Tasks and their addresses redirect to it. Nothing changes on the site until you publish the draft.',
+            action: 'Merge into a draft of Tasks',
+        });
+    });
+
+    it('names a single page it merges', () => {
+        expect(similarFixOf(search('merge', 1)).title).toBe('Merge Guide 1 into Tasks');
+        expect(similarFixOf(search('merge', 1)).sentence).toContain('Its own text');
+    });
+
+    it('links the pages to the winner otherwise', () => {
+        expect(similarFixOf(search('link', 3))).toEqual({
+            title: 'Link the 3 pages to Tasks',
+            sentence: 'Each page gets a link to Tasks in a draft.',
+            action: 'Add links to Tasks',
+        });
+    });
+
+    it('reads merge as red and link as yellow', () => {
+        expect(similarBandOf(search('merge', 2))).toBe('poor');
+        expect(similarBandOf(search('link', 2))).toBe('fair');
     });
 });
