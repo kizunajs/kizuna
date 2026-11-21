@@ -1,6 +1,6 @@
 {
   "name": "kizunajs",
-  "version": "2.0.0-beta.36",
+  "version": "2.0.0-beta.37",
   "description": "Route declaration, validation, and the adapter API for Kizuna.js",
   "keywords": [
     "kizunajs",
