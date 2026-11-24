@@ -62,6 +62,7 @@ import {
 } from './link-targets.js';
 import { contentLinksOf, LINK_BRAND, withRenamedLinks } from './links.js';
 import { trashItem } from './trash.js';
+import { finishMerges } from './merges.js';
 import { changesOf, contentEvent, fireContentEvents } from './content-events.js';
 import {
     DocumentStore,
@@ -77,6 +78,7 @@ import {
     type Migration,
 } from './storage/store.js';
 import { ScheduleStore } from './storage/schedule-store.js';
+import { MergeStore } from './storage/merge-store.js';
 import { applyRedirectsIn, RedirectStore } from './storage/redirect-store.js';
 import { publishEffects, touchTargets } from './redirects.js';
 import { previewSecret, previewTokenExpiry, signPreviewToken, verifyPreviewToken, verifyRefresh } from './preview-token.js';
@@ -567,6 +569,10 @@ export class CmsService {
      */
     readonly redirects: RedirectStore;
     /**
+     * The pages and items merged into another, waiting for it to publish.
+     */
+    readonly merges: MergeStore;
+    /**
      * Tells the draft preview, on every server instance, when a draft is saved.
      */
     readonly notices: DraftNotices;
@@ -615,6 +621,7 @@ export class CmsService {
         this.store = new DocumentStore(options.db);
         this.schedules = new ScheduleStore(options.db);
         this.redirects = new RedirectStore(options.db);
+        this.merges = new MergeStore(options.db);
         this.notices = new DraftNotices(options.db);
         this.sites = Object.fromEntries(Object.entries(sitesOf(options)).map(([site, declared]) => [site, declared.pages]));
         this.pages = this.sites[DEFAULT_SITE] ?? {};
@@ -3511,6 +3518,7 @@ export class CmsService {
         await fireContentEvents(this, [
             contentEvent(this, state.target, 'published', author, changesOf(state.row?.published, state.row?.draft)),
         ]);
+        await finishMerges(this, [ref], author);
         return this.draftState(ref);
     }
 
@@ -3562,6 +3570,7 @@ export class CmsService {
                 })
             )
         );
+        await finishMerges(this, refs, author);
         return versions;
     }
 
@@ -3609,6 +3618,7 @@ export class CmsService {
         await fireContentEvents(this, [
             contentEvent(this, state.target, 'published', approval.by, changesOf(state.row?.published, state.row?.draft)),
         ]);
+        await finishMerges(this, [ref], approval.by);
         return this.draftState(ref);
     }
 

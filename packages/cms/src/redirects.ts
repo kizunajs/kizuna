@@ -1,7 +1,7 @@
 import { collectionPreviewPath, showsOnOf, type CmsService, type Target } from './cms.js';
 import { fillPath } from './dynamic.js';
 import { DEFAULT_SITE } from './options.js';
-import { formatRef, sourceRefOf, type DocumentRef } from './refs.js';
+import { formatRef, parseRef, sourceRefOf, type DocumentRef } from './refs.js';
 import type { DocumentRow } from './storage/store.js';
 import type { NewRedirect, PublishedAddress, RedirectChanges } from './storage/redirect-store.js';
 
@@ -149,9 +149,52 @@ export const renameChanges = (
 };
 
 /**
+ * The redirects publishing a document makes for the pages and items merged
+ * into it: each address one is served at now sends visitors to the document.
+ * Nothing when no merge waits for it, or when a translation publishes.
+ */
+export const mergeChanges = async (cms: CmsService, ref: DocumentRef, author: string): Promise<RedirectChanges> => {
+    const canonical = cms.canonical(ref);
+    const none = {
+        add: [],
+        live: [],
+        touch: [],
+    };
+    if (canonical.locale !== undefined) return none;
+    const into = formatRef(sourceRefOf(canonical));
+    const merge = await cms.merges.pending(into);
+    if (merge === undefined) return none;
+    const add: NewRedirect[] = [];
+    for (const value of merge.merged) {
+        const merged = parseRef(value);
+        if (merged === undefined) continue;
+        for (const address of await addressesOf(cms, merged, publishedCopy)) {
+            add.push({
+                site: address.site,
+                locale: address.locale,
+                from: address.path,
+                to: {
+                    type: 'document',
+                    ref: into,
+                },
+                status: 308,
+                origin: 'manual',
+                createdBy: author,
+            });
+        }
+    }
+    return {
+        add,
+        live: [],
+        touch: [],
+    };
+};
+
+/**
  * What publishing some documents together writes besides their content: the
- * addresses each version records, and the redirects. Drafts make none, so
- * this runs on publish alone.
+ * addresses each version records, and the redirects, including those of
+ * pages merged into one of them. Drafts make none, so this runs on publish
+ * alone.
  */
 export const publishEffects = async (
     cms: CmsService,
@@ -171,6 +214,7 @@ export const publishEffects = async (
         }
         const after = await addressesOf(cms, source, live);
         paths.set(key, after);
+        changes.push(await mergeChanges(cms, ref, author));
         changes.push(renameChanges(source, await addressesOf(cms, source, publishedCopy), after, author));
     }
     return {

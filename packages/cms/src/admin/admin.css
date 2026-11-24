@@ -2597,8 +2597,14 @@
         color: var(--k-ink);
     }
 
-    /* The panel sits on the page's own background, where the preview sits on grey. */
-    .k-document__seo {
+    /*
+     * The panel sits on the page's own background, where the preview sits on
+     * grey, and scrolls with the page rather than inside a box of its own, so
+     * the wheel never stops at the panel's end.
+     */
+    .k-document__preview.k-document__seo {
+        position: static;
+        height: auto;
         background: var(--k-canvas);
     }
 
@@ -2607,7 +2613,6 @@
         flex: 1;
         flex-direction: column;
         min-width: 0;
-        overflow: auto;
     }
 
     .k-seo__head {

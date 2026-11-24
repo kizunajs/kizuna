@@ -379,3 +379,34 @@ export const cmsRedirectVersions = pgTable('cms_redirect_versions', {
     site: text('site').primaryKey(),
     version: integer('version').notNull(),
 });
+
+/**
+ * Pages and items merged into another, `ref`, waiting for it to publish.
+ * Publishing it redirects each address of `merged` to it and takes them off
+ * the site. A document has at most one pending merge.
+ */
+export const cmsMerges = pgTable(
+    'cms_merges',
+    {
+        id: text('id').primaryKey(),
+        ref: text('ref').notNull(),
+        /**
+         * The refs of the pages and items merged into `ref`.
+         */
+        merged: jsonb('merged').notNull(),
+        /**
+         * `pending` or `done`.
+         */
+        status: text('status').notNull(),
+        createdBy: text('created_by').notNull(),
+        createdAt: timestamp('created_at', {
+            withTimezone: true,
+            mode: 'date',
+        }).notNull(),
+        doneAt: timestamp('done_at', {
+            withTimezone: true,
+            mode: 'date',
+        }),
+    },
+    (table) => [index('cms_merges_ref').on(table.ref, table.status)]
+);

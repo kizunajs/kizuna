@@ -251,6 +251,30 @@ export class RedirectStore {
         await this.db.transaction(async (tx) => touchIn(tx as unknown as CmsDatabase, sites));
     }
 
+    /**
+     * Points every redirect to one of `from`, by ref, at `to` instead, and
+     * moves the version of each site holding one on, for documents merged
+     * into another.
+     */
+    async repointDocuments(from: readonly string[], to: string): Promise<void> {
+        if (from.length === 0) return;
+        await this.db.transaction(async (tx) => {
+            const moved = await tx
+                .update(cmsRedirects)
+                .set({
+                    toValue: to,
+                })
+                .where(and(eq(cmsRedirects.toType, 'document'), inArray(cmsRedirects.toValue, [...from])))
+                .returning({
+                    site: cmsRedirects.site,
+                });
+            await touchIn(
+                tx as unknown as CmsDatabase,
+                moved.map((row) => row.site)
+            );
+        });
+    }
+
     // Editing: an editor's redirects, one at a time, from the editing routes.
 
     /**

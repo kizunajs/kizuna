@@ -267,7 +267,9 @@ beforeEach(async () => {
             answers: 40,
         },
     });
-    await pglite.exec('delete from cms_reviews; delete from cms_refs; delete from cms_versions; delete from cms_documents;');
+    await pglite.exec(
+        'delete from cms_merges; delete from cms_redirects; delete from cms_reviews; delete from cms_refs; delete from cms_versions; delete from cms_documents;'
+    );
 });
 
 afterAll(async () => {
@@ -942,6 +944,7 @@ describe('editing_similar_pages', () => {
                             path: '/plant-care/plant-doctor',
                             position: 48,
                             similarity: 0.92,
+                            fixing: null,
                         },
                         {
                             ref: 'page:uk:frontPage',
@@ -949,6 +952,7 @@ describe('editing_similar_pages', () => {
                             path: '/',
                             position: 52,
                             similarity: 0.6,
+                            fixing: null,
                         },
                     ],
                     fix: 'merge',
@@ -970,6 +974,7 @@ describe('editing_similar_pages', () => {
                             path: '/',
                             position: 14,
                             similarity: 0.58,
+                            fixing: null,
                         },
                     ],
                     fix: 'link',
@@ -990,5 +995,327 @@ describe('editing_similar_pages', () => {
         expect(answer.status).toBe(200);
         expect(answer.body.label).toBe('Sample data');
         expect(answer.body.searches).toEqual([]);
+    });
+});
+
+/**
+ * A rich text paragraph of plain words.
+ */
+const plain = (key: string, text: string) => ({
+    _type: 'block',
+    _key: key,
+    style: 'normal',
+    markDefs: [],
+    children: [
+        {
+            _type: 'span',
+            _key: `${key}-span`,
+            text,
+            marks: [],
+        },
+    ],
+});
+
+const post = (path: string, body: unknown, on = app) => request(on).post(path).send(body).set('authorization', 'Bearer token');
+
+describe('editing_merge_plan', () => {
+    it('lists what each page says that the winner does not, and refuses the front page', async () => {
+        await publish(page('plantCarePage'), {
+            heading: 'Plant care',
+            body: [plain('water', 'Water once a week.'), plain('light', 'Most plants like bright light.')],
+        });
+        await publish(page('plantDoctorPage'), {
+            heading: 'Plant doctor',
+            body: [plain('again', 'water once a week'), plain('saturday', 'Bring a sick plant on a Saturday.')],
+        });
+        await publish(page('frontPage'), {
+            heading: 'Front page',
+        });
+        const answer = await get('/editing/seo/merge-plan', {
+            winner: 'page:uk:plantCarePage',
+            pages: ['page:uk:plantDoctorPage', 'page:uk:frontPage'],
+        });
+        expect(answer.status).toBe(200);
+        expect(answer.body).toEqual({
+            winner: {
+                ref: 'page:uk:plantCarePage',
+                title: 'Plant care',
+                field: 'body',
+            },
+            pages: [
+                {
+                    ref: 'page:uk:plantDoctorPage',
+                    title: 'Plant doctor',
+                    path: '/plant-care/plant-doctor',
+                    refusal: null,
+                    parts: [
+                        {
+                            id: 'body.saturday',
+                            kind: 'paragraph',
+                            text: 'Bring a sick plant on a Saturday.',
+                            fits: true,
+                        },
+                    ],
+                },
+                {
+                    ref: 'page:uk:frontPage',
+                    title: 'Front page',
+                    path: '/',
+                    refusal: 'Front page is the front page of its site, so it stays.',
+                    parts: [],
+                },
+            ],
+        });
+        const one = await get('/editing/seo/merge-plan', {
+            winner: 'page:uk:plantCarePage',
+            pages: 'page:uk:plantDoctorPage',
+        });
+        expect(one.status).toBe(200);
+        expect(one.body.pages.map((each: { ref: string }) => each.ref)).toEqual(['page:uk:plantDoctorPage']);
+    });
+});
+
+describe('editing_merge_pages', () => {
+    it("moves the parts into the winner's draft, and redirects and unpublishes the page only when the winner publishes", async () => {
+        await publish(page('plantCarePage'), {
+            heading: 'Plant care',
+            body: [plain('water', 'Water once a week.')],
+        });
+        await publish(page('plantDoctorPage'), {
+            heading: 'Plant doctor',
+            body: [plain('again', 'Water once a week.'), plain('saturday', 'Bring a sick plant on a Saturday.')],
+        });
+        const merged = await post('/editing/seo/merge', {
+            winner: 'page:uk:plantCarePage',
+            pages: [
+                {
+                    ref: 'page:uk:plantDoctorPage',
+                    parts: ['body.saturday'],
+                },
+            ],
+        });
+        expect(merged.status).toBe(200);
+        expect(merged.body).toEqual({
+            ref: 'page:uk:plantCarePage',
+            title: 'Plant care',
+            moved: 1,
+            merging: [
+                {
+                    ref: 'page:uk:plantDoctorPage',
+                    title: 'Plant doctor',
+                },
+            ],
+            waitsForPublish: true,
+        });
+        const winner = (await service.document(page('plantCarePage'))).row!;
+        expect((winner.draft!['body'] as Array<{ children: Array<{ text: string }> }>).map((node) => node.children[0]!.text)).toEqual([
+            'Water once a week.',
+            'Plant doctor',
+            'Bring a sick plant on a Saturday.',
+        ]);
+        expect((winner.published!['body'] as unknown[]).length).toBe(1);
+        expect(await service.redirects.list('uk')).toEqual([]);
+        expect((await service.document(page('plantDoctorPage'))).row?.published).not.toBeNull();
+
+        const similar = await service.merges.pending('page:uk:plantCarePage');
+        expect(similar?.merged).toEqual(['page:uk:plantDoctorPage']);
+
+        await service.publish(page('plantCarePage'), 'ada');
+        expect(
+            (await service.redirects.list('uk')).map((redirect) => ({
+                from: redirect.from,
+                to: redirect.to,
+                status: redirect.status,
+            }))
+        ).toEqual([
+            {
+                from: '/plant-care/plant-doctor',
+                to: {
+                    type: 'document',
+                    ref: 'page:uk:plantCarePage',
+                },
+                status: 308,
+            },
+        ]);
+        expect((await service.document(page('plantDoctorPage'))).row?.published).toBeNull();
+        expect(await service.merges.pending('page:uk:plantCarePage')).toBeUndefined();
+    });
+
+    it('takes an item over now when the winner has nothing new to publish, moving it to the trash', async () => {
+        await publish(page('plantCarePage'), {
+            heading: 'Plant care',
+        });
+        const created = await service.createItem(
+            'shops',
+            {
+                name: 'Plant care shop',
+                slug: 'plant-care-shop',
+            },
+            {},
+            'ada'
+        );
+        await service.publish(created.target.ref, 'ada');
+        const ref = `item:shops:${(created.target.ref as { id: string }).id}`;
+        const merged = await post('/editing/seo/merge', {
+            winner: 'page:uk:plantCarePage',
+            pages: [
+                {
+                    ref,
+                    parts: [],
+                },
+            ],
+        });
+        expect(merged.status).toBe(200);
+        expect(merged.body.waitsForPublish).toBe(false);
+        expect((await service.redirects.list('uk')).map((redirect) => redirect.from)).toEqual(['/shops/plant-care-shop']);
+        expect(await service.trashed(created.target.ref)).toBeDefined();
+    });
+
+    it("refuses to merge the site's front page", async () => {
+        await publish(page('plantCarePage'), {
+            heading: 'Plant care',
+        });
+        await publish(page('frontPage'), {
+            heading: 'Front page',
+        });
+        const merged = await post('/editing/seo/merge', {
+            winner: 'page:uk:plantCarePage',
+            pages: [
+                {
+                    ref: 'page:uk:frontPage',
+                    parts: [],
+                },
+            ],
+        });
+        expect(merged.status).toBe(422);
+        expect(merged.body.detail).toBe('Front page is the front page of its site, so it stays.');
+        expect(await service.merges.pending('page:uk:plantCarePage')).toBeUndefined();
+    });
+
+    it('marks a page that merges into the winner in the similar pages answer', async () => {
+        await publish(page('plantCarePage'), {
+            heading: 'Plant care',
+        });
+        await publish(page('plantDoctorPage'), {
+            heading: 'Plant doctor',
+            body: [plain('saturday', 'Bring a sick plant on a Saturday.')],
+        });
+        siteAnswer = () => ({
+            checkedAt: '2026-11-20T09:00:00.000Z',
+            scores: {
+                search: 71,
+                answers: 54,
+            },
+            competing: [
+                {
+                    keyword: 'plant doctor',
+                    volume: 600,
+                    urls: [
+                        {
+                            url: 'https://hagen.example.co.uk/plant-care',
+                            position: 4,
+                        },
+                        {
+                            url: 'https://hagen.example.co.uk/plant-care/plant-doctor',
+                            position: 9,
+                            similarity: 0.9,
+                        },
+                    ],
+                },
+            ],
+        });
+        await post('/editing/seo/merge', {
+            winner: 'page:uk:plantCarePage',
+            pages: [
+                {
+                    ref: 'page:uk:plantDoctorPage',
+                    parts: ['body.saturday'],
+                },
+            ],
+        });
+        const answer = await get('/editing/seo/similar-pages', {
+            site: 'uk',
+            refresh: true,
+        });
+        expect(answer.body.searches[0].others[0].fixing).toBe('merge');
+    });
+});
+
+describe('editing_link_plan and editing_link_pages', () => {
+    it('finds the sentence that names the winner, and links it in a draft', async () => {
+        await publish(page('plantCarePage'), {
+            heading: 'Plant care',
+        });
+        await publish(page('frontPage'), {
+            heading: 'Front page',
+            body: [plain('intro', 'Fresh plants every week. Read our plant care guide before you water.')],
+        });
+        await publish(page('plantDoctorPage'), {
+            heading: 'Plant doctor',
+            body: paragraph('Read about ', 'plant care', {
+                ref: 'page:uk:plantCarePage',
+            }),
+        });
+        const plan = await get('/editing/seo/link-plan', {
+            winner: 'page:uk:plantCarePage',
+            keyword: 'how often to water houseplants',
+            pages: ['page:uk:frontPage', 'page:uk:plantDoctorPage'],
+        });
+        expect(plan.status).toBe(200);
+        expect(plan.body.pages).toEqual([
+            {
+                ref: 'page:uk:frontPage',
+                title: 'Front page',
+                path: '/',
+                refusal: null,
+                sentence: {
+                    text: 'Read our plant care guide before you water.',
+                    phrase: 'plant care',
+                    at: 9,
+                },
+            },
+            {
+                ref: 'page:uk:plantDoctorPage',
+                title: 'Plant doctor',
+                path: '/plant-care/plant-doctor',
+                refusal: 'Plant doctor links to Plant care already.',
+                sentence: null,
+            },
+        ]);
+
+        const linked = await post('/editing/seo/link', {
+            winner: 'page:uk:plantCarePage',
+            keyword: 'how often to water houseplants',
+            pages: ['page:uk:frontPage', 'page:uk:plantDoctorPage'],
+        });
+        expect(linked.status).toBe(200);
+        expect(linked.body).toEqual({
+            drafts: [
+                {
+                    ref: 'page:uk:frontPage',
+                    title: 'Front page',
+                },
+            ],
+            skipped: [
+                {
+                    ref: 'page:uk:plantDoctorPage',
+                    title: 'Plant doctor',
+                    reason: 'Plant doctor links to Plant care already.',
+                },
+            ],
+        });
+        const row = (await service.document(page('frontPage'))).row!;
+        const [intro] = row.draft!['body'] as Array<{
+            markDefs: Array<{ _key: string; ref?: string }>;
+            children: Array<{ text: string; marks: string[] }>;
+        }>;
+        const mark = intro!.markDefs[0]!;
+        expect(mark.ref).toBe('page:uk:plantCarePage');
+        expect(intro!.children.map((span) => [span.text, span.marks])).toEqual([
+            ['Fresh plants every week. Read our ', []],
+            ['plant care', [mark._key]],
+            [' guide before you water.', []],
+        ]);
+        expect((row.published!['body'] as Array<{ markDefs: unknown[] }>)[0]!.markDefs).toEqual([]);
     });
 });

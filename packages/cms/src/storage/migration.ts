@@ -190,6 +190,20 @@ create table if not exists cms_redirect_versions (
     site text primary key,
     version int not null
 );
+
+create table if not exists cms_merges (
+    id text primary key,
+    ref text not null,
+    merged jsonb not null,
+    status text not null,
+    created_by text not null,
+    created_at timestamptz not null,
+    done_at timestamptz
+);
+
+create unique index if not exists cms_merges_pending on cms_merges (ref) where status = 'pending';
+
+create index if not exists cms_merges_ref on cms_merges (ref, status);
 `;
 
 /**

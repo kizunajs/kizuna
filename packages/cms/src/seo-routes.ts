@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { Kizuna, type RouteAuth } from 'kizunajs';
 import { route } from 'kizunajs/plugin';
-import { ProblemDetailsSchema } from 'kizunajs/schemas';
+import { ProblemDetailsSchema, ValidationErrorSchema } from 'kizunajs/schemas';
 import { readMeta, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { CmsHttpError, type CmsService, type DraftState } from './cms.js';
 import type { EditingArgs, Guarded } from './action-routes.js';
@@ -14,6 +14,20 @@ import { dataFields } from './field.js';
 import { SEO_GOALS } from './seo.js';
 import type { PageSeoData, SeoCheck, SeoData, SeoScores, SiteSeoData } from './seo-data.js';
 import type { ContentDefinition } from './definitions.js';
+import type { MergeRow } from './storage/merge-store.js';
+import { mergeNow } from './merges.js';
+import {
+    mergedRichText,
+    nodesOf,
+    nodeText,
+    partKindOf,
+    richTextFieldsOf,
+    topicMatchOf,
+    unsaidNodes,
+    withLinkAt,
+    type RichTextNode,
+    type TopicMatch,
+} from './seo-fixes.js';
 
 const ScoresSchema = z.object({
     search: z.number().describe('How well it does in search results, from 0 to 100. 80 and over is good, under 50 poor.'),
@@ -183,6 +197,12 @@ export const SimilarPagesSchema = Kizuna.model({
                     others: z.array(
                         SimilarPageSchema.extend({
                             similarity: z.number().describe('How alike it is to the winner, from 0 to 1.'),
+                            fixing: z
+                                .enum(['merge', 'link'])
+                                .nullable()
+                                .describe(
+                                    '`merge` when it merges into the winner once the winner publishes, `link` when its draft links to the winner, otherwise null.'
+                                ),
                         })
                     ),
                     fix: z
@@ -192,6 +212,119 @@ export const SimilarPagesSchema = Kizuna.model({
                 })
             )
             .describe('Largest search first.'),
+    }),
+});
+
+const PlannedPageSchema = z.object({
+    ref: z.string(),
+    title: z.string(),
+    path: z.string().nullable(),
+    refusal: z.string().nullable().describe('Why it cannot take this fix, or null when it can.'),
+});
+
+export const MergePlanSchema = Kizuna.model({
+    title: 'CMS.MergePlan',
+    schema: z.object({
+        winner: z.object({
+            ref: z.string(),
+            title: z.string(),
+            field: z.string().nullable().describe('The rich text field the parts join, or null when the winner has none.'),
+        }),
+        pages: z.array(
+            PlannedPageSchema.extend({
+                parts: z
+                    .array(
+                        z.object({
+                            id: z.string().describe('What `parts` names it by when merging, its field and `_key`, like body.k3j9x2.'),
+                            kind: z.enum(['paragraph', 'heading', 'quote', 'listItem', 'image', 'block']),
+                            text: z.string().describe('Its words, or for an image or a block without words, its type.'),
+                            fits: z.boolean().describe("Whether the winner's rich text field can hold it."),
+                        })
+                    )
+                    .describe("The paragraphs and blocks of its rich text the winner does not say, in the page's order."),
+            })
+        ),
+    }),
+});
+
+export const MergeBodySchema = z.object({
+    winner: z.string().describe('The page or item to keep, like page:uk:plantCarePage.'),
+    pages: z
+        .array(
+            z.object({
+                ref: z.string().describe('A page or item to merge into the winner.'),
+                parts: z.array(z.string()).describe('The ids of the parts to move, from the merge plan.'),
+            })
+        )
+        .min(1),
+});
+
+export const MergedSchema = Kizuna.model({
+    title: 'CMS.Merged',
+    schema: z.object({
+        ref: z.string().describe('The winner, whose draft holds the moved parts.'),
+        title: z.string(),
+        moved: z.int().describe('How many parts joined its draft.'),
+        merging: z.array(
+            z.object({
+                ref: z.string(),
+                title: z.string(),
+            })
+        ),
+        waitsForPublish: z
+            .boolean()
+            .describe(
+                'True while the redirects and the trash wait for the winner to publish. False when the winner had nothing new to publish, so they happened now.'
+            ),
+    }),
+});
+
+export const LinkPlanSchema = Kizuna.model({
+    title: 'CMS.LinkPlan',
+    schema: z.object({
+        winner: z.object({
+            ref: z.string(),
+            title: z.string(),
+        }),
+        pages: z.array(
+            PlannedPageSchema.extend({
+                sentence: z
+                    .object({
+                        text: z.string(),
+                        phrase: z.string().describe('The words in it that carry the link.'),
+                        at: z.int().describe('Where the words start in `text`.'),
+                    })
+                    .nullable()
+                    .describe('The sentence where it repeats the topic, or null when none does.'),
+            })
+        ),
+    }),
+});
+
+export const LinkBodySchema = z.object({
+    winner: z.string().describe('The page or item to link to, like page:uk:plantCarePage.'),
+    keyword: z.string().describe('The search the pages compete for, the first words a link goes on.'),
+    pages: z.array(z.string()).min(1).describe('The pages and items to add the link to.'),
+});
+
+export const LinkedSchema = Kizuna.model({
+    title: 'CMS.Linked',
+    schema: z.object({
+        drafts: z
+            .array(
+                z.object({
+                    ref: z.string(),
+                    title: z.string(),
+                })
+            )
+            .describe('The drafts that now link to the winner.'),
+        skipped: z.array(
+            z.object({
+                ref: z.string(),
+                title: z.string(),
+                reason: z.string(),
+            })
+        ),
     }),
 });
 
@@ -579,6 +712,165 @@ const endOf = async (
                   },
               }),
     };
+};
+
+/**
+ * A page or item a fix names, as its source, refused when it is neither or
+ * the caller may not open it.
+ */
+const fixRefOf = (cms: CmsService, args: EditingArgs, value: string): DocumentRef => {
+    const ref = parseRef(value);
+    if (ref === undefined || ref.type === 'global') {
+        throw new CmsHttpError(400, {
+            detail: `'${value}' is not the ref of a page or an item.`,
+        });
+    }
+    return sourceRefOf(cms.canonical(cms.access(args.auth).assertSeesRef(ref)));
+};
+
+/**
+ * A page or item a fix reads and writes: its draft, or its published copy
+ * before it has one, its title and its address.
+ */
+interface FixDocument {
+    ref: DocumentRef;
+    value: string;
+    state: DraftState;
+    title: string;
+    content: Record<string, unknown>;
+    path: string | null;
+}
+
+const fixDocumentOf = async (cms: CmsService, args: EditingArgs, value: string): Promise<FixDocument> => {
+    const ref = fixRefOf(cms, args, value);
+    const formatted = formatRef(ref);
+    if ((await cms.trashed(ref)) !== undefined) {
+        throw new CmsHttpError(404, {
+            detail: `'${formatted}' is in the trash.`,
+        });
+    }
+    const state = await cms.draftState(ref);
+    if (state.row === undefined) {
+        throw new CmsHttpError(404, {
+            detail: `'${formatted}' has no content yet.`,
+        });
+    }
+    const content = state.row.draft ?? state.row.published ?? {};
+    return {
+        ref,
+        value: formatted,
+        state,
+        title: documentLabel(state),
+        content,
+        path: cms.addressOf(state.target, content) ?? null,
+    };
+};
+
+/**
+ * Each rich text field of a document with the nodes it holds.
+ */
+const richTextOf = (document: FixDocument): Array<{ field: string; nodes: RichTextNode[] }> =>
+    richTextFieldsOf(document.state.target.definition).map((field) => ({
+        field,
+        nodes: nodesOf(document.content[field]),
+    }));
+
+const typeWords = (type: string): string =>
+    type
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .toLowerCase()
+        .replace(/^./, (first) => first.toUpperCase());
+
+/**
+ * The parts of a page's rich text the winner does not say, each named by its
+ * field and `_key`, and whether the winner's field can hold it.
+ */
+const unsaidPartsOf = (winner: FixDocument, field: string | null, page: FixDocument) => {
+    const said = richTextOf(winner).flatMap((each) => each.nodes);
+    const schema =
+        field === null ? undefined : dataFields(winner.state.target.definition.fields).find((candidate) => candidate.name === field)?.schema;
+    return richTextOf(page).flatMap((each) =>
+        unsaidNodes(said, each.nodes)
+            .filter((node) => typeof node['_key'] === 'string')
+            .map((node) => {
+                const text = nodeText(node);
+                return {
+                    id: `${each.field}.${String(node['_key'])}`,
+                    kind: partKindOf(node),
+                    text: text === '' ? typeWords(String(node['_type'])) : text,
+                    fits: schema !== undefined && schema.safeParse([node]).success,
+                    node,
+                };
+            })
+    );
+};
+
+/**
+ * Why a page cannot merge into the winner, or null when it can: it is the
+ * winner, the site's front page, shared content the caller may not take off
+ * every site, or part of another merge.
+ */
+const mergeRefusalOf = (
+    cms: CmsService,
+    args: EditingArgs,
+    winner: FixDocument,
+    page: FixDocument,
+    pending: readonly MergeRow[]
+): string | null => {
+    if (page.value === winner.value) return `${page.title} is the page to keep.`;
+    if (page.ref.type === 'page' && page.path === '/') return `${page.title} is the front page of its site, so it stays.`;
+    if (!cms.mayPublish(cms.access(args.auth), page.ref)) {
+        return `${page.title} is shared by every site, so only an admin over every site can take it off them.`;
+    }
+    if (pending.some((merge) => merge.ref === page.value)) {
+        return `Other pages merge into ${page.title} when it publishes. Publish it first.`;
+    }
+    if (pending.some((merge) => merge.ref !== winner.value && merge.merged.includes(page.value))) {
+        return `${page.title} already merges into another page when that page publishes.`;
+    }
+    return null;
+};
+
+/**
+ * The words a link to the winner goes on, the search first, then the
+ * winner's title.
+ */
+const topicPhrases = (keyword: string | undefined, winner: FixDocument): string[] =>
+    [keyword ?? '', winner.title].filter((phrase, index, all) => phrase.trim().length >= 3 && all.indexOf(phrase) === index);
+
+/**
+ * Where a page repeats the topic, or why it takes no link: it links to the
+ * winner already, or no sentence says the topic.
+ */
+const linkPlanOf = (
+    winner: FixDocument,
+    page: FixDocument,
+    keyword: string | undefined
+): { match: TopicMatch; refusal: null } | { match: undefined; refusal: string } => {
+    if (page.value === winner.value) {
+        return {
+            match: undefined,
+            refusal: `${page.title} is the page they link to.`,
+        };
+    }
+    if (heldLinksOf(page.content).some((link) => link.ref === winner.value)) {
+        return {
+            match: undefined,
+            refusal: `${page.title} links to ${winner.title} already.`,
+        };
+    }
+    const match = topicMatchOf(richTextOf(page), topicPhrases(keyword, winner));
+    return match === undefined
+        ? {
+              match: undefined,
+              refusal: `No sentence in ${page.title} says ${topicPhrases(keyword, winner)
+                  .map((phrase) => `"${phrase}"`)
+                  .join(' or ')}.`,
+          }
+        : {
+              match,
+              refusal: null,
+          };
 };
 
 /**
@@ -1298,6 +1590,7 @@ export const seoRoutes = (input: { editor: RouteAuth; editingBase: `/${string}`;
                     detail: `${seoData.label} did not answer for ${base}: ${error instanceof Error ? error.message : String(error)}`,
                 });
             }
+            const pending = await cms.merges.allPending();
             const searches = [];
             for (const competing of data.competing ?? []) {
                 const matched = new Map<
@@ -1336,10 +1629,21 @@ export const seoRoutes = (input: { editor: RouteAuth; editingBase: `/${string}`;
                           }),
                 });
                 const winner = shown(best!);
-                const others = rest.map((entry) => ({
-                    ...shown(entry),
-                    similarity: entry.similarity ?? 0,
-                }));
+                const others = [];
+                for (const entry of rest) {
+                    let fixing: 'merge' | 'link' | null = null;
+                    if (pending.some((merge) => merge.ref === winner.ref && merge.merged.includes(entry.page.ref))) {
+                        fixing = 'merge';
+                    } else {
+                        const row = (await cms.document(parseRef(entry.page.ref)!)).row;
+                        if (heldLinksOf(row?.draft ?? row?.published ?? {}).some((link) => link.ref === winner.ref)) fixing = 'link';
+                    }
+                    others.push({
+                        ...shown(entry),
+                        similarity: entry.similarity ?? 0,
+                        fixing,
+                    });
+                }
                 const fix: 'merge' | 'link' = others.some((other) => other.similarity >= MERGE_SIMILARITY) ? 'merge' : 'link';
                 searches.push({
                     keyword: competing.keyword,
@@ -1366,11 +1670,299 @@ export const seoRoutes = (input: { editor: RouteAuth; editingBase: `/${string}`;
         }) as never
     );
 
+    const mergePlan = route({
+        method: 'GET',
+        path: `${input.editingBase}/seo/merge-plan`,
+        auth: input.editor,
+        summary: 'List what each page to merge says that the page to keep does not',
+        description:
+            "For each page or item in `pages`, the paragraphs and blocks of its rich text the winner does not say already, compared by their words, and why a page cannot merge, like being the site's front page. Read it before `editing_merge_pages`, which takes the ids of the parts to move.",
+        tool: true,
+        query: z.object({
+            winner: z.string().describe('The page or item to keep, like page:uk:plantCarePage.'),
+            pages: z.array(z.string()).describe('The pages and items to merge into it.'),
+        }),
+        responses: {
+            200: {
+                body: MergePlanSchema,
+                cache: 'no-store',
+            },
+            400: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+        },
+    }).handler(
+        input.guarded(async (cms, args) => {
+            const query = args.query as { winner: string; pages: string[] };
+            const winner = await fixDocumentOf(cms, args, query.winner);
+            const field = richTextFieldsOf(winner.state.target.definition)[0] ?? null;
+            const pending = await cms.merges.allPending();
+            const pages = [];
+            for (const value of [query.pages].flat()) {
+                const page = await fixDocumentOf(cms, args, value);
+                pages.push({
+                    ref: page.value,
+                    title: page.title,
+                    path: page.path,
+                    refusal: mergeRefusalOf(cms, args, winner, page, pending),
+                    parts: unsaidPartsOf(winner, field, page).map(({ node: _node, ...part }) => part),
+                });
+            }
+            return {
+                status: 200,
+                body: {
+                    winner: {
+                        ref: winner.value,
+                        title: winner.title,
+                        field,
+                    },
+                    pages,
+                },
+            };
+        }) as never
+    );
+
+    const mergePages = route({
+        method: 'POST',
+        path: `${input.editingBase}/seo/merge`,
+        auth: input.editor,
+        summary: 'Merge pages into the page to keep, which takes them over when it publishes',
+        description:
+            "Moves the parts named in each page's `parts`, ids from `editing_merge_plan`, into the winner's draft at the end of its rich text, under a heading with that page's title. When the winner publishes, each merged page's address redirects to it, a merged item goes to the trash and a merged page is unpublished. Until then the site stays as it is. A winner with nothing new to publish takes them over now. The person confirms before this runs.",
+        tool: {
+            needsApproval: true,
+        },
+        body: MergeBodySchema,
+        responses: {
+            200: {
+                body: MergedSchema,
+                cache: 'no-store',
+            },
+            400: ProblemDetailsSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+            422: ValidationErrorSchema,
+        },
+    }).handler(
+        input.guarded(async (cms, args) => {
+            const body = args.body as z.output<typeof MergeBodySchema>;
+            const author = cms.author(args.auth?.[cms.identity]);
+            const access = cms.access(args.auth);
+            const winner = await fixDocumentOf(cms, args, body.winner);
+            const field = richTextFieldsOf(winner.state.target.definition)[0];
+            const pending = await cms.merges.allPending();
+            const sections: Array<{ title: string; nodes: RichTextNode[] }> = [];
+            const merging: Array<{ ref: string; title: string }> = [];
+            for (const asked of body.pages) {
+                const page = await fixDocumentOf(cms, args, asked.ref);
+                if (merging.some((each) => each.ref === page.value)) continue;
+                const refusal = mergeRefusalOf(cms, args, winner, page, pending);
+                if (refusal !== null) {
+                    throw new CmsHttpError(422, {
+                        detail: refusal,
+                        errors: [],
+                    });
+                }
+                const chosen = new Set(asked.parts);
+                const parts = field === undefined ? [] : unsaidPartsOf(winner, field, page).filter((part) => chosen.has(part.id));
+                const unfit = parts.find((part) => !part.fits);
+                if (unfit !== undefined) {
+                    throw new CmsHttpError(422, {
+                        detail: `${winner.title} cannot hold the ${unfit.kind === 'block' ? unfit.text.toLowerCase() : unfit.kind} '${unfit.id}' of ${page.title}. Leave it out.`,
+                        errors: [],
+                    });
+                }
+                if (asked.parts.length > 0 && field === undefined) {
+                    throw new CmsHttpError(422, {
+                        detail: `${winner.title} has no rich text field to move the parts into.`,
+                        errors: [],
+                    });
+                }
+                sections.push({
+                    title: page.title,
+                    nodes: parts.map((part) => part.node),
+                });
+                merging.push({
+                    ref: page.value,
+                    title: page.title,
+                });
+            }
+            const moved = sections.reduce((sum, section) => sum + section.nodes.length, 0);
+            if (moved > 0 && field !== undefined) {
+                await cms.assertNotHeld(winner.ref, author);
+                await cms.update({
+                    ref: winner.ref,
+                    changes: {
+                        [field]: mergedRichText(nodesOf(winner.content[field]), sections),
+                    },
+                    caller: access.callerFor(winner.ref),
+                    access,
+                    author,
+                    summary: `Merged ${merging.map((page) => page.title).join(', ')} into this page`,
+                });
+            }
+            await cms.merges.record(
+                winner.value,
+                merging.map((page) => page.ref),
+                author
+            );
+            const status = (await cms.draftState(winner.ref)).status;
+            const waitsForPublish = status !== 'published';
+            if (!waitsForPublish) await mergeNow(cms, winner.ref, author);
+            return {
+                status: 200,
+                body: {
+                    ref: winner.value,
+                    title: winner.title,
+                    moved,
+                    merging,
+                    waitsForPublish,
+                },
+            };
+        }) as never
+    );
+
+    const linkPlan = route({
+        method: 'GET',
+        path: `${input.editingBase}/seo/link-plan`,
+        auth: input.editor,
+        summary: 'Find the sentence where each competing page repeats the topic, to link it to the page to keep',
+        description:
+            "For each page or item in `pages`, the first sentence of its rich text that says the search or the winner's title, with the words a link to the winner goes on, or why it takes no link. Read it before `editing_link_pages`.",
+        tool: true,
+        query: z.object({
+            winner: z.string().describe('The page or item to link to, like page:uk:plantCarePage.'),
+            keyword: z.string().optional().describe('The search the pages compete for.'),
+            pages: z.array(z.string()).describe('The pages and items to link from.'),
+        }),
+        responses: {
+            200: {
+                body: LinkPlanSchema,
+                cache: 'no-store',
+            },
+            400: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+        },
+    }).handler(
+        input.guarded(async (cms, args) => {
+            const query = args.query as { winner: string; keyword?: string; pages: string[] };
+            const winner = await fixDocumentOf(cms, args, query.winner);
+            const pages = [];
+            for (const value of [query.pages].flat()) {
+                const page = await fixDocumentOf(cms, args, value);
+                const plan = linkPlanOf(winner, page, query.keyword);
+                pages.push({
+                    ref: page.value,
+                    title: page.title,
+                    path: page.path,
+                    refusal: plan.refusal,
+                    sentence:
+                        plan.match === undefined
+                            ? null
+                            : {
+                                  text: plan.match.sentence,
+                                  phrase: plan.match.phrase,
+                                  at: plan.match.at,
+                              },
+                });
+            }
+            return {
+                status: 200,
+                body: {
+                    winner: {
+                        ref: winner.value,
+                        title: winner.title,
+                    },
+                    pages,
+                },
+            };
+        }) as never
+    );
+
+    const linkPages = route({
+        method: 'POST',
+        path: `${input.editingBase}/seo/link`,
+        auth: input.editor,
+        summary: 'Link competing pages to the page to keep, in their drafts',
+        description:
+            "Writes a draft of each page or item in `pages` with a link to the winner on the words where it repeats the topic, as `editing_link_plan` finds them. A page that links to the winner already, or says the topic nowhere, is skipped and named in `skipped`. Nothing goes live until each draft is published.",
+        tool: true,
+        body: LinkBodySchema,
+        responses: {
+            200: {
+                body: LinkedSchema,
+                cache: 'no-store',
+            },
+            400: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            422: ValidationErrorSchema,
+        },
+    }).handler(
+        input.guarded(async (cms, args) => {
+            const body = args.body as z.output<typeof LinkBodySchema>;
+            const author = cms.author(args.auth?.[cms.identity]);
+            const access = cms.access(args.auth);
+            const winner = await fixDocumentOf(cms, args, body.winner);
+            const drafts: Array<{ ref: string; title: string }> = [];
+            const skipped: Array<{ ref: string; title: string; reason: string }> = [];
+            for (const value of [...new Set(body.pages)]) {
+                const page = await fixDocumentOf(cms, args, value);
+                const plan = linkPlanOf(winner, page, body.keyword);
+                const linked =
+                    plan.match === undefined ? undefined : withLinkAt(nodesOf(page.content[plan.match.field]), plan.match, winner.value);
+                if (plan.match === undefined || linked === undefined) {
+                    skipped.push({
+                        ref: page.value,
+                        title: page.title,
+                        reason: plan.refusal ?? `${page.title} changed. Look again.`,
+                    });
+                    continue;
+                }
+                try {
+                    await cms.assertNotHeld(page.ref, author);
+                } catch (error) {
+                    if (!(error instanceof CmsHttpError)) throw error;
+                    skipped.push({
+                        ref: page.value,
+                        title: page.title,
+                        reason: `Someone else is editing ${page.title}.`,
+                    });
+                    continue;
+                }
+                await cms.update({
+                    ref: page.ref,
+                    changes: {
+                        [plan.match.field]: linked,
+                    },
+                    caller: access.callerFor(page.ref),
+                    access,
+                    author,
+                    summary: `Linked to ${winner.title}`,
+                });
+                drafts.push({
+                    ref: page.value,
+                    title: page.title,
+                });
+            }
+            return {
+                status: 200,
+                body: {
+                    drafts,
+                    skipped,
+                },
+            };
+        }) as never
+    );
+
     return {
         pageSeo,
         siteSeo,
         linkMap,
         pageScores,
         similarPages,
+        mergePlan,
+        mergePages,
+        linkPlan,
+        linkPages,
     };
 };

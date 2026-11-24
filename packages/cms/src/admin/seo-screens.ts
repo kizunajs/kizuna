@@ -239,6 +239,11 @@ export interface SimilarSearch {
              * How much of the winner it says, from 0 to 1.
              */
             similarity: number;
+            /**
+             * `merge` while it waits to merge into the winner, `link` once its
+             * draft links to the winner.
+             */
+            fixing: 'merge' | 'link' | null;
         }
     >;
     fix: 'merge' | 'link';
@@ -262,9 +267,10 @@ export const similarBandOf = (search: SimilarSearch): SeoBand => (search.fix ===
 
 /**
  * The fix for a group of competing pages: its title, what happens, and the
- * button's words.
+ * button's words. Once every page is merging or linked, the button opens
+ * the winner, which is what is left to publish.
  */
-export const similarFixOf = (search: SimilarSearch): { title: string; sentence: string; action: string } => {
+export const similarFixOf = (search: SimilarSearch): { title: string; sentence: string; action: string; done: boolean } => {
     const winner = search.winner.title;
     const [only] = search.others;
     const pages =
@@ -273,17 +279,146 @@ export const similarFixOf = (search: SimilarSearch): { title: string; sentence: 
             : search.others.length === 2
               ? 'both pages'
               : `the ${search.others.length} pages`;
+    const one = search.others.length === 1;
+    const done = search.others.length > 0 && search.others.every((page) => page.fixing !== null);
     if (search.fix === 'merge') {
-        const one = search.others.length === 1;
         return {
             title: `Merge ${pages} into ${winner}`,
-            sentence: `Move what only ${one ? 'it says' : 'they say'} into ${winner}, then redirect ${one ? 'its address' : 'their addresses'} to it from Redirects.`,
-            action: `Open ${winner}`,
+            sentence: done
+                ? `${one ? 'It merges' : 'They merge'} into ${winner} when ${winner} publishes.`
+                : `Move what only ${one ? 'it says' : 'they say'} into ${winner}. When ${winner} publishes, ${one ? 'its address redirects' : 'their addresses redirect'} to it.`,
+            action: done ? `Open ${winner}` : `Merge into ${winner}…`,
+            done,
         };
     }
     return {
         title: `Link ${pages} to ${winner}`,
-        sentence: `Add a link to ${winner} where ${search.others.length === 1 ? 'it repeats' : 'they repeat'} what ${winner} says.`,
-        action: `Open ${winner}`,
+        sentence: done
+            ? `${one ? 'Its draft links' : 'Their drafts link'} to ${winner}. Publish ${one ? 'it' : 'them'} to put the ${one ? 'link' : 'links'} live.`
+            : `Add a link to ${winner} where ${one ? 'it repeats' : 'they repeat'} what ${winner} says.`,
+        action: done ? `Open ${winner}` : `Add links to ${winner}…`,
+        done,
     };
 };
+
+/**
+ * One part of a page's rich text in the merge dialog.
+ */
+export interface MergePart {
+    id: string;
+    kind: 'paragraph' | 'heading' | 'quote' | 'listItem' | 'image' | 'block';
+    text: string;
+    fits: boolean;
+}
+
+/**
+ * What `editing_merge_plan` answers.
+ */
+export interface MergePlan {
+    winner: {
+        ref: string;
+        title: string;
+        field: string | null;
+    };
+    pages: Array<{
+        ref: string;
+        title: string;
+        path: string | null;
+        refusal: string | null;
+        parts: MergePart[];
+    }>;
+}
+
+/**
+ * What `editing_merge_pages` answers.
+ */
+export interface MergedAnswer {
+    ref: string;
+    title: string;
+    moved: number;
+    merging: Array<{
+        ref: string;
+        title: string;
+    }>;
+    waitsForPublish: boolean;
+}
+
+/**
+ * What `editing_link_plan` answers.
+ */
+export interface LinkPlan {
+    winner: {
+        ref: string;
+        title: string;
+    };
+    pages: Array<{
+        ref: string;
+        title: string;
+        path: string | null;
+        refusal: string | null;
+        sentence: {
+            text: string;
+            phrase: string;
+            at: number;
+        } | null;
+    }>;
+}
+
+/**
+ * What `editing_link_pages` answers.
+ */
+export interface LinkedAnswer {
+    drafts: Array<{
+        ref: string;
+        title: string;
+    }>;
+    skipped: Array<{
+        ref: string;
+        title: string;
+        reason: string;
+    }>;
+}
+
+/**
+ * The pages a fix starts from: those not merging or linked yet.
+ */
+export const pagesToFixOf = (search: SimilarSearch): SimilarSearch['others'] => search.others.filter((page) => page.fixing === null);
+
+/**
+ * What the merge dialog starts with: each page that may merge, ticked when
+ * it says nearly what the winner says, and every part that fits, ticked.
+ */
+export const mergeChoicesOf = (
+    plan: MergePlan,
+    similarity: ReadonlyMap<string, number>
+): { pages: Set<string>; parts: Set<string> } => {
+    const open = plan.pages.filter((page) => page.refusal === null);
+    return {
+        pages: new Set(open.filter((page) => (similarity.get(page.ref) ?? 0) >= MERGE_SIMILARITY).map((page) => page.ref)),
+        parts: new Set(open.flatMap((page) => page.parts.filter((part) => part.fits).map((part) => `${page.ref} ${part.id}`))),
+    };
+};
+
+/**
+ * The merge body from what the dialog ticks: each ticked page with its
+ * ticked parts.
+ */
+export const mergeBodyOf = (
+    plan: MergePlan,
+    pages: ReadonlySet<string>,
+    parts: ReadonlySet<string>
+): { winner: string; pages: Array<{ ref: string; parts: string[] }> } => ({
+    winner: plan.winner.ref,
+    pages: plan.pages
+        .filter((page) => page.refusal === null && pages.has(page.ref))
+        .map((page) => ({
+            ref: page.ref,
+            parts: page.parts.filter((part) => part.fits && parts.has(`${page.ref} ${part.id}`)).map((part) => part.id),
+        })),
+});
+
+/**
+ * Titles as a sentence lists them: "A", "A and B", "A, B and C".
+ */
+export const titlesOf = (titles: readonly string[]): string =>
+    titles.length <= 1 ? (titles[0] ?? '') : `${titles.slice(0, -1).join(', ')} and ${titles[titles.length - 1]}`;
