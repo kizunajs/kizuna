@@ -13,6 +13,7 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - 'next@16.3.8'
   - '@next/*'
+  - '@kizunajs/*'
 
 catalog:
   '@hono/node-server': ^1.19.18

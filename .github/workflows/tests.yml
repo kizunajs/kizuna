@@ -30,6 +30,9 @@ jobs:
             - name: Lint
               run: pnpm lint
 
+            - name: Shared rules in CLAUDE.md
+              run: pnpm exec kizuna-tooling sync-claude --check
+
             - name: Build
               run: pnpm build
 
