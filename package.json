@@ -27,25 +27,22 @@
     "lint": "pnpm --filter kizunajs --filter @kizunajs/eslint-plugin build && eslint .",
     "lint:fix": "pnpm --filter @kizunajs/eslint-plugin build && eslint . --fix",
     "docs": "pnpm --filter docs dev",
-    "release": "release-it",
+    "release": "kizuna-release",
     "kizuna:generate": "pnpm -r --filter \"@kizunajs-demo/express\" --filter \"@kizunajs-demo/fastify\" --filter \"@kizunajs-demo/hono\" --filter \"@kizunajs-demo/next\" kizuna:generate",
     "kizuna:check": "pnpm -r --filter \"@kizunajs-demo/express\" --filter \"@kizunajs-demo/fastify\" --filter \"@kizunajs-demo/hono\" --filter \"@kizunajs-demo/next\" kizuna:check"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
-    "@eslint/js": "^9.39.5",
     "@hey-api/openapi-ts": "0.99.0",
     "@kizunajs/eslint-plugin": "workspace:*",
     "@kizunajs/fetch": "workspace:*",
-    "@release-it/conventional-changelog": "^11.0.1",
+    "@kizunajs/release": "^0.7.0",
+    "@kizunajs/tooling": "^0.2.0",
     "@types/supertest": "^6.0.3",
     "@vscode/vsce": "^3.9.2",
     "concurrently": "catalog:",
     "esbuild": "^0.28.2",
     "eslint": "catalog:",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-jsdoc": "^64.5.4",
-    "eslint-plugin-prettier": "^5.5.7",
     "jest-expect-openapi": "^6.3.1",
     "ovsx": "^1.3.0",
     "prettier": "^3.9.10",
@@ -57,5 +54,6 @@
     "typescript-eslint": "^8.72.1",
     "vitest": "3.2.4"
   },
+  "prettier": "@kizunajs/tooling/prettier",
   "packageManager": "pnpm@11.28.9+sha512.35421cea2720eca3f5ad722b67e8ef18f4d3cd4745ed2fcfeb0dc288d4e9437fad3870d91ee6e83f268f0f6f7e0f62723317b19617bb45ee4333172ef51159f8"
 }

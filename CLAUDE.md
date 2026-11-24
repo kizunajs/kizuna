@@ -74,63 +74,11 @@ Deliberate omissions: no LLM clients, no agent loop, no provider wire shapes, an
 
 # Naming
 
-Use full English words.
-
-- No single-letter names (`u`, `x`, `s`, `r`, `v`, `i`). Use `user`, `candidate`, `server`, `result`, `value`, `index`.
-- No truncated abbreviations (`idx`, `cfg`, `usr`). Spell it out.
-- Name callback parameters after what they represent: `users.find((candidate) => ...)`.
-
-Exceptions: `_` for unused, `req`/`res`/`next` in Express handlers, `_`-prefixed unused params, and namespace tokens (`k`, `z`).
-
-# Object literals
-
-Always multi-line. Every property on its own line, every nested object expanded, even single-property ones.
-
-```ts
-// no
-client.getUser({ params: { id: '1' } });
-client.getUser({
-    params: { id: '1' },
-});
-
-// yes
-client.getUser({
-    params: {
-        id: '1',
-    },
-});
-```
-
-# JSDoc
-
-Always multi-line. `/**` on its own line, content on its own line(s), `*/` on its own line, even for one-liners.
-
-```ts
-// no
-/** Return an `AdapterResult` to override the default outcome. */
-onError?: (...) => ...;
-
-// yes
-/**
- * Return an `AdapterResult` to override the default outcome.
- */
-onError?: (...) => ...;
-```
-
-# Git
-
-Never add `Co-Authored-By` trailers for AI agents (Claude, Copilot, Cursor, etc.) to commit messages. AI is a tool, not an author.
+`req`, `res` and `next` in Express handlers are exceptions too.
 
 # Writing
 
-Applies equally to docs pages, README, JSDoc, and code comments.
-
-- **Plain over clever.** If a sentence has to be decoded, it is wrong. A reader should never have to supply the meaning of your metaphor.
-- **Say the concrete thing.** "Swift and Kotlin clients" rather than "native clients". Name what the reader gets, not the category it belongs to.
-- **Prefer commas and full stops over em dashes.** An em dash rarely earns the interruption it creates. Where a sentence needs a break, use a comma or start a new sentence, not a semicolon.
-- **One idea per example.** A snippet that demonstrates two things teaches neither. Split it.
-- **Stop when it is said.** No filler ("simply", "seamlessly", "powerful", "just"), no restating the previous sentence, no explaining what the reader already worked out.
-- **Never define a thing by what it is not.** "It is not a wrapper, it is a contract", "an alternative rather than a rewrite", "this is not about performance". Naming the thing you did not mean forces the reader to hold two ideas to arrive at one. Say the thing.
+Where a sentence needs a break, use a comma or start a new sentence, never a semicolon.
 
 # Comments
 
@@ -220,3 +168,106 @@ JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home" ./gra
 # Formatting
 
 After finishing code edits, always run `pnpm format:check` to verify formatting. If it fails, run `pnpm format` to fix it.
+
+<!-- @kizunajs/tooling start. This part comes from CLAUDE.shared.md in @kizunajs/tooling. Change it there, then run `kizuna-tooling sync-claude`. -->
+
+# Naming
+
+Use full English words.
+
+- No single-letter names (`u`, `x`, `s`, `r`, `v`, `i`). Use `user`, `candidate`, `server`, `result`, `value`, `index`.
+- No truncated abbreviations (`idx`, `cfg`, `usr`). Spell it out.
+- Name callback parameters after what they represent: `users.find((candidate) => ...)`.
+
+Exceptions: `_` for unused, `_`-prefixed unused params, and namespace tokens (`k`, `z`). A repo's own CLAUDE.md can add a few more.
+
+# Object literals
+
+Always multi-line. Every property on its own line, every nested object expanded, even single-property ones.
+
+```ts
+// no
+client.getUser({ params: { id: '1' } });
+client.getUser({
+    params: { id: '1' },
+});
+
+// yes
+client.getUser({
+    params: {
+        id: '1',
+    },
+});
+```
+
+# JSDoc
+
+Always multi-line. `/**` on its own line, content on its own line(s), `*/` on its own line, even for one-liners.
+
+```ts
+// no
+/** The label a person reads. */
+label: string;
+
+// yes
+/**
+ * The label a person reads.
+ */
+label: string;
+```
+
+# Writing
+
+Applies equally to docs, README, JSDoc and code comments.
+
+- **American English.** behavior, center, color, organization, canceled.
+- **Short sentences.** One idea per sentence and few commas. Two sentences beat one with a list of clauses.
+- **Plain over clever.** If a sentence has to be decoded, it is wrong. A reader should never have to supply the meaning of your metaphor.
+- **Say the concrete thing.** "Swift and Kotlin clients" rather than "native clients". Name what the reader gets, not the category it belongs to.
+- **Join phrases with a comma, a period or a new line.** Never with "·", "–" or "—".
+- **One idea per example.** A snippet that demonstrates two things teaches neither. Split it.
+- **Stop when it is said.** No filler ("simply", "seamlessly", "powerful", "just"), no restating the previous sentence, no explaining what the reader already worked out.
+- **Never define a thing by what it is not.** "It is not a wrapper, it is a contract" makes the reader hold two ideas to arrive at one. Say the thing.
+
+# Comments
+
+A comment says what a thing is for. It never holds design discussion, history or a debate about alternatives. Those belong in the PR.
+
+Examples in comments and JSDoc use names from this repo's own examples, never from client projects.
+
+# Git
+
+Never add `Co-Authored-By` trailers for AI agents (Claude, Copilot, Cursor, etc.) to commit messages, and never mention AI in commits, PR titles or PR descriptions. AI is a tool, not an author.
+
+Commit messages and PR titles follow Conventional Commits with the package folder as scope: `feat(core): ...`. `deps` is a scope too, and a repo's own CLAUDE.md lists any others. Mark breaking changes with `!`.
+
+# Releasing
+
+`@kizunajs/release` releases the repo. `pnpm release` runs `kizuna-release`, which works out the next version from the conventional commits, writes it into the packages, tags it, writes the GitHub release and publishes to npm.
+
+- `--dry-run` shows the next version and its changelog, and changes nothing. Run it before every real release.
+- `--pre beta` releases `<version>-beta.<n>` under the `beta` dist-tag.
+- `--major` lets a breaking change bump the major. Without it a `!` bumps the minor, on a beta, a 0.x and a stable version alike.
+- A `feat` bumps the minor and a `fix`, `perf` or `revert` the patch. Commits of any other type release nothing, unless the release config sets `releaseEveryCommit: true` or gives the type its own bump.
+- `kizuna-release publish --dry-run` packs each package and lists its files without publishing.
+
+# Publishing
+
+Every package under `packages/` publishes to npmjs. Publishing uses npm trusted publishing from GitHub Actions, with no stored token.
+
+`private: true` is what keeps a package unpublished. A new package ships with it until its first publish, since npm cannot configure a trusted publisher for a package that does not exist yet:
+
+1. Let a release go out first, so the sibling versions the new package pins are on npm.
+2. Publish it once by hand from a clean checkout of the release tag, with `private: true` deleted in the working tree: `pnpm --filter <name> publish --access public --no-git-checks`. Answer the 2FA prompt.
+3. Add the trusted publisher on the package's npm access page: GitHub Actions, the `kizunajs` organization, this repository, workflow `release.yaml`.
+4. Commit the removal of `private: true`.
+
+Every package keeps every field its siblings have: `description`, `keywords`, `license`, `homepage`, `repository` with its `directory`, `bugs`, `sideEffects`, `engines` and `publishConfig.access` set to `public`. A scoped package publishes restricted without that last one. Each has a `README.md` with the description, an install line, the smallest snippet that works and a docs link.
+
+When changing any exported function, type or option, check whether a README, JSDoc example or docs page references the old API, and update it in the same change.
+
+# Checks
+
+Before you finish a change, run `pnpm format:check`, `pnpm lint`, `pnpm typecheck` and `pnpm test`. Fix what fails. `pnpm format` fixes the formatting.
+
+<!-- @kizunajs/tooling end -->
