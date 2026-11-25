@@ -26,15 +26,25 @@ export const resendPlugin = definePlugin({
     basePath: '/resend',
     options: ResendPluginOptionsSchema,
     setup: ({ options }) => {
-        const resend = new Resend(options.apiKey, options.resend);
+        const { apiKey } = options;
+        let client: Resend | undefined;
+        // Made on first use, since `new Resend` throws without a key.
+        const getClient = (): Resend => {
+            if (apiKey === undefined) throw new Error('[kizuna/resend] apiKey is required');
+            client ??= new Resend(apiKey, options.resend);
+            return client;
+        };
         const routes: PluginRoutes = {};
         if (options.webhookSecret !== undefined) {
-            routes.webhook = webhookRoute(resend, options.webhookSecret, options.on ?? {});
+            routes.webhook = webhookRoute(getClient, options.webhookSecret, options.on ?? {});
         }
 
         return {
-            exports: resendExports(resend, options),
+            exports: resendExports(getClient, options),
             routes,
+            start: () => {
+                if (apiKey === undefined) throw new Error('apiKey is required');
+            },
         };
     },
 });

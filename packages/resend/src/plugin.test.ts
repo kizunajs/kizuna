@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { defineConfig } from 'kizunajs';
+import { startJobs } from 'kizunajs/jobs';
 import { pluginExportsOf } from 'kizunajs/adapter';
 import { expressAdapter } from '@kizunajs/express';
 import { resendPlugin } from './plugin.js';
@@ -107,18 +108,53 @@ const install = (on?: ResendEventHandlers, intercept?: ResendPluginProps['interc
 const resendOf = (api: unknown) => pluginExportsOf(api).resend as ReturnType<typeof import('./requests.js').resendExports>;
 
 describe('resendPlugin options', () => {
-    it('stops the app without an API key, naming the field', () => {
-        expect(() =>
-            defineConfig({
-                routes: [],
-                plugins: [
-                    resendPlugin({
-                        apiKey: undefined as never,
-                        from: 'Kizuna <hello@example.com>',
-                    }),
-                ],
-            })
-        ).toThrow(/\[kizuna\] Plugin 'resend' has invalid options: apiKey is required/);
+    const withApiKey = (apiKey: string | undefined) =>
+        defineConfig({
+            adapter: expressAdapter(),
+            routes: [],
+            jobs,
+            jobRunner: {
+                mode: 'long-running',
+                transport: false,
+            },
+            plugins: [
+                resendPlugin({
+                    apiKey,
+                    from: 'Kizuna <hello@example.com>',
+                }),
+            ],
+        });
+
+    it('loads the config without an API key, so kizuna generate runs without one', () => {
+        for (const apiKey of [undefined, '', '   ']) {
+            expect(() => withApiKey(apiKey)).not.toThrow();
+        }
+    });
+
+    it('stops the app from serving without an API key, naming the field', () => {
+        for (const apiKey of [undefined, '', '   ']) {
+            expect(() => withApiKey(apiKey).api.mount(express())).toThrow("[kizuna] Plugin 'resend' can't start: apiKey is required");
+        }
+    });
+
+    it('stops the jobs from starting without an API key', () => {
+        expect(() => startJobs(withApiKey('').api)).toThrow("[kizuna] Plugin 'resend' can't start: apiKey is required");
+    });
+
+    it('stops the app without a sender, naming the field', () => {
+        for (const from of [undefined, '', '   ']) {
+            expect(() =>
+                defineConfig({
+                    routes: [],
+                    plugins: [
+                        resendPlugin({
+                            apiKey: 're_test',
+                            from,
+                        }),
+                    ],
+                })
+            ).toThrow(/\[kizuna\] Plugin 'resend' has invalid options: from is required/);
+        }
     });
 
     it('stops the app on a sender Resend would refuse', () => {

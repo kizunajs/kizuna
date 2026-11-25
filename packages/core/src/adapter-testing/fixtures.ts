@@ -1496,6 +1496,24 @@ export const pluginInput = {
 
 export const pluginContract = defineConfig(pluginInput).api;
 
+const keylessPlugin = definePlugin({
+    slug: 'mailer',
+    setup: () => ({
+        start: () => {
+            throw new Error('apiKey is required');
+        },
+    }),
+});
+
+/**
+ * The plugin fixture beside a plugin whose `start` throws, the way a plugin
+ * without its API key stops the app.
+ */
+export const keylessPluginInput = {
+    ...pluginInput,
+    plugins: [...pluginInput.plugins, keylessPlugin()],
+};
+
 // Holds the generator before its last event. Open by default; `hold()` arms it for one test.
 const createStreamGate = () => {
     let open: Promise<void> = Promise.resolve();

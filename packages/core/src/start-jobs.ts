@@ -1,6 +1,7 @@
 import { nextRun, scheduleExpression, scheduleTimezone, type JobSchedule } from './schedule.js';
 import { flattenJobs, jobFnAt, jobRunnerFrom, JOBS_META, type JobsMeta, type ScheduledJob } from './adapter.js';
 import { waitUntil, type Wait } from './wait-until.js';
+import { startPlugins } from './plugin-server.js';
 
 export interface StartJobsOptions {
     /**
@@ -58,6 +59,7 @@ export const startJobs = (api: unknown, options?: StartJobsOptions): JobSchedule
             'startJobs was given an api with no jobs. Declare them with `k.jobs` and name them under `jobs` in `defineConfig`.'
         );
     }
+    startPlugins(api);
 
     const scheduled = flattenJobs(meta.jobs)
         .filter(({ jobKey, job }) => {

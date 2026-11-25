@@ -48,7 +48,7 @@ export const defineResendEvents = <Config = unknown>(handlers: ResendEventHandle
 /**
  * Checks each delivery's signature, then runs the function for its event.
  */
-export const webhookRoute = (resend: Resend, webhookSecret: string, on: ResendEventHandlers): RouteDefinition =>
+export const webhookRoute = (getClient: () => Resend, webhookSecret: string, on: ResendEventHandlers): RouteDefinition =>
     route({
         method: 'POST',
         path: '/webhooks',
@@ -69,7 +69,7 @@ export const webhookRoute = (resend: Resend, webhookSecret: string, on: ResendEv
         const { rawBody, headers, throwError } = args;
         let event: WebhookEventPayload;
         try {
-            event = resend.webhooks.verify({
+            event = getClient().webhooks.verify({
                 payload: rawBody,
                 headers: {
                     id: headers['svix-id'],
