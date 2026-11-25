@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ADAPTER_BEHAVIOUR, ADAPTER_FEATURES, featureGroups, featuresInGroup, type AdapterFeature, type AdapterName } from './features.js';
 import {
     adminToken,
@@ -17,6 +17,14 @@ import {
     sessionAuthorization,
     sharedSegmentInput,
     signedBodyText,
+    nestingInput,
+    taskFilterOf,
+    TASK_NESTING_LIMIT,
+    bodyLimitInput,
+    taskBodyOfSize,
+    TASK_BODY_LIMIT,
+    backgroundInput,
+    backgroundWork,
     subUserInput,
     userInput,
     pluginInput,
@@ -88,6 +96,36 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             },
             use
         );
+
+    const usingBodyLimit = <T>(use: (mounted: MountedApi) => Promise<T>) =>
+        using(
+            {
+                input: bodyLimitInput,
+            },
+            use
+        );
+
+    const usingBackground = <T>(use: (mounted: MountedApi) => Promise<T>) =>
+        using(
+            {
+                input: backgroundInput,
+            },
+            use
+        );
+
+    const usingNesting = <T>(use: (mounted: MountedApi) => Promise<T>) =>
+        using(
+            {
+                input: nestingInput,
+            },
+            use
+        );
+
+    const filteredTasks = (tasks: MountedApi, path: string, levels: number) =>
+        tasks.request({
+            method: 'GET',
+            path: `${path}?filter=${encodeURIComponent(taskFilterOf(levels))}`,
+        });
 
     const usingSecured = <T>(use: (mounted: MountedApi) => Promise<T>) =>
         using(
@@ -648,6 +686,217 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 rawBody: signedBodyText,
                 name: 'Ada',
             });
+        },
+
+        'body.limit413': async () => {
+            await usingBodyLimit(async (tasks) => {
+                const atLimit = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks',
+                    body: taskBodyOfSize(TASK_BODY_LIMIT),
+                });
+                expect(atLimit.status).toBe(201);
+
+                const overLimit = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks',
+                    body: taskBodyOfSize(TASK_BODY_LIMIT + 1),
+                });
+                expect(overLimit.status).toBe(413);
+                expect(overLimit.headers.get('connection')).toBe('close');
+                expect(overLimit.headers.get('content-type')).toContain('application/problem+json');
+                expect(overLimit.body).toMatchObject({
+                    status: 413,
+                    detail: `The request body is larger than ${TASK_BODY_LIMIT} bytes.`,
+                });
+            });
+        },
+
+        'body.limitChunked': async () => {
+            await usingBodyLimit(async (tasks) => {
+                const atLimit = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks',
+                    body: taskBodyOfSize(TASK_BODY_LIMIT),
+                    chunked: true,
+                });
+                expect(atLimit.status).toBe(201);
+
+                const overLimit = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks',
+                    body: taskBodyOfSize(TASK_BODY_LIMIT + 1),
+                    chunked: true,
+                });
+                expect(overLimit.status).toBe(413);
+            });
+        },
+
+        'body.limitPerRoute': async () => {
+            await usingBodyLimit(async (tasks) => {
+                const body = taskBodyOfSize(TASK_BODY_LIMIT * 2);
+                const raised = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks/import',
+                    body,
+                });
+                expect(raised.status).toBe(201);
+
+                const refused = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks',
+                    body,
+                });
+                expect(refused.status).toBe(413);
+            });
+        },
+
+        'body.limitRawBody': async () => {
+            await usingBodyLimit(async (tasks) => {
+                const atLimit = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks/signed',
+                    body: taskBodyOfSize(TASK_BODY_LIMIT),
+                });
+                expect(atLimit.status).toBe(201);
+
+                const overLimit = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks/signed',
+                    body: taskBodyOfSize(TASK_BODY_LIMIT + 1),
+                    chunked: true,
+                });
+                expect(overLimit.status).toBe(413);
+            });
+        },
+
+        'body.nesting400': async () => {
+            await usingNesting(async (tasks) => {
+                const atLimit = await tasks.request({
+                    method: 'POST',
+                    path: '/task-filters',
+                    body: taskFilterOf(TASK_NESTING_LIMIT),
+                });
+                expect(atLimit.status).toBe(201);
+
+                const overLimit = await tasks.request({
+                    method: 'POST',
+                    path: '/task-filters',
+                    body: taskFilterOf(TASK_NESTING_LIMIT + 1),
+                });
+                expect(overLimit.status).toBe(400);
+                expect(overLimit.headers.get('content-type')).toContain('application/problem+json');
+                expect(overLimit.body).toMatchObject({
+                    status: 400,
+                    errors: [
+                        {
+                            code: 'too_big',
+                            path: [],
+                            message: `Nests deeper than ${TASK_NESTING_LIMIT} levels.`,
+                        },
+                    ],
+                });
+            });
+        },
+
+        'body.deepNesting400': async () => {
+            await usingNesting(async (tasks) => {
+                const response = await tasks.request({
+                    method: 'POST',
+                    path: '/task-filters',
+                    body: taskFilterOf(10_001),
+                });
+                expect(response.status).toBe(400);
+            });
+        },
+
+        'query.nesting400': async () => {
+            await usingNesting(async (tasks) => {
+                expect((await filteredTasks(tasks, '/filtered-tasks', TASK_NESTING_LIMIT)).status).toBe(200);
+
+                const overLimit = await filteredTasks(tasks, '/filtered-tasks', TASK_NESTING_LIMIT + 1);
+                expect(overLimit.status).toBe(400);
+                expect(overLimit.body).toMatchObject({
+                    status: 400,
+                    errors: [
+                        {
+                            code: 'too_big',
+                            path: ['filter'],
+                            message: `Nests deeper than ${TASK_NESTING_LIMIT} levels.`,
+                        },
+                    ],
+                });
+            });
+        },
+
+        'query.deepNesting400': async () => {
+            await usingNesting(async (tasks) => {
+                const response = await filteredTasks(tasks, '/deeply-filtered-tasks', 1_201);
+                expect(response.status).toBe(400);
+            });
+        },
+
+        'query.nestingPerRoute': async () => {
+            await usingNesting(async (tasks) => {
+                const levels = TASK_NESTING_LIMIT + 2;
+                expect((await filteredTasks(tasks, '/deeply-filtered-tasks', levels)).status).toBe(200);
+                expect((await filteredTasks(tasks, '/filtered-tasks', levels)).status).toBe(400);
+            });
+        },
+
+        'body.compressed415': async () => {
+            await usingBodyLimit(async (tasks) => {
+                const response = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks',
+                    body: taskBodyOfSize(TASK_BODY_LIMIT),
+                    headers: {
+                        'content-encoding': 'gzip',
+                    },
+                });
+                expect(response.status).toBe(415);
+                expect(response.headers.get('accept-encoding')).toBe('identity');
+                expect(response.headers.get('content-type')).toContain('application/problem+json');
+            });
+        },
+
+        'handler.waitUntil': async () => {
+            await usingBackground(async (tasks) => {
+                backgroundWork.hold();
+                const response = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks/reminders',
+                });
+                expect(response.status).toBe(202);
+                expect(backgroundWork.isFinished).toBe(false);
+
+                backgroundWork.release();
+                await backgroundWork.finished;
+                expect(backgroundWork.isFinished).toBe(true);
+            });
+        },
+
+        'handler.waitUntilFailure': async () => {
+            const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+            try {
+                await usingBackground(async (tasks) => {
+                    const response = await tasks.request({
+                        method: 'POST',
+                        path: '/tasks/failing-reminders',
+                    });
+                    expect(response.status).toBe(202);
+                    await vi.waitFor(() => {
+                        expect(logged).toHaveBeenCalledWith(
+                            '[kizuna] failReminder: the work passed to `waitUntil` failed.',
+                            expect.objectContaining({
+                                message: 'The mail service is down.',
+                            })
+                        );
+                    });
+                });
+            } finally {
+                logged.mockRestore();
+            }
         },
 
         'errors.declaredProblemDetails': async () => {

@@ -432,6 +432,48 @@ export interface RouteDefinition<GroupPaths extends string = string, SchemeNames
      */
     rawBody?: true;
     /**
+     * The most bytes this route's request body may hold. A larger body is
+     * answered with `413 Content Too Large` before any of it is parsed.
+     *
+     * @default the config's `bodyLimit`, or 1 MiB
+     * @example
+     * ```ts
+     * importEvents: k.route({
+     *     method: 'POST',
+     *     path: '/events/import',
+     *     auth: 'user',
+     *     bodyLimit: 10 * 1024 * 1024,
+     *     body: EventImportSchema,
+     *     responses: {
+     *         202: z.void(),
+     *     },
+     * }),
+     * ```
+     */
+    bodyLimit?: number;
+    /**
+     * How many levels of objects and arrays JSON in this route's query values and body may nest. Deeper JSON is
+     * answered with `400` before the schema runs.
+     *
+     * @default the config's `nestingLimit`, or 64
+     * @example
+     * ```ts
+     * listTasks: k.route({
+     *     method: 'GET',
+     *     path: '/tasks',
+     *     auth: 'user',
+     *     nestingLimit: 128,
+     *     query: z.object({
+     *         filter: TaskFilterSchema.optional(),
+     *     }),
+     *     responses: {
+     *         200: z.array(TaskSchema),
+     *     },
+     * }),
+     * ```
+     */
+    nestingLimit?: number;
+    /**
      * Deprecates the route. Pass a message to tell callers what to use instead,
      * or the object form to announce the deprecation in response headers.
      */

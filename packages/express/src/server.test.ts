@@ -3,7 +3,7 @@ import request from 'supertest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { expressAdapter, type ExpressApi } from './server.js';
-import { fetchStream, nodeHeaders, readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
+import { fetchTestRequest, fetchStream, nodeHeaders, readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 import { defineConfig } from 'kizunajs';
 
 testAdapterFeatures({
@@ -31,7 +31,10 @@ testAdapterFeatures({
                 await new Promise<void>((resolve) => started.close(() => resolve()));
             },
             stream: async (mountRequest) => fetchStream(await baseUrl(), mountRequest),
-            request: async ({ method, path, body, headers }) => {
+            request: async (mountRequest) => {
+                // supertest can't send a chunked body, so that request goes over the socket.
+                if (mountRequest.chunked) return fetchTestRequest(await baseUrl(), mountRequest);
+                const { method, path, body, headers } = mountRequest;
                 let call = request(app)[method.toLowerCase() as 'get'](path).buffer(true);
                 for (const [name, value] of Object.entries(headers)) call = call.set(name, value);
                 const response = body === undefined ? await call : await call.send(body);

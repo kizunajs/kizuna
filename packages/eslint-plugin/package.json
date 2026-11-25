@@ -1,6 +1,6 @@
 {
   "name": "@kizunajs/eslint-plugin",
-  "version": "2.0.0-beta.36",
+  "version": "2.0.0-beta.41",
   "description": "ESLint rules for Kizuna.js",
   "keywords": [
     "kizunajs",

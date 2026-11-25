@@ -16,6 +16,9 @@ import {
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     JOBS_META,
+    BODY_LIMIT_META,
+    NESTING_LIMIT_META,
+    bodyLimitOf,
     type JobsMeta,
     pluginRoutesOf,
     pluginExportsOf,
@@ -29,6 +32,7 @@ import {
     type Adapter,
     renderJsonResult,
     parseFetchBody,
+    readBodyText,
     entriesToObject,
     headersToObject,
     isMethodOverride,
@@ -41,6 +45,8 @@ export type HonoApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
+    readonly [BODY_LIMIT_META]?: unknown;
+    readonly [NESTING_LIMIT_META]?: unknown;
     /**
      * Register every route on a Hono app.
      */
@@ -65,15 +71,47 @@ export interface HonoOptions {
      * {@link ErrorFormatter}.
      */
     formatError?: ErrorFormatter<Request>;
+    /**
+     * Keeps work a handler passed to `waitUntil` running after the response,
+     * for a serverless host Kizuna can't find on its own.
+     *
+     * @example
+     * import { waitUntil } from '@vercel/functions';
+     *
+     * api.mount(app, {
+     *     waitUntil,
+     * });
+     */
+    waitUntil?: (promise: Promise<unknown>) => void;
 }
+
+/**
+ * Returns the host's own `waitUntil`: Cloudflare Workers' execution context, or the Netlify context Hono passes as `c.env.context`.
+ */
+const hostWaitUntilOf = (c: Context<Env>): ((promise: Promise<unknown>) => void) | undefined => {
+    try {
+        const executionContext = c.executionCtx;
+        return (promise) => executionContext.waitUntil(promise);
+    } catch {
+        // Hono's getter throws where the runtime has no execution context, like Node.
+    }
+    const netlify = (c.env as { context?: { waitUntil?: (promise: Promise<unknown>) => void } } | undefined)?.context;
+    return netlify?.waitUntil === undefined ? undefined : (promise) => netlify.waitUntil!(promise);
+};
 
 const pipeline = defineAdapter<
     Request,
     Response,
     HonoHandlerContext<Env>,
-    { c: Context<Env>; formatError?: ErrorFormatter<Request>; responseValidation?: boolean }
+    {
+        c: Context<Env>;
+        formatError?: ErrorFormatter<Request>;
+        responseValidation?: boolean;
+        waitUntil?: (promise: Promise<unknown>) => void;
+    }
 >({
     buildHandlerContext: (_adapterRequest, { c }) => ({ c }),
+    waitUntil: (promise, { c, waitUntil }) => (waitUntil ?? hostWaitUntilOf(c))?.(promise),
     respond: (result, { c, formatError, responseValidation }) => {
         if (result.kind === 'handler-error') {
             throw result.error;
@@ -118,6 +156,8 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
     const pluginExports = pluginExportsOf(api);
     const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
     const jobRunner = jobRunnerFrom(jobsMeta);
+    const configBodyLimit = api[BODY_LIMIT_META] as number | undefined;
+    const configNestingLimit = api[NESTING_LIMIT_META] as number | undefined;
     const mountRoute = (
         routeKey: string,
         route: RouteDefinition,
@@ -162,8 +202,10 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
                           },
                 query: override ? entriesToObject(new URLSearchParams(await c.req.raw.text())) : entriesToObject(url.searchParams),
                 headers: headersToObject(c.req.raw.headers),
-                readBody: (r: RouteDefinition) => (override ? undefined : parseFetchBody(c.req.raw, r)),
-                readRawBody: () => (override ? '' : c.req.raw.text()),
+                readBody: (r: RouteDefinition) => (override ? undefined : parseFetchBody(c.req.raw, r, bodyLimitOf(r, configBodyLimit))),
+                readRawBody: (r: RouteDefinition) => (override ? '' : readBodyText(c.req.raw, bodyLimitOf(r, configBodyLimit))),
+                configBodyLimit,
+                configNestingLimit,
             };
 
             return pipeline.handle({
@@ -174,6 +216,7 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
                     c: c as unknown as Context<Env>,
                     formatError: options?.formatError,
                     responseValidation: options?.responseValidation,
+                    waitUntil: options?.waitUntil,
                 },
                 guards,
                 schemes,

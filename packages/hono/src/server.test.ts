@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import { honoAdapter, type HonoApi } from './server.js';
-import { readTestBody, streamedResponse, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
+import { toChunkedStream, readTestBody, streamedResponse, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 interface Config {
     adapter: ReturnType<typeof honoAdapter>;
@@ -75,12 +75,17 @@ testAdapterFeatures({
                 });
                 return streamedResponse(response, controller);
             },
-            request: async ({ method, path, body, headers }) => {
+            request: async ({ method, path, body, headers, chunked }) => {
                 const response = await app.request(path, {
                     method,
-                    body,
+                    body: chunked && body !== undefined ? toChunkedStream(body) : body,
                     headers,
-                });
+                    ...(chunked
+                        ? {
+                              duplex: 'half',
+                          }
+                        : {}),
+                } as RequestInit);
                 const text = await response.text();
                 return {
                     status: response.status,

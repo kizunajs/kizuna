@@ -4,7 +4,7 @@ import { Kizuna } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { nextAdapter, NextRequest, NextResponse, type NextApi } from './server.js';
-import { readTestBody, streamedResponse, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
+import { toChunkedStream, readTestBody, streamedResponse, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 interface Config {
     adapter: ReturnType<typeof nextAdapter>;
@@ -425,15 +425,20 @@ testAdapterFeatures({
                 );
                 return streamedResponse(response, controller);
             },
-            request: async ({ method, path, body, headers }) => {
+            request: async ({ method, path, body, headers, chunked }) => {
                 const handler = handlers[method];
                 if (!handler) throw new Error(`next: no handler exported for ${method}`);
                 const response = await handler(
                     new NextRequest(`http://localhost:3000/api${path}`, {
                         method,
-                        body,
+                        body: chunked && body !== undefined ? toChunkedStream(body) : body,
                         headers,
-                    })
+                        ...(chunked
+                            ? {
+                                  duplex: 'half',
+                              }
+                            : {}),
+                    } as ConstructorParameters<typeof NextRequest>[1])
                 );
                 const text = await response.text();
                 return {

@@ -22,6 +22,8 @@ import { assertNoPathCollisions, routeClaims } from './path-claims.js';
 import { deprecationHeaders } from './deprecation.js';
 import { cacheHeaders } from './cache.js';
 import { computeEtag, etagMatches } from './etag.js';
+import { bodyLimitOf, checkBodyHeaders, ContentTooLargeError, readBodyText, readBodyBytes } from './body-limit.js';
+import { nestingLimitOf } from './nesting-limit.js';
 import { ResponseError } from './response-error.js';
 import { problemDetails, problemFromBody, type ProblemDetails } from './problem-details.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
@@ -69,6 +71,8 @@ export { rawResponse, isRawResponse, type RawResponse } from './raw-response.js'
 export { encodeStreamBody, type EncodeStreamOptions, type StreamContext } from './stream.js';
 export { injectedRequestOf, responseOfInjected, type InjectedRequest, type InjectedResponse } from './injected.js';
 export { isStreamResponse } from './generator-utils.js';
+export { bodyLimitOf, checkBodyHeaders, ContentTooLargeError, DEFAULT_BODY_LIMIT, readBodyText } from './body-limit.js';
+export { DEFAULT_NESTING_LIMIT, nestingLimitOf } from './nesting-limit.js';
 export {
     definePlugin,
     pluginRouteTree,
@@ -128,6 +132,14 @@ export const GUARD_SCHEMA_META: unique symbol = Symbol.for('kizuna.guardSchema')
 export const REQUEST_CONTEXT_META: unique symbol = Symbol.for('kizuna.request-context') as symbol as typeof REQUEST_CONTEXT_META;
 const CONTRACT_META: unique symbol = Symbol.for('kizuna.contract');
 export const JOBS_META: unique symbol = Symbol.for('kizuna.jobs') as symbol as typeof JOBS_META;
+/**
+ * The config's `bodyLimit`, which every route without its own takes.
+ */
+export const BODY_LIMIT_META: unique symbol = Symbol.for('kizuna.body-limit') as symbol as typeof BODY_LIMIT_META;
+/**
+ * The config's `nestingLimit`, which every route without its own takes.
+ */
+export const NESTING_LIMIT_META: unique symbol = Symbol.for('kizuna.nesting-limit') as symbol as typeof NESTING_LIMIT_META;
 
 export type ApiBrand = { readonly [API_META]: true };
 export type ApiWithRouter<R extends Routes = Routes> = ApiBrand & {
@@ -297,6 +309,7 @@ export const HANDLER_ARG_KEYS = [
     'body',
     'headers',
     'throwError',
+    'waitUntil',
     'auth',
     'requestContext',
     'plugins',
@@ -734,6 +747,14 @@ export interface AdapterRequest<NativeRequest> {
     headers: unknown;
     readBody: (route: RouteDefinition) => Promise<unknown> | unknown;
     /**
+     * The config's `bodyLimit`, read off the api as `api[BODY_LIMIT_META]`.
+     */
+    configBodyLimit?: number;
+    /**
+     * The config's `nestingLimit`, read off the api as `api[NESTING_LIMIT_META]`.
+     */
+    configNestingLimit?: number;
+    /**
      * The body as it was sent, for a route with `rawBody: true`, or `undefined`
      * when it was already consumed.
      */
@@ -766,6 +787,16 @@ export type AdapterResult =
     | {
           kind: 'invalid-body';
           detail: string;
+          headers?: ResponseHeaders;
+      }
+    | {
+          kind: 'content-too-large';
+          limit: number;
+          headers?: ResponseHeaders;
+      }
+    | {
+          kind: 'unsupported-content-coding';
+          coding: string;
           headers?: ResponseHeaders;
       }
     | {
@@ -821,6 +852,14 @@ export interface AdapterDefinition<NativeRequest, NativeResponse, HandlerContext
      * Return an `AdapterResult` to override the default `handler-error` outcome; return `void` to let it pass through.
      */
     onError?: (error: unknown, request: AdapterRequest<NativeRequest>) => AdapterResult | void | Promise<AdapterResult | void>;
+    /**
+     * Hands work a handler passed to `waitUntil` to the host, so a serverless host keeps running it after the response.
+     * The promise never rejects. Leave it out on a host whose process keeps running, like a Node server.
+     *
+     * @example
+     * waitUntil: (promise, { c }) => c.executionCtx.waitUntil(promise),
+     */
+    waitUntil?: (promise: Promise<void>, context: ResponseContext) => void;
     matcher?: RouteMatcher;
 }
 
@@ -1179,7 +1218,10 @@ const statusOf = (result: AdapterResult): number | undefined => {
         case 'invalid-body':
         case 'validation-failed':
             return 400;
+        case 'content-too-large':
+            return 413;
         case 'unsupported-media-type':
+        case 'unsupported-content-coding':
             return 415;
         case 'not-acceptable':
             return 406;
@@ -1332,9 +1374,22 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         body: undefined,
     };
 
+    const refusal = checkBodyHeaders(route, raw.headers as Record<string, string | undefined>, bodyLimitOf(route, request.configBodyLimit));
+    if (refusal !== undefined) return refusal;
+
     let rawBody: string | undefined;
     if (route.rawBody === true) {
-        rawBody = request.readRawBody === undefined ? undefined : await request.readRawBody(route);
+        try {
+            rawBody = request.readRawBody === undefined ? undefined : await request.readRawBody(route);
+        } catch (error) {
+            if (error instanceof ContentTooLargeError) {
+                return {
+                    kind: 'content-too-large',
+                    limit: error.limit,
+                };
+            }
+            throw error;
+        }
         if (rawBody === undefined) {
             const error = new Error(
                 `[kizuna] ${routeKey} needs the raw body, but it was parsed before kizuna saw it. On Express, mount kizuna before express.json(), or pass \`verify: keepRawBody\` to it.`
@@ -1373,7 +1428,13 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             }
             try {
                 raw.body = rawBody !== undefined ? parseBodyText(rawBody, route) : await request.readBody(route);
-            } catch {
+            } catch (error) {
+                if (error instanceof ContentTooLargeError) {
+                    return {
+                        kind: 'content-too-large',
+                        limit: error.limit,
+                    };
+                }
                 return {
                     kind: 'invalid-body',
                     detail: 'Bad Request',
@@ -1382,7 +1443,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         }
     }
 
-    const validation = validateRequest(route, raw);
+    const validation = validateRequest(route, raw, nestingLimitOf(route, request.configNestingLimit));
     if (!validation.ok) {
         const formatted = formatValidationError(validation.error);
         return {
@@ -1401,6 +1462,15 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         routes,
         definition,
         handlerContext: () => definition.buildHandlerContext(request, responseContext),
+        waitUntil: (promise) => {
+            const settled = promise.then(
+                () => undefined,
+                (error: unknown) => {
+                    console.error(`[kizuna] ${routeKey}: the work passed to \`waitUntil\` failed.`, error);
+                }
+            );
+            definition.waitUntil?.(settled, responseContext);
+        },
         guards,
         schemes,
         contextResolvers,
@@ -1423,6 +1493,7 @@ interface Invocation<NativeRequest, HandlerContext, ResponseContext> {
     routes: Routes;
     definition: AdapterDefinition<NativeRequest, unknown, HandlerContext, ResponseContext>;
     handlerContext: () => HandlerContext | Promise<HandlerContext>;
+    waitUntil: (promise: Promise<unknown>) => void;
     guards: GuardMap<HandlerContext> | undefined;
     schemes: Record<string, SecurityScheme> | undefined;
     contextResolvers: RequestContextMap<HandlerContext> | undefined;
@@ -1613,6 +1684,7 @@ const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
                   }
                 : {}),
             throwError,
+            waitUntil: invocation.waitUntil,
             ...handlerContext,
             ...(tools
                 ? {
@@ -1942,6 +2014,23 @@ const renderResult = (
                 undefined,
                 result.headers
             );
+        case 'content-too-large':
+            // Closing the connection spares the server from reading the rest of the body (RFC 9110 §15.5.14).
+            return renderError(413, `The request body is larger than ${result.limit} bytes.`, undefined, {
+                ...result.headers,
+                connection: 'close',
+            });
+        case 'unsupported-content-coding':
+            // Accept-Encoding names the codings the server takes (RFC 9110 §15.5.16).
+            return renderError(
+                415,
+                `The request body is sent with \`Content-Encoding: ${result.coding}\`. Send it uncompressed.`,
+                undefined,
+                {
+                    ...result.headers,
+                    'accept-encoding': 'identity',
+                }
+            );
         case 'not-acceptable':
             return renderError(406, 'Not Acceptable', undefined, result.headers);
         case 'handler-error':
@@ -1995,22 +2084,27 @@ export const parseBodyText = (text: string, route: RouteDefinition): unknown => 
 };
 
 /**
- * Content-type-aware body parser for Web Fetch `Request`.
+ * Parses a Fetch `Request`'s body by the route's content type, reading at most `limit` bytes.
+ * A body past the limit throws {@link ContentTooLargeError}, which the pipeline answers with `413`.
  *
- * Reusable across any Fetch-based adapter.
- *
- * */
-export const parseFetchBody = async (request: Request, route: RouteDefinition): Promise<unknown> => {
-    switch (route.contentType) {
-        case 'multipart/form-data':
-            return entriesToObject(await request.formData());
-        case 'application/x-www-form-urlencoded':
-            return entriesToObject(new URLSearchParams(await request.text()));
-        default: {
-            const text = await request.text();
-            return text.length > 0 ? JSON.parse(text) : undefined;
-        }
+ * @example
+ * readBody: (route) => parseFetchBody(request, route, bodyLimitOf(route, configBodyLimit)),
+ */
+export const parseFetchBody = async (
+    request: Request,
+    route: RouteDefinition,
+    limit: number = bodyLimitOf(route, undefined)
+): Promise<unknown> => {
+    if (route.contentType === 'multipart/form-data') {
+        const bytes = await readBodyBytes(request.body, limit);
+        const parts = new Response(bytes, {
+            headers: {
+                'content-type': request.headers.get('content-type') ?? '',
+            },
+        });
+        return entriesToObject(await parts.formData());
     }
+    return parseBodyText(await readBodyText(request, limit), route);
 };
 
 export const headersToObject = (headers: Headers): ResponseHeaders => {

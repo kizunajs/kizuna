@@ -20,6 +20,7 @@ export const STATUS_TITLES = {
     406: 'Not Acceptable',
     409: 'Conflict',
     410: 'Gone',
+    413: 'Content Too Large',
     415: 'Unsupported Media Type',
     422: 'Unprocessable Content',
     429: 'Too Many Requests',

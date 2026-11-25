@@ -91,63 +91,11 @@ Deliberate omissions: no LLM clients, no agent loop, no provider wire shapes, an
 
 # Naming
 
-Use full English words.
-
-- No single-letter names (`u`, `x`, `s`, `r`, `v`, `i`). Use `user`, `candidate`, `server`, `result`, `value`, `index`.
-- No truncated abbreviations (`idx`, `cfg`, `usr`). Spell it out.
-- Name callback parameters after what they represent: `users.find((candidate) => ...)`.
-
-Exceptions: `_` for unused, `req`/`res`/`next` in Express handlers, `_`-prefixed unused params, and namespace tokens (`k`, `z`).
-
-# Object literals
-
-Always multi-line. Every property on its own line, every nested object expanded, even single-property ones.
-
-```ts
-// no
-client.getUser({ params: { id: '1' } });
-client.getUser({
-    params: { id: '1' },
-});
-
-// yes
-client.getUser({
-    params: {
-        id: '1',
-    },
-});
-```
-
-# JSDoc
-
-Always multi-line. `/**` on its own line, content on its own line(s), `*/` on its own line, even for one-liners.
-
-```ts
-// no
-/** Return an `AdapterResult` to override the default outcome. */
-onError?: (...) => ...;
-
-// yes
-/**
- * Return an `AdapterResult` to override the default outcome.
- */
-onError?: (...) => ...;
-```
-
-# Git
-
-Never add `Co-Authored-By` trailers for AI agents (Claude, Copilot, Cursor, etc.) to commit messages. AI is a tool, not an author.
+`req`, `res` and `next` in Express handlers are exceptions too.
 
 # Writing
 
-Applies equally to docs pages, README, JSDoc, and code comments.
-
-- **Plain over clever.** If a sentence has to be decoded, it is wrong. A reader should never have to supply the meaning of your metaphor.
-- **Say the concrete thing.** "Swift and Kotlin clients" rather than "native clients". Name what the reader gets, not the category it belongs to.
-- **Prefer commas and full stops over em dashes.** An em dash rarely earns the interruption it creates. Where a sentence needs a break, use a comma or start a new sentence, not a semicolon.
-- **One idea per example.** A snippet that demonstrates two things teaches neither. Split it.
-- **Stop when it is said.** No filler ("simply", "seamlessly", "powerful", "just"), no restating the previous sentence, no explaining what the reader already worked out.
-- **Never define a thing by what it is not.** "It is not a wrapper, it is a contract", "an alternative rather than a rewrite", "this is not about performance". Naming the thing you did not mean forces the reader to hold two ideas to arrive at one. Say the thing.
+Where a sentence needs a break, use a comma or start a new sentence, never a semicolon.
 
 # Comments
 
@@ -238,3 +186,173 @@ JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home" ./gra
 # Formatting
 
 After finishing code edits, always run `pnpm format:check` to verify formatting. If it fails, run `pnpm format` to fix it.
+
+<!-- @kizunajs/tooling start. This part comes from CLAUDE.shared.md in @kizunajs/tooling. Change it there, then run `kizuna-tooling sync-claude`. -->
+
+# Naming
+
+Use full English words.
+
+- No single-letter names (`u`, `x`, `s`, `r`, `v`, `i`). Use `user`, `candidate`, `server`, `result`, `value`, `index`.
+- No truncated abbreviations (`idx`, `cfg`, `usr`). Spell it out.
+- Name callback parameters after what they represent: `users.find((candidate) => ...)`.
+
+Exceptions: `_` for unused, `_`-prefixed unused params, and namespace tokens (`k`, `z`). A repo's own CLAUDE.md can add a few more.
+
+## Functions
+
+A function's name says what it does or what it answers, so a reader knows the result without opening it.
+
+- **A function that does something starts with a verb**: `readBodyText`, `checkBodyHeaders`, `parseFetchBody`. Never a noun alone, like `bodyRefusal`.
+- **A function that answers yes or no reads as a question**: `isVoidSchema`, `hasRequestBody`, `validatesRequest`. Never a bare verb, like `takesBody`, which reads as an action.
+- **A function that returns a value of something takes `Of`**: `bodyLimitOf(route)`, `rawBodyOf(request)`.
+- **Name the thing, not the mechanism.** `readBodyBytes`, not `readLimitedBytes`. The limit is an argument, so the name doesn't repeat it.
+- **No vague verbs.** `handle`, `process`, `do`, `manage` and `run` say nothing about the result. Say what it reads, checks, parses or sends.
+- **No one-line wrappers.** A helper that only renames one line, like `throwBodyError`, hides that line. Write the line where it is used.
+
+# Object literals
+
+Always multi-line. Every property on its own line, every nested object expanded, even single-property ones.
+
+```ts
+// no
+client.getUser({ params: { id: '1' } });
+client.getUser({
+    params: { id: '1' },
+});
+
+// yes
+client.getUser({
+    params: {
+        id: '1',
+    },
+});
+```
+
+# JSDoc
+
+Always multi-line. `/**` on its own line, content on its own line(s), `*/` on its own line, even for one-liners.
+
+```ts
+// no
+/** The label a person reads. */
+label: string;
+
+// yes
+/**
+ * The label a person reads.
+ */
+label: string;
+```
+
+Every exported function, type, option and component prop has JSDoc. An internal helper has none, unless its name cannot say what it does, and then one line.
+
+The first sentence says what the thing does for the person using it. A function starts with a verb, and a value or an option with a noun phrase:
+
+```ts
+/**
+ * Returns the tasks a user may read.
+ */
+export const readableTasksOf = (user: User): Task[] => ...
+
+/**
+ * The roles that may read a task.
+ */
+read: Role[];
+```
+
+- **A second sentence only when it is needed**, for the shape you pass or an effect you would miss. At most two sentences before the tags.
+- **Special values get their own sentence.** "`'public'` lets anyone read without logging in."
+- **`@default` only when leaving the option out does something you would not guess**, written as what happens: `@default 20 MB`. Never for "none", "empty" or `undefined`, where leaving it out obviously means none.
+- **Examples go in `@example` as code**, never in the sentence. "Extra fields, like a photographer's credit" belongs in an `@example`.
+- **No `@see`** until the docs page it links to exists.
+- **Never internal commentary.** Not how it is built, not what it sits on top of, no sentence without a subject ("Its documents log in"), no fragment the reader has to decode ("`['public']` needs no login").
+
+# Writing
+
+Applies equally to docs, README, JSDoc and code comments.
+
+- **American English.** behavior, center, color, organization, canceled.
+- **Short sentences.** One idea per sentence and few commas. Two sentences beat one with a list of clauses.
+- **Plain over clever.** If a sentence has to be decoded, it is wrong. A reader should never have to supply the meaning of your metaphor.
+- **Say the concrete thing.** "Swift and Kotlin clients" rather than "native clients". Name what the reader gets, not the category it belongs to.
+- **Join phrases with a comma, a period or a new line.** Never with "·", "–" or "—".
+- **One idea per example.** A snippet that demonstrates two things teaches neither. Split it.
+- **Stop when it is said.** No filler ("simply", "seamlessly", "powerful", "just"), no restating the previous sentence, no explaining what the reader already worked out.
+- **Never define a thing by what it is not.** "It is not a wrapper, it is a contract" makes the reader hold two ideas to arrive at one. Say the thing.
+
+# Comments
+
+A comment says what a thing is for. It never holds design discussion, history or a debate about alternatives. Those belong in the PR.
+
+Examples in comments and JSDoc use names from this repo's own examples, never from client projects.
+
+# Git
+
+Never add `Co-Authored-By` trailers for AI agents (Claude, Copilot, Cursor, etc.) to commit messages, and never mention AI in commits, PR titles or PR descriptions. AI is a tool, not an author.
+
+Commit messages and PR titles follow Conventional Commits with the package folder as scope: `feat(core): ...`. `deps` is a scope too, and a repo's own CLAUDE.md lists any others. Mark breaking changes with `!`.
+
+# Pull request descriptions
+
+The title is the commit subject. The description says what changes and why, for a reader who doesn't have the code open.
+
+````md
+Adds <the change, in one sentence>.
+
+<What went wrong before, concretely.>
+
+<What it does now.>
+
+```ts
+<the smallest example of the new thing>
+```
+
+## Breaking changes
+
+- <What now fails or behaves differently, and when.> <What to write instead:>
+
+    ```ts
+    <the fix>
+    ```
+````
+
+- The first word says what the pull request does: "Adds", "Fixes", "Removes".
+- **One idea per paragraph**, in one or two sentences. Split a paragraph rather than join its sentences.
+- **Say enough, and no more.** A reader who hasn't seen the code should understand what changed, why, and how it behaves. How it is built gets one short sentence at most, and only when the reader needs it to trust the change.
+- The why is concrete. Name the error, the wrong output or the case that was missing.
+- A title with `!` always has a "Breaking changes" section. Each item shows the code that breaks and the code to write instead.
+- Leave out a section that has nothing in it.
+- Never mention tests. They are part of every change.
+- Never list the changed files. The diff shows them.
+
+# Releasing
+
+`@kizunajs/release` releases the repo. `pnpm release` runs `kizuna-release`, which works out the next version from the conventional commits, writes it into the packages, tags it, writes the GitHub release and publishes to npm.
+
+- `--dry-run` shows the next version and its changelog, and changes nothing. Run it before every real release.
+- `--pre beta` releases `<version>-beta.<n>` under the `beta` dist-tag.
+- `--major` lets a breaking change bump the major. Without it a `!` bumps the minor, on a beta, a 0.x and a stable version alike.
+- A `feat` bumps the minor and a `fix`, `perf` or `revert` the patch. Commits of any other type release nothing, unless the release config sets `releaseEveryCommit: true` or gives the type its own bump.
+- `kizuna-release publish --dry-run` packs each package and lists its files without publishing.
+
+# Publishing
+
+Every package under `packages/` publishes to npmjs. Publishing uses npm trusted publishing from GitHub Actions, with no stored token.
+
+`private: true` is what keeps a package unpublished. A new package ships with it until its first publish, since npm cannot configure a trusted publisher for a package that does not exist yet:
+
+1. Let a release go out first, so the sibling versions the new package pins are on npm.
+2. Publish it once by hand from a clean checkout of the release tag, with `private: true` deleted in the working tree: `pnpm --filter <name> publish --access public --no-git-checks`. Answer the 2FA prompt.
+3. Add the trusted publisher on the package's npm access page: GitHub Actions, the `kizunajs` organization, this repository, workflow `release.yaml`.
+4. Commit the removal of `private: true`.
+
+Every package keeps every field its siblings have: `description`, `keywords`, `license`, `homepage`, `repository` with its `directory`, `bugs`, `sideEffects`, `engines` and `publishConfig.access` set to `public`. A scoped package publishes restricted without that last one. Each has a `README.md` with the description, an install line, the smallest snippet that works and a docs link.
+
+When changing any exported function, type or option, check whether a README, JSDoc example or docs page references the old API, and update it in the same change.
+
+# Checks
+
+Before you finish a change, run `pnpm format:check`, `pnpm lint`, `pnpm typecheck` and `pnpm test`. Fix what fails. `pnpm format` fixes the formatting.
+
+<!-- @kizunajs/tooling end -->

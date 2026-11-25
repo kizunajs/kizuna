@@ -97,25 +97,27 @@ A route only a generator or a client reads can skip `.handler()`. One your confi
 
 ### Route fields
 
-| Field         | Required | Description                                                                                                                                                                                                |
-| ------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `method`      | Yes      | `GET` `POST` `PUT` `PATCH` `DELETE` `HEAD` `OPTIONS`                                                                                                                                                       |
-| `path`        | Yes      | URL path. Use `:name` for path parameters                                                                                                                                                                  |
-| `responses`   | Yes      | Response schemas keyed by status code                                                                                                                                                                      |
-| `pathParams`  | No       | Path parameter schema, keyed by placeholder name                                                                                                                                                           |
-| `body`        | No       | Request body schema                                                                                                                                                                                        |
-| `query`       | No       | Query string schema                                                                                                                                                                                        |
-| `headers`     | No       | Request headers schema                                                                                                                                                                                     |
-| `contentType` | No       | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'`                                                                                                             |
-| `summary`     | No       | Short description shown in OpenAPI, and what a model reads when the route publishes as a tool                                                                                                              |
-| `description` | No       | The longer account, for OpenAPI and for a model                                                                                                                                                            |
-| `groups`      | No       | More [groups](/docs/reference/k-groups) to list the route under, beside the one `k.routes` files it in                                                                                                     |
-| `auth`        | No       | The identity this route requires, and the roles or permissions it accepts. Required once your config declares an identity, so public takes an explicit `false`. See [Access Control](/docs/access-control) |
-| `tool`        | No       | Publish this route as a [tool](/docs/tools) a model can call                                                                                                                                               |
-| `rawBody`     | No       | `true` to receive the body as sent, as `rawBody`, for checking a signature. See [below](#verifying-signed-requests)                                                                                        |
-| `hidden`      | No       | `true` to leave it out of the generated clients and the OpenAPI document. See [below](#hidden-routes)                                                                                                      |
-| `deprecated`  | No       | `true`, or the migration message. See [Deprecations](/docs/deprecations)                                                                                                                                   |
-| `cache`       | No       | The `Cache-Control` policy its responses send. See [Caching](/docs/caching)                                                                                                                                |
+| Field          | Required | Description                                                                                                                                                                                                |
+| -------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `method`       | Yes      | `GET` `POST` `PUT` `PATCH` `DELETE` `HEAD` `OPTIONS`                                                                                                                                                       |
+| `path`         | Yes      | URL path. Use `:name` for path parameters                                                                                                                                                                  |
+| `responses`    | Yes      | Response schemas keyed by status code                                                                                                                                                                      |
+| `pathParams`   | No       | Path parameter schema, keyed by placeholder name                                                                                                                                                           |
+| `body`         | No       | Request body schema                                                                                                                                                                                        |
+| `query`        | No       | Query string schema                                                                                                                                                                                        |
+| `headers`      | No       | Request headers schema                                                                                                                                                                                     |
+| `contentType`  | No       | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'`                                                                                                             |
+| `summary`      | No       | Short description shown in OpenAPI, and what a model reads when the route publishes as a tool                                                                                                              |
+| `description`  | No       | The longer account, for OpenAPI and for a model                                                                                                                                                            |
+| `groups`       | No       | More [groups](/docs/reference/k-groups) to list the route under, beside the one `k.routes` files it in                                                                                                     |
+| `auth`         | No       | The identity this route requires, and the roles or permissions it accepts. Required once your config declares an identity, so public takes an explicit `false`. See [Access Control](/docs/access-control) |
+| `tool`         | No       | Publish this route as a [tool](/docs/tools) a model can call                                                                                                                                               |
+| `rawBody`      | No       | `true` to receive the body as sent, as `rawBody`, for checking a signature. See [below](#verifying-signed-requests)                                                                                        |
+| `bodyLimit`    | No       | The most bytes the request body may hold. See [below](#request-body-size)                                                                                                                                  |
+| `nestingLimit` | No       | How deep JSON in a query value or the body may nest. See [below](#json-nesting-depth)                                                                                                                      |
+| `hidden`       | No       | `true` to leave it out of the generated clients and the OpenAPI document. See [below](#hidden-routes)                                                                                                      |
+| `deprecated`   | No       | `true`, or the migration message. See [Deprecations](/docs/deprecations)                                                                                                                                   |
+| `cache`        | No       | The `Cache-Control` policy its responses send. See [Caching](/docs/caching)                                                                                                                                |
 
 ### Typing path parameters
 
@@ -306,6 +308,7 @@ Each handler receives an object with the validated inputs for that route:
 | `body`             | Route has a `body` schema                                          |
 | `headers`          | Route has a `headers` schema                                       |
 | `throwError`       | Always                                                             |
+| `waitUntil`        | Always. See [below](#work-after-the-response)                      |
 | `auth`             | Route's [`auth`](/docs/access-control) names an identity           |
 | `requestContext`   | Config declares [request context](/docs/request-context)           |
 | `plugins`          | Config declares [plugins](/docs/config#using-what-a-plugin-offers) |
@@ -316,6 +319,54 @@ Each handler receives an object with the validated inputs for that route:
 | `request`          | Next.js adapter                                                    |
 
 Which framework object arrives is decided by the `adapter` your config names, so a handler reads `req` or `c` without importing either framework's types.
+
+## Work after the response
+
+Some work doesn't need to hold up the response, like recording a signup for your analytics. Pass it to `waitUntil`, and the response goes out at once:
+
+```ts title="src/routes/users.ts"
+createUser: k
+    .route({
+        method: 'POST',
+        path: '/users',
+        auth: false,
+        body: CreateUserSchema,
+        responses: {
+            201: UserSchema,
+        },
+    })
+    .handler(async ({ body, waitUntil }) => {
+        const user = await saveUser(body);
+        waitUntil(recordSignup(user));
+
+        return {
+            status: 201,
+            body: user,
+        };
+    }),
+```
+
+On a serverless host, the function would otherwise stop once it answers. Each adapter tells its host to keep running until the work settles. Next.js uses `after()`, and Hono uses the execution context on Cloudflare Workers and Netlify. On another serverless host, pass its `waitUntil` to `mount`, like the one from `@vercel/functions`.
+
+If the work fails, Kizuna logs the error with the route's key. The response has already gone out, so the caller never sees it.
+
+Work that must happen, like a welcome email, belongs in a [job](/docs/jobs). The job's transport keeps it through a crash and retries it when it fails:
+
+```ts title="src/routes/users.ts"
+.handler(async ({ body, jobs }) => {
+    const user = await saveUser(body);
+    await jobs.sendWelcomeEmail.queue({
+        input: {
+            userId: user.id,
+        },
+    });
+
+    return {
+        status: 201,
+        body: user,
+    };
+}),
+```
 
 ## Identity context
 
@@ -674,6 +725,95 @@ resendEvents: k
 ```
 
 `rawBody` is the body as a string, before any parsing. Checking the signature against it, rather than against `body`, is what makes the check hold, since re-serialising the JSON can change a single byte and break it. Every adapter keeps it for you. On Express it takes one extra step only if your app also runs `express.json()` ahead of Kizuna; see [alongside your own Express routes](/docs/adapters/express#alongside-your-own-express-routes).
+
+## Request body size
+
+Every route that takes a body reads at most 1 MiB of it. A larger body is answered with `413 Content Too Large` before any of it is parsed. Kizuna counts the bytes as it reads them, so a chunked body or a wrong `Content-Length` can't get past the limit.
+
+Set a different limit for the whole API in `defineConfig`:
+
+```ts title="src/kizuna.config.ts"
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    bodyLimit: 256 * 1024,
+});
+```
+
+A route that takes more raises its own:
+
+```ts title="src/routes/events.ts"
+importEvents: k
+    .route({
+        method: 'POST',
+        path: '/events/import',
+        auth: 'user',
+        bodyLimit: 10 * 1024 * 1024,
+        body: EventImportSchema,
+        responses: {
+            202: z.void(),
+        },
+    })
+    .handler(async ({ body }) => {
+        await queueImport(body.events);
+
+        return {
+            status: 202,
+        };
+    }),
+```
+
+Files are better kept out of the API. A route can hand out a presigned upload URL, and the file goes straight to storage.
+
+A body sent with a `Content-Encoding`, like gzip, is answered with `415 Unsupported Media Type` and `Accept-Encoding: identity`. Its size after decompressing is unknown until it is read, so Kizuna asks for it uncompressed.
+
+## JSON nesting depth
+
+JSON in a query value or a body may nest 64 levels of objects and arrays. Deeper JSON is answered with `400` before your schema runs. A schema that refers to itself, like a filter with nested `and` and `or`, would otherwise overflow the stack on deep enough input:
+
+```ts title="src/routes/tasks.ts"
+const TaskFilterSchema = Kizuna.model({
+    title: 'TaskFilter',
+    schema: z.object({
+        status: z.enum(['open', 'done']).optional(),
+        get and() {
+            return z.array(TaskFilterSchema).optional();
+        },
+        get or() {
+            return z.array(TaskFilterSchema).optional();
+        },
+    }),
+});
+
+listTasks: k
+    .route({
+        method: 'GET',
+        path: '/tasks',
+        auth: 'user',
+        query: z.object({
+            filter: TaskFilterSchema.optional(),
+        }),
+        responses: {
+            200: z.array(TaskSchema),
+        },
+    })
+    .handler(async ({ query }) => ({
+        status: 200,
+        body: await findTasks(query.filter),
+    })),
+```
+
+The `400` names the query parameter, or the body, in its `errors`:
+
+```json
+{
+    "code": "too_big",
+    "path": ["filter"],
+    "message": "Nests deeper than 64 levels."
+}
+```
+
+Set `nestingLimit` in `defineConfig` to change it for the whole API, or on a route that takes deeper JSON.
 
 ## Non-JSON responses
 

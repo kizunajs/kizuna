@@ -11,6 +11,7 @@ import {
     headersToObject,
     matchRoute,
     parseFetchBody,
+    readBodyText,
     entriesToObject,
     renderJsonResult,
     type Jobs,
@@ -20,6 +21,9 @@ import {
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     JOBS_META,
+    BODY_LIMIT_META,
+    NESTING_LIMIT_META,
+    bodyLimitOf,
     type JobsMeta,
     jobRoutes,
     jobRouter,
@@ -33,7 +37,7 @@ import {
     METHOD_OVERRIDE_HEADER,
 } from 'kizunajs/adapter';
 import type { SecurityScheme } from 'kizunajs';
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 
 export { NextRequest, NextResponse } from 'next/server';
 
@@ -124,7 +128,9 @@ export const handleNextRequest = async <T extends Routes>(
     schemes?: Record<string, SecurityScheme>,
     requestContext?: RequestContextMap<NextHandlerContext>,
     pluginExports?: Record<string, unknown>,
-    jobs?: MountedJobs
+    jobs?: MountedJobs,
+    configBodyLimit?: number,
+    configNestingLimit?: number
 ): Promise<NextResponse> => {
     const url = new URL(request.url);
 
@@ -132,6 +138,13 @@ export const handleNextRequest = async <T extends Routes>(
         buildHandlerContext: (adapterRequest) => ({
             request: adapterRequest.request,
         }),
+        waitUntil: (promise) => {
+            try {
+                after(promise);
+            } catch {
+                // Outside a Next request, as when a test calls the handler, nothing stops the process early.
+            }
+        },
         respond: (result) => {
             if (result.kind === 'raw-response') return result.response as NextResponse;
             const rendered = renderJsonResult(result, options?.formatError as ErrorFormatter, request, request.method);
@@ -178,8 +191,10 @@ export const handleNextRequest = async <T extends Routes>(
                 },
                 query: entriesToObject(url.searchParams),
                 headers: headersToObject(request.headers),
-                readBody: (route) => parseFetchBody(request, route),
-                readRawBody: () => request.text(),
+                readBody: (route) => parseFetchBody(request, route, bodyLimitOf(route, configBodyLimit)),
+                readRawBody: (route) => readBodyText(request, bodyLimitOf(route, configBodyLimit)),
+                configBodyLimit,
+                configNestingLimit,
             };
             return adapter.handle({
                 routes: jobs.routes,
@@ -229,8 +244,10 @@ export const handleNextRequest = async <T extends Routes>(
                 },
                 query: entriesToObject(url.searchParams),
                 headers: headersToObject(request.headers),
-                readBody: (route) => parseFetchBody(request, route),
-                readRawBody: () => request.text(),
+                readBody: (route) => parseFetchBody(request, route, bodyLimitOf(route, configBodyLimit)),
+                readRawBody: (route) => readBodyText(request, bodyLimitOf(route, configBodyLimit)),
+                configBodyLimit,
+                configNestingLimit,
             };
 
             return adapter.handle({
@@ -256,8 +273,10 @@ export const handleNextRequest = async <T extends Routes>(
         },
         query: entriesToObject(url.searchParams),
         headers: headersToObject(request.headers),
-        readBody: (route) => parseFetchBody(request, route),
-        readRawBody: () => request.text(),
+        readBody: (route) => parseFetchBody(request, route, bodyLimitOf(route, configBodyLimit)),
+        readRawBody: (route) => readBodyText(request, bodyLimitOf(route, configBodyLimit)),
+        configBodyLimit,
+        configNestingLimit,
     };
 
     return adapter.handle({
@@ -291,6 +310,8 @@ export type NextApiWithRouter = ApiWithRouter & {
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
+    readonly [BODY_LIMIT_META]?: unknown;
+    readonly [NESTING_LIMIT_META]?: unknown;
 };
 
 export type NextApi<R extends Routes = Routes> = ApiWithRouter<R> & {
@@ -315,6 +336,8 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
     const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
     const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<NextHandlerContext> | undefined;
     const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
+    const configBodyLimit = api[BODY_LIMIT_META] as number | undefined;
+    const configNestingLimit = api[NESTING_LIMIT_META] as number | undefined;
     const mountedJobs = jobsMeta
         ? {
               routes: jobRoutes(jobsMeta),
@@ -356,7 +379,9 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
                     schemes,
                     requestContext,
                     pluginExports,
-                    undefined
+                    undefined,
+                    configBodyLimit,
+                    configNestingLimit
                 );
             }
         }
@@ -370,7 +395,9 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
             schemes,
             requestContext,
             pluginExports,
-            mountedJobs
+            mountedJobs,
+            configBodyLimit,
+            configNestingLimit
         );
     };
     return {

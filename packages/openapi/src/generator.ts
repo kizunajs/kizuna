@@ -8,6 +8,7 @@ import {
     isVoidSchema,
     isJsonQueryField,
     validatesRequest,
+    hasRequestBody,
     parsePath,
     readDiscriminatedUnion,
     readDiscriminatorLiteral,
@@ -30,7 +31,7 @@ import {
     encodeForWire,
 } from 'kizunajs/generator';
 import { getStatusText } from 'kizunajs';
-import { ValidationErrorSchema } from 'kizunajs/schemas';
+import { ProblemDetailsSchema, ValidationErrorSchema } from 'kizunajs/schemas';
 import type { ApiDefinition, RequiredPermissions, SecurityRequirement } from 'kizunajs';
 import { OPENAPI_PLUGIN_SLUG } from './plugin.js';
 import type { StreamResponseDefinition } from 'kizunajs';
@@ -475,6 +476,17 @@ const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWa
                         },
                     };
                 }
+            }
+
+            if (hasRequestBody(route) && !operation.responses['413']) {
+                operation.responses['413'] = {
+                    description: getStatusText(413),
+                    content: {
+                        'application/problem+json': {
+                            schema: toJsonSchema(ProblemDetailsSchema),
+                        },
+                    },
+                };
             }
 
             const announced = deprecationHeaders(route);

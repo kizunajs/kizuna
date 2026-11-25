@@ -73,6 +73,43 @@ export const ADAPTER_FEATURES = {
     'body.rawBody': {
         summary: 'A route with `rawBody: true` receives the body exactly as sent, beside the validated body.',
     },
+    'body.limit413': {
+        summary: 'A body one byte over the limit is refused with 413 Problem Details and a closed connection, and one at the limit passes.',
+    },
+    'body.limitChunked': {
+        summary: 'A body sent in chunks with no `Content-Length` is refused once it passes the limit.',
+    },
+    'body.limitPerRoute': {
+        summary: "A route's own `bodyLimit` takes a body the config's limit refuses.",
+    },
+    'body.limitRawBody': {
+        summary: 'A `rawBody: true` route refuses a body over the limit the same way.',
+    },
+    'body.nesting400': {
+        summary: 'A JSON body one level deeper than the nesting limit answers 400, and one at the limit passes.',
+    },
+    'body.deepNesting400': {
+        summary: 'A JSON body 10,000 levels deep answers 400 at once, never a stack overflow.',
+    },
+    'query.nesting400': {
+        summary:
+            'A JSON query value one level deeper than the nesting limit answers 400 that names the parameter, and one at the limit passes.',
+    },
+    'query.deepNesting400': {
+        summary: 'A JSON query value deep enough to overflow a recursive schema answers 400, never 500.',
+    },
+    'query.nestingPerRoute': {
+        summary: "A route's own `nestingLimit` takes a value the config's limit refuses.",
+    },
+    'body.compressed415': {
+        summary: 'A body sent with a `Content-Encoding` is refused with 415 and `Accept-Encoding: identity`.',
+    },
+    'handler.waitUntil': {
+        summary: 'Work a handler passes to `waitUntil` finishes after the response is sent.',
+    },
+    'handler.waitUntilFailure': {
+        summary: 'Work passed to `waitUntil` that fails is logged with the route, and the response stands.',
+    },
     'errors.declaredProblemDetails': {
         summary: 'A declared error response is sent as `application/problem+json`.',
     },

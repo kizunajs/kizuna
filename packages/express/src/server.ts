@@ -17,6 +17,8 @@ import {
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     JOBS_META,
+    BODY_LIMIT_META,
+    NESTING_LIMIT_META,
     type JobsMeta,
     pluginRoutesOf,
     pluginExportsOf,
@@ -35,6 +37,9 @@ import {
     METHOD_OVERRIDE_HEADER,
     injectedRequestOf,
     responseOfInjected,
+    bodyLimitOf,
+    checkBodyHeaders,
+    ContentTooLargeError,
 } from 'kizunajs/adapter';
 import type { SecurityScheme } from 'kizunajs';
 
@@ -43,6 +48,8 @@ export type ExpressApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
+    readonly [BODY_LIMIT_META]?: unknown;
+    readonly [NESTING_LIMIT_META]?: unknown;
     /**
      * Register every route on an Express app or router.
      */
@@ -78,6 +85,10 @@ declare global {
              * The query a method-override POST carries in its form body.
              */
             kizunaOverrideQuery?: Record<string, unknown>;
+            /**
+             * Why kizuna's parser refused this request's body, which the route answers.
+             */
+            kizunaBodyError?: unknown;
         }
     }
 }
@@ -97,31 +108,41 @@ export const keepRawBody = (req: IncomingMessage, _res: ServerResponse, buffer: 
     (req as Request).rawBody = buffer;
 };
 
-type JsonOptions = NonNullable<Parameters<typeof json>[0]>;
+type JsonOptions = Omit<NonNullable<Parameters<typeof json>[0]>, 'limit' | 'inflate' | 'verify'>;
 
 /**
  * Parse a kizuna route's body, unless the app already parsed it. The parser
  * keeps the text as well, for routes with `rawBody: true`.
  */
-const bodyParserFor = (route: RouteDefinition, jsonOptions: JsonOptions | undefined): RequestHandler | undefined => {
+const bodyParserFor = (route: RouteDefinition, jsonOptions: JsonOptions | undefined, limit: number): RequestHandler | undefined => {
     if (route.contentType === 'multipart/form-data') return undefined;
     const parse: RequestHandler =
         route.contentType === 'application/x-www-form-urlencoded'
             ? urlencoded({
                   extended: false,
+                  limit,
+                  inflate: false,
                   verify: keepRawBody,
               })
             : json({
                   ...jsonOptions,
+                  limit,
+                  inflate: false,
                   verify: keepRawBody,
               });
     return (req, res, next) => {
-        if (req.body !== undefined) {
+        // A body refused from its headers is never read, and the route answers the refusal.
+        if (req.body !== undefined || checkBodyHeaders(route, req.headers, limit) !== undefined) {
             next();
             return;
         }
         req.kizunaParsedBody = true;
-        parse(req, res, next);
+        parse(req, res, (error?: unknown) => {
+            if (error !== undefined) {
+                req.kizunaBodyError = (error as { type?: string }).type === 'entity.too.large' ? new ContentTooLargeError(limit) : error;
+            }
+            next();
+        });
     };
 };
 
@@ -171,16 +192,30 @@ export interface ExpressOptions {
      */
     formatError?: ErrorFormatter<Request>;
     /**
-     * The options for `express.json()`, like `limit` and `strict`, used to parse
-     * the bodies of kizuna's own routes. An `express.json()` your app runs
-     * first takes precedence, and kizuna uses the body it parsed.
+     * The options for `express.json()`, like `strict`, used to parse the
+     * bodies of kizuna's own routes. The size limit is each route's
+     * `bodyLimit`. An `express.json()` your app runs first takes precedence,
+     * and kizuna uses the body it parsed.
      *
      * @example
      * json: {
-     *     limit: '5mb',
+     *     strict: false,
      * }
      */
     json?: JsonOptions;
+    /**
+     * Keeps work a handler passed to `waitUntil` running after the response,
+     * on a serverless host that stops the function once it answers. Leave it
+     * out on a server whose process keeps running.
+     *
+     * @example
+     * import { waitUntil } from '@vercel/functions';
+     *
+     * api.mount(app, {
+     *     waitUntil,
+     * });
+     */
+    waitUntil?: (promise: Promise<unknown>) => void;
 }
 
 export interface AppLike {
@@ -192,6 +227,7 @@ interface ExpressResponseContext {
     next: NextFunction;
     formatError?: ErrorFormatter<Request>;
     responseValidation?: boolean;
+    waitUntil?: (promise: Promise<unknown>) => void;
 }
 
 const writeStream = (open: NonNullable<RenderedResult['stream']>, res: ServerResponse, validate: boolean | undefined): void => {
@@ -232,6 +268,7 @@ const adapter = defineAdapter<Request, void, ExpressHandlerContext, ExpressRespo
         req: adapterRequest.request,
         res,
     }),
+    waitUntil: (promise, { waitUntil }) => waitUntil?.(promise),
     respond: (result, { res, next, formatError, responseValidation }) => {
         if (result.kind === 'handler-error') {
             next(result.error);
@@ -285,6 +322,8 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
 
     const pluginExports = pluginExportsOf(api);
     const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
+    const configBodyLimit = api[BODY_LIMIT_META] as number | undefined;
+    const configNestingLimit = api[NESTING_LIMIT_META] as number | undefined;
     const jobRunner = jobRunnerFrom(jobsMeta);
     const expressRouter = createExpressRouter();
 
@@ -296,7 +335,7 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
         override = false
     ): void => {
         const method = override ? 'post' : (route.method.toLowerCase() as 'get' | 'head' | 'post' | 'put' | 'patch' | 'delete' | 'options');
-        const parseBody = override ? readOverrideQuery : bodyParserFor(route, options?.json);
+        const parseBody = override ? readOverrideQuery : bodyParserFor(route, options?.json, bodyLimitOf(route, configBodyLimit));
         const shared = sharedSegmentRoute(route.path);
         expressRouter[method](
             route.path,
@@ -335,8 +374,18 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
                               },
                     query: override ? (req.kizunaOverrideQuery ?? {}) : req.query,
                     headers: req.headers,
-                    readBody: () => (override ? undefined : req.body),
-                    readRawBody: () => (override ? '' : rawBodyOf(req)),
+                    readBody: () => {
+                        if (override) return undefined;
+                        if (req.kizunaBodyError !== undefined) throw req.kizunaBodyError;
+                        return req.body;
+                    },
+                    configBodyLimit,
+                    configNestingLimit,
+                    readRawBody: () => {
+                        if (override) return '';
+                        if (req.kizunaBodyError !== undefined) throw req.kizunaBodyError;
+                        return rawBodyOf(req);
+                    },
                 };
                 await adapter.handle({
                     routes,
@@ -347,6 +396,7 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
                         next,
                         formatError: options?.formatError,
                         responseValidation: options?.responseValidation,
+                        waitUntil: options?.waitUntil,
                     },
                     guards,
                     schemes,

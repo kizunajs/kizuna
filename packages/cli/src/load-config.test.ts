@@ -10,4 +10,10 @@ describe('loadConfig', () => {
         expect(loaded).toHaveLength(1);
         expect(Object.keys(loaded[0]!.api.routes)).toEqual(['users']);
     });
+
+    it('hands back everything the config exports, beside the api', async () => {
+        const loaded = await loadConfig(path.join(FIXTURES, 'aliased-jsx-config', 'kizuna.config.ts'));
+        expect(loaded[0]!.config['api']).toBe(loaded[0]!.api);
+        expect(Object.keys(loaded[0]!.config)).toEqual(expect.arrayContaining(['api', 'clients']));
+    });
 });

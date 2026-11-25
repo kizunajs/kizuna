@@ -5,6 +5,10 @@ export interface TestRequest {
     path: string;
     body?: unknown;
     headers?: Record<string, string>;
+    /**
+     * Sends the body in chunks with no `Content-Length`.
+     */
+    chunked?: true;
 }
 
 /**
@@ -15,7 +19,49 @@ export interface MountRequest {
     path: string;
     body: string | undefined;
     headers: Record<string, string>;
+    /**
+     * Sends the body in chunks with no `Content-Length`. {@link toChunkedStream} makes the stream.
+     */
+    chunked?: true;
 }
+
+/**
+ * Returns the text as a stream of two chunks, which a request sends with no `Content-Length`.
+ */
+export const toChunkedStream = (text: string): ReadableStream<Uint8Array> => {
+    const bytes = new TextEncoder().encode(text);
+    const middle = Math.floor(bytes.length / 2);
+    return new ReadableStream<Uint8Array>({
+        start(controller) {
+            controller.enqueue(bytes.slice(0, middle));
+            controller.enqueue(bytes.slice(middle));
+            controller.close();
+        },
+    });
+};
+
+/**
+ * Sends a request to a listening server with `fetch`, for a transport whose own client can't send a chunked body.
+ */
+export const fetchTestRequest = async (baseUrl: string, { method, path, body, headers, chunked }: MountRequest): Promise<TestResponse> => {
+    const response = await fetch(baseUrl + path, {
+        method,
+        headers,
+        body: body === undefined ? undefined : chunked ? toChunkedStream(body) : body,
+        ...(chunked
+            ? {
+                  duplex: 'half',
+              }
+            : {}),
+    } as RequestInit);
+    const text = await response.text();
+    return {
+        status: response.status,
+        headers: response.headers,
+        body: readTestBody(text),
+        text,
+    };
+};
 
 export interface TestResponse {
     status: number;
@@ -136,7 +182,7 @@ export const readTestBody = (text: string): unknown => {
     }
 };
 
-const resolveRequest = ({ method, path, body, headers }: TestRequest): MountRequest => {
+const resolveRequest = ({ method, path, body, headers, chunked }: TestRequest): MountRequest => {
     if (body === undefined) {
         return {
             method,
@@ -154,6 +200,11 @@ const resolveRequest = ({ method, path, body, headers }: TestRequest): MountRequ
             'content-type': 'application/json',
             ...headers,
         },
+        ...(chunked
+            ? {
+                  chunked,
+              }
+            : {}),
     };
 };
 

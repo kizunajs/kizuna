@@ -18,6 +18,7 @@ minimumReleaseAgeExclude:
   - '@next/*'
   - '@aws-sdk/client-s3@3.1146.0'
   - '@aws-sdk/s3-request-presigner@3.1146.0'
+  - '@kizunajs/*'
 
 catalog:
   '@hono/node-server': ^1.19.18

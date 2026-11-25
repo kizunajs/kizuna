@@ -103,6 +103,7 @@ interface AdapterDefinition<NativeRequest, NativeResponse, HandlerContext, Respo
     buildHandlerContext: (request: AdapterRequest<NativeRequest>, context: ResponseContext) => HandlerContext | Promise<HandlerContext>;
     respond: (result: AdapterResult, context: ResponseContext) => NativeResponse | Promise<NativeResponse>;
     onError?: (error: unknown, request: AdapterRequest<NativeRequest>) => AdapterResult | void | Promise<AdapterResult | void>;
+    waitUntil?: (promise: Promise<void>, context: ResponseContext) => void;
     matcher?: RouteMatcher;
 }
 ```
@@ -112,6 +113,7 @@ interface AdapterDefinition<NativeRequest, NativeResponse, HandlerContext, Respo
 | `buildHandlerContext` | Returns the context object each handler receives alongside `params`, `query`, `body`, `headers`.                                                          |
 | `respond`             | Translates an `AdapterResult` to a native response. Always handle `kind: 'raw-response'` first, as it carries a pre-built native response from `onError`. |
 | `onError`             | Called on unhandled handler errors. Return an `AdapterResult` to override the default 500, or return `void` to let it pass through.                       |
+| `waitUntil`           | Hands work a handler passed to `waitUntil` to the host, so a serverless host keeps running it after the response. Leave it out on a Node server.          |
 | `matcher`             | Custom route matcher. Defaults to Kizuna's built-in path matcher.                                                                                         |
 
 ## `AdapterRequest`
@@ -167,9 +169,16 @@ A `success` result on a status declared with [`stream`](/docs/streaming) renders
 
 Content-type-aware body parsing for fetch-based runtimes (`Request` / `Response` API). Handles `application/json`, `multipart/form-data`, and `application/x-www-form-urlencoded`.
 
+It reads at most the limit you pass, and Kizuna answers a larger body with `413`. Read the config's `bodyLimit` off the api once, and pass it on the request too, so a `Content-Length` over the limit is refused before any of the body is read:
+
 ```ts
-readBody: (route) => parseFetchBody(request, route),
+const configBodyLimit = api[BODY_LIMIT_META] as number | undefined;
+
+readBody: (route) => parseFetchBody(request, route, bodyLimitOf(route, configBodyLimit)),
+configBodyLimit,
 ```
+
+Left out, the limit is the route's own `bodyLimit`, or 1 MiB.
 
 ### `entriesToObject`
 
