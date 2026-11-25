@@ -69,15 +69,47 @@ export interface HonoOptions {
      * {@link ErrorFormatter}.
      */
     formatError?: ErrorFormatter<Request>;
+    /**
+     * Keeps work a handler passed to `waitUntil` running after the response,
+     * for a serverless host Kizuna can't find on its own.
+     *
+     * @example
+     * import { waitUntil } from '@vercel/functions';
+     *
+     * api.mount(app, {
+     *     waitUntil,
+     * });
+     */
+    waitUntil?: (promise: Promise<unknown>) => void;
 }
+
+/**
+ * Returns the host's own `waitUntil`: Cloudflare Workers' execution context, or the Netlify context Hono passes as `c.env.context`.
+ */
+const hostWaitUntilOf = (c: Context<Env>): ((promise: Promise<unknown>) => void) | undefined => {
+    try {
+        const executionContext = c.executionCtx;
+        return (promise) => executionContext.waitUntil(promise);
+    } catch {
+        // Hono's getter throws where the runtime has no execution context, like Node.
+    }
+    const netlify = (c.env as { context?: { waitUntil?: (promise: Promise<unknown>) => void } } | undefined)?.context;
+    return netlify?.waitUntil === undefined ? undefined : (promise) => netlify.waitUntil!(promise);
+};
 
 const pipeline = defineAdapter<
     Request,
     Response,
     HonoHandlerContext<Env>,
-    { c: Context<Env>; formatError?: ErrorFormatter<Request>; responseValidation?: boolean }
+    {
+        c: Context<Env>;
+        formatError?: ErrorFormatter<Request>;
+        responseValidation?: boolean;
+        waitUntil?: (promise: Promise<unknown>) => void;
+    }
 >({
     buildHandlerContext: (_adapterRequest, { c }) => ({ c }),
+    waitUntil: (promise, { c, waitUntil }) => (waitUntil ?? hostWaitUntilOf(c))?.(promise),
     respond: (result, { c, formatError, responseValidation }) => {
         if (result.kind === 'handler-error') {
             throw result.error;
@@ -180,6 +212,7 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
                     c: c as unknown as Context<Env>,
                     formatError: options?.formatError,
                     responseValidation: options?.responseValidation,
+                    waitUntil: options?.waitUntil,
                 },
                 guards,
                 schemes,

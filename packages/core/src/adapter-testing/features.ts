@@ -88,6 +88,12 @@ export const ADAPTER_FEATURES = {
     'body.compressed415': {
         summary: 'A body sent with a `Content-Encoding` is refused with 415 and `Accept-Encoding: identity`.',
     },
+    'handler.waitUntil': {
+        summary: 'Work a handler passes to `waitUntil` finishes after the response is sent.',
+    },
+    'handler.waitUntilFailure': {
+        summary: 'Work passed to `waitUntil` that fails is logged with the route, and the response stands.',
+    },
     'errors.declaredProblemDetails': {
         summary: 'A declared error response is sent as `application/problem+json`.',
     },

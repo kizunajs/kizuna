@@ -147,6 +147,23 @@ export type HandlerArgs<R extends RouteDefinition> = ToolsArg<R> &
          * This function throws internally and never returns.
          */
         throwError: (response: ThrowableReturn<R> | GuardAnswer<R>) => never;
+        /**
+         * Keeps working on a promise after the response is sent, on serverless hosts too. A failure is logged.
+         *
+         * @example
+         * ```ts
+         * .handler(async ({ body, waitUntil }) => {
+         *     const user = await saveUser(body);
+         *     waitUntil(recordSignup(user));
+         *
+         *     return {
+         *         status: 201,
+         *         body: user,
+         *     };
+         * })
+         * ```
+         */
+        waitUntil: (promise: Promise<unknown>) => void;
     };
 
 export type RouteHandler<R extends RouteDefinition, HandlerContext = unknown> = (
