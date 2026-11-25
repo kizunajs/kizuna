@@ -196,7 +196,8 @@ The input is always the canonical problem; only the outgoing bytes change, so wh
 | Guards (`deny`)        | `deny({ status: 403, body: { detail: 'Forbidden' } })` |
 | Route not found        | 404 for unmatched paths                                |
 | Method not allowed     | 405 with `Allow` header                                |
-| Unsupported media type | 415 for wrong `Content-Type`                           |
+| Body too large         | 413 for a body over the route's `bodyLimit`            |
+| Unsupported media type | 415 for wrong `Content-Type` or a `Content-Encoding`   |
 | Handler errors         | 500 for unhandled exceptions                           |
 
 All built-in error responses use `application/problem+json` as the content type.

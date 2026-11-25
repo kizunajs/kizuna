@@ -626,6 +626,86 @@ export const responseShapeRoutes = k.routes({
  */
 export const signedBodyText = '{ "name" :  "Ada" }';
 
+/**
+ * The most bytes a task body may hold in {@link bodyLimitInput}.
+ */
+export const TASK_BODY_LIMIT = 64;
+
+/**
+ * Returns a task body that is exactly `bytes` long.
+ */
+export const taskBodyOfSize = (bytes: number): string => `{"title":"${'a'.repeat(bytes - 12)}"}`;
+
+export const bodyLimitRoutes = k.routes({
+    createTask: k
+        .route({
+            method: 'POST',
+            path: '/tasks',
+            body: z.object({
+                title: z.string(),
+            }),
+            responses: {
+                201: z.object({
+                    length: z.number(),
+                }),
+            },
+        })
+        .handler(({ body }) => ({
+            status: 201,
+            body: {
+                length: body.title.length,
+            },
+        })),
+    importTasks: k
+        .route({
+            method: 'POST',
+            path: '/tasks/import',
+            bodyLimit: TASK_BODY_LIMIT * 4,
+            body: z.object({
+                title: z.string(),
+            }),
+            responses: {
+                201: z.object({
+                    length: z.number(),
+                }),
+            },
+        })
+        .handler(({ body }) => ({
+            status: 201,
+            body: {
+                length: body.title.length,
+            },
+        })),
+    signTask: k
+        .route({
+            method: 'POST',
+            path: '/tasks/signed',
+            rawBody: true,
+            body: z.object({
+                title: z.string(),
+            }),
+            responses: {
+                201: z.object({
+                    length: z.number(),
+                }),
+            },
+        })
+        .handler(({ rawBody }) => ({
+            status: 201,
+            body: {
+                length: rawBody.length,
+            },
+        })),
+});
+
+export const bodyLimitInput = {
+    ...config,
+    bodyLimit: TASK_BODY_LIMIT,
+    routes: [bodyLimitRoutes],
+};
+
+export const bodyLimitContract = defineConfig(bodyLimitInput).api;
+
 export const responseShapeInput = {
     ...config,
     routes: [responseShapeRoutes],

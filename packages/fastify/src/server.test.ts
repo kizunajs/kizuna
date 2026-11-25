@@ -5,7 +5,7 @@ import { Kizuna } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import type { AddressInfo } from 'node:net';
 import { fastifyAdapter, type FastifyApi } from './server.js';
-import { fetchStream, readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
+import { fetchTestRequest, fetchStream, readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 interface Config {
     adapter: ReturnType<typeof fastifyAdapter>;
@@ -84,7 +84,10 @@ testAdapterFeatures({
         return {
             close: () => app.close(),
             stream: async (mountRequest) => fetchStream(await baseUrl(), mountRequest),
-            request: async ({ method, path, body, headers }) => {
+            request: async (mountRequest) => {
+                // inject can't send a chunked body, so that request goes over the socket.
+                if (mountRequest.chunked) return fetchTestRequest(await baseUrl(), mountRequest);
+                const { method, path, body, headers } = mountRequest;
                 const response = await app.inject({
                     method,
                     url: path,

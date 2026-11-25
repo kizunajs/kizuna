@@ -102,8 +102,8 @@ importers:
         specifier: ^0.7.0
         version: 0.7.0(conventional-commits-filter@5.0.0)(conventional-commits-parser@6.4.0)(release-it@20.2.1(@types/node@24.19.2)(supports-color@8.1.1))
       '@kizunajs/tooling':
-        specifier: ^0.2.0
-        version: 0.2.0(eslint@9.39.5(jiti@2.7.0)(supports-color@8.1.1))(prettier@3.9.10)(supports-color@8.1.1)(typescript@6.0.3)
+        specifier: ^0.2.4
+        version: 0.2.4(eslint@9.39.5(jiti@2.7.0)(supports-color@8.1.1))(prettier@3.9.10)(supports-color@8.1.1)(typescript@6.0.3)
       '@types/supertest':
         specifier: ^6.0.3
         version: 6.0.3
@@ -2436,8 +2436,8 @@ packages:
     peerDependencies:
       release-it: ^20.2.0
 
-  '@kizunajs/tooling@0.2.0':
-    resolution: {integrity: sha512-K6An+WReWtdQPE89dthmJnT1YtLrHbtpv+4It1AkOn5u578vX4ozOuKQbbd3gkEEYczLsIR32VqGqFLLh3ldeQ==}
+  '@kizunajs/tooling@0.2.4':
+    resolution: {integrity: sha512-QHywYFKmRnMSIMO9PCwXz0RW4Gu8hdh0/WKnl8J5tS7Tgq/6wdFunDH+IzrJe1AJ/HnU89Pt9VfLrK1WK7ot8g==}
     engines: {node: '>=24'}
     hasBin: true
     peerDependencies:
@@ -9795,7 +9795,7 @@ snapshots:
       - conventional-commits-filter
       - conventional-commits-parser
 
-  '@kizunajs/tooling@0.2.0(eslint@9.39.5(jiti@2.7.0)(supports-color@8.1.1))(prettier@3.9.10)(supports-color@8.1.1)(typescript@6.0.3)':
+  '@kizunajs/tooling@0.2.4(eslint@9.39.5(jiti@2.7.0)(supports-color@8.1.1))(prettier@3.9.10)(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
       '@eslint/js': 9.39.5
       eslint: 9.39.5(jiti@2.7.0)(supports-color@8.1.1)

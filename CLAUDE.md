@@ -181,6 +181,17 @@ Use full English words.
 
 Exceptions: `_` for unused, `_`-prefixed unused params, and namespace tokens (`k`, `z`). A repo's own CLAUDE.md can add a few more.
 
+## Functions
+
+A function's name says what it does or what it answers, so a reader knows the result without opening it.
+
+- **A function that does something starts with a verb**: `readBodyText`, `checkBodyHeaders`, `parseFetchBody`. Never a noun alone, like `bodyRefusal`.
+- **A function that answers yes or no reads as a question**: `isVoidSchema`, `hasRequestBody`, `validatesRequest`. Never a bare verb, like `takesBody`, which reads as an action.
+- **A function that returns a value of something takes `Of`**: `bodyLimitOf(route)`, `rawBodyOf(request)`.
+- **Name the thing, not the mechanism.** `readBodyBytes`, not `readLimitedBytes`. The limit is an argument, so the name doesn't repeat it.
+- **No vague verbs.** `handle`, `process`, `do`, `manage` and `run` say nothing about the result. Say what it reads, checks, parses or sends.
+- **No one-line wrappers.** A helper that only renames one line, like `throwBodyError`, hides that line. Write the line where it is used.
+
 # Object literals
 
 Always multi-line. Every property on its own line, every nested object expanded, even single-property ones.
@@ -216,6 +227,29 @@ label: string;
 label: string;
 ```
 
+Every exported function, type, option and component prop has JSDoc. An internal helper has none, unless its name cannot say what it does, and then one line.
+
+The first sentence says what the thing does for the person using it. A function starts with a verb, and a value or an option with a noun phrase:
+
+```ts
+/**
+ * Returns the tasks a user may read.
+ */
+export const readableTasksOf = (user: User): Task[] => ...
+
+/**
+ * The roles that may read a task.
+ */
+read: Role[];
+```
+
+- **A second sentence only when it is needed**, for the shape you pass or an effect you would miss. At most two sentences before the tags.
+- **Special values get their own sentence.** "`'public'` lets anyone read without logging in."
+- **`@default` only when leaving the option out does something you would not guess**, written as what happens: `@default 20 MB`. Never for "none", "empty" or `undefined`, where leaving it out obviously means none.
+- **Examples go in `@example` as code**, never in the sentence. "Extra fields, like a photographer's credit" belongs in an `@example`.
+- **No `@see`** until the docs page it links to exists.
+- **Never internal commentary.** Not how it is built, not what it sits on top of, no sentence without a subject ("Its documents log in"), no fragment the reader has to decode ("`['public']` needs no login").
+
 # Writing
 
 Applies equally to docs, README, JSDoc and code comments.
@@ -240,6 +274,39 @@ Examples in comments and JSDoc use names from this repo's own examples, never fr
 Never add `Co-Authored-By` trailers for AI agents (Claude, Copilot, Cursor, etc.) to commit messages, and never mention AI in commits, PR titles or PR descriptions. AI is a tool, not an author.
 
 Commit messages and PR titles follow Conventional Commits with the package folder as scope: `feat(core): ...`. `deps` is a scope too, and a repo's own CLAUDE.md lists any others. Mark breaking changes with `!`.
+
+# Pull request descriptions
+
+The title is the commit subject. The description says what changes and why, for a reader who doesn't have the code open.
+
+````md
+Adds <the change, in one sentence>.
+
+<What went wrong before, concretely.>
+
+<What it does now.>
+
+```ts
+<the smallest example of the new thing>
+```
+
+## Breaking changes
+
+- <What now fails or behaves differently, and when.> <What to write instead:>
+
+    ```ts
+    <the fix>
+    ```
+````
+
+- The first word says what the pull request does: "Adds", "Fixes", "Removes".
+- **One idea per paragraph**, in one or two sentences. Split a paragraph rather than join its sentences.
+- **Say enough, and no more.** A reader who hasn't seen the code should understand what changed, why, and how it behaves. How it is built gets one short sentence at most, and only when the reader needs it to trust the change.
+- The why is concrete. Name the error, the wrong output or the case that was missing.
+- A title with `!` always has a "Breaking changes" section. Each item shows the code that breaks and the code to write instead.
+- Leave out a section that has nothing in it.
+- Never mention tests. They are part of every change.
+- Never list the changed files. The diff shows them.
 
 # Releasing
 

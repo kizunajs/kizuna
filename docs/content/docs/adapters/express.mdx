@@ -161,16 +161,16 @@ For request-scoped values handlers need, use [request context](/docs/request-con
 kizuna.api.mount(app, {
     responseValidation: false,
     json: {
-        limit: '5mb',
+        strict: false,
     },
 });
 ```
 
-| Option               | Default            | Description                                                                                                                                                                               |
-| -------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `responseValidation` | `false`            | Validate handler return values against response schemas, surfacing as 500 on mismatch. Enable in development.                                                                             |
-| `json`               | Express's defaults | The options for `express.json()`, like `limit` and `strict`, used for Kizuna's own routes. Leave it out if the app runs its own `express.json()`.                                         |
-| `formatError`        | none               | Reshape error (`>= 400`) response bytes for migrating clients. Most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api). |
+| Option               | Default            | Description                                                                                                                                                                                                         |
+| -------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `responseValidation` | `false`            | Validate handler return values against response schemas, surfacing as 500 on mismatch. Enable in development.                                                                                                       |
+| `json`               | Express's defaults | The options for `express.json()`, like `strict`, used for Kizuna's own routes. The size limit is each route's [`bodyLimit`](/docs/routes#request-body-size). Leave it out if the app runs its own `express.json()`. |
+| `formatError`        | none               | Reshape error (`>= 400`) response bytes for migrating clients. Most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api).                           |
 
 ## Type-safe request properties
 
@@ -201,7 +201,7 @@ If a path is matched but the method is not declared, the adapter returns 405 wit
 
 ## Alongside your own Express routes
 
-An app with Express routes of its own usually runs `express.json()` for them. Kizuna works with that: its routes use the body `express.json()` already parsed. Set it up one of two ways.
+An app with Express routes of its own usually runs `express.json()` for them. Kizuna works with that: its routes use the body `express.json()` already parsed. That body was read under your `express.json()`'s own `limit`, so mounting Kizuna first keeps each route's `bodyLimit` in charge. Set it up one of two ways.
 
 ### Mount Kizuna first
 
@@ -240,7 +240,7 @@ Without either, a `rawBody` route answers `500`, and the log names the route and
 
 ## Multipart / file uploads
 
-For routes with `contentType: 'multipart/form-data'`, add a multipart middleware such as `multer` or `busboy` before the Kizuna handler. The adapter reads `req.body` as-is.
+For routes with `contentType: 'multipart/form-data'`, add a multipart middleware such as `multer` or `busboy` before the Kizuna handler. The adapter reads `req.body` as-is. Kizuna refuses a `Content-Length` over the route's `bodyLimit` before the middleware runs, but a chunked upload is read by the middleware, so give it the same limit.
 
 ```ts title="src/index.ts"
 import multer from 'multer';

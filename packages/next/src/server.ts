@@ -11,6 +11,7 @@ import {
     headersToObject,
     matchRoute,
     parseFetchBody,
+    readBodyText,
     entriesToObject,
     renderJsonResult,
     type Jobs,
@@ -20,6 +21,8 @@ import {
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     JOBS_META,
+    BODY_LIMIT_META,
+    bodyLimitOf,
     type JobsMeta,
     jobRoutes,
     jobRouter,
@@ -123,7 +126,8 @@ export const handleNextRequest = async <T extends Routes>(
     schemes?: Record<string, SecurityScheme>,
     requestContext?: RequestContextMap<NextHandlerContext>,
     pluginExports?: Record<string, unknown>,
-    jobs?: MountedJobs
+    jobs?: MountedJobs,
+    configBodyLimit?: number
 ): Promise<NextResponse> => {
     const url = new URL(request.url);
 
@@ -177,8 +181,9 @@ export const handleNextRequest = async <T extends Routes>(
                 },
                 query: entriesToObject(url.searchParams),
                 headers: headersToObject(request.headers),
-                readBody: (route) => parseFetchBody(request, route),
-                readRawBody: () => request.text(),
+                readBody: (route) => parseFetchBody(request, route, bodyLimitOf(route, configBodyLimit)),
+                readRawBody: (route) => readBodyText(request, bodyLimitOf(route, configBodyLimit)),
+                configBodyLimit,
             };
             return adapter.handle({
                 routes: jobs.routes,
@@ -228,8 +233,9 @@ export const handleNextRequest = async <T extends Routes>(
                 },
                 query: entriesToObject(url.searchParams),
                 headers: headersToObject(request.headers),
-                readBody: (route) => parseFetchBody(request, route),
-                readRawBody: () => request.text(),
+                readBody: (route) => parseFetchBody(request, route, bodyLimitOf(route, configBodyLimit)),
+                readRawBody: (route) => readBodyText(request, bodyLimitOf(route, configBodyLimit)),
+                configBodyLimit,
             };
 
             return adapter.handle({
@@ -255,8 +261,9 @@ export const handleNextRequest = async <T extends Routes>(
         },
         query: entriesToObject(url.searchParams),
         headers: headersToObject(request.headers),
-        readBody: (route) => parseFetchBody(request, route),
-        readRawBody: () => request.text(),
+        readBody: (route) => parseFetchBody(request, route, bodyLimitOf(route, configBodyLimit)),
+        readRawBody: (route) => readBodyText(request, bodyLimitOf(route, configBodyLimit)),
+        configBodyLimit,
     };
 
     return adapter.handle({
@@ -290,6 +297,7 @@ export type NextApiWithRouter = ApiWithRouter & {
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
+    readonly [BODY_LIMIT_META]?: unknown;
 };
 
 export type NextApi<R extends Routes = Routes> = ApiWithRouter<R> & {
@@ -314,6 +322,7 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
     const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
     const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<NextHandlerContext> | undefined;
     const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
+    const configBodyLimit = api[BODY_LIMIT_META] as number | undefined;
     const mountedJobs = jobsMeta
         ? {
               routes: jobRoutes(jobsMeta),
@@ -355,7 +364,8 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
                     schemes,
                     requestContext,
                     pluginExports,
-                    undefined
+                    undefined,
+                    configBodyLimit
                 );
             }
         }
@@ -369,7 +379,8 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
             schemes,
             requestContext,
             pluginExports,
-            mountedJobs
+            mountedJobs,
+            configBodyLimit
         );
     };
     return {

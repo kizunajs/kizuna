@@ -17,7 +17,7 @@ import { streamToolsOf } from './tool-events.js';
 import type { Routes, RouteDefinition, RouteAuth, SecurityRequirement, RequiredPermissions } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
-import type { AnyAdapter } from './adapter.js';
+import { BODY_LIMIT_META, type AnyAdapter } from './adapter.js';
 import { permissionNames } from './permissions.js';
 import { GUARD } from './identity-builder.js';
 import { RESOLVER } from './request-context-builder.js';
@@ -198,6 +198,16 @@ export type KizunaConfigInput<
     routes?: R;
     jobs?: J;
     /**
+     * The most bytes a request body may hold, on every route that sets no
+     * `bodyLimit` of its own. A larger body is answered with
+     * `413 Content Too Large` before any of it is parsed.
+     *
+     * @default 1 MiB
+     * @example
+     * bodyLimit: 256 * 1024,
+     */
+    bodyLimit?: number;
+    /**
      * What this API installs beside its own routes. Each plugin carries its own
      * name, which is what handlers reach it under.
      *
@@ -332,6 +342,15 @@ export type ConfiguredApi<
 >;
 
 /**
+ * Throws unless a `bodyLimit` is a whole number of bytes above zero.
+ */
+const assertBodyLimit = (limit: number, owner: string): void => {
+    if (!Number.isSafeInteger(limit) || limit <= 0) {
+        throw new Error(`${owner} sets \`bodyLimit\` to ${limit}. Give a whole number of bytes above 0, like \`1024 * 1024\` for 1 MiB.`);
+    }
+};
+
+/**
  * Everything kizuna knows about one API, written in `kizuna.config.ts`. Every
  * route's `auth` resolves onto its `security`, `roles` and `requires`, the
  * routes, jobs, tools and plugins are checked against one another, and the
@@ -369,6 +388,7 @@ export const defineConfig = <
 } => {
     const guardSchema = options.auth?.guardSchema;
     if (guardSchema) assertFillableGuardSchema(guardSchema);
+    if (options.bodyLimit !== undefined) assertBodyLimit(options.bodyLimit, 'The config');
     assertConfigExtensions(options.typescript?.extend);
 
     const routes = assembleRoutes((options.routes ?? []) as readonly Routes[]);
@@ -399,6 +419,7 @@ export const defineConfig = <
             );
         }
         assertNoContentResponses(route, routeKey);
+        if (route.bodyLimit !== undefined) assertBodyLimit(route.bodyLimit, `Route '${routeKey}'`);
         if (route.rawBody === true && route.contentType === 'multipart/form-data') {
             throw new Error(
                 `Route '${routeKey}' declares \`rawBody\` on a \`multipart/form-data\` body. A multipart body is read as a stream of parts, so kizuna cannot keep it as text. Remove \`rawBody\`, or take the body as JSON.`
@@ -475,6 +496,7 @@ export const defineConfig = <
         },
         options.adapter
     ) as unknown as ConfiguredApi<R, J, P, Groups, Codes, Identities, RequestContext, GuardSchema, AdapterValue>;
+    (api as unknown as Record<symbol, unknown>)[BODY_LIMIT_META] = options.bodyLimit;
     apiReference.bind(api);
     for (const plugin of Object.values(plugins)) plugin.validate?.();
 

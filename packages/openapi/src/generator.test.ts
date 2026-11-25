@@ -1321,6 +1321,22 @@ describe('OpenAPI generator: HEAD method', () => {
     });
 });
 
+describe('content too large response', () => {
+    const spec = generateJson(contract, baseConfig);
+
+    it('adds 413 Problem Details to a route that takes a body', () => {
+        const response = spec.paths['/users']?.post?.responses?.['413'];
+        expect(response?.description).toBe('Content Too Large');
+        expect(response?.content?.['application/problem+json']?.schema).toEqual({
+            $ref: '#/components/schemas/ProblemDetails',
+        });
+    });
+
+    it('leaves 413 off a route without a body', () => {
+        expect(spec.paths['/users']?.get?.responses?.['413']).toBeUndefined();
+    });
+});
+
 describe('automatic validation error response', () => {
     const spec = generateJson(contract, baseConfig);
 

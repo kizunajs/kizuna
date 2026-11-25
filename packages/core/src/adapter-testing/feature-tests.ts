@@ -17,6 +17,9 @@ import {
     sessionAuthorization,
     sharedSegmentInput,
     signedBodyText,
+    bodyLimitInput,
+    taskBodyOfSize,
+    TASK_BODY_LIMIT,
     subUserInput,
     userInput,
     pluginInput,
@@ -85,6 +88,14 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         using(
             {
                 input: pluginInput,
+            },
+            use
+        );
+
+    const usingBodyLimit = <T>(use: (mounted: MountedApi) => Promise<T>) =>
+        using(
+            {
+                input: bodyLimitInput,
             },
             use
         );
@@ -647,6 +658,104 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             expect(response.body).toEqual({
                 rawBody: signedBodyText,
                 name: 'Ada',
+            });
+        },
+
+        'body.limit413': async () => {
+            await usingBodyLimit(async (tasks) => {
+                const atLimit = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks',
+                    body: taskBodyOfSize(TASK_BODY_LIMIT),
+                });
+                expect(atLimit.status).toBe(201);
+
+                const overLimit = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks',
+                    body: taskBodyOfSize(TASK_BODY_LIMIT + 1),
+                });
+                expect(overLimit.status).toBe(413);
+                expect(overLimit.headers.get('connection')).toBe('close');
+                expect(overLimit.headers.get('content-type')).toContain('application/problem+json');
+                expect(overLimit.body).toMatchObject({
+                    status: 413,
+                    detail: `The request body is larger than ${TASK_BODY_LIMIT} bytes.`,
+                });
+            });
+        },
+
+        'body.limitChunked': async () => {
+            await usingBodyLimit(async (tasks) => {
+                const atLimit = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks',
+                    body: taskBodyOfSize(TASK_BODY_LIMIT),
+                    chunked: true,
+                });
+                expect(atLimit.status).toBe(201);
+
+                const overLimit = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks',
+                    body: taskBodyOfSize(TASK_BODY_LIMIT + 1),
+                    chunked: true,
+                });
+                expect(overLimit.status).toBe(413);
+            });
+        },
+
+        'body.limitPerRoute': async () => {
+            await usingBodyLimit(async (tasks) => {
+                const body = taskBodyOfSize(TASK_BODY_LIMIT * 2);
+                const raised = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks/import',
+                    body,
+                });
+                expect(raised.status).toBe(201);
+
+                const refused = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks',
+                    body,
+                });
+                expect(refused.status).toBe(413);
+            });
+        },
+
+        'body.limitRawBody': async () => {
+            await usingBodyLimit(async (tasks) => {
+                const atLimit = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks/signed',
+                    body: taskBodyOfSize(TASK_BODY_LIMIT),
+                });
+                expect(atLimit.status).toBe(201);
+
+                const overLimit = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks/signed',
+                    body: taskBodyOfSize(TASK_BODY_LIMIT + 1),
+                    chunked: true,
+                });
+                expect(overLimit.status).toBe(413);
+            });
+        },
+
+        'body.compressed415': async () => {
+            await usingBodyLimit(async (tasks) => {
+                const response = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks',
+                    body: taskBodyOfSize(TASK_BODY_LIMIT),
+                    headers: {
+                        'content-encoding': 'gzip',
+                    },
+                });
+                expect(response.status).toBe(415);
+                expect(response.headers.get('accept-encoding')).toBe('identity');
+                expect(response.headers.get('content-type')).toContain('application/problem+json');
             });
         },
 

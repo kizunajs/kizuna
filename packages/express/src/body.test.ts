@@ -45,15 +45,15 @@ describe('request bodies', () => {
         const app = express();
         createApi().mount(app, {
             json: {
-                limit: '5b',
+                strict: false,
             },
         });
 
-        const response = await request(app).post('/validated').send({
-            name: 'Ada',
-        });
+        // Without `strict: false` a JSON string is refused before validation, with no `errors`.
+        const response = await request(app).post('/validated').set('content-type', 'application/json').send('"Ada"');
 
-        expect(response.status).toBe(413);
+        expect(response.status).toBe(400);
+        expect(response.body.errors).toHaveLength(1);
     });
 });
 
