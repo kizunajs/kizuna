@@ -157,6 +157,24 @@ export const ADAPTER_FEATURES = {
     'cache.etagMismatchSendsBody': {
         summary: 'A non-matching `If-None-Match` answers `200` with the body.',
     },
+    'preconditions.ifMatchWrites': {
+        summary: 'A write whose `If-Match` names the current tag goes ahead.',
+    },
+    'preconditions.ifMatchStale': {
+        summary: 'A write whose `If-Match` names a stale tag answers `412` as Problem Details and changes nothing.',
+    },
+    'preconditions.ifMatchAbsent': {
+        summary: 'A write without `If-Match` sets no precondition and goes ahead.',
+    },
+    'preconditions.ifMatchAny': {
+        summary: 'A write with `If-Match: *` goes ahead, since the resource exists.',
+    },
+    'preconditions.ifMatchWeak': {
+        summary: 'A weak tag in `If-Match` never matches, so the write answers `412`.',
+    },
+    'preconditions.ifMatchNewEtag': {
+        summary: 'A write that goes ahead sends the `ETag` of what it saved, which the next read sends too.',
+    },
     'plugins.routesServed': {
         summary: 'A plugin route is served by `api.mount`, in the same pipeline as the contract’s own.',
     },

@@ -75,9 +75,12 @@ const contract = defineConfig({
                     name: z.string(),
                 }),
                 responses: {
-                    200: z.object({
-                        ok: z.boolean(),
-                    }),
+                    200: {
+                        body: z.object({
+                            ok: z.boolean(),
+                        }),
+                        etag: true,
+                    },
                     206: {
                         stream: {
                             done: z.object({

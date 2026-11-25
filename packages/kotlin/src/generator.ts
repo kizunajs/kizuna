@@ -10,6 +10,7 @@ import {
     isJsonMediaType,
     isJsonQueryField,
     validatesRequest,
+    ifMatchStatus,
     isObjectSchema,
     isDiscriminatedUnionSchema,
     readMetaId,
@@ -30,6 +31,7 @@ import {
     soleStreamResponse,
 } from 'kizunajs/generator';
 import type { ApiDefinition } from 'kizunajs';
+import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { KotlinWriter, stringLiteral } from './emit.js';
 import {
     TypeRegistry,
@@ -320,6 +322,14 @@ const buildRouteMethod = (
             caseName: has400 ? 'validationError' : statusToCamelCase(400),
             status: 400,
             type: 'ValidationError',
+        });
+    }
+    // A write that declares `etag` answers a stale `If-Match` with a 412 of its own.
+    if (ifMatchStatus(route) !== undefined && !errorCases.some((candidate) => candidate.status === 412)) {
+        errorCases.push({
+            caseName: statusToCamelCase(412),
+            status: 412,
+            type: mapType(ProblemDetailsSchema, registry, 'ProblemDetails').expression,
         });
     }
 

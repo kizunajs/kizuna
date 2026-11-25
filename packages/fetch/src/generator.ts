@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import type { ApiDefinition, ResponseDefinition, RouteDefinition, Routes } from 'kizunajs';
-import { ValidationErrorSchema } from 'kizunajs/schemas';
+import { ProblemDetailsSchema, ValidationErrorSchema } from 'kizunajs/schemas';
 import {
     isBinarySchema,
     isJsonMediaType,
@@ -17,6 +17,7 @@ import {
     type StreamMode,
     listedRoutes,
     validatesRequest,
+    ifMatchStatus,
 } from 'kizunajs/generator';
 import { runtimeSource } from './runtime.js';
 import { TypeCollector, docComment, sampleObject, sampleValue, typeOf } from './zod-to-typescript.js';
@@ -211,6 +212,15 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
         results.push(`{ status: 400; body: ${validationBody}; headers: Record<string, string> }`);
     }
 
+    // A write that declares `etag` answers a stale `If-Match` with a 412 of its own.
+    const preconditionBody =
+        ifMatchStatus(route) !== undefined && !Object.keys(route.responses).includes('412')
+            ? typeOf(ProblemDetailsSchema, collector, 'ProblemDetails')
+            : undefined;
+    if (preconditionBody) {
+        results.push(`{ status: 412; body: ${preconditionBody}; headers: Record<string, string> }`);
+    }
+
     members.push(`export type Result =\n${indent(results.map((result) => `| ${result}`).join('\n'))};`);
 
     const argsType = `{\n${indent(args.map((arg) => `${arg};`).join('\n'))}\n}`;
@@ -224,6 +234,7 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
     );
     // The runtime and its wrappers read the table alone, so it lists the 400 the types add.
     if (validationBody && !declaredBadRequest) responses.push('400: {}');
+    if (preconditionBody) responses.push('412: {}');
     tableEntries.push(`responses: {\n${indent(responses.map((entry) => `${entry},`).join('\n'))}\n}`);
 
     const streams = Object.values(route.responses).some((response) => isStreamResponse(response));

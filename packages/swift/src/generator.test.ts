@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Kizuna, type ApiDefinition } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import { definePlugin, route } from 'kizunajs/plugin';
-import { FileSchema } from 'kizunajs/schemas';
+import { FileSchema, ProblemDetailsSchema } from 'kizunajs/schemas';
 import { generateSwiftClient } from './generator.js';
 
 interface Config {
@@ -2964,5 +2964,87 @@ describe('Swift generator: a model with an id and a file', () => {
             baseConfig
         );
         expect(output).toContain('public struct Attachment: Sendable, Equatable, Identifiable');
+    });
+});
+
+describe('Swift generator: the automatic 412 for a write that declares etag', () => {
+    const TaskSchema = z.object({
+        id: z.string(),
+        title: z.string(),
+    });
+
+    const outputFor = (definition: Record<string, unknown>) =>
+        generateSwiftClient(
+            defineConfig({
+                routes: [
+                    {
+                        saveTask: {
+                            path: '/tasks/:id',
+                            ...definition,
+                        },
+                    },
+                ],
+            } as never).api,
+            baseConfig
+        );
+
+    const taggedWrite = {
+        method: 'PATCH',
+        responses: {
+            200: {
+                body: TaskSchema,
+                etag: true,
+            },
+        },
+    };
+
+    const taggedRead = {
+        method: 'GET',
+        responses: {
+            200: {
+                body: TaskSchema,
+                etag: true,
+            },
+        },
+    };
+
+    const untaggedWrite = {
+        method: 'DELETE',
+        responses: {
+            200: TaskSchema,
+        },
+    };
+
+    const declaredPrecondition = {
+        method: 'PUT',
+        responses: {
+            200: {
+                body: TaskSchema,
+                etag: true,
+            },
+            412: ProblemDetailsSchema.extend({
+                currentTitle: z.string(),
+            }),
+        },
+    };
+
+    it('adds a preconditionFailed case carrying Problem Details', () => {
+        const output = outputFor(taggedWrite);
+        expect(output).toContain('case preconditionFailed(TestAPI.ProblemDetails)');
+        expect(output).toContain('public struct ProblemDetails');
+    });
+
+    it('adds no case to a read that declares etag', () => {
+        expect(outputFor(taggedRead)).not.toContain('preconditionFailed');
+    });
+
+    it('adds no case to a write that declares no etag', () => {
+        expect(outputFor(untaggedWrite)).not.toContain('preconditionFailed');
+    });
+
+    it('keeps a 412 the route declares', () => {
+        const output = outputFor(declaredPrecondition);
+        expect(output).toContain('case preconditionFailed(Response412)');
+        expect(output).not.toContain('case preconditionFailed(TestAPI.ProblemDetails)');
     });
 });

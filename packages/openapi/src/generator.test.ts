@@ -2987,3 +2987,98 @@ describe('an object in a query', () => {
         });
     });
 });
+
+describe('OpenAPI generator: the automatic 412 for a write that declares etag', () => {
+    const TaskSchema = z.object({
+        id: z.string(),
+        title: z.string(),
+    });
+
+    const outputFor = (definition: Record<string, unknown>) =>
+        generateJson(
+            defineConfig({
+                routes: [
+                    {
+                        saveTask: {
+                            path: '/tasks/:id',
+                            ...definition,
+                        },
+                    },
+                ],
+            } as never).api,
+            baseConfig
+        );
+
+    const taggedWrite = {
+        method: 'PATCH',
+        responses: {
+            200: {
+                body: TaskSchema,
+                etag: true,
+            },
+        },
+    };
+
+    const taggedRead = {
+        method: 'GET',
+        responses: {
+            200: {
+                body: TaskSchema,
+                etag: true,
+            },
+        },
+    };
+
+    const untaggedWrite = {
+        method: 'DELETE',
+        responses: {
+            200: TaskSchema,
+        },
+    };
+
+    const declaredPrecondition = {
+        method: 'PUT',
+        responses: {
+            200: {
+                body: TaskSchema,
+                etag: true,
+            },
+            412: ProblemDetailsSchema.extend({
+                currentTitle: z.string(),
+            }),
+        },
+    };
+
+    it('documents 412 as Problem Details', () => {
+        const response = outputFor(taggedWrite).paths['/tasks/{id}']?.patch?.responses['412'];
+        expect(response).toEqual({
+            description: 'Precondition Failed',
+            content: {
+                'application/problem+json': {
+                    schema: {
+                        $ref: '#/components/schemas/ProblemDetails',
+                    },
+                },
+            },
+        });
+    });
+
+    it('tells the caller to send the ETag back as If-Match', () => {
+        const response = outputFor(taggedWrite).paths['/tasks/{id}']?.patch?.responses['200'];
+        expect(response?.headers?.['ETag']?.description).toContain('`If-Match`');
+    });
+
+    it('documents no 412 on a read that declares etag', () => {
+        expect(outputFor(taggedRead).paths['/tasks/{id}']?.get?.responses['412']).toBeUndefined();
+    });
+
+    it('documents no 412 on a write that declares no etag', () => {
+        expect(outputFor(untaggedWrite).paths['/tasks/{id}']?.delete?.responses['412']).toBeUndefined();
+    });
+
+    it('keeps a 412 the route declares', () => {
+        const schema = outputFor(declaredPrecondition).paths['/tasks/{id}']?.put?.responses['412']?.content?.['application/problem+json']
+            ?.schema as { properties?: Record<string, unknown> };
+        expect(schema.properties).toHaveProperty('currentTitle');
+    });
+});

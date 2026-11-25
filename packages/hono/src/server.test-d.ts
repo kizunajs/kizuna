@@ -7,6 +7,7 @@ import type { Env } from 'hono';
 import type { GuardRun, RequestContextRun } from 'kizunajs/adapter';
 import {
     checkAdapterTypeFeatures,
+    conditionalWriteContract,
     gateContract,
     inferenceContract,
     inferenceGroupContract,
@@ -220,6 +221,34 @@ test('conforms to the shared adapter type catalogue', () => {
                 .parameter(0)
                 .toMatchTypeOf<{ lastEventId: string | undefined }>();
             expectTypeOf<Parameters<Handlers<typeof inferenceContract>['createUser']>[0]>().not.toHaveProperty('lastEventId');
+        },
+        'handler.ifMatch': () => {
+            type UpdateTaskArgs = Parameters<Handlers<typeof conditionalWriteContract>['updateTask']>[0];
+            expectTypeOf<UpdateTaskArgs['ifMatch']>().parameter(0).toEqualTypeOf<{
+                id: string;
+                title: string;
+            }>();
+            expectTypeOf<UpdateTaskArgs['ifMatch']>().returns.toEqualTypeOf<Promise<void>>();
+            const updateTask: Handlers<typeof conditionalWriteContract>['updateTask'] = async ({ params, body, ifMatch }) => {
+                await ifMatch({
+                    id: params.id,
+                    title: 'Write the report',
+                });
+                // @ts-expect-error `ifMatch` takes the task the route answers with
+                await ifMatch({
+                    id: params.id,
+                });
+                return {
+                    status: 200,
+                    body: {
+                        id: params.id,
+                        title: body.title,
+                    },
+                };
+            };
+            void updateTask;
+            expectTypeOf<Parameters<Handlers<typeof conditionalWriteContract>['getTask']>[0]>().not.toHaveProperty('ifMatch');
+            expectTypeOf<Parameters<Handlers<typeof conditionalWriteContract>['deleteTask']>[0]>().not.toHaveProperty('ifMatch');
         },
         'handler.context': () => {
             expectTypeOf<Handlers<typeof inferenceContract>['getUser']>().parameter(0).toMatchTypeOf<HonoHandlerContext>();

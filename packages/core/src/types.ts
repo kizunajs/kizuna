@@ -178,6 +178,9 @@ export type ResponseDefinition =
            * body again. Pairs with a `cache` policy that revalidates, such as
            * `noCache` or `maxAge: 0` with `mustRevalidate`.
            *
+           * On a write, the handler gets `ifMatch`, which answers `412` when
+           * the caller's `If-Match` is stale.
+           *
            * Successful responses only, since `304` says the representation the
            * caller holds is still current.
            */

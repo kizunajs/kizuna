@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { computeEtag, etagMatches } from './etag.js';
+import { computeEtag, etagMatches, etagMatchesStrongly } from './etag.js';
 
 describe('computeEtag', () => {
     test('is a quoted strong tag', async () => {
@@ -48,5 +48,42 @@ describe('etagMatches', () => {
 
     test('a tag that only shares a prefix does not match', () => {
         expect(etagMatches('"abc"', etag)).toBe(false);
+    });
+});
+
+describe('etagMatchesStrongly', () => {
+    const etag = '"abc123"';
+
+    test('the same tag matches', () => {
+        expect(etagMatchesStrongly('"abc123"', etag)).toBe(true);
+    });
+
+    test('a different tag does not', () => {
+        expect(etagMatchesStrongly('"def456"', etag)).toBe(false);
+    });
+
+    test('a star matches any representation', () => {
+        expect(etagMatchesStrongly('*', etag)).toBe(true);
+    });
+
+    test('a star matches a representation sent with no tag', () => {
+        expect(etagMatchesStrongly('*', undefined)).toBe(true);
+    });
+
+    test('a tag never matches a representation sent with no tag', () => {
+        expect(etagMatchesStrongly('"abc123"', undefined)).toBe(false);
+    });
+
+    test('one entry of a list is enough', () => {
+        expect(etagMatchesStrongly('"def456", "abc123"', etag)).toBe(true);
+    });
+
+    test('the comparison is strong, so a W/ prefix never matches', () => {
+        expect(etagMatchesStrongly('W/"abc123"', etag)).toBe(false);
+        expect(etagMatchesStrongly('W/"abc123"', 'W/"abc123"')).toBe(false);
+    });
+
+    test('a tag that only shares a prefix does not match', () => {
+        expect(etagMatchesStrongly('"abc"', etag)).toBe(false);
     });
 });

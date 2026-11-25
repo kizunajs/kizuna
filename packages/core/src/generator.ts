@@ -69,6 +69,7 @@ export {
     validatesRequest,
     resolveResponseCache,
     resolveResponseEtag,
+    ifMatchStatus,
     isJsonMediaType,
     toPascalCase,
     toCamelCase,

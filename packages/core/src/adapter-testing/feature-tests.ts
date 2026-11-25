@@ -7,6 +7,8 @@ import {
     resetUsers,
     csvBody,
     cachedInput,
+    conditionalInput,
+    resetTasks,
     deprecatedInput,
     failingStreamFirstChunk,
     issueInput,
@@ -139,6 +141,55 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             },
             use
         );
+
+    const usingConditional = <T>(use: (mounted: MountedApi) => Promise<T>) => {
+        resetTasks();
+        return using(
+            {
+                input: conditionalInput,
+            },
+            use
+        );
+    };
+
+    const readTask = (mounted: MountedApi) =>
+        mounted.request({
+            method: 'GET',
+            path: '/tasks/1',
+        });
+
+    const renameTask = (mounted: MountedApi, ifMatch?: string) =>
+        mounted.request({
+            method: 'PATCH',
+            path: '/tasks/1',
+            body: {
+                title: 'Ship the report',
+            },
+            ...(ifMatch === undefined
+                ? {}
+                : {
+                      headers: {
+                          'if-match': ifMatch,
+                      },
+                  }),
+        });
+
+    const expectRefused = async (mounted: MountedApi, ifMatch: string) => {
+        const response = await renameTask(mounted, ifMatch);
+        expect(response.status).toBe(412);
+        expect(response.headers.get('content-type')).toContain('application/problem+json');
+        expect(response.body).toEqual({
+            type: 'about:blank',
+            title: 'Precondition Failed',
+            status: 412,
+            detail: 'The resource has changed since it was read.',
+        });
+        const after = await readTask(mounted);
+        expect(after.body).toEqual({
+            id: '1',
+            title: 'Write the report',
+        });
+    };
 
     const usingShapes = <T>(use: (mounted: MountedApi) => Promise<T>) =>
         using(
@@ -1101,6 +1152,61 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 expect(response.body).toEqual({
                     id: '1',
                 });
+            });
+        },
+        'preconditions.ifMatchWrites': async () => {
+            await usingConditional(async (mounted) => {
+                const read = await readTask(mounted);
+                const etag = read.headers.get('etag');
+                expect(etag).not.toBeNull();
+
+                const saved = await renameTask(mounted, etag as string);
+                expect(saved.status).toBe(200);
+                expect(saved.body).toEqual({
+                    id: '1',
+                    title: 'Ship the report',
+                });
+            });
+        },
+        'preconditions.ifMatchStale': async () => {
+            await usingConditional(async (mounted) => {
+                await expectRefused(mounted, '"stale-tag-value"');
+            });
+        },
+        'preconditions.ifMatchAbsent': async () => {
+            await usingConditional(async (mounted) => {
+                const saved = await renameTask(mounted);
+                expect(saved.status).toBe(200);
+                expect(saved.body).toEqual({
+                    id: '1',
+                    title: 'Ship the report',
+                });
+            });
+        },
+        'preconditions.ifMatchAny': async () => {
+            await usingConditional(async (mounted) => {
+                const saved = await renameTask(mounted, '*');
+                expect(saved.status).toBe(200);
+                expect(saved.body).toEqual({
+                    id: '1',
+                    title: 'Ship the report',
+                });
+            });
+        },
+        'preconditions.ifMatchWeak': async () => {
+            await usingConditional(async (mounted) => {
+                const read = await readTask(mounted);
+                await expectRefused(mounted, `W/${read.headers.get('etag')}`);
+            });
+        },
+        'preconditions.ifMatchNewEtag': async () => {
+            await usingConditional(async (mounted) => {
+                const before = (await readTask(mounted)).headers.get('etag');
+                const saved = await renameTask(mounted, before as string);
+                const etag = saved.headers.get('etag');
+                expect(etag).toMatch(/^"[0-9a-f]{32}"$/);
+                expect(etag).not.toBe(before);
+                expect((await readTask(mounted)).headers.get('etag')).toBe(etag);
             });
         },
         'plugins.routesServed': async () => {

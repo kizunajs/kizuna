@@ -21,7 +21,7 @@ import { type MatchResult, matchRoute as defaultMatchRoute, sortFlattenedRoutes 
 import { assertNoPathCollisions, routeClaims } from './path-claims.js';
 import { deprecationHeaders } from './deprecation.js';
 import { cacheHeaders } from './cache.js';
-import { computeEtag, etagMatches } from './etag.js';
+import { computeEtag, etagMatches, etagMatchesStrongly } from './etag.js';
 import { ResponseError } from './response-error.js';
 import { problemDetails, problemFromBody, type ProblemDetails } from './problem-details.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
@@ -33,6 +33,7 @@ import {
     resolveResponseContentType,
     resolveResponseCache,
     resolveResponseEtag,
+    ifMatchStatus,
     isJsonMediaType,
     isStreamResponse,
     isSuccessStatus,
@@ -295,6 +296,7 @@ export const HANDLER_ARG_KEYS = [
     'body',
     'headers',
     'throwError',
+    'ifMatch',
     'auth',
     'requestContext',
     'plugins',
@@ -1222,6 +1224,28 @@ const withEtag = async (result: AdapterResult, route: RouteDefinition, request: 
     };
 };
 
+/**
+ * The handler's `ifMatch`, which tags `current` the way {@link withEtag} tags the response.
+ */
+export const ifMatchArg = (route: RouteDefinition, headers: unknown): { ifMatch?: (current: unknown) => Promise<void> } => {
+    const status = ifMatchStatus(route);
+    if (status === undefined) return {};
+    const response = route.responses[status];
+    return {
+        ifMatch: async (current) => {
+            const ifMatch = getHeaderValue((headers as Record<string, unknown> | undefined)?.['if-match']);
+            if (ifMatch === undefined) return;
+            const bytes = responseBytes(current, response);
+            const etag = bytes === undefined ? undefined : await computeEtag(bytes);
+            if (etagMatchesStrongly(ifMatch, etag)) return;
+            throw new ResponseError({
+                status: 412,
+                body: problemDetails(412, 'The resource has changed since it was read.'),
+            });
+        },
+    };
+};
+
 const omitHeaders = (headers: ResponseHeaders, names: readonly string[]): ResponseHeaders => {
     const kept: ResponseHeaders = {};
     for (const [name, value] of Object.entries(headers)) {
@@ -1385,6 +1409,10 @@ interface Invocation<NativeRequest, HandlerContext, ResponseContext> {
     pluginExports: Record<string, unknown> | undefined;
     jobRunner: JobRunner<Jobs> | undefined;
     responseValidation: boolean | undefined;
+    /**
+     * A call a stream's `tools` run, which never sees the stream's `If-Match`.
+     */
+    toolCall?: true;
 }
 
 const streamToolsOfRoute = (route: RouteDefinition): Routes | undefined => {
@@ -1435,6 +1463,7 @@ const streamToolsFor = <NativeRequest, HandlerContext, ResponseContext>(
                     parsed,
                     handler: entry.route[HANDLER],
                     handlerContext: () => handlerContext,
+                    toolCall: true,
                 })
             ),
         render: (failure) => {
@@ -1569,6 +1598,7 @@ const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
                   }
                 : {}),
             throwError,
+            ...ifMatchArg(route, invocation.toolCall ? undefined : invocation.request.headers),
             ...handlerContext,
             ...(tools
                 ? {

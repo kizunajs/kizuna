@@ -1,7 +1,6 @@
 /**
- * The `ETag` a response body hashes to, and the `If-None-Match` comparison that
- * decides whether the caller already holds it. RFC 9110 sections 8.8.3 and
- * 13.1.2.
+ * The `ETag` a response body hashes to, and the `If-None-Match` and `If-Match`
+ * comparisons against it. RFC 9110 sections 8.8.3 and 13.1.
  */
 
 const toHex = (bytes: Uint8Array): string => {
@@ -39,4 +38,14 @@ export const etagMatches = (ifNoneMatch: string | undefined, etag: string): bool
     const dropWeak = (tag: string) => (tag.startsWith('W/') ? tag.slice(2) : tag);
     const target = dropWeak(etag);
     return candidate.split(',').some((entry) => dropWeak(entry.trim()) === target);
+};
+
+/**
+ * Whether `If-Match` names the current tag, compared strongly as RFC 9110 section 13.1.1 requires.
+ */
+export const etagMatchesStrongly = (ifMatch: string, etag: string | undefined): boolean => {
+    const candidate = ifMatch.trim();
+    if (candidate === '*') return true;
+    if (etag === undefined || etag.startsWith('W/')) return false;
+    return candidate.split(',').some((entry) => entry.trim() === etag);
 };

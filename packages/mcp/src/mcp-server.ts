@@ -27,6 +27,7 @@ import {
     resolveSecurityRequirements,
     callGuard,
     isGuardDenial,
+    ifMatchArg,
 } from 'kizunajs/adapter';
 import { contractOf } from 'kizunajs/adapter';
 import type { ApiDefinition, Routes, RouteDefinition, SecurityScheme } from 'kizunajs';
@@ -559,6 +560,8 @@ const executeToolCall = async (
             body: validation.parsed.body,
             headers: validation.parsed.headers,
             throwError,
+            // A tool call holds no tag from an earlier read, so it sets no precondition.
+            ...ifMatchArg(route, undefined),
             ...handlerContext,
             ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
             ...(Object.keys(guardOutcome.securityContext).length > 0 ? { auth: guardOutcome.securityContext } : {}),

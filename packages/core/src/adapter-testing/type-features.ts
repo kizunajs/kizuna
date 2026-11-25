@@ -28,6 +28,10 @@ export const ADAPTER_TYPE_FEATURES = {
     'handler.context': {
         summary: 'Handler args carry the adapter’s own handler context.',
     },
+    'handler.ifMatch': {
+        summary:
+            'A write that declares `etag` gives its handler an `ifMatch` taking that response body, and a read or a write without `etag` gives none.',
+    },
     'guards.identityContext': {
         summary: 'A secured handler receives each required identity’s context under `auth`.',
     },

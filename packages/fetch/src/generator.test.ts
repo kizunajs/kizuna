@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import { definePlugin, route } from 'kizunajs/plugin';
+import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { generateFetchClient } from './generator.js';
 import { apiContract } from './api.fixture.js';
 
@@ -462,5 +463,89 @@ describe('a model that holds itself', () => {
 
     it('writes a type that holds a list of itself', () => {
         expect(output).toContain('or?: Array<EventFilter>;');
+    });
+});
+
+describe('Fetch generator: the automatic 412 for a write that declares etag', () => {
+    const TaskSchema = z.object({
+        id: z.string(),
+        title: z.string(),
+    });
+
+    const outputFor = (definition: Record<string, unknown>) =>
+        generateFetchClient(
+            defineConfig({
+                routes: [
+                    {
+                        saveTask: {
+                            path: '/tasks/:id',
+                            ...definition,
+                        },
+                    },
+                ],
+            } as never).api,
+            {
+                source: '../src/contract.ts',
+            }
+        );
+
+    const taggedWrite = {
+        method: 'PATCH',
+        responses: {
+            200: {
+                body: TaskSchema,
+                etag: true,
+            },
+        },
+    };
+
+    const taggedRead = {
+        method: 'GET',
+        responses: {
+            200: {
+                body: TaskSchema,
+                etag: true,
+            },
+        },
+    };
+
+    const untaggedWrite = {
+        method: 'DELETE',
+        responses: {
+            200: TaskSchema,
+        },
+    };
+
+    const declaredPrecondition = {
+        method: 'PUT',
+        responses: {
+            200: {
+                body: TaskSchema,
+                etag: true,
+            },
+            412: ProblemDetailsSchema.extend({
+                currentTitle: z.string(),
+            }),
+        },
+    };
+
+    it('adds 412 to the result and the table', () => {
+        const output = outputFor(taggedWrite);
+        expect(output).toContain('| { status: 412; body: ProblemDetails; headers: Record<string, string> }');
+        expect(output).toMatch(/responses: \{\n\s+200: \{\},\n\s+412: \{\},/);
+    });
+
+    it('adds no 412 to a read that declares etag', () => {
+        expect(outputFor(taggedRead)).not.toContain('status: 412');
+    });
+
+    it('adds no 412 to a write that declares no etag', () => {
+        expect(outputFor(untaggedWrite)).not.toContain('status: 412');
+    });
+
+    it('keeps a 412 the route declares', () => {
+        const output = outputFor(declaredPrecondition);
+        expect(output).toContain('currentTitle: string;');
+        expect(output).not.toContain('| { status: 412; body: ProblemDetails;');
     });
 });

@@ -62,6 +62,20 @@ export const resolveResponseCache = (value: ResponseDefinition | undefined): Cac
 export const resolveResponseEtag = (value: ResponseDefinition | undefined): boolean =>
     value !== undefined && !isZodSchema(value) && !isStreamResponse(value) && value.etag === true;
 
+const WRITE_METHODS: ReadonlySet<string> = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+/**
+ * The lowest `2xx` that declares `etag` on a write, whose tag `If-Match` is compared with.
+ */
+export const ifMatchStatus = (route: Pick<RouteDefinition, 'method' | 'responses'>): number | undefined => {
+    if (!WRITE_METHODS.has(route.method)) return undefined;
+    const statuses = Object.keys(route.responses)
+        .map(Number)
+        .filter((status) => isSuccessStatus(status) && resolveResponseEtag(route.responses[status]))
+        .sort((left, right) => left - right);
+    return statuses[0];
+};
+
 /**
  * Makes a list of names unique, in order. A name an earlier one already took
  * gets `_` in front until it is free, so `name` and `-name`, both written
@@ -164,6 +178,7 @@ export const statusToCamelCase = (status: number): string => {
         405: 'methodNotAllowed',
         409: 'conflict',
         410: 'gone',
+        412: 'preconditionFailed',
         422: 'unprocessableEntity',
         429: 'tooManyRequests',
         500: 'internalServerError',

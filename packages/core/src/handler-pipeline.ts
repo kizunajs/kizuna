@@ -134,9 +134,39 @@ type LastEventIdArg<R extends RouteDefinition> = [EventStreamStatuses<R>] extend
           lastEventId: string | undefined;
       };
 
+type IsSuccessStatus<Status> = `${Status & number}` extends `2${string}` ? true : false;
+
+/**
+ * The success statuses of a route that declare `etag`.
+ */
+type EtagStatuses<R extends Pick<RouteDefinition, 'responses'>> = {
+    [Status in keyof R['responses']]: R['responses'][Status] extends { etag: true }
+        ? IsSuccessStatus<Status> extends true
+            ? Status
+            : never
+        : never;
+}[keyof R['responses']];
+
+/**
+ * `ifMatch` on a write whose success response declares `etag`.
+ */
+type IfMatchArg<R extends RouteDefinition> = R extends { method: 'POST' | 'PUT' | 'PATCH' | 'DELETE' }
+    ? [EtagStatuses<R>] extends [never]
+        ? unknown
+        : {
+              /**
+               * Answers `412` when the caller's `If-Match` is not the tag `current` would get. Call it before writing.
+               */
+              ifMatch: (
+                  current: { [Status in EtagStatuses<R>]: HandlerBody<R['responses'][Status], Status> }[EtagStatuses<R>]
+              ) => Promise<void>;
+          }
+    : unknown;
+
 export type HandlerArgs<R extends RouteDefinition> = ToolsArg<R> &
     RawBodyArg<R> &
-    LastEventIdArg<R> & {
+    LastEventIdArg<R> &
+    IfMatchArg<R> & {
         params: R extends { pathParams: z.ZodType } ? z.output<R['pathParams']> : ExtractPathParams<R['path']>;
         query: R extends { query: z.ZodType } ? z.output<R['query']> : undefined;
         body: R extends { body: z.ZodType } ? z.output<R['body']> : undefined;

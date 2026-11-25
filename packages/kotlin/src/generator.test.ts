@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { Kizuna, type ApiDefinition } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import { definePlugin, route } from 'kizunajs/plugin';
+import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { generateKotlinClient } from './generator.js';
 
 const k = new Kizuna();
@@ -2890,5 +2891,87 @@ describe('Kotlin generator: the automatic 400 for each validated part', () => {
             }),
         });
         expect(output).toContain('data class BadRequest(val body: TestAPIClient.ValidationError) : Failure()');
+    });
+});
+
+describe('Kotlin generator: the automatic 412 for a write that declares etag', () => {
+    const TaskSchema = z.object({
+        id: z.string(),
+        title: z.string(),
+    });
+
+    const outputFor = (definition: Record<string, unknown>) =>
+        generateKotlinClient(
+            defineConfig({
+                routes: [
+                    {
+                        saveTask: {
+                            path: '/tasks/:id',
+                            ...definition,
+                        },
+                    },
+                ],
+            } as never).api,
+            baseConfig
+        );
+
+    const taggedWrite = {
+        method: 'PATCH',
+        responses: {
+            200: {
+                body: TaskSchema,
+                etag: true,
+            },
+        },
+    };
+
+    const taggedRead = {
+        method: 'GET',
+        responses: {
+            200: {
+                body: TaskSchema,
+                etag: true,
+            },
+        },
+    };
+
+    const untaggedWrite = {
+        method: 'DELETE',
+        responses: {
+            200: TaskSchema,
+        },
+    };
+
+    const declaredPrecondition = {
+        method: 'PUT',
+        responses: {
+            200: {
+                body: TaskSchema,
+                etag: true,
+            },
+            412: ProblemDetailsSchema.extend({
+                currentTitle: z.string(),
+            }),
+        },
+    };
+
+    it('adds a PreconditionFailed variant carrying Problem Details', () => {
+        const output = outputFor(taggedWrite);
+        expect(output).toContain('data class PreconditionFailed(val body: TestAPI.ProblemDetails) : Failure()');
+        expect(output).toContain('data class ProblemDetails(');
+    });
+
+    it('adds no variant to a read that declares etag', () => {
+        expect(outputFor(taggedRead)).not.toContain('PreconditionFailed');
+    });
+
+    it('adds no variant to a write that declares no etag', () => {
+        expect(outputFor(untaggedWrite)).not.toContain('PreconditionFailed');
+    });
+
+    it('keeps a 412 the route declares', () => {
+        const output = outputFor(declaredPrecondition);
+        expect(output).toContain('data class PreconditionFailed(val body: Response412) : Failure()');
+        expect(output).not.toContain('data class PreconditionFailed(val body: TestAPI.ProblemDetails)');
     });
 });

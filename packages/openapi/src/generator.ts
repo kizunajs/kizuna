@@ -21,6 +21,7 @@ import {
     resolveResponseContentType,
     resolveResponseCache,
     resolveResponseEtag,
+    ifMatchStatus,
     deprecationHeaders,
     isStreamResponse,
     isNamedStream,
@@ -30,7 +31,7 @@ import {
     encodeForWire,
 } from 'kizunajs/generator';
 import { getStatusText } from 'kizunajs';
-import { ValidationErrorSchema } from 'kizunajs/schemas';
+import { ProblemDetailsSchema, ValidationErrorSchema } from 'kizunajs/schemas';
 import type { ApiDefinition, RequiredPermissions, SecurityRequirement } from 'kizunajs';
 import { OPENAPI_PLUGIN_SLUG } from './plugin.js';
 import type { StreamResponseDefinition } from 'kizunajs';
@@ -468,6 +469,18 @@ const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWa
                 }
             }
 
+            // A write that declares `etag` answers a stale `If-Match` itself.
+            if (ifMatchStatus(route) !== undefined && !operation.responses['412']) {
+                operation.responses['412'] = {
+                    description: getStatusText(412),
+                    content: {
+                        'application/problem+json': {
+                            schema: toJsonSchema(ProblemDetailsSchema),
+                        },
+                    },
+                };
+            }
+
             const announced = deprecationHeaders(route);
             if (Object.keys(announced).length > 0) {
                 const documented: Record<string, { description: string; schema: Record<string, unknown> }> = {};
@@ -516,7 +529,9 @@ const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWa
                 if (resolveResponseEtag(declared)) {
                     documented['ETag'] = {
                         description:
-                            'The entity tag of this response, per RFC 9110. Send it back as `If-None-Match` to be answered `304 Not Modified` when it still holds.',
+                            ifMatchStatus(route) === undefined
+                                ? 'The entity tag of this response, per RFC 9110. Send it back as `If-None-Match` to be answered `304 Not Modified` when it still holds.'
+                                : 'The entity tag of this response, per RFC 9110. Send it back as `If-Match` on the next write, which answers `412 Precondition Failed` when the resource has changed since.',
                         schema: { type: 'string' },
                     };
                 }

@@ -914,6 +914,106 @@ export const cachedInput = {
 
 export const cachedContract = defineConfig(cachedInput).api;
 
+export interface Task {
+    id: string;
+    title: string;
+}
+
+const tasks = new Map<string, Task>();
+
+/**
+ * Puts the one task back as it started, so each test saves against the same tag.
+ */
+export const resetTasks = (): void => {
+    tasks.clear();
+    tasks.set('1', {
+        id: '1',
+        title: 'Write the report',
+    });
+};
+
+const TaskSchema = z.object({
+    id: z.string(),
+    title: z.string(),
+});
+
+/**
+ * A read and a write that tag the same representation, so a tag the read sends
+ * is what the write's `If-Match` compares against.
+ */
+export const conditionalRoutes = k.routes({
+    getTask: k
+        .route({
+            method: 'GET',
+            path: '/tasks/:id',
+            responses: {
+                200: {
+                    body: TaskSchema,
+                    etag: true,
+                },
+                404: ProblemDetailsSchema,
+            },
+        })
+        .handler(({ params }) => {
+            const task = tasks.get(params.id);
+            if (task === undefined) {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'Task not found',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: task,
+            };
+        }),
+    updateTask: k
+        .route({
+            method: 'PATCH',
+            path: '/tasks/:id',
+            body: z.object({
+                title: z.string(),
+            }),
+            responses: {
+                200: {
+                    body: TaskSchema,
+                    etag: true,
+                },
+                404: ProblemDetailsSchema,
+            },
+        })
+        .handler(async ({ params, body, ifMatch, throwError }) => {
+            const task = tasks.get(params.id);
+            if (task === undefined) {
+                return throwError({
+                    status: 404,
+                    body: {
+                        detail: 'Task not found',
+                    },
+                });
+            }
+            await ifMatch(task);
+            const updated = {
+                ...task,
+                title: body.title,
+            };
+            tasks.set(params.id, updated);
+            return {
+                status: 200,
+                body: updated,
+            };
+        }),
+});
+
+export const conditionalInput = {
+    ...config,
+    routes: [conditionalRoutes],
+};
+
+export const conditionalContract = defineConfig(conditionalInput).api;
+
 const echoMethod = (method: string) => () => ({
     status: 200 as const,
     body: {

@@ -116,6 +116,53 @@ export const rawBodyContract = defineConfig({
     ],
 }).api;
 
+const TaskSchema = z.object({
+    id: z.string(),
+    title: z.string(),
+});
+
+/**
+ * A write that declares `etag`, beside a read that declares one and a write
+ * that does not, so only the first handler gets `ifMatch`.
+ */
+export const conditionalWriteContract = defineConfig({
+    ...config,
+    routes: [
+        k.routes({
+            getTask: k.route({
+                method: 'GET',
+                path: '/tasks/:id',
+                responses: {
+                    200: {
+                        body: TaskSchema,
+                        etag: true,
+                    },
+                },
+            }),
+            updateTask: k.route({
+                method: 'PATCH',
+                path: '/tasks/:id',
+                body: z.object({
+                    title: z.string(),
+                }),
+                responses: {
+                    200: {
+                        body: TaskSchema,
+                        etag: true,
+                    },
+                },
+            }),
+            deleteTask: k.route({
+                method: 'DELETE',
+                path: '/tasks/:id',
+                responses: {
+                    200: TaskSchema,
+                },
+            }),
+        }),
+    ],
+}).api;
+
 export const streamInferenceRoutes = k.routes({
     reply: k.route({
         method: 'POST',
