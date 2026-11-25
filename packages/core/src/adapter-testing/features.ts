@@ -85,6 +85,22 @@ export const ADAPTER_FEATURES = {
     'body.limitRawBody': {
         summary: 'A `rawBody: true` route refuses a body over the limit the same way.',
     },
+    'body.nesting400': {
+        summary: 'A JSON body one level deeper than the nesting limit answers 400, and one at the limit passes.',
+    },
+    'body.deepNesting400': {
+        summary: 'A JSON body 10,000 levels deep answers 400 at once, never a stack overflow.',
+    },
+    'query.nesting400': {
+        summary:
+            'A JSON query value one level deeper than the nesting limit answers 400 that names the parameter, and one at the limit passes.',
+    },
+    'query.deepNesting400': {
+        summary: 'A JSON query value deep enough to overflow a recursive schema answers 400, never 500.',
+    },
+    'query.nestingPerRoute': {
+        summary: "A route's own `nestingLimit` takes a value the config's limit refuses.",
+    },
     'body.compressed415': {
         summary: 'A body sent with a `Content-Encoding` is refused with 415 and `Accept-Encoding: identity`.',
     },

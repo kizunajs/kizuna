@@ -37,20 +37,21 @@ kizuna.api.mount(app);
 
 ## What it takes
 
-| Field            | What it is                                                                                                                                                                    |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `adapter`        | The framework this API is served on, as a call: `expressAdapter()`. Its request reaches every handler, typed.                                                                 |
-| `routes`         | A list of what [`k.routes`](/docs/reference/k-routes) returned, in any order. Each route is keyed by its group, and carries its own handler. Omit it while setting up.        |
-| `auth`           | Who may call this API: `identities`, each declared with [`k.identity`](/docs/reference/k-identity) and carrying its own guard, and the `guardSchema` their `deny()` produces. |
-| `requestContext` | What every route resolves before its guards run, declared with [`k.requestContext`](/docs/reference/k-request-context).                                                       |
-| `validation`     | How a request is checked: `issueCodes`, the `code` values [`k.issue`](/docs/reference/k-issue) may emit beyond Zod's own.                                                     |
-| `bodyLimit`      | The most bytes a request body may hold, on every route that sets none of its own. 1 MiB when left out. See [Request body size](/docs/routes#request-body-size).               |
-| `jobs`           | Scheduled work, declared with [`k.jobs`](/docs/reference/k-jobs).                                                                                                             |
-| `jobRunner`      | How this deployment runs them: `mode`, `path`, `method`, `transport`, `onError`. See [Jobs](/docs/jobs).                                                                      |
-| `plugins`        | What this API installs beside its own routes, as a list. See [Create a Plugin](/docs/extend/create-plugin).                                                                   |
-| `groups`         | The groups routes are filed under, from [`k.groups`](/docs/reference/k-groups).                                                                                               |
-| `typescript`     | Where `kizuna generate` writes the `Config` in `outputFile` and what else it holds in `extend`. See [Extend Kizuna](/docs/extend/extend-kizuna).                              |
-| `clients`        | The clients `kizuna generate` writes from this API, each built with [`defineClient`](/docs/extend/create-client).                                                             |
+| Field            | What it is                                                                                                                                                                       |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `adapter`        | The framework this API is served on, as a call: `expressAdapter()`. Its request reaches every handler, typed.                                                                    |
+| `routes`         | A list of what [`k.routes`](/docs/reference/k-routes) returned, in any order. Each route is keyed by its group, and carries its own handler. Omit it while setting up.           |
+| `auth`           | Who may call this API: `identities`, each declared with [`k.identity`](/docs/reference/k-identity) and carrying its own guard, and the `guardSchema` their `deny()` produces.    |
+| `requestContext` | What every route resolves before its guards run, declared with [`k.requestContext`](/docs/reference/k-request-context).                                                          |
+| `validation`     | How a request is checked: `issueCodes`, the `code` values [`k.issue`](/docs/reference/k-issue) may emit beyond Zod's own.                                                        |
+| `bodyLimit`      | The most bytes a request body may hold, on every route that sets none of its own. 1 MiB when left out. See [Request body size](/docs/routes#request-body-size).                  |
+| `nestingLimit`   | How many levels JSON in a query value or a body may nest, on every route that sets none of its own. 64 when left out. See [JSON nesting depth](/docs/routes#json-nesting-depth). |
+| `jobs`           | Scheduled work, declared with [`k.jobs`](/docs/reference/k-jobs).                                                                                                                |
+| `jobRunner`      | How this deployment runs them: `mode`, `path`, `method`, `transport`, `onError`. See [Jobs](/docs/jobs).                                                                         |
+| `plugins`        | What this API installs beside its own routes, as a list. See [Create a Plugin](/docs/extend/create-plugin).                                                                      |
+| `groups`         | The groups routes are filed under, from [`k.groups`](/docs/reference/k-groups).                                                                                                  |
+| `typescript`     | Where `kizuna generate` writes the `Config` in `outputFile` and what else it holds in `extend`. See [Extend Kizuna](/docs/extend/extend-kizuna).                                 |
+| `clients`        | The clients `kizuna generate` writes from this API, each built with [`defineClient`](/docs/extend/create-client).                                                                |
 
 `jobs` is what the jobs are, and `jobRunner` is how this deployment runs them: the first is shared by every config that serves these routes, the second differs between dev and production.
 

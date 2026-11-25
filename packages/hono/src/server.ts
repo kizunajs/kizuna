@@ -17,6 +17,7 @@ import {
     REQUEST_CONTEXT_META,
     JOBS_META,
     BODY_LIMIT_META,
+    NESTING_LIMIT_META,
     bodyLimitOf,
     type JobsMeta,
     pluginRoutesOf,
@@ -45,6 +46,7 @@ export type HonoApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
     readonly [BODY_LIMIT_META]?: unknown;
+    readonly [NESTING_LIMIT_META]?: unknown;
     /**
      * Register every route on a Hono app.
      */
@@ -155,6 +157,7 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
     const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
     const jobRunner = jobRunnerFrom(jobsMeta);
     const configBodyLimit = api[BODY_LIMIT_META] as number | undefined;
+    const configNestingLimit = api[NESTING_LIMIT_META] as number | undefined;
     const mountRoute = (
         routeKey: string,
         route: RouteDefinition,
@@ -202,6 +205,7 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
                 readBody: (r: RouteDefinition) => (override ? undefined : parseFetchBody(c.req.raw, r, bodyLimitOf(r, configBodyLimit))),
                 readRawBody: (r: RouteDefinition) => (override ? '' : readBodyText(c.req.raw, bodyLimitOf(r, configBodyLimit))),
                 configBodyLimit,
+                configNestingLimit,
             };
 
             return pipeline.handle({

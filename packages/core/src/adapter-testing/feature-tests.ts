@@ -17,6 +17,9 @@ import {
     sessionAuthorization,
     sharedSegmentInput,
     signedBodyText,
+    nestingInput,
+    taskFilterOf,
+    TASK_NESTING_LIMIT,
     bodyLimitInput,
     taskBodyOfSize,
     TASK_BODY_LIMIT,
@@ -109,6 +112,20 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             },
             use
         );
+
+    const usingNesting = <T>(use: (mounted: MountedApi) => Promise<T>) =>
+        using(
+            {
+                input: nestingInput,
+            },
+            use
+        );
+
+    const filteredTasks = (tasks: MountedApi, path: string, levels: number) =>
+        tasks.request({
+            method: 'GET',
+            path: `${path}?filter=${encodeURIComponent(taskFilterOf(levels))}`,
+        });
 
     const usingSecured = <T>(use: (mounted: MountedApi) => Promise<T>) =>
         using(
@@ -750,6 +767,80 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                     chunked: true,
                 });
                 expect(overLimit.status).toBe(413);
+            });
+        },
+
+        'body.nesting400': async () => {
+            await usingNesting(async (tasks) => {
+                const atLimit = await tasks.request({
+                    method: 'POST',
+                    path: '/task-filters',
+                    body: taskFilterOf(TASK_NESTING_LIMIT),
+                });
+                expect(atLimit.status).toBe(201);
+
+                const overLimit = await tasks.request({
+                    method: 'POST',
+                    path: '/task-filters',
+                    body: taskFilterOf(TASK_NESTING_LIMIT + 1),
+                });
+                expect(overLimit.status).toBe(400);
+                expect(overLimit.headers.get('content-type')).toContain('application/problem+json');
+                expect(overLimit.body).toMatchObject({
+                    status: 400,
+                    errors: [
+                        {
+                            code: 'too_big',
+                            path: [],
+                            message: `Nests deeper than ${TASK_NESTING_LIMIT} levels.`,
+                        },
+                    ],
+                });
+            });
+        },
+
+        'body.deepNesting400': async () => {
+            await usingNesting(async (tasks) => {
+                const response = await tasks.request({
+                    method: 'POST',
+                    path: '/task-filters',
+                    body: taskFilterOf(10_001),
+                });
+                expect(response.status).toBe(400);
+            });
+        },
+
+        'query.nesting400': async () => {
+            await usingNesting(async (tasks) => {
+                expect((await filteredTasks(tasks, '/filtered-tasks', TASK_NESTING_LIMIT)).status).toBe(200);
+
+                const overLimit = await filteredTasks(tasks, '/filtered-tasks', TASK_NESTING_LIMIT + 1);
+                expect(overLimit.status).toBe(400);
+                expect(overLimit.body).toMatchObject({
+                    status: 400,
+                    errors: [
+                        {
+                            code: 'too_big',
+                            path: ['filter'],
+                            message: `Nests deeper than ${TASK_NESTING_LIMIT} levels.`,
+                        },
+                    ],
+                });
+            });
+        },
+
+        'query.deepNesting400': async () => {
+            await usingNesting(async (tasks) => {
+                const response = await filteredTasks(tasks, '/deeply-filtered-tasks', 1_201);
+                expect(response.status).toBe(400);
+            });
+        },
+
+        'query.nestingPerRoute': async () => {
+            await usingNesting(async (tasks) => {
+                const levels = TASK_NESTING_LIMIT + 2;
+                expect((await filteredTasks(tasks, '/deeply-filtered-tasks', levels)).status).toBe(200);
+                expect((await filteredTasks(tasks, '/filtered-tasks', levels)).status).toBe(400);
             });
         },
 

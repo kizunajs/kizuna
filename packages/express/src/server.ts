@@ -18,6 +18,7 @@ import {
     REQUEST_CONTEXT_META,
     JOBS_META,
     BODY_LIMIT_META,
+    NESTING_LIMIT_META,
     type JobsMeta,
     pluginRoutesOf,
     pluginExportsOf,
@@ -48,6 +49,7 @@ export type ExpressApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
     readonly [BODY_LIMIT_META]?: unknown;
+    readonly [NESTING_LIMIT_META]?: unknown;
     /**
      * Register every route on an Express app or router.
      */
@@ -316,6 +318,7 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
     const pluginExports = pluginExportsOf(api);
     const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
     const configBodyLimit = api[BODY_LIMIT_META] as number | undefined;
+    const configNestingLimit = api[NESTING_LIMIT_META] as number | undefined;
     const jobRunner = jobRunnerFrom(jobsMeta);
     const expressRouter = createExpressRouter();
 
@@ -372,6 +375,7 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
                         return req.body;
                     },
                     configBodyLimit,
+                    configNestingLimit,
                     readRawBody: () => {
                         if (override) return '';
                         if (req.kizunaBodyError !== undefined) throw req.kizunaBodyError;

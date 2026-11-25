@@ -22,6 +22,7 @@ import {
     REQUEST_CONTEXT_META,
     JOBS_META,
     BODY_LIMIT_META,
+    NESTING_LIMIT_META,
     bodyLimitOf,
     type JobsMeta,
     jobRoutes,
@@ -127,7 +128,8 @@ export const handleNextRequest = async <T extends Routes>(
     requestContext?: RequestContextMap<NextHandlerContext>,
     pluginExports?: Record<string, unknown>,
     jobs?: MountedJobs,
-    configBodyLimit?: number
+    configBodyLimit?: number,
+    configNestingLimit?: number
 ): Promise<NextResponse> => {
     const url = new URL(request.url);
 
@@ -191,6 +193,7 @@ export const handleNextRequest = async <T extends Routes>(
                 readBody: (route) => parseFetchBody(request, route, bodyLimitOf(route, configBodyLimit)),
                 readRawBody: (route) => readBodyText(request, bodyLimitOf(route, configBodyLimit)),
                 configBodyLimit,
+                configNestingLimit,
             };
             return adapter.handle({
                 routes: jobs.routes,
@@ -243,6 +246,7 @@ export const handleNextRequest = async <T extends Routes>(
                 readBody: (route) => parseFetchBody(request, route, bodyLimitOf(route, configBodyLimit)),
                 readRawBody: (route) => readBodyText(request, bodyLimitOf(route, configBodyLimit)),
                 configBodyLimit,
+                configNestingLimit,
             };
 
             return adapter.handle({
@@ -271,6 +275,7 @@ export const handleNextRequest = async <T extends Routes>(
         readBody: (route) => parseFetchBody(request, route, bodyLimitOf(route, configBodyLimit)),
         readRawBody: (route) => readBodyText(request, bodyLimitOf(route, configBodyLimit)),
         configBodyLimit,
+        configNestingLimit,
     };
 
     return adapter.handle({
@@ -305,6 +310,7 @@ export type NextApiWithRouter = ApiWithRouter & {
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
     readonly [BODY_LIMIT_META]?: unknown;
+    readonly [NESTING_LIMIT_META]?: unknown;
 };
 
 export type NextApi<R extends Routes = Routes> = ApiWithRouter<R> & {
@@ -330,6 +336,7 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
     const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<NextHandlerContext> | undefined;
     const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
     const configBodyLimit = api[BODY_LIMIT_META] as number | undefined;
+    const configNestingLimit = api[NESTING_LIMIT_META] as number | undefined;
     const mountedJobs = jobsMeta
         ? {
               routes: jobRoutes(jobsMeta),
@@ -372,7 +379,8 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
                     requestContext,
                     pluginExports,
                     undefined,
-                    configBodyLimit
+                    configBodyLimit,
+                    configNestingLimit
                 );
             }
         }
@@ -387,7 +395,8 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
             requestContext,
             pluginExports,
             mountedJobs,
-            configBodyLimit
+            configBodyLimit,
+            configNestingLimit
         );
     };
     return {
