@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ADAPTER_BEHAVIOUR, ADAPTER_FEATURES, featureGroups, featuresInGroup, type AdapterFeature, type AdapterName } from './features.js';
 import {
     adminToken,
@@ -20,6 +20,8 @@ import {
     bodyLimitInput,
     taskBodyOfSize,
     TASK_BODY_LIMIT,
+    backgroundInput,
+    backgroundWork,
     subUserInput,
     userInput,
     pluginInput,
@@ -96,6 +98,14 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         using(
             {
                 input: bodyLimitInput,
+            },
+            use
+        );
+
+    const usingBackground = <T>(use: (mounted: MountedApi) => Promise<T>) =>
+        using(
+            {
+                input: backgroundInput,
             },
             use
         );
@@ -757,6 +767,45 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 expect(response.headers.get('accept-encoding')).toBe('identity');
                 expect(response.headers.get('content-type')).toContain('application/problem+json');
             });
+        },
+
+        'handler.waitUntil': async () => {
+            await usingBackground(async (tasks) => {
+                backgroundWork.hold();
+                const response = await tasks.request({
+                    method: 'POST',
+                    path: '/tasks/reminders',
+                });
+                expect(response.status).toBe(202);
+                expect(backgroundWork.isFinished).toBe(false);
+
+                backgroundWork.release();
+                await backgroundWork.finished;
+                expect(backgroundWork.isFinished).toBe(true);
+            });
+        },
+
+        'handler.waitUntilFailure': async () => {
+            const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+            try {
+                await usingBackground(async (tasks) => {
+                    const response = await tasks.request({
+                        method: 'POST',
+                        path: '/tasks/failing-reminders',
+                    });
+                    expect(response.status).toBe(202);
+                    await vi.waitFor(() => {
+                        expect(logged).toHaveBeenCalledWith(
+                            '[kizuna] failReminder: the work passed to `waitUntil` failed.',
+                            expect.objectContaining({
+                                message: 'The mail service is down.',
+                            })
+                        );
+                    });
+                });
+            } finally {
+                logged.mockRestore();
+            }
         },
 
         'errors.declaredProblemDetails': async () => {

@@ -103,6 +103,7 @@ interface AdapterDefinition<NativeRequest, NativeResponse, HandlerContext, Respo
     buildHandlerContext: (request: AdapterRequest<NativeRequest>, context: ResponseContext) => HandlerContext | Promise<HandlerContext>;
     respond: (result: AdapterResult, context: ResponseContext) => NativeResponse | Promise<NativeResponse>;
     onError?: (error: unknown, request: AdapterRequest<NativeRequest>) => AdapterResult | void | Promise<AdapterResult | void>;
+    waitUntil?: (promise: Promise<void>, context: ResponseContext) => void;
     matcher?: RouteMatcher;
 }
 ```
@@ -112,6 +113,7 @@ interface AdapterDefinition<NativeRequest, NativeResponse, HandlerContext, Respo
 | `buildHandlerContext` | Returns the context object each handler receives alongside `params`, `query`, `body`, `headers`.                                                          |
 | `respond`             | Translates an `AdapterResult` to a native response. Always handle `kind: 'raw-response'` first, as it carries a pre-built native response from `onError`. |
 | `onError`             | Called on unhandled handler errors. Return an `AdapterResult` to override the default 500, or return `void` to let it pass through.                       |
+| `waitUntil`           | Hands work a handler passed to `waitUntil` to the host, so a serverless host keeps running it after the response. Leave it out on a Node server.          |
 | `matcher`             | Custom route matcher. Defaults to Kizuna's built-in path matcher.                                                                                         |
 
 ## `AdapterRequest`

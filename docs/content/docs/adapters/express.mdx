@@ -171,6 +171,7 @@ kizuna.api.mount(app, {
 | `responseValidation` | `false`            | Validate handler return values against response schemas, surfacing as 500 on mismatch. Enable in development.                                                                                                       |
 | `json`               | Express's defaults | The options for `express.json()`, like `strict`, used for Kizuna's own routes. The size limit is each route's [`bodyLimit`](/docs/routes#request-body-size). Leave it out if the app runs its own `express.json()`. |
 | `formatError`        | none               | Reshape error (`>= 400`) response bytes for migrating clients. Most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api).                           |
+| `waitUntil`          | none               | Keeps work passed to `waitUntil` running after the response, on a serverless host like Vercel. Pass `waitUntil` from `@vercel/functions`. See [Work after the response](/docs/routes#work-after-the-response).      |
 
 ## Type-safe request properties
 

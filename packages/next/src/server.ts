@@ -35,7 +35,7 @@ import {
     METHOD_OVERRIDE_HEADER,
 } from 'kizunajs/adapter';
 import type { SecurityScheme } from 'kizunajs';
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 
 export { NextRequest, NextResponse } from 'next/server';
 
@@ -135,6 +135,13 @@ export const handleNextRequest = async <T extends Routes>(
         buildHandlerContext: (adapterRequest) => ({
             request: adapterRequest.request,
         }),
+        waitUntil: (promise) => {
+            try {
+                after(promise);
+            } catch {
+                // Outside a Next request, as when a test calls the handler, nothing stops the process early.
+            }
+        },
         respond: (result) => {
             if (result.kind === 'raw-response') return result.response as NextResponse;
             const rendered = renderJsonResult(result, options?.formatError as ErrorFormatter, request, request.method);

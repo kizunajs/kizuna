@@ -201,6 +201,19 @@ export interface ExpressOptions {
      * }
      */
     json?: JsonOptions;
+    /**
+     * Keeps work a handler passed to `waitUntil` running after the response,
+     * on a serverless host that stops the function once it answers. Leave it
+     * out on a server whose process keeps running.
+     *
+     * @example
+     * import { waitUntil } from '@vercel/functions';
+     *
+     * api.mount(app, {
+     *     waitUntil,
+     * });
+     */
+    waitUntil?: (promise: Promise<unknown>) => void;
 }
 
 export interface AppLike {
@@ -212,6 +225,7 @@ interface ExpressResponseContext {
     next: NextFunction;
     formatError?: ErrorFormatter<Request>;
     responseValidation?: boolean;
+    waitUntil?: (promise: Promise<unknown>) => void;
 }
 
 const writeStream = (open: NonNullable<RenderedResult['stream']>, res: ServerResponse, validate: boolean | undefined): void => {
@@ -247,6 +261,7 @@ const adapter = defineAdapter<Request, void, ExpressHandlerContext, ExpressRespo
         req: adapterRequest.request,
         res,
     }),
+    waitUntil: (promise, { waitUntil }) => waitUntil?.(promise),
     respond: (result, { res, next, formatError, responseValidation }) => {
         if (result.kind === 'handler-error') {
             next(result.error);
@@ -372,6 +387,7 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
                         next,
                         formatError: options?.formatError,
                         responseValidation: options?.responseValidation,
+                        waitUntil: options?.waitUntil,
                     },
                     guards,
                     schemes,

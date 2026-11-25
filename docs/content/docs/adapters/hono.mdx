@@ -181,10 +181,11 @@ kizuna.api.mount(app, {
 });
 ```
 
-| Option               | Default | Description                                                                                                                                                                               |
-| -------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                                                                                                           |
-| `formatError`        | none    | Reshape error (`>= 400`) response bytes for migrating clients. Most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api). |
+| Option               | Default | Description                                                                                                                                                                                                                      |
+| -------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                                                                                                                                                  |
+| `formatError`        | none    | Reshape error (`>= 400`) response bytes for migrating clients. Most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api).                                        |
+| `waitUntil`          | none    | Keeps work passed to `waitUntil` running after the response, on a serverless host Kizuna can't reach on its own, like `waitUntil` from `@vercel/functions`. See [Work after the response](/docs/routes#work-after-the-response). |
 
 ## Streams
 

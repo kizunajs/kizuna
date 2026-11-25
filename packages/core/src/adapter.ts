@@ -301,6 +301,7 @@ export const HANDLER_ARG_KEYS = [
     'body',
     'headers',
     'throwError',
+    'waitUntil',
     'auth',
     'requestContext',
     'plugins',
@@ -833,6 +834,14 @@ export interface AdapterDefinition<NativeRequest, NativeResponse, HandlerContext
      * Return an `AdapterResult` to override the default `handler-error` outcome; return `void` to let it pass through.
      */
     onError?: (error: unknown, request: AdapterRequest<NativeRequest>) => AdapterResult | void | Promise<AdapterResult | void>;
+    /**
+     * Hands work a handler passed to `waitUntil` to the host, so a serverless host keeps running it after the response.
+     * The promise never rejects. Leave it out on a host whose process keeps running, like a Node server.
+     *
+     * @example
+     * waitUntil: (promise, { c }) => c.executionCtx.waitUntil(promise),
+     */
+    waitUntil?: (promise: Promise<void>, context: ResponseContext) => void;
     matcher?: RouteMatcher;
 }
 
@@ -1399,6 +1408,15 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         routes,
         definition,
         handlerContext: () => definition.buildHandlerContext(request, responseContext),
+        waitUntil: (promise) => {
+            const settled = promise.then(
+                () => undefined,
+                (error: unknown) => {
+                    console.error(`[kizuna] ${routeKey}: the work passed to \`waitUntil\` failed.`, error);
+                }
+            );
+            definition.waitUntil?.(settled, responseContext);
+        },
         guards,
         schemes,
         contextResolvers,
@@ -1421,6 +1439,7 @@ interface Invocation<NativeRequest, HandlerContext, ResponseContext> {
     routes: Routes;
     definition: AdapterDefinition<NativeRequest, unknown, HandlerContext, ResponseContext>;
     handlerContext: () => HandlerContext | Promise<HandlerContext>;
+    waitUntil: (promise: Promise<unknown>) => void;
     guards: GuardMap<HandlerContext> | undefined;
     schemes: Record<string, SecurityScheme> | undefined;
     contextResolvers: RequestContextMap<HandlerContext> | undefined;
@@ -1611,6 +1630,7 @@ const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
                   }
                 : {}),
             throwError,
+            waitUntil: invocation.waitUntil,
             ...handlerContext,
             ...(tools
                 ? {

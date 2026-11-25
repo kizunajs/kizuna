@@ -100,12 +100,26 @@ export interface FastifyOptions {
      * {@link ErrorFormatter}.
      */
     formatError?: ErrorFormatter<FastifyRequest>;
+    /**
+     * Keeps work a handler passed to `waitUntil` running after the response,
+     * on a serverless host that stops the function once it answers. Leave it
+     * out on a server whose process keeps running.
+     *
+     * @example
+     * import { waitUntil } from '@vercel/functions';
+     *
+     * api.mount(app, {
+     *     waitUntil,
+     * });
+     */
+    waitUntil?: (promise: Promise<unknown>) => void;
 }
 
 interface FastifyResponseContext {
     reply: FastifyReply;
     formatError?: ErrorFormatter<FastifyRequest>;
     responseValidation?: boolean;
+    waitUntil?: (promise: Promise<unknown>) => void;
 }
 
 type CountedStream = NodeJS.ReadableStream & {
@@ -190,6 +204,7 @@ const adapter = defineAdapter<FastifyRequest, void, FastifyHandlerContext, Fasti
         request: adapterRequest.request,
         reply,
     }),
+    waitUntil: (promise, { waitUntil }) => waitUntil?.(promise),
     respond: (result, { reply, formatError, responseValidation }) => {
         if (result.kind === 'handler-error') {
             throw result.error;
@@ -324,6 +339,7 @@ export const fastifyKizuna = fastifyPlugin(
                         reply,
                         formatError: options?.formatError,
                         responseValidation: options?.responseValidation,
+                        waitUntil: options?.waitUntil,
                     },
                     guards,
                     schemes,

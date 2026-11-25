@@ -169,6 +169,8 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount
 | `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                                                |
 | `onError`            | none    | Map a thrown error into a response (inbound migration seam); return an `AdapterResult`/`Response` to override the default 500. |
 
+Work a handler passes to [`waitUntil`](/docs/routes#work-after-the-response) runs through Next's `after()`, so it keeps running after the response on any host Next supports.
+
 ## `onError`
 
 Pass `onError` to `nextAdapter()`, or to `mount`, to send your own response:

@@ -307,6 +307,7 @@ Each handler receives an object with the validated inputs for that route:
 | `body`             | Route has a `body` schema                                          |
 | `headers`          | Route has a `headers` schema                                       |
 | `throwError`       | Always                                                             |
+| `waitUntil`        | Always. See [below](#work-after-the-response)                      |
 | `auth`             | Route's [`auth`](/docs/access-control) names an identity           |
 | `requestContext`   | Config declares [request context](/docs/request-context)           |
 | `plugins`          | Config declares [plugins](/docs/config#using-what-a-plugin-offers) |
@@ -317,6 +318,54 @@ Each handler receives an object with the validated inputs for that route:
 | `request`          | Next.js adapter                                                    |
 
 Which framework object arrives is decided by the `adapter` your config names, so a handler reads `req` or `c` without importing either framework's types.
+
+## Work after the response
+
+Some work doesn't need to hold up the response, like recording a signup for your analytics. Pass it to `waitUntil`, and the response goes out at once:
+
+```ts title="src/routes/users.ts"
+createUser: k
+    .route({
+        method: 'POST',
+        path: '/users',
+        auth: false,
+        body: CreateUserSchema,
+        responses: {
+            201: UserSchema,
+        },
+    })
+    .handler(async ({ body, waitUntil }) => {
+        const user = await saveUser(body);
+        waitUntil(recordSignup(user));
+
+        return {
+            status: 201,
+            body: user,
+        };
+    }),
+```
+
+On a serverless host, the function would otherwise stop once it answers. Each adapter tells its host to keep running until the work settles. Next.js uses `after()`, and Hono uses the execution context on Cloudflare Workers and Netlify. On another serverless host, pass its `waitUntil` to `mount`, like the one from `@vercel/functions`.
+
+If the work fails, Kizuna logs the error with the route's key. The response has already gone out, so the caller never sees it.
+
+Work that must happen, like a welcome email, belongs in a [job](/docs/jobs). The job's transport keeps it through a crash and retries it when it fails:
+
+```ts title="src/routes/users.ts"
+.handler(async ({ body, jobs }) => {
+    const user = await saveUser(body);
+    await jobs.sendWelcomeEmail.queue({
+        input: {
+            userId: user.id,
+        },
+    });
+
+    return {
+        status: 201,
+        body: user,
+    };
+}),
+```
 
 ## Identity context
 

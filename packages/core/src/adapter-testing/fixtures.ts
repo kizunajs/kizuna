@@ -706,6 +706,84 @@ export const bodyLimitInput = {
 
 export const bodyLimitContract = defineConfig(bodyLimitInput).api;
 
+/**
+ * The work a `waitUntil` route hands off. It waits until a test releases it, so a test can see the response arrive first.
+ */
+const createBackgroundWork = () => {
+    let release: () => void = () => undefined;
+    let open: Promise<void> = Promise.resolve();
+    let markFinished: () => void = () => undefined;
+    let finished: Promise<void> = Promise.resolve();
+    let isFinished = false;
+    return {
+        hold(): void {
+            isFinished = false;
+            open = new Promise((resolve) => {
+                release = resolve;
+            });
+            finished = new Promise((resolve) => {
+                markFinished = resolve;
+            });
+        },
+        release(): void {
+            release();
+        },
+        async run(): Promise<void> {
+            await open;
+            isFinished = true;
+            markFinished();
+        },
+        get isFinished(): boolean {
+            return isFinished;
+        },
+        get finished(): Promise<void> {
+            return finished;
+        },
+    };
+};
+
+export const backgroundWork = createBackgroundWork();
+
+export const backgroundRoutes = k.routes({
+    remindTask: k
+        .route({
+            method: 'POST',
+            path: '/tasks/reminders',
+            responses: {
+                202: z.void(),
+            },
+        })
+        .handler(({ waitUntil }) => {
+            waitUntil(backgroundWork.run());
+
+            return {
+                status: 202,
+            };
+        }),
+    failReminder: k
+        .route({
+            method: 'POST',
+            path: '/tasks/failing-reminders',
+            responses: {
+                202: z.void(),
+            },
+        })
+        .handler(({ waitUntil }) => {
+            waitUntil(Promise.reject(new Error('The mail service is down.')));
+
+            return {
+                status: 202,
+            };
+        }),
+});
+
+export const backgroundInput = {
+    ...config,
+    routes: [backgroundRoutes],
+};
+
+export const backgroundContract = defineConfig(backgroundInput).api;
+
 export const responseShapeInput = {
     ...config,
     routes: [responseShapeRoutes],
