@@ -784,6 +784,97 @@ export const backgroundInput = {
 
 export const backgroundContract = defineConfig(backgroundInput).api;
 
+/**
+ * How many levels JSON may nest in {@link nestingInput}.
+ */
+export const TASK_NESTING_LIMIT = 5;
+
+const TaskFilterSchema = Kizuna.model({
+    title: 'TaskFilter',
+    schema: z.object({
+        title: z.string().optional(),
+        get and() {
+            return z.array(TaskFilterSchema).optional();
+        },
+    }),
+});
+
+/**
+ * Returns a task filter whose `and` lists nest `levels` deep, as JSON. Each `and` adds two levels: its object and its
+ * list.
+ */
+export const taskFilterOf = (levels: number): string =>
+    '{"and":['.repeat(Math.floor((levels - 1) / 2)) +
+    (levels % 2 === 0 ? '{"title":"a","and":[]}' : '{"title":"a"}') +
+    ']}'.repeat(Math.floor((levels - 1) / 2));
+
+export const nestingRoutes = k.routes({
+    listTasks: k
+        .route({
+            method: 'GET',
+            path: '/filtered-tasks',
+            query: z.object({
+                filter: TaskFilterSchema.optional(),
+            }),
+            responses: {
+                200: z.object({
+                    matched: z.boolean(),
+                }),
+            },
+        })
+        .handler(({ query }) => ({
+            status: 200,
+            body: {
+                matched: query.filter !== undefined,
+            },
+        })),
+    listDeepTasks: k
+        .route({
+            method: 'GET',
+            path: '/deeply-filtered-tasks',
+            nestingLimit: TASK_NESTING_LIMIT + 2,
+            query: z.object({
+                filter: TaskFilterSchema.optional(),
+            }),
+            responses: {
+                200: z.object({
+                    matched: z.boolean(),
+                }),
+            },
+        })
+        .handler(({ query }) => ({
+            status: 200,
+            body: {
+                matched: query.filter !== undefined,
+            },
+        })),
+    saveTaskFilter: k
+        .route({
+            method: 'POST',
+            path: '/task-filters',
+            body: TaskFilterSchema,
+            responses: {
+                201: z.object({
+                    saved: z.boolean(),
+                }),
+            },
+        })
+        .handler(() => ({
+            status: 201,
+            body: {
+                saved: true,
+            },
+        })),
+});
+
+export const nestingInput = {
+    ...config,
+    nestingLimit: TASK_NESTING_LIMIT,
+    routes: [nestingRoutes],
+};
+
+export const nestingContract = defineConfig(nestingInput).api;
+
 export const responseShapeInput = {
     ...config,
     routes: [responseShapeRoutes],

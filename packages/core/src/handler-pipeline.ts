@@ -18,6 +18,7 @@ import type { ExtractPathParams } from './path-params.js';
 import type { ContextOf } from './security-scheme.js';
 import type { GuardHoldings, IdentityRole } from './identity.js';
 import { applyCoercion, coercionPlanFor } from './coercion.js';
+import { nestingLimitOf, nestsDeeperThan } from './nesting-limit.js';
 import type { ProblemDetails, StripProblemEnvelope } from './problem-details.js';
 import type { StreamTools } from './tool-runner.js';
 
@@ -422,9 +423,35 @@ export const formatValidationError = (failure: ValidationFailure): { detail: str
     issues: failure.issues,
 });
 
+/**
+ * The issue a value gets when its JSON nests deeper than the route allows.
+ */
+const tooDeepIssue = (path: PropertyKey[], limit: number): z.core.$ZodIssue =>
+    ({
+        code: 'too_big',
+        origin: 'nesting',
+        maximum: limit,
+        inclusive: true,
+        path,
+        message: `Nests deeper than ${limit} levels.`,
+    }) as unknown as z.core.$ZodIssue;
+
+/**
+ * Returns the query parameters or the body that nest deeper than `limit`, checked before the schema runs, since a
+ * schema that refers to itself overflows the stack on deep enough input.
+ */
+const tooDeepIssues = (stage: ValidationStage, input: unknown, limit: number): z.core.$ZodIssue[] => {
+    if (stage === 'body') return nestsDeeperThan(input, limit) ? [tooDeepIssue([], limit)] : [];
+    if (stage !== 'query' || input === null || typeof input !== 'object') return [];
+    return Object.entries(input)
+        .filter(([, value]) => nestsDeeperThan(value, limit))
+        .map(([name]) => tooDeepIssue([name], limit));
+};
+
 export const validateRequest = (
     route: RouteDefinition,
-    raw: RawInputs
+    raw: RawInputs,
+    nestingLimit: number = nestingLimitOf(route, undefined)
 ): { ok: true; parsed: RawInputs } | { ok: false; error: ValidationFailure } => {
     const order: ReadonlyArray<{ stage: ValidationStage; schema: z.ZodType | undefined; input: unknown; coerced: boolean }> = [
         {
@@ -463,6 +490,16 @@ export const validateRequest = (
     for (const step of order) {
         if (!step.schema) continue;
         const input = step.coerced ? applyCoercion(step.input, coercionPlanFor(step.schema)) : step.input;
+        const tooDeep = tooDeepIssues(step.stage, input, nestingLimit);
+        if (tooDeep.length > 0) {
+            return {
+                ok: false,
+                error: {
+                    stage: step.stage,
+                    issues: tooDeep,
+                },
+            };
+        }
         const result = step.schema.safeParse(input);
         if (!result.success) {
             return {

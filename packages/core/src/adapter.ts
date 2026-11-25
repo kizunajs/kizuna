@@ -23,6 +23,7 @@ import { deprecationHeaders } from './deprecation.js';
 import { cacheHeaders } from './cache.js';
 import { computeEtag, etagMatches } from './etag.js';
 import { bodyLimitOf, checkBodyHeaders, ContentTooLargeError, readBodyText, readBodyBytes } from './body-limit.js';
+import { nestingLimitOf } from './nesting-limit.js';
 import { ResponseError } from './response-error.js';
 import { problemDetails, problemFromBody, type ProblemDetails } from './problem-details.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
@@ -69,6 +70,7 @@ export { encodeStreamBody, type EncodeStreamOptions, type StreamContext } from '
 export { injectedRequestOf, responseOfInjected, type InjectedRequest, type InjectedResponse } from './injected.js';
 export { isStreamResponse } from './generator-utils.js';
 export { bodyLimitOf, checkBodyHeaders, ContentTooLargeError, DEFAULT_BODY_LIMIT, readBodyText } from './body-limit.js';
+export { DEFAULT_NESTING_LIMIT, nestingLimitOf } from './nesting-limit.js';
 export {
     definePlugin,
     pluginRouteTree,
@@ -132,6 +134,10 @@ export const JOBS_META: unique symbol = Symbol.for('kizuna.jobs') as symbol as t
  * The config's `bodyLimit`, which every route without its own takes.
  */
 export const BODY_LIMIT_META: unique symbol = Symbol.for('kizuna.body-limit') as symbol as typeof BODY_LIMIT_META;
+/**
+ * The config's `nestingLimit`, which every route without its own takes.
+ */
+export const NESTING_LIMIT_META: unique symbol = Symbol.for('kizuna.nesting-limit') as symbol as typeof NESTING_LIMIT_META;
 
 export type ApiBrand = { readonly [API_META]: true };
 export type ApiWithRouter<R extends Routes = Routes> = ApiBrand & {
@@ -736,6 +742,10 @@ export interface AdapterRequest<NativeRequest> {
      * The config's `bodyLimit`, read off the api as `api[BODY_LIMIT_META]`.
      */
     configBodyLimit?: number;
+    /**
+     * The config's `nestingLimit`, read off the api as `api[NESTING_LIMIT_META]`.
+     */
+    configNestingLimit?: number;
     /**
      * The body as it was sent, for a route with `rawBody: true`, or `undefined`
      * when it was already consumed.
@@ -1389,7 +1399,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         }
     }
 
-    const validation = validateRequest(route, raw);
+    const validation = validateRequest(route, raw, nestingLimitOf(route, request.configNestingLimit));
     if (!validation.ok) {
         const formatted = formatValidationError(validation.error);
         return {

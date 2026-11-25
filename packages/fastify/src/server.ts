@@ -19,6 +19,7 @@ import {
     REQUEST_CONTEXT_META,
     JOBS_META,
     BODY_LIMIT_META,
+    NESTING_LIMIT_META,
     type JobsMeta,
     pluginRoutesOf,
     pluginExportsOf,
@@ -49,6 +50,7 @@ export type FastifyApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
     readonly [BODY_LIMIT_META]?: unknown;
+    readonly [NESTING_LIMIT_META]?: unknown;
     /**
      * Register every route on a Fastify instance. Calls
      * `app.register` internally, so encapsulation behaves as Fastify expects.
@@ -289,6 +291,7 @@ export const fastifyKizuna = fastifyPlugin(
         const pluginExports = pluginExportsOf(api);
         const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
         const configBodyLimit = api[BODY_LIMIT_META] as number | undefined;
+        const configNestingLimit = api[NESTING_LIMIT_META] as number | undefined;
         const jobRunner = jobRunnerFrom(jobsMeta);
         const mountRoute = (
             routeKey: string,
@@ -324,6 +327,7 @@ export const fastifyKizuna = fastifyPlugin(
                         return request.body;
                     },
                     configBodyLimit,
+                    configNestingLimit,
                     readRawBody: () => {
                         if (override) return '';
                         if (request.kizunaBodyError !== undefined) throw request.kizunaBodyError;
