@@ -25,6 +25,15 @@ export interface LoadedApi {
      * What else `kizuna diff` treats as breaking.
      */
     diff: DiffSettings;
+    /**
+     * Everything the config module default-exports, for a tool that reads more than the api, like the options a
+     * product built on Kizuna.js adds.
+     *
+     * @example
+     * const [loaded] = await loadConfig('kizuna.config.ts');
+     * const { db } = loaded.config as { db: Database };
+     */
+    config: Record<string, unknown>;
 }
 
 /**
@@ -43,6 +52,7 @@ export const loadConfig = async (configPath: string): Promise<LoadedApi[]> => {
     });
 
     const loaded = (await jiti.import(configPath)) as Record<string, unknown>;
+    const config = (loaded.default ?? loaded) as Record<string, unknown>;
 
     return apiEntries(loaded).map(([name, entry]) => ({
         name,
@@ -52,5 +62,6 @@ export const loadConfig = async (configPath: string): Promise<LoadedApi[]> => {
         typesOutput: entry.typescript?.outputFile,
         typesExtensions: entry.typescript?.extend ?? [],
         diff: entry.diff ?? {},
+        config,
     }));
 };
