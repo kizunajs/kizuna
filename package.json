@@ -37,7 +37,7 @@
     "@kizunajs/eslint-plugin": "workspace:*",
     "@kizunajs/fetch": "workspace:*",
     "@kizunajs/release": "^0.7.0",
-    "@kizunajs/tooling": "^0.2.0",
+    "@kizunajs/tooling": "^0.2.4",
     "@types/supertest": "^6.0.3",
     "@vscode/vsce": "^3.9.2",
     "concurrently": "catalog:",

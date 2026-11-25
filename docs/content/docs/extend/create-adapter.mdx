@@ -167,9 +167,16 @@ A `success` result on a status declared with [`stream`](/docs/streaming) renders
 
 Content-type-aware body parsing for fetch-based runtimes (`Request` / `Response` API). Handles `application/json`, `multipart/form-data`, and `application/x-www-form-urlencoded`.
 
+It reads at most the limit you pass, and Kizuna answers a larger body with `413`. Read the config's `bodyLimit` off the api once, and pass it on the request too, so a `Content-Length` over the limit is refused before any of the body is read:
+
 ```ts
-readBody: (route) => parseFetchBody(request, route),
+const configBodyLimit = api[BODY_LIMIT_META] as number | undefined;
+
+readBody: (route) => parseFetchBody(request, route, bodyLimitOf(route, configBodyLimit)),
+configBodyLimit,
 ```
+
+Left out, the limit is the route's own `bodyLimit`, or 1 MiB.
 
 ### `entriesToObject`
 

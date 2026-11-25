@@ -16,6 +16,8 @@ import {
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     JOBS_META,
+    BODY_LIMIT_META,
+    bodyLimitOf,
     type JobsMeta,
     pluginRoutesOf,
     pluginExportsOf,
@@ -29,6 +31,7 @@ import {
     type Adapter,
     renderJsonResult,
     parseFetchBody,
+    readBodyText,
     entriesToObject,
     headersToObject,
     isMethodOverride,
@@ -41,6 +44,7 @@ export type HonoApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
+    readonly [BODY_LIMIT_META]?: unknown;
     /**
      * Register every route on a Hono app.
      */
@@ -118,6 +122,7 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
     const pluginExports = pluginExportsOf(api);
     const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
     const jobRunner = jobRunnerFrom(jobsMeta);
+    const configBodyLimit = api[BODY_LIMIT_META] as number | undefined;
     const mountRoute = (
         routeKey: string,
         route: RouteDefinition,
@@ -162,8 +167,9 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
                           },
                 query: override ? entriesToObject(new URLSearchParams(await c.req.raw.text())) : entriesToObject(url.searchParams),
                 headers: headersToObject(c.req.raw.headers),
-                readBody: (r: RouteDefinition) => (override ? undefined : parseFetchBody(c.req.raw, r)),
-                readRawBody: () => (override ? '' : c.req.raw.text()),
+                readBody: (r: RouteDefinition) => (override ? undefined : parseFetchBody(c.req.raw, r, bodyLimitOf(r, configBodyLimit))),
+                readRawBody: (r: RouteDefinition) => (override ? '' : readBodyText(c.req.raw, bodyLimitOf(r, configBodyLimit))),
+                configBodyLimit,
             };
 
             return pipeline.handle({

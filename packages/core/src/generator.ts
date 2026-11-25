@@ -82,6 +82,7 @@ export {
     isSuccessStatus,
     mergeHeaderFields,
 } from './generator-utils.js';
+export { hasRequestBody } from './body-limit.js';
 
 export interface GeneratorRouteContext {
     routeKey: string;

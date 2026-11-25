@@ -44,6 +44,7 @@ kizuna.api.mount(app);
 | `auth`           | Who may call this API: `identities`, each declared with [`k.identity`](/docs/reference/k-identity) and carrying its own guard, and the `guardSchema` their `deny()` produces. |
 | `requestContext` | What every route resolves before its guards run, declared with [`k.requestContext`](/docs/reference/k-request-context).                                                       |
 | `validation`     | How a request is checked: `issueCodes`, the `code` values [`k.issue`](/docs/reference/k-issue) may emit beyond Zod's own.                                                     |
+| `bodyLimit`      | The most bytes a request body may hold, on every route that sets none of its own. 1 MiB when left out. See [Request body size](/docs/routes#request-body-size).               |
 | `jobs`           | Scheduled work, declared with [`k.jobs`](/docs/reference/k-jobs).                                                                                                             |
 | `jobRunner`      | How this deployment runs them: `mode`, `path`, `method`, `transport`, `onError`. See [Jobs](/docs/jobs).                                                                      |
 | `plugins`        | What this API installs beside its own routes, as a list. See [Create a Plugin](/docs/extend/create-plugin).                                                                   |

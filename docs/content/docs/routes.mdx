@@ -113,6 +113,7 @@ A route only a generator or a client reads can skip `.handler()`. One your confi
 | `auth`        | No       | The identity this route requires, and the roles or permissions it accepts. Required once your config declares an identity, so public takes an explicit `false`. See [Access Control](/docs/access-control) |
 | `tool`        | No       | Publish this route as a [tool](/docs/tools) a model can call                                                                                                                                               |
 | `rawBody`     | No       | `true` to receive the body as sent, as `rawBody`, for checking a signature. See [below](#verifying-signed-requests)                                                                                        |
+| `bodyLimit`   | No       | The most bytes the request body may hold. See [below](#request-body-size)                                                                                                                                  |
 | `hidden`      | No       | `true` to leave it out of the generated clients and the OpenAPI document. See [below](#hidden-routes)                                                                                                      |
 | `deprecated`  | No       | `true`, or the migration message. See [Deprecations](/docs/deprecations)                                                                                                                                   |
 | `cache`       | No       | The `Cache-Control` policy its responses send. See [Caching](/docs/caching)                                                                                                                                |
@@ -674,6 +675,47 @@ resendEvents: k
 ```
 
 `rawBody` is the body as a string, before any parsing. Checking the signature against it, rather than against `body`, is what makes the check hold, since re-serialising the JSON can change a single byte and break it. Every adapter keeps it for you. On Express it takes one extra step only if your app also runs `express.json()` ahead of Kizuna; see [alongside your own Express routes](/docs/adapters/express#alongside-your-own-express-routes).
+
+## Request body size
+
+Every route that takes a body reads at most 1 MiB of it. A larger body is answered with `413 Content Too Large` before any of it is parsed. Kizuna counts the bytes as it reads them, so a chunked body or a wrong `Content-Length` can't get past the limit.
+
+Set a different limit for the whole API in `defineConfig`:
+
+```ts title="src/kizuna.config.ts"
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    bodyLimit: 256 * 1024,
+});
+```
+
+A route that takes more raises its own:
+
+```ts title="src/routes/events.ts"
+importEvents: k
+    .route({
+        method: 'POST',
+        path: '/events/import',
+        auth: 'user',
+        bodyLimit: 10 * 1024 * 1024,
+        body: EventImportSchema,
+        responses: {
+            202: z.void(),
+        },
+    })
+    .handler(async ({ body }) => {
+        await queueImport(body.events);
+
+        return {
+            status: 202,
+        };
+    }),
+```
+
+Files are better kept out of the API. A route can hand out a presigned upload URL, and the file goes straight to storage.
+
+A body sent with a `Content-Encoding`, like gzip, is answered with `415 Unsupported Media Type` and `Accept-Encoding: identity`. Its size after decompressing is unknown until it is read, so Kizuna asks for it uncompressed.
 
 ## Non-JSON responses
 

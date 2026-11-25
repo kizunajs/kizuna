@@ -183,6 +183,8 @@ await app.register(fastifyKizuna, {
 });
 ```
 
+Each Kizuna route sets its own Fastify `bodyLimit` from its [`bodyLimit`](/docs/routes#request-body-size), so the one you pass to `Fastify()` applies only to your own routes.
+
 ## Type-safe request properties
 
 Middleware that sets custom properties on `request`, such as a request id, needs Fastify's [declaration merging](https://fastify.dev/docs/latest/Reference/TypeScript/#creating-a-typescript-fastify-plugin) to extend the `FastifyRequest` interface. Authentication data does not: guards hand handlers typed context directly.

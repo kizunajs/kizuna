@@ -43,8 +43,8 @@ const api = defineConfig({
     routes: [routes],
 }).api;
 
-const listen = async (app: FastifyInstance): Promise<number> => {
-    await api.mount(app);
+const listen = async (app: FastifyInstance, mounted: typeof api = api): Promise<number> => {
+    await mounted.mount(app);
     await app.listen({
         port: 0,
         host: '127.0.0.1',
@@ -166,9 +166,7 @@ describe('Fastify: a rawBody route over the body limit', () => {
     let port: number;
 
     beforeAll(async () => {
-        app = Fastify({
-            bodyLimit,
-        });
+        app = Fastify();
         // Counts what the server has read from the socket, and what it had read by the time it replied.
         app.addHook('preParsing', async (request, _reply, payload) => {
             const testCase = String(request.headers['x-test-case']);
@@ -190,7 +188,14 @@ describe('Fastify: a rawBody route over the body limit', () => {
             });
             return payload;
         });
-        port = await listen(app);
+        port = await listen(
+            app,
+            defineConfig({
+                adapter: fastifyAdapter(),
+                routes: [routes],
+                bodyLimit,
+            }).api
+        );
     });
 
     afterAll(async () => {

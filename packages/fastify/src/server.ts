@@ -1,5 +1,5 @@
 import Fastify from 'fastify';
-import type { FastifyInstance, FastifyRequest, FastifyReply, FastifyPluginAsync } from 'fastify';
+import type { FastifyError, FastifyInstance, FastifyRequest, FastifyReply, FastifyPluginAsync } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 import { Readable, Transform, pipeline } from 'node:stream';
 import type { ServerResponse } from 'node:http';
@@ -18,6 +18,7 @@ import {
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     JOBS_META,
+    BODY_LIMIT_META,
     type JobsMeta,
     pluginRoutesOf,
     pluginExportsOf,
@@ -36,6 +37,9 @@ import {
     METHOD_OVERRIDE_HEADER,
     injectedRequestOf,
     responseOfInjected,
+    bodyLimitOf,
+    checkBodyHeaders,
+    ContentTooLargeError,
 } from 'kizunajs/adapter';
 import type { SecurityScheme } from 'kizunajs';
 
@@ -44,6 +48,7 @@ export type FastifyApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
+    readonly [BODY_LIMIT_META]?: unknown;
     /**
      * Register every route on a Fastify instance. Calls
      * `app.register` internally, so encapsulation behaves as Fastify expects.
@@ -72,6 +77,10 @@ declare module 'fastify' {
          * The body as it was sent, kept for routes with `rawBody: true`.
          */
         kizunaRawBody?: string;
+        /**
+         * Why Fastify refused this request's body, which the route answers.
+         */
+        kizunaBodyError?: unknown;
     }
 }
 
@@ -107,6 +116,18 @@ type CountedStream = NodeJS.ReadableStream & {
      */
     receivedEncodedLength?: number;
 };
+
+/**
+ * Stops the parse of a body kizuna refuses from its headers, so none of it is read.
+ */
+class RefusedBody extends Error {}
+
+const skipRefusedBody =
+    (route: RouteDefinition, limit: number) =>
+    async (request: FastifyRequest, _reply: FastifyReply, payload: CountedStream): Promise<CountedStream> => {
+        if (checkBodyHeaders(route, request.headers, limit) !== undefined) throw new RefusedBody();
+        return payload;
+    };
 
 /**
  * Keep a `rawBody` route's body as it was sent. The bytes pass through to
@@ -252,6 +273,7 @@ export const fastifyKizuna = fastifyPlugin(
 
         const pluginExports = pluginExportsOf(api);
         const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
+        const configBodyLimit = api[BODY_LIMIT_META] as number | undefined;
         const jobRunner = jobRunnerFrom(jobsMeta);
         const mountRoute = (
             routeKey: string,
@@ -262,6 +284,55 @@ export const fastifyKizuna = fastifyPlugin(
             override = false
         ): void => {
             const shared = sharedSegmentRoute(route.path);
+            const bodyLimit = bodyLimitOf(route, configBodyLimit);
+            const handler = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+                const adapterRequest: AdapterRequest<FastifyRequest> = {
+                    request,
+                    method: override ? 'GET' : request.method,
+                    resolution:
+                        request.kizunaParams?.kind === 'malformed-path'
+                            ? request.kizunaParams
+                            : {
+                                  kind: 'pre-resolved',
+                                  routeKey,
+                                  route,
+                                  params:
+                                      request.kizunaParams?.kind === 'matched'
+                                          ? request.kizunaParams.params
+                                          : ((request.params ?? {}) as Record<string, string>),
+                              },
+                    query: ((override ? request.body : request.query) ?? {}) as Record<string, string>,
+                    headers: request.headers,
+                    readBody: () => {
+                        if (override) return undefined;
+                        if (request.kizunaBodyError !== undefined) throw request.kizunaBodyError;
+                        return request.body;
+                    },
+                    configBodyLimit,
+                    readRawBody: () => {
+                        if (override) return '';
+                        if (request.kizunaBodyError !== undefined) throw request.kizunaBodyError;
+                        return request.kizunaRawBody ?? '';
+                    },
+                };
+
+                await adapter.handle({
+                    routes: lane,
+                    router: resolvedRouter,
+                    request: adapterRequest,
+                    responseContext: {
+                        reply,
+                        formatError: options?.formatError,
+                        responseValidation: options?.responseValidation,
+                    },
+                    guards,
+                    schemes,
+                    requestContext,
+                    pluginExports,
+                    jobs: jobRunner,
+                    responseValidation: options?.responseValidation,
+                });
+            };
             app.route({
                 method: override ? 'POST' : method,
                 url: route.path,
@@ -291,49 +362,17 @@ export const fastifyKizuna = fastifyPlugin(
                         request.kizunaRoute = route;
                     },
                 ],
-                ...(route.rawBody === true
-                    ? {
-                          preParsing: [keepRawBody],
-                      }
-                    : {}),
-                handler: async (request: FastifyRequest, reply: FastifyReply) => {
-                    const adapterRequest: AdapterRequest<FastifyRequest> = {
-                        request,
-                        method: override ? 'GET' : request.method,
-                        resolution:
-                            request.kizunaParams?.kind === 'malformed-path'
-                                ? request.kizunaParams
-                                : {
-                                      kind: 'pre-resolved',
-                                      routeKey,
-                                      route,
-                                      params:
-                                          request.kizunaParams?.kind === 'matched'
-                                              ? request.kizunaParams.params
-                                              : ((request.params ?? {}) as Record<string, string>),
-                                  },
-                        query: ((override ? request.body : request.query) ?? {}) as Record<string, string>,
-                        headers: request.headers,
-                        readBody: () => (override ? undefined : request.body),
-                        readRawBody: () => (override ? '' : (request.kizunaRawBody ?? '')),
-                    };
-
-                    await adapter.handle({
-                        routes: lane,
-                        router: resolvedRouter,
-                        request: adapterRequest,
-                        responseContext: {
-                            reply,
-                            formatError: options?.formatError,
-                            responseValidation: options?.responseValidation,
-                        },
-                        guards,
-                        schemes,
-                        requestContext,
-                        pluginExports,
-                        jobs: jobRunner,
-                        responseValidation: options?.responseValidation,
-                    });
+                bodyLimit,
+                preParsing: [skipRefusedBody(route, bodyLimit), ...(route.rawBody === true ? [keepRawBody] : [])],
+                handler,
+                errorHandler: async (error: FastifyError, request: FastifyRequest, reply: FastifyReply) => {
+                    // A body refused from its headers, or one past Fastify's `bodyLimit`, is answered by the route like any other.
+                    if (error instanceof RefusedBody) return handler(request, reply);
+                    if (error.code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
+                        request.kizunaBodyError = new ContentTooLargeError(bodyLimit);
+                        return handler(request, reply);
+                    }
+                    return app.errorHandler(error, request, reply);
                 },
             });
         };

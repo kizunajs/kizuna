@@ -73,6 +73,21 @@ export const ADAPTER_FEATURES = {
     'body.rawBody': {
         summary: 'A route with `rawBody: true` receives the body exactly as sent, beside the validated body.',
     },
+    'body.limit413': {
+        summary: 'A body one byte over the limit is refused with 413 Problem Details and a closed connection, and one at the limit passes.',
+    },
+    'body.limitChunked': {
+        summary: 'A body sent in chunks with no `Content-Length` is refused once it passes the limit.',
+    },
+    'body.limitPerRoute': {
+        summary: "A route's own `bodyLimit` takes a body the config's limit refuses.",
+    },
+    'body.limitRawBody': {
+        summary: 'A `rawBody: true` route refuses a body over the limit the same way.',
+    },
+    'body.compressed415': {
+        summary: 'A body sent with a `Content-Encoding` is refused with 415 and `Accept-Encoding: identity`.',
+    },
     'errors.declaredProblemDetails': {
         summary: 'A declared error response is sent as `application/problem+json`.',
     },
