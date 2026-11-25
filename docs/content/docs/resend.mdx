@@ -36,7 +36,7 @@ export default defineConfig({
 });
 ```
 
-A missing or empty API key stops the app when it starts serving. `kizuna generate` and `next build` run without one. `from` is an address, or a name and an address like `Kizuna <hello@example.com>`, and one Resend wouldn't accept stops the config from loading.
+A missing or empty API key, or a `from` Resend wouldn't accept, stops the app at startup, naming the field. `from` is an address, or a name and an address like `Kizuna <hello@example.com>`.
 
 </Step>
 
@@ -346,7 +346,13 @@ Broadcasts go to a segment, so `intercept` doesn't reach them. Point your `lists
 
 ### Without a Resend key
 
-`kizuna generate` and `next build` need no key, so a developer without one can still generate the clients and build the app. Serving needs one. Create a key of your own in Resend, and keep `intercept` on so nothing reaches real people.
+`kizuna generate` loads the config, so it needs a key too. It never sends anything, so any value works where you have none, like in CI:
+
+```sh
+RESEND_API_KEY=re_dummy kizuna generate
+```
+
+Serving needs a real key. Create one of your own in Resend, and keep `intercept` on so nothing reaches real people.
 
 ## Errors
 
@@ -366,7 +372,7 @@ await plugins.resend.client.domains.list();
 
 | Option          | Default   | Description                                                             |
 | --------------- | --------- | ----------------------------------------------------------------------- |
-| `apiKey`        | required  | The Resend API key, checked when the app starts serving                 |
+| `apiKey`        | required  | The Resend API key                                                      |
 | `from`          | required  | The sender every email and broadcast uses unless it names its own       |
 | `lists`         | none      | Lists by name, each a `segmentId` and an optional `topicId`             |
 | `webhookSecret` | none      | The webhook's signing secret. Set it to serve the webhook route         |

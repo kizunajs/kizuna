@@ -43,11 +43,6 @@ export interface PluginSetup {
      * the app starting, for a check that needs the app's routes or identities.
      */
     validate?: () => void;
-    /**
-     * Checks what the plugin needs to serve, like an API key, when the app
-     * starts. Throw to stop the app.
-     */
-    start?: () => void;
 }
 
 /**
@@ -104,8 +99,9 @@ export interface PluginDefinition<
      */
     options?: Schema;
     /**
-     * Builds the plugin from its validated options when the config assembles,
-     * `kizuna generate` included, so a secret is checked in `start`.
+     * Builds the plugin from its validated options, once, when the config
+     * assembles. It runs during `kizuna generate` too, so it creates clients and
+     * leaves connections to the handlers.
      */
     setup: (context: PluginSetupContext<OptionsOutput<Schema>>) => Setup;
 }
@@ -302,7 +298,6 @@ export interface ResolvedPlugin {
     exports: unknown;
     generators: readonly GeneratedFile[];
     validate: (() => void) | undefined;
-    start: (() => void) | undefined;
 }
 
 /**

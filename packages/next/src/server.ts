@@ -31,7 +31,6 @@ import {
     type Adapter,
     pluginRoutesOf,
     pluginExportsOf,
-    startPlugins,
     pluginRouterOf,
     isMethodOverride,
     METHOD_OVERRIDE_HEADER,
@@ -357,9 +356,7 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
 
     const hasPluginRoutes = Object.keys(pluginRoutes).length > 0;
 
-    // Started on the first request, since `next build` imports the route file.
     const handler = async (incoming: NextRequest) => {
-        startPlugins(api);
         const request = isMethodOverride(
             incoming.method,
             incoming.headers.get(METHOD_OVERRIDE_HEADER),

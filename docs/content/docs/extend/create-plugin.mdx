@@ -143,11 +143,10 @@ createUser: k
 | `exports`    | Functions every route and job handler reaches at `plugins.<name>`                             |
 | `routes`     | Routes an outside system calls, like a webhook                                                |
 | `generators` | Files `kizuna generate` writes, built with [`defineGenerator`](/docs/extend/create-generator) |
-| `start`      | Runs once when the app starts serving, to check a secret like an API key                      |
 
 Everything `setup` returns shares what it creates, so the Resend client is made once and used by all of it.
 
-`setup` runs when the config assembles, which includes `kizuna generate` and `next build`. So it leaves connections and file reads to the handlers, the same as [route modules](/docs/routes#nothing-runs-at-import), and checks secrets in [`start`](#secrets).
+`setup` runs when the config assembles, which includes `kizuna generate`. So it creates clients, and leaves connections and file reads to the handlers, the same as [route modules](/docs/routes#nothing-runs-at-import).
 
 ## Options
 
@@ -161,51 +160,11 @@ options: z.object({
 }),
 ```
 
-A misconfigured plugin stops the config from loading, and the error names the plugin and the field:
+A misconfigured plugin stops the app from starting, and the error names the plugin and the field. Secrets come in through options, so a missing environment variable is caught the same way:
 
 ```text
-[kizuna] Plugin 'email' has invalid options: from is required
+[kizuna] Plugin 'email' has invalid options: apiKey is required
 ```
-
-### Secrets
-
-`kizuna generate` and `next build` load the config where the app's secrets are often unset. So a secret is optional in `options`, and `start` checks it once the app starts serving:
-
-```ts title="src/plugins/email/index.ts"
-export const emailPlugin = definePlugin({
-    slug: 'email',
-    options: z.object({
-        apiKey: z.string().optional(),
-        from: z.string(),
-    }),
-    setup: ({ options }) => {
-        const { apiKey } = options;
-        let resend: Resend | undefined;
-        const getClient = () => (resend ??= new Resend(apiKey));
-
-        return {
-            exports: {
-                send: (email: Email) =>
-                    getClient().emails.send({
-                        from: options.from,
-                        ...email,
-                    }),
-            },
-            start: () => {
-                if (apiKey === undefined) throw new Error('apiKey is required');
-            },
-        };
-    },
-});
-```
-
-The client is made on first use, since Resend's constructor throws without a key. An error from `start` stops the app and names the plugin:
-
-```text
-[kizuna] Plugin 'email' can't start: apiKey is required
-```
-
-Express, Fastify and Hono start the plugins when they mount, and Next on its first request, so `next build` needs no secrets. `startJobs` and `startJobWorker` start them too.
 
 ### A type from an SDK
 

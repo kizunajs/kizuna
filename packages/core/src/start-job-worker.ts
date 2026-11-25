@@ -9,7 +9,6 @@ import {
     type JobWorker,
 } from './adapter.js';
 import { attemptJob } from './job-runner.js';
-import { startPlugins } from './plugin-server.js';
 
 export interface StartJobWorkerOptions {
     /**
@@ -47,7 +46,6 @@ export const startJobWorker = async (api: unknown, options?: StartJobWorkerOptio
     const logger = options?.logger ?? console;
     const meta = (api as { [JOBS_META]?: JobsMeta })[JOBS_META];
     if (!meta) return undefined;
-    startPlugins(api);
 
     const transport = meta.transport;
     if (!transport?.start) return undefined;

@@ -22,7 +22,6 @@ import {
     type JobsMeta,
     pluginRoutesOf,
     pluginExportsOf,
-    startPlugins,
     pluginRouterOf,
     defineAdapter,
     jobRoutes,
@@ -150,7 +149,6 @@ const pipeline = defineAdapter<
  * api.mount(app);
  */
 export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, options?: HonoOptions): void {
-    startPlugins(api);
     const guards = api[GUARDS_META] as GuardMap<HonoHandlerContext<Env>> | undefined;
     const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
     const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<HonoHandlerContext<Env>> | undefined;

@@ -47,13 +47,12 @@ const EnvValueSchema = z.union([z.string(), z.undefined()]).transform((value) =>
 export const ResendPluginOptionsSchema = z
     .object({
         /**
-         * The Resend API key. A missing or blank one stops the app when it
-         * starts.
+         * The Resend API key. A missing or blank one stops the app at startup.
          *
          * @example
          * apiKey: process.env.RESEND_API_KEY,
          */
-        apiKey: EnvValueSchema,
+        apiKey: EnvValueSchema.pipe(z.string()),
         /**
          * The sender every email and broadcast uses unless it names its own.
          *

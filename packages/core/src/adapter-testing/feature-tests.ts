@@ -28,7 +28,6 @@ import {
     subUserInput,
     userInput,
     pluginInput,
-    keylessPluginInput,
     streamInput,
     streamGate,
     streamedEventsText,
@@ -1388,22 +1387,6 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                     from: 'contract',
                 });
             });
-        },
-        'plugins.startStopsServing': async () => {
-            const outcome = await mount({
-                input: keylessPluginInput,
-            })
-                .then((mounted) =>
-                    mounted.request({
-                        method: 'GET',
-                        path: '/which-label',
-                    })
-                )
-                .then(
-                    (response) => response.status,
-                    (error: unknown) => (error instanceof Error ? error.message : String(error))
-                );
-            expect(outcome).toBe("[kizuna] Plugin 'mailer' can't start: apiKey is required");
         },
         'plugins.rawResponse': async () => {
             await usingPlugins(async (mounted) => {
