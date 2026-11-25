@@ -105,7 +105,7 @@ export {
     type JobWorker,
     type JobWorkerContext,
 } from './job-transport.js';
-export { pluginRoutesOf, pluginRouterOf, pluginExportsOf, resolvePlugins, createApiReference } from './plugin-server.js';
+export { pluginRoutesOf, pluginRouterOf, pluginExportsOf, resolvePlugins, createApiReference, startPlugins } from './plugin-server.js';
 
 export class ResponseValidationError extends Error {
     readonly routeKey: string;
@@ -347,8 +347,8 @@ export interface ApiParts {
  */
 const pluginServers = (
     plugins: Record<string, ResolvedPlugin> | undefined
-): Record<string, { router: Record<string, unknown>; exports?: unknown }> => {
-    const servers: Record<string, { router: Record<string, unknown>; exports?: unknown }> = {};
+): Record<string, { router: Record<string, unknown>; exports?: unknown; start?: () => void }> => {
+    const servers: Record<string, { router: Record<string, unknown>; exports?: unknown; start?: () => void }> = {};
     for (const [slug, plugin] of Object.entries(plugins ?? {})) {
         for (const [routeKey, route] of Object.entries(plugin.routes)) {
             if (route[HANDLER] !== undefined) continue;
@@ -359,6 +359,7 @@ const pluginServers = (
         servers[slug] = {
             router: routerFromRoutes(plugin.routes),
             exports: plugin.exports,
+            start: plugin.start,
         };
     }
     return servers;

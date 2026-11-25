@@ -22,6 +22,7 @@ import {
     type JobsMeta,
     pluginRoutesOf,
     pluginExportsOf,
+    startPlugins,
     pluginRouterOf,
     defineAdapter,
     renderJsonResult,
@@ -311,6 +312,7 @@ const adapter = defineAdapter<Request, void, ExpressHandlerContext, ExpressRespo
  * api.mount(app);
  */
 export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOptions): ExpressRouter {
+    startPlugins(api);
     const guards = api[GUARDS_META] as GuardMap<ExpressHandlerContext> | undefined;
     const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
     const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<ExpressHandlerContext> | undefined;

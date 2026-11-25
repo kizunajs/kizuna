@@ -36,7 +36,7 @@ export default defineConfig({
 });
 ```
 
-A missing API key, or a `from` Resend wouldn't accept, stops the app at startup, naming the field. `from` is an address, or a name and an address like `Kizuna <hello@example.com>`.
+A missing or empty API key stops the app when it starts serving. `kizuna generate` and `next build` run without one. `from` is an address, or a name and an address like `Kizuna <hello@example.com>`, and one Resend wouldn't accept stops the config from loading.
 
 </Step>
 
@@ -316,7 +316,7 @@ resendPlugin({
 
 ## In development
 
-`intercept` catches every email and forwards it to your own inbox instead of its real recipients:
+`intercept` is optional. When it's on, it catches every email and forwards it to your own inbox instead of its real recipients:
 
 ```ts title="kizuna.config.ts"
 resendPlugin({
@@ -344,6 +344,10 @@ Each intercepted email carries who it was for in `X-Intercepted-To`, `X-Intercep
 
 Broadcasts go to a segment, so `intercept` doesn't reach them. Point your `lists` at a test segment in development instead.
 
+### Without a Resend key
+
+`kizuna generate` and `next build` need no key, so a developer without one can still generate the clients and build the app. Serving needs one. Create a key of your own in Resend, and keep `intercept` on so nothing reaches real people.
+
 ## Errors
 
 Resend's SDK answers with `{ data, error }` instead of throwing. The plugin throws a `ResendRequestError` instead, so a failed call fails the handler that made it, and kizuna answers `500` and logs it.
@@ -362,7 +366,7 @@ await plugins.resend.client.domains.list();
 
 | Option          | Default   | Description                                                             |
 | --------------- | --------- | ----------------------------------------------------------------------- |
-| `apiKey`        | required  | The Resend API key                                                      |
+| `apiKey`        | required  | The Resend API key, checked when the app starts serving                 |
 | `from`          | required  | The sender every email and broadcast uses unless it names its own       |
 | `lists`         | none      | Lists by name, each a `segmentId` and an optional `topicId`             |
 | `webhookSecret` | none      | The webhook's signing secret. Set it to serve the webhook route         |

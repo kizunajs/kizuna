@@ -39,19 +39,28 @@ export const SenderSchema = z.string().refine(isSender, {
     error: 'must be an address, or a name and an address like `Kizuna <hello@example.com>`',
 });
 
+/**
+ * Takes what `process.env` gives, and reads a blank value like `KEY=` as unset.
+ */
+const EnvValueSchema = z.union([z.string(), z.undefined()]).transform((value) => (value?.trim() === '' ? undefined : value));
+
 export const ResendPluginOptionsSchema = z
     .object({
         /**
-         * The Resend API key.
+         * The Resend API key. A missing or blank one stops the app when it
+         * starts.
+         *
+         * @example
+         * apiKey: process.env.RESEND_API_KEY,
          */
-        apiKey: z.string(),
+        apiKey: EnvValueSchema,
         /**
          * The sender every email and broadcast uses unless it names its own.
          *
          * @example
          * from: 'Kizuna <hello@example.com>',
          */
-        from: SenderSchema,
+        from: EnvValueSchema.pipe(SenderSchema),
         /**
          * The lists `subscribe`, `unsubscribe` and `broadcast` name, keyed by
          * the name handlers use.

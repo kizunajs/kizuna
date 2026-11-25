@@ -206,6 +206,9 @@ export const ADAPTER_FEATURES = {
     'plugins.rawResponse': {
         summary: 'A plugin route answering with `rawResponse` sends its response untouched by validation or rendering.',
     },
+    'plugins.startStopsServing': {
+        summary: 'A plugin whose `start` throws answers no request, and the error names the plugin.',
+    },
     'plugins.rawResponseStreamError': {
         summary: 'A `rawResponse` body that fails partway ends that response, and the server goes on serving.',
     },

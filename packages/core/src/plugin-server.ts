@@ -34,6 +34,26 @@ export const pluginExportsOf = (api: unknown): Record<string, unknown> => {
     return exported;
 };
 
+const started = new WeakSet<object>();
+
+/**
+ * Starts every plugin once, for an adapter to call before it serves.
+ */
+export const startPlugins = (api: unknown): void => {
+    if (started.has(api as object)) return;
+    const servers = (api as Record<symbol, unknown>)[PLUGIN_SERVERS_META_KEY] as Record<string, { start?: () => void }> | undefined;
+    for (const [pluginKey, served] of Object.entries(servers ?? {})) {
+        try {
+            served.start?.();
+        } catch (error) {
+            throw new Error(`[kizuna] Plugin '${pluginKey}' can't start: ${error instanceof Error ? error.message : String(error)}`, {
+                cause: error,
+            });
+        }
+    }
+    started.add(api as object);
+};
+
 /**
  * One issue as the app should read it: the field, and what's wrong with it.
  */
@@ -107,6 +127,7 @@ const resolvePlugin = (declaration: PluginDeclaration, api: PluginApi): Resolved
         exports: setup.exports,
         generators: setup.generators ?? [],
         validate: setup.validate,
+        start: setup.start,
     };
 };
 

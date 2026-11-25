@@ -23,6 +23,7 @@ import {
     type JobsMeta,
     pluginRoutesOf,
     pluginExportsOf,
+    startPlugins,
     pluginRouterOf,
     defineAdapter,
     renderJsonResult,
@@ -284,6 +285,7 @@ const methodOverrideStrategy: ConstraintStrategy = {
 export const fastifyKizuna = fastifyPlugin(
     async (app: FastifyInstance, options: KizunaPluginOptions) => {
         const { api } = options;
+        startPlugins(api);
         const guards = api[GUARDS_META] as GuardMap<FastifyHandlerContext> | undefined;
         const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
         const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<FastifyHandlerContext> | undefined;

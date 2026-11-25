@@ -173,7 +173,7 @@ export interface ResendUnsubscriber {
 /**
  * What handlers reach at `plugins.resend`.
  */
-export const resendExports = (resend: Resend, options: ResendPluginProps) => {
+export const resendExports = (getClient: () => Resend, options: ResendPluginProps) => {
     const listNamed = (name: string): ResendList => {
         const list = options.lists?.[name];
         if (list === undefined) throw new Error(`[kizuna/resend] No list is named '${name}'. Declare it under \`lists\`.`);
@@ -184,7 +184,9 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
         /**
          * The Resend client, for anything the plugin doesn't cover.
          */
-        client: resend,
+        get client(): Resend {
+            return getClient();
+        },
 
         /**
          * Send one email.
@@ -192,7 +194,7 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
         sendEmail: (email: ResendEmail): Promise<{ id: string }> => {
             const addressed = options.intercept === undefined ? email : intercepted(email, options.intercept);
             return call('Sending the email', () =>
-                resend.emails.send({
+                getClient().emails.send({
                     from: options.from,
                     ...addressed,
                 } as CreateEmailOptions)
@@ -214,12 +216,12 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
                           },
                       ];
 
-            const found = await resend.contacts.get({
+            const found = await getClient().contacts.get({
                 email,
             });
             if (found.error?.name === 'not_found') {
                 const created = await call('Creating the contact', () =>
-                    resend.contacts.create({
+                    getClient().contacts.create({
                         email,
                         firstName,
                         lastName,
@@ -238,7 +240,7 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
             if (found.error !== null) throw new ResendRequestError('Looking up the contact', found.error);
 
             await call('Updating the contact', () =>
-                resend.contacts.update({
+                getClient().contacts.update({
                     email,
                     unsubscribed: false,
                     firstName,
@@ -246,14 +248,14 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
                 })
             );
             await call('Adding the contact to the segment', () =>
-                resend.contacts.segments.add({
+                getClient().contacts.segments.add({
                     email,
                     segmentId: list.segmentId,
                 })
             );
             if (topics.length > 0) {
                 await call('Opting the contact in to the topic', () =>
-                    resend.contacts.topics.update({
+                    getClient().contacts.topics.update({
                         email,
                         topics,
                     })
@@ -271,12 +273,12 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
          */
         changeEmail: async ({ from, to }: ResendEmailChange): Promise<{ contactId: string }> => {
             const contact = await call('Looking up the contact', () =>
-                resend.contacts.get({
+                getClient().contacts.get({
                     email: from,
                 })
             );
             const segments = await everyPage('Listing the contact segments', (after) =>
-                resend.contacts.segments.list({
+                getClient().contacts.segments.list({
                     email: from,
                     limit: 100,
                     ...(after === undefined
@@ -287,7 +289,7 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
                 })
             );
             const topics = await everyPage('Listing the contact topics', (after) =>
-                resend.contacts.topics.list({
+                getClient().contacts.topics.list({
                     email: from,
                     limit: 100,
                     ...(after === undefined
@@ -299,7 +301,7 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
             );
 
             const created = await call('Creating the contact', () =>
-                resend.contacts.create({
+                getClient().contacts.create({
                     email: to,
                     firstName: contact.first_name ?? undefined,
                     lastName: contact.last_name ?? undefined,
@@ -314,7 +316,7 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
                 })
             );
             await call('Removing the old contact', () =>
-                resend.contacts.remove({
+                getClient().contacts.remove({
                     email: from,
                 })
             );
@@ -329,7 +331,7 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
         unsubscribe: async ({ email, list: name }: ResendUnsubscriber): Promise<void> => {
             if (name === undefined) {
                 await call('Unsubscribing the contact', () =>
-                    resend.contacts.update({
+                    getClient().contacts.update({
                         email,
                         unsubscribed: true,
                     })
@@ -339,7 +341,7 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
             const { segmentId, topicId } = listNamed(name);
             if (topicId === undefined) {
                 await call('Removing the contact from the segment', () =>
-                    resend.contacts.segments.remove({
+                    getClient().contacts.segments.remove({
                         email,
                         segmentId,
                     })
@@ -347,7 +349,7 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
                 return;
             }
             await call('Opting the contact out of the topic', () =>
-                resend.contacts.topics.update({
+                getClient().contacts.topics.update({
                     email,
                     topics: [
                         {
@@ -365,7 +367,7 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
         sendBroadcast: ({ list: name, from, scheduledAt, ...content }: ResendBroadcast): Promise<{ id: string }> => {
             const list = listNamed(name);
             return call('Sending the broadcast', () =>
-                resend.broadcasts.create({
+                getClient().broadcasts.create({
                     ...content,
                     from: from ?? options.from,
                     segmentId: list.segmentId,

@@ -43,6 +43,24 @@ test('fits the plugin options', () => {
     });
 });
 
+test('takes the API key and sender straight from process.env', () => {
+    resendPlugin({
+        apiKey: process.env.RESEND_API_KEY,
+        from: process.env.EMAIL_FROM,
+    });
+});
+
+test('keeps apiKey and from as keys the app writes', () => {
+    // @ts-expect-error apiKey is left out
+    resendPlugin({
+        from: 'Kizuna <hello@example.com>',
+    });
+    // @ts-expect-error from is left out
+    resendPlugin({
+        apiKey: 're_test',
+    });
+});
+
 test('types the event without a Config, and gives no jobs', () => {
     defineResendEvents({
         'email.bounced': (context) => {
