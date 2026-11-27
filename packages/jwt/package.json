@@ -1,7 +1,6 @@
 {
   "name": "@kizunajs/jwt",
   "version": "2.0.0-beta.42",
-  "private": true,
   "description": "Verify JWTs from any sign-in provider in a Kizuna.js guard",
   "keywords": [
     "kizunajs",
