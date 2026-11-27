@@ -98,50 +98,33 @@ export const usersRoutes = k.routes.users({
 
 ## Verify in the guard
 
-The guard receives the token as `oauth2`. Check the signature against the authorization server's JWKS, the issuer, and the audience, then return the user's role and the token's scopes as `permissions`:
+[`@kizunajs/jwt`](/docs/jwt) checks the token's signature against the authorization server's JWKS, the issuer and the audience. Return the user's role, and the token's scopes as `permissions`:
 
 The guard sits on the identity, so this continues the declaration above:
 
 ```ts title="src/identities.ts"
-import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { verifyJwt } from '@kizunajs/jwt';
 import { permissions } from './permissions';
 
-const jwks = createRemoteJWKSet(new URL('https://auth.example.com/oauth2/jwks'));
-
 // ...continues `export const user = k.identity.oauth2({ ... })`
-.guard(async ({ oauth2, deny }) => {
-    if (!oauth2) {
-        return deny({
-            status: 401,
-            body: {
-                detail: 'Unauthorized',
-            },
-        });
-    }
-
-    let claims;
-    try {
-        ({ payload: claims } = await jwtVerify(oauth2.token, jwks, {
-            issuer: 'https://auth.example.com',
-            audience: 'https://api.example.com',
-        }));
-    } catch {
-        return deny({
-            status: 401,
-            body: {
-                detail: 'Invalid or expired token',
-            },
-        });
-    }
-
-    const tokenScopes = typeof claims.scope === 'string' ? claims.scope.split(' ') : [];
-
-    return {
-        userId: String(claims.sub),
-        role: claims.role === 'admin' ? 'admin' : 'member',
-        permissions: permissions.names.filter((name) => tokenScopes.includes(name)),
-    };
-});
+.guard(
+    verifyJwt({
+        jwks: 'https://auth.example.com/oauth2/jwks',
+        issuer: 'https://auth.example.com',
+        audience: 'https://api.example.com',
+        algorithms: ['RS256'],
+        claims: z.object({
+            sub: z.string(),
+            role: z.enum(['member', 'admin']).default('member'),
+            scope: z.string().default(''),
+        }),
+        context: ({ claims }) => ({
+            userId: claims.sub,
+            role: claims.role,
+            permissions: permissions.names.filter((name) => claims.scope.split(' ').includes(name)),
+        }),
+    })
+);
 ```
 
 Name it under `auth.identities` on your config and a route's `auth: 'user'` runs it.
@@ -229,6 +212,7 @@ See [`ProtectedResourceMetadataSchema`](/docs/reference/protected-resource-metad
 ## Reference
 
 - [Authentication](/docs/authentication) for identities and guards
+- [JWT](/docs/jwt) for `verifyJwt`
 - [Access Control](/docs/access-control) for what a route's `auth` can say
 - [`k.identity`](/docs/reference/k-identity)
 - [`ProtectedResourceMetadataSchema`](/docs/reference/protected-resource-metadata-schema)

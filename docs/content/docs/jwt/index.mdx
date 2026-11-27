@@ -1,0 +1,187 @@
+---
+title: JWT
+description: Verify the tokens your sign-in provider signs. Point a guard at the provider's public keys, and the claims become the caller.
+---
+
+<AlphaNotice>
+
+`@kizunajs/jwt` is new. Its options may change while v2 is in beta, so pin your version if you depend on it.
+
+</AlphaNotice>
+
+When someone signs in with a provider like Supabase Auth, Better Auth or Microsoft Entra ID, the provider hands their app a JWT. The app sends it to your API as a bearer token. `verifyJwt` checks it against the provider's public keys and turns its claims into the caller.
+
+<InstallTabs packageName="@kizunajs/jwt" />
+
+<Steps>
+
+<Step>
+
+## Verify in the guard
+
+`verifyJwt` builds the guard for a `bearer` identity:
+
+```ts title="src/identities.ts"
+import { verifyJwt } from '@kizunajs/jwt';
+
+export const user = k.identity
+    .bearer({
+        bearerFormat: 'JWT',
+        context: z.object({
+            userId: z.string(),
+        }),
+    })
+    .guard(
+        verifyJwt({
+            jwks: 'https://auth.example.com/.well-known/jwks.json',
+            issuer: 'https://auth.example.com',
+            audience: 'https://api.example.com',
+            algorithms: ['RS256'],
+            claims: z.object({
+                sub: z.string(),
+            }),
+            context: ({ claims }) => ({
+                userId: claims.sub,
+            }),
+        })
+    );
+```
+
+Your provider's page tells you its `jwks`, `issuer`, `audience` and `algorithms`. See [Supabase Auth](/docs/jwt/supabase), [Better Auth](/docs/jwt/better-auth) and [Microsoft Entra ID](/docs/jwt/entra-id).
+
+</Step>
+
+<Step>
+
+## Name it on your config
+
+It is an identity like any other, so routes name it in their `auth`:
+
+```ts title="kizuna.config.ts"
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    auth: {
+        identities: {
+            user,
+        },
+    },
+});
+```
+
+</Step>
+
+<Step>
+
+## Send the token
+
+The app that signed in sends the token in the `Authorization` header. Providers refresh it every few minutes, so the [fetch client](/docs/clients/fetch) reads the current one in `onRequest`, before every request:
+
+```ts title="src/lib/api-client.ts"
+export const apiClient = createClient({
+    baseUrl: 'https://api.example.com',
+    onRequest: async ({ headers }) => {
+        const token = await readAccessToken();
+        if (token) headers.set('Authorization', `Bearer ${token}`);
+    },
+});
+```
+
+</Step>
+
+</Steps>
+
+## What it checks
+
+Every token has to pass all of these, and none of them can be turned off:
+
+- The signature, against a key from `jwks`, with one of `algorithms`.
+- `iss` is your `issuer`.
+- `aud` names your `audience`.
+- `exp` is set and has not passed, and `nbf`, when set, has.
+- The claims match your `claims` schema.
+
+`algorithms` lists what your provider signs with. With `jwks` it takes public-key algorithms only, like `RS256`, `ES256` or `EdDSA`. A token can never pick its own algorithm, and `none` is never accepted.
+
+The `jwks` URL is https, or http on `localhost`. Keys are fetched on the first request and cached. When the provider rotates its keys, a token signed with a new one fetches them again.
+
+## Turn claims into the caller
+
+`context` receives the verified claims, typed from your schema, and returns the identity's context. When the identity declares [roles](/docs/access-control), it returns the `role` too:
+
+```ts title="src/identities.ts"
+verifyJwt({
+    jwks: 'https://auth.example.com/.well-known/jwks.json',
+    issuer: 'https://auth.example.com',
+    audience: 'https://api.example.com',
+    algorithms: ['RS256'],
+    claims: z.object({
+        sub: z.string(),
+        role: z.enum(['member', 'admin']).default('member'),
+    }),
+    context: ({ claims }) => ({
+        userId: claims.sub,
+        role: claims.role,
+    }),
+});
+```
+
+It may be async, and it may call `deny`, like any guard:
+
+```ts title="src/identities.ts"
+context: async ({ claims, deny }) => {
+    const account = await findAccount(claims.sub);
+
+    if (!account) {
+        return deny({
+            status: 403,
+            body: {
+                detail: 'No account for this sign-in',
+            },
+        });
+    }
+
+    return {
+        userId: account.id,
+    };
+},
+```
+
+A JWT stays valid until it expires, even after the person signs out. When your API needs to cut someone off sooner, look up their session here.
+
+## What a failure answers
+
+- No token, or one that fails a check, answers `401` with the identity's `WWW-Authenticate` challenge.
+- Keys that cannot be fetched throw, so the request answers `500`. A provider outage never looks like a wrong password.
+- An option read from an environment variable that is not set throws on the first request, so it answers `500`. `kizuna generate` loads no environment, so it never needs one.
+
+## A shared secret
+
+Some providers sign with a secret your API shares instead of a key pair. Pass `secret` in place of `jwks`, with `HS256`, `HS384` or `HS512`:
+
+```ts title="src/identities.ts"
+verifyJwt({
+    secret: process.env.JWT_SECRET,
+    issuer: 'https://auth.example.com',
+    audience: 'https://api.example.com',
+    algorithms: ['HS256'],
+    claims: z.object({
+        sub: z.string(),
+    }),
+    context: ({ claims }) => ({
+        userId: claims.sub,
+    }),
+});
+```
+
+The secret is at least as long as the algorithm needs: 32 bytes for `HS256`, 48 for `HS384` and 64 for `HS512`. Anyone holding it can sign tokens, so prefer public keys when your provider offers them.
+
+## OAuth
+
+An `oauth2` or `openIdConnect` identity tells clients where to get a token. That token is usually a JWT too, so `verifyJwt` checks it the same way. [OAuth](/docs/oauth) shows it with scopes as permissions.
+
+## Reference
+
+- [Authentication](/docs/authentication)
+- [Access Control](/docs/access-control)
+- [OAuth](/docs/oauth)

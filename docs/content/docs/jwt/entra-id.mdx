@@ -1,0 +1,114 @@
+---
+title: Microsoft Entra ID
+description: Let people who sign in with Microsoft call your API. MSAL gets a token for your API, and your API verifies it against Microsoft's public keys.
+---
+
+<Supports items={['Microsoft Entra ID v2.0 access tokens']} />
+
+When your app signs people in with Microsoft through MSAL, Entra ID signs an access token for your API. Your API verifies it with [`@kizunajs/jwt`](/docs/jwt), and app roles you assign in Entra arrive as the caller's roles.
+
+Entra ID was called Azure Active Directory until 2023, so this page covers both.
+
+<InstallTabs packageName="@kizunajs/jwt" />
+
+<Steps>
+
+<Step>
+
+## Register your API
+
+In the Entra admin center, under **App registrations**, register an app for your API:
+
+1. Under **Expose an API**, set the Application ID URI to `api://<api-client-id>` and add a scope, like `access_as_user`.
+2. In the **Manifest**, set `requestedAccessTokenVersion` to `2`. Without it, Entra signs v1.0 tokens, which carry another issuer and audience.
+3. Under **App roles**, add the roles your API checks, like `member` and `admin`, and assign them to people under **Enterprise applications**.
+
+</Step>
+
+<Step>
+
+## Declare the identity
+
+`<tenant-id>` and `<api-client-id>` are on your API's **Overview** page:
+
+```ts title="src/identities.ts"
+import { verifyJwt } from '@kizunajs/jwt';
+import { roles } from './roles';
+
+export const user = k.identity
+    .bearer({
+        bearerFormat: 'JWT',
+        context: z.object({
+            userId: z.string(),
+            email: z.string().optional(),
+        }),
+        roles,
+    })
+    .guard(
+        verifyJwt({
+            jwks: 'https://login.microsoftonline.com/<tenant-id>/discovery/v2.0/keys',
+            issuer: 'https://login.microsoftonline.com/<tenant-id>/v2.0',
+            audience: '<api-client-id>',
+            algorithms: ['RS256'],
+            claims: z.object({
+                oid: z.string(),
+                preferred_username: z.string().optional(),
+                roles: z.array(z.string()).default([]),
+            }),
+            context: ({ claims }) => ({
+                userId: claims.oid,
+                email: claims.preferred_username,
+                role: roles.names.filter((name) => claims.roles.includes(name)),
+            }),
+        })
+    );
+```
+
+`oid` is the person's id in your tenant, the same in every app. `roles` holds the app roles they were assigned, and a role your API does not declare is left out.
+
+</Step>
+
+<Step>
+
+## Get a token for your API
+
+The app asks MSAL for your API's scope, and sends the token before every request:
+
+```ts title="src/lib/api-client.ts"
+import { msal } from './msal';
+import { createClient } from './api-client.generated';
+
+export const apiClient = createClient({
+    baseUrl: 'https://api.example.com',
+    onRequest: async ({ headers }) => {
+        const account = msal.getActiveAccount();
+        if (!account) return;
+        const { accessToken } = await msal.acquireTokenSilent({
+            scopes: ['api://<api-client-id>/access_as_user'],
+            account,
+        });
+        headers.set('Authorization', `Bearer ${accessToken}`);
+    },
+});
+```
+
+MSAL keeps the token and refreshes it, so `acquireTokenSilent` only calls Microsoft when it has to.
+
+</Step>
+
+</Steps>
+
+<Callout type="warn" title="Ask for your API's scope, not Microsoft Graph">
+    The token MSAL returns for `User.Read` is for Microsoft Graph. Its audience is Graph, and your API cannot verify it, so it answers `401`. Request
+    `api://<api-client-id>/...` for calls to your API.
+</Callout>
+
+## One tenant
+
+The issuer names one tenant, so only people from that organization get in. An API open to every Microsoft organization has to check each tenant's issuer itself, which this page does not cover.
+
+## Reference
+
+- [JWT](/docs/jwt)
+- [Authentication](/docs/authentication)
+- [Access Control](/docs/access-control)

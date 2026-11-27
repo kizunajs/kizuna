@@ -65,6 +65,7 @@ Follow the [quickstart](https://kizunajs.com/docs/quickstart), which goes from a
 | `@kizunajs/mcp`            | MCP endpoint for AI assistants                     |
 | `@kizunajs/resend`         | Email, newsletters and webhooks through Resend     |
 | `@kizunajs/pgmq`           | pgmq job transport                                 |
+| `@kizunajs/jwt`            | JWT verification for guards                        |
 | `@kizunajs/eslint-plugin`  | ESLint rules                                       |
 | `@kizunajs/cli`            | Command line tooling                               |
 

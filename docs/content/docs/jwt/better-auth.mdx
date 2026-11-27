@@ -1,0 +1,129 @@
+---
+title: Better Auth
+description: Let people who sign in with Better Auth call your API. Its JWT plugin signs a token, and your API verifies it against the plugin's public keys.
+---
+
+<Supports items={['Better Auth with the JWT plugin']} />
+
+Better Auth keeps sessions in a cookie on your app's own domain. An API on another server or another domain cannot read that cookie. Better Auth's JWT plugin signs a short-lived token for the session instead, and your API verifies it with [`@kizunajs/jwt`](/docs/jwt).
+
+<InstallTabs packageName="@kizunajs/jwt" />
+
+<Steps>
+
+<Step>
+
+## Turn on the JWT plugin
+
+Name your API as the token's audience. Without it, the audience is your app's own URL:
+
+```ts title="auth.ts"
+import { betterAuth } from 'better-auth';
+import { jwt } from 'better-auth/plugins';
+
+export const auth = betterAuth({
+    baseURL: 'https://app.example.com',
+    plugins: [
+        jwt({
+            jwt: {
+                audience: 'https://api.example.com',
+            },
+        }),
+    ],
+});
+```
+
+The plugin serves its public keys at `/api/auth/jwks` and signs with `EdDSA`. A token lasts 15 minutes.
+
+</Step>
+
+<Step>
+
+## Declare the identity
+
+The issuer is your app's origin, the `baseURL` above:
+
+```ts title="src/identities.ts"
+import { verifyJwt } from '@kizunajs/jwt';
+
+export const user = k.identity
+    .bearer({
+        bearerFormat: 'JWT',
+        context: z.object({
+            userId: z.string(),
+            email: z.string(),
+        }),
+    })
+    .guard(
+        verifyJwt({
+            jwks: 'https://app.example.com/api/auth/jwks',
+            issuer: 'https://app.example.com',
+            audience: 'https://api.example.com',
+            algorithms: ['EdDSA'],
+            claims: z.object({
+                sub: z.string(),
+                email: z.string(),
+            }),
+            context: ({ claims }) => ({
+                userId: claims.sub,
+                email: claims.email,
+            }),
+        })
+    );
+```
+
+`sub` is the user's id, and the other claims are the session's user, like `email` and `name`.
+
+</Step>
+
+<Step>
+
+## Send the token
+
+The app asks Better Auth for a token, and sends it before every request:
+
+```ts title="src/lib/api-client.ts"
+import { authClient } from './auth-client';
+import { createClient } from './api-client.generated';
+
+export const apiClient = createClient({
+    baseUrl: 'https://api.example.com',
+    onRequest: async ({ headers }) => {
+        const { data } = await authClient.token();
+        if (data) headers.set('Authorization', `Bearer ${data.token}`);
+    },
+});
+```
+
+Each call asks for a fresh token. Keep the token until shortly before its `exp` to save the round trip.
+
+</Step>
+
+</Steps>
+
+## Roles
+
+A role on the user, like the one Better Auth's admin plugin adds, arrives as a claim:
+
+```ts title="src/identities.ts"
+claims: z.object({
+    sub: z.string(),
+    role: z.enum(['member', 'admin']).default('member'),
+}),
+context: ({ claims }) => ({
+    userId: claims.sub,
+    role: claims.role,
+}),
+```
+
+To choose the claims yourself, set `jwt.definePayload` on the plugin.
+
+## Other clients and AI assistants
+
+For apps you do not own, like an MCP client, Better Auth's OAuth provider issues tokens with scopes. [OAuth](/docs/oauth) covers that setup.
+
+## Reference
+
+- [JWT](/docs/jwt)
+- [Authentication](/docs/authentication)
+- [OAuth](/docs/oauth)
