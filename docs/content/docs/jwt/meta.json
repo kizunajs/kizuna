@@ -1,0 +1,4 @@
+{
+    "title": "JWT",
+    "pages": ["supabase", "better-auth", "entra-id"]
+}

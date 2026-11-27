@@ -9,6 +9,7 @@ const badges: Record<string, Stage> = {
     '/docs/authentication': 'beta',
     '/docs/access-control': 'alpha',
     '/docs/oauth': 'alpha',
+    '/docs/jwt': 'alpha',
     '/docs/jobs': 'alpha',
     '/docs/caching': 'beta',
     '/docs/mcp': 'beta',
@@ -42,6 +43,20 @@ export const source = loader({
             {
                 file(node) {
                     const stage = node.type === 'page' ? badges[node.url] : undefined;
+                    if (!stage) return node;
+
+                    return {
+                        ...node,
+                        name: (
+                            <>
+                                {node.name}
+                                <Badge stage={stage} />
+                            </>
+                        ),
+                    };
+                },
+                folder(node) {
+                    const stage = node.index ? badges[node.index.url] : undefined;
                     if (!stage) return node;
 
                     return {

@@ -1,0 +1,146 @@
+---
+title: Supabase Auth
+description: Let people who sign in with Supabase Auth call your API. Verify the access token Supabase signs, and read the user from its claims.
+---
+
+<Supports items={['Supabase Auth with JWT signing keys']} />
+
+Supabase Auth signs an access token for everyone who signs in. Your API verifies it with [`@kizunajs/jwt`](/docs/jwt) against your project's public keys, so it never calls Supabase on a request.
+
+<InstallTabs packageName="@kizunajs/jwt" />
+
+<Steps>
+
+<Step>
+
+## Declare the identity
+
+Replace `<ref>` with your project's reference, the part before `.supabase.co` in its URL:
+
+```ts title="src/identities.ts"
+import { verifyJwt } from '@kizunajs/jwt';
+
+export const user = k.identity
+    .bearer({
+        bearerFormat: 'JWT',
+        context: z.object({
+            userId: z.string(),
+            email: z.string().optional(),
+        }),
+    })
+    .guard(
+        verifyJwt({
+            jwks: 'https://<ref>.supabase.co/auth/v1/.well-known/jwks.json',
+            issuer: 'https://<ref>.supabase.co/auth/v1',
+            audience: 'authenticated',
+            algorithms: ['ES256'],
+            claims: z.object({
+                sub: z.string(),
+                email: z.string().optional(),
+            }),
+            context: ({ claims }) => ({
+                userId: claims.sub,
+                email: claims.email,
+            }),
+        })
+    );
+```
+
+Supabase signs with `ES256` unless you picked `RS256` for your signing key under **Project Settings → JWT Keys**.
+
+The audience `authenticated` is what Supabase gives every signed-in user. The `anon` and publishable API keys are not a user's token, so they never pass.
+
+</Step>
+
+<Step>
+
+## Send the access token
+
+`supabase-js` keeps the session and refreshes it. Read the current access token before every request:
+
+```ts title="src/lib/api-client.ts"
+import { supabase } from './supabase';
+import { createClient } from './api-client.generated';
+
+export const apiClient = createClient({
+    baseUrl: 'https://api.example.com',
+    onRequest: async ({ headers }) => {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) headers.set('Authorization', `Bearer ${data.session.access_token}`);
+    },
+});
+```
+
+</Step>
+
+</Steps>
+
+## Roles
+
+Give a user their role in `app_metadata`, which only your server can change, and read it from the claims:
+
+```ts title="src/identities.ts"
+claims: z.object({
+    sub: z.string(),
+    app_metadata: z.object({
+        role: z.enum(['member', 'admin']).default('member'),
+    }),
+}),
+context: ({ claims }) => ({
+    userId: claims.sub,
+    role: claims.app_metadata.role,
+}),
+```
+
+Never read a role from `user_metadata`. The user can change it from the browser.
+
+A [custom access token hook](https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook) can put a role from your own tables straight into the claims instead.
+
+## Anonymous sign-ins
+
+When anonymous sign-ins are on, those users also get the `authenticated` audience. Turn them away where a route needs a real account:
+
+```ts title="src/identities.ts"
+claims: z.object({
+    sub: z.string(),
+    is_anonymous: z.boolean().default(false),
+}),
+context: ({ claims, deny }) =>
+    claims.is_anonymous
+        ? deny({
+              status: 403,
+              body: {
+                  detail: 'Sign in with an account',
+              },
+          })
+        : {
+              userId: claims.sub,
+          },
+```
+
+## Projects on the legacy JWT secret
+
+A project that has not moved to JWT signing keys signs with a shared secret, and its JWKS is empty. Verify with the secret from **Project Settings → JWT Keys** instead:
+
+```ts title="src/identities.ts"
+verifyJwt({
+    secret: process.env.SUPABASE_JWT_SECRET,
+    issuer: 'https://<ref>.supabase.co/auth/v1',
+    audience: 'authenticated',
+    algorithms: ['HS256'],
+    claims: z.object({
+        sub: z.string(),
+    }),
+    context: ({ claims }) => ({
+        userId: claims.sub,
+    }),
+});
+```
+
+Moving to signing keys is better. Anyone holding the secret can sign a token, and your API no longer needs to hold it.
+
+## Reference
+
+- [JWT](/docs/jwt)
+- [Authentication](/docs/authentication)
+- [Access Control](/docs/access-control)

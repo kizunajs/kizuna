@@ -25,7 +25,7 @@ An identity and its guard go together:
 
 <Tab value="Bearer">
 
-A token in the `Authorization` header.
+A token in the `Authorization` header. When a sign-in provider signs it as a JWT, [`@kizunajs/jwt`](/docs/jwt) verifies it for you.
 
 ```ts title="src/identities.ts"
 export const user = k.identity
@@ -159,7 +159,7 @@ export const inviteToken = k.identity
 
 </Tabs>
 
-`oauth2` and `openIdConnect` are on [OAuth](/docs/oauth).
+`oauth2` and `openIdConnect` are on [OAuth](/docs/oauth). Tokens from [Supabase Auth](/docs/jwt/supabase), [Better Auth](/docs/jwt/better-auth) and [Microsoft Entra ID](/docs/jwt/entra-id) each have their own page.
 
 An identity with no `context` only proves the caller is known. Its guard returns nothing and handlers get no argument for it.
 
@@ -305,3 +305,4 @@ The [fetch client](/docs/clients/fetch) sends the credential in `baseHeaders`, a
 - [`defineConfig`](/docs/reference/define-config)
 - [Access Control](/docs/access-control)
 - [OAuth](/docs/oauth)
+- [JWT](/docs/jwt)
